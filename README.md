@@ -111,21 +111,19 @@ Materials Science Knowledge       x  Full Lifecycle Management
 KeyIP-Intelligence follows a four-layer architecture with strict separation of concerns:
 
 ```
-
-+------------------------------------------------------------------+
++-------------------------------------------------------------------+
 |                    Application Layer                              |
 |  Patent Mining | Infringement Watch | Portfolio | Lifecycle | ... |
-+------------------------------------------------------------------+
++-------------------------------------------------------------------+
 |                    Intelligence Layer                             |
-|  MolPatent-GNN | ClaimBERT | StrategyGPT | ChemExtractor | ...  |
-+------------------------------------------------------------------+
+|  MolPatent-GNN | ClaimBERT | StrategyGPT | ChemExtractor | ...    |
++-------------------------------------------------------------------+
 |                       Data Layer                                  |
-|  Patent KG (Neo4j) | Molecule DB | Property DB | Citation Net   |
-+------------------------------------------------------------------+
+|  Patent KG (Neo4j) | Molecule DB | Property DB | Citation Net     |
++-------------------------------------------------------------------+
 |                   Infrastructure Layer                            |
-|  OpenSearch | Milvus | Kafka | MinIO | Keycloak | Prometheus     |
-+------------------------------------------------------------------+
-
+|  OpenSearch | Milvus | Kafka | MinIO | Keycloak | Prometheus      |
++-------------------------------------------------------------------+
 ````
 
 For the complete architecture design, component breakdown, data flow diagrams, and deployment topology, see **[docs/architecture.md](docs/architecture.md)**.
