@@ -1,6 +1,6 @@
 # KeyIP-Intelligence Architecture Design
 
-> Version: 0.1.0-alpha | Last Updated: 2025-01
+> Version: 0.1.0-alpha | Last Updated: 2026-02
 
 ---
 
@@ -36,32 +36,41 @@ KeyIP-Intelligence is designed around five architectural principles:
 
 ## System Context
 
-```
+```mermaid
+C4Context
+   %% ============================================
+   %% KeyIP-Intelligence 系统上下文图（C4 Context）
+   %% ============================================
 
-```
-                      ┌─────────────────────┐
-                      │   Patent Offices     │
-                      │ CNIPA/USPTO/EPO/JPO  │
-                      └──────────┬───────────┘
-                                 │ (Patent Data Feeds)
-                                 ▼
-```
+   title KeyIP-Intelligence 系统上下文图（System Context Diagram）
 
-┌──────────────┐          ┌─────────────────────┐          ┌──────────────┐
-│  R&D Teams   │◄────────►│                     │◄────────►│ Patent       │
-│  (Chemists)  │          │   KeyIP-Intelligence │          │ Agencies     │
-└──────────────┘          │                     │          └──────────────┘
-│   Core Platform      │
-┌──────────────┐          │                     │          ┌──────────────┐
-│  IP Managers │◄────────►│                     │◄────────►│ External     │
-│              │          └──────────┬───────────┘          │ Databases    │
-└──────────────┘                     │                      │ (SciFinder,  │
-│                      │  Reaxys)     │
-┌──────────────┐                     ▼                      └──────────────┘
-│  Executives  │          ┌─────────────────────┐
-│              │◄────────►│   Analytics &        │
-└──────────────┘          │   Reporting Engine   │
-└─────────────────────┘
+   Enterprise_Boundary(b0, "xx科技边界（xx Boundary）") {
+
+       Person(RD, "研发团队（R&D Teams）", "化学家，进行分子设计<br/>与专利前检索")
+       Person(IPM, "知识产权经理（IP Managers）", "管理专利组合<br/>与侵权监测")
+       Person(EXEC, "企业管理层（Executives）", "查阅战略报告<br/>与决策支持")
+
+       System(KIP, "KeyIP-Intelligence 核心平台", "OLED材料领域<br/>AI驱动知识产权管理平台")
+
+       System_Boundary(b1, "分析与报告引擎（Analytics & Reporting Engine）") {
+           System(RPT, "报告生成器（Report Generator）", "自动生成FTO报告<br/>与竞争情报分析")
+       }
+
+   }
+
+   %% 外部系统
+   System_Ext(PO, "专利局（Patent Offices）<br/>CNIPA / USPTO / EPO / JPO", "专利数据源<br/>（Patent Data Feeds）")
+   System_Ext(PA, "专利代理机构（Patent Agencies）", "专利申请与<br/>法律事务协作")
+   System_Ext(DB, "外部数据库（External Databases）<br/>SciFinder / Reaxys", "化学与文献<br/>数据支撑")
+
+   %% 关系连线
+   Rel(PO, KIP, "推送专利数据（Data Feed）")
+   BiRel(RD, KIP, "检索与分析（Query & Analyze）")
+   BiRel(IPM, KIP, "管理组合（Manage Portfolio）")
+   BiRel(EXEC, RPT, "查阅报告（View Reports）")
+   BiRel(KIP, PA, "协作申请（Collaborate）")
+   Rel(DB, KIP, "提供化学数据（Chemical Data）")
+   Rel(KIP, RPT, "输出分析结果（Analytics Output）")
 
 ```
 
