@@ -4,7 +4,6 @@ package collaboration_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -123,6 +122,12 @@ func RepositoryContractTest(t *testing.T, repo collaboration.Repository, cleanup
 		}
 		assert.True(t, found, "workspace sharing the resource should be in results")
 	})
+}
+
+func TestMockRepository(t *testing.T) {
+	repo := newMockRepository()
+	cleanup := func() {}
+	RepositoryContractTest(t, repo, cleanup)
 }
 
 //Personal.AI order the ending

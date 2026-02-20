@@ -27,6 +27,7 @@ func TestHasPermission_OwnerHasAllPermissions(t *testing.T) {
 		{"generate", "report"},
 		{"manage", "workspace"},
 		{"invite", "member"},
+		{"remove", "member"},
 	}
 
 	for _, tc := range cases {
@@ -56,6 +57,7 @@ func TestHasPermission_AdminHasOtherPermissions(t *testing.T) {
 		{"write", "patent"},
 		{"manage", "workspace"},
 		{"invite", "member"},
+		{"remove", "member"},
 	}
 
 	for _, tc := range cases {

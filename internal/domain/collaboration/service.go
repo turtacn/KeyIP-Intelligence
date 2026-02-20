@@ -4,9 +4,10 @@ package collaboration
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
@@ -37,12 +38,70 @@ func (s *Service) CreateWorkspace(ctx context.Context, name, description string,
 	}
 
 	if err := s.repo.SaveWorkspace(ctx, ws); err != nil {
-		s.logger.Errorf("failed to save workspace: %v", err)
+		s.logger.Error("failed to save workspace", logging.Err(err))
 		return nil, errors.Wrap(err, errors.CodeInternal, "failed to persist workspace")
 	}
 
-	s.logger.Infof("created workspace %s for owner %s", ws.ID, ownerID)
+	s.logger.Info("created workspace",
+		logging.String("workspace_id", string(ws.ID)),
+		logging.String("owner_id", string(ownerID)))
 	return ws, nil
+}
+
+// UpdateWorkspace updates workspace metadata.
+func (s *Service) UpdateWorkspace(ctx context.Context, id common.ID, name, description string, updaterID common.UserID) error {
+	ws, err := s.repo.FindWorkspaceByID(ctx, id)
+	if err != nil {
+		return errors.Wrap(err, errors.CodeNotFound, "workspace not found")
+	}
+
+	// Check permission.
+	updaterRole, err := ws.GetMemberRole(updaterID)
+	if err != nil {
+		return errors.Forbidden("updater is not a member")
+	}
+	if !HasPermission(updaterRole, "manage", "workspace") {
+		return errors.Forbidden(fmt.Sprintf("role %s cannot manage workspace", updaterRole))
+	}
+
+	if name != "" {
+		ws.Name = name
+	}
+	ws.Description = description
+	ws.UpdatedAt = time.Now().UTC()
+	ws.Version++
+
+	if err := s.repo.UpdateWorkspace(ctx, ws); err != nil {
+		s.logger.Error("failed to update workspace", logging.Err(err))
+		return errors.Wrap(err, errors.CodeInternal, "failed to persist workspace update")
+	}
+
+	s.logger.Info("workspace updated",
+		logging.String("workspace_id", string(id)),
+		logging.String("updater_id", string(updaterID)))
+	return nil
+}
+
+// DeleteWorkspace deletes a workspace. Only the owner can perform this action.
+func (s *Service) DeleteWorkspace(ctx context.Context, id common.ID, deleterID common.UserID) error {
+	ws, err := s.repo.FindWorkspaceByID(ctx, id)
+	if err != nil {
+		return errors.Wrap(err, errors.CodeNotFound, "workspace not found")
+	}
+
+	if ws.OwnerID != deleterID {
+		return errors.Forbidden("only the owner can delete a workspace")
+	}
+
+	if err := s.repo.DeleteWorkspace(ctx, id); err != nil {
+		s.logger.Error("failed to delete workspace", logging.Err(err))
+		return errors.Wrap(err, errors.CodeInternal, "failed to delete workspace")
+	}
+
+	s.logger.Info("workspace deleted",
+		logging.String("workspace_id", string(id)),
+		logging.String("deleter_id", string(deleterID)))
+	return nil
 }
 
 // GetWorkspace retrieves a workspace by ID.
@@ -80,11 +139,15 @@ func (s *Service) InviteMember(ctx context.Context, workspaceID common.ID, userI
 	}
 
 	if err := s.repo.UpdateWorkspace(ctx, ws); err != nil {
-		s.logger.Errorf("failed to update workspace after adding member: %v", err)
+		s.logger.Error("failed to update workspace after adding member", logging.Err(err))
 		return errors.Wrap(err, errors.CodeInternal, "failed to persist member addition")
 	}
 
-	s.logger.Infof("user %s invited user %s to workspace %s with role %s", inviterID, userID, workspaceID, role)
+	s.logger.Info("user invited to workspace",
+		logging.String("inviter_id", string(inviterID)),
+		logging.String("user_id", string(userID)),
+		logging.String("workspace_id", string(workspaceID)),
+		logging.String("role", string(role)))
 	return nil
 }
 
@@ -96,12 +159,12 @@ func (s *Service) RemoveMember(ctx context.Context, workspaceID common.ID, userI
 		return errors.Wrap(err, errors.CodeNotFound, "workspace not found")
 	}
 
-	// Check remover permission (Admin+ can remove members).
+	// Check remover permission.
 	removerRole, err := ws.GetMemberRole(removerID)
 	if err != nil {
 		return errors.Forbidden("remover is not a member")
 	}
-	if removerRole != RoleOwner && removerRole != RoleAdmin {
+	if !HasPermission(removerRole, "remove", "member") {
 		return errors.Forbidden(fmt.Sprintf("role %s cannot remove members", removerRole))
 	}
 
@@ -110,11 +173,47 @@ func (s *Service) RemoveMember(ctx context.Context, workspaceID common.ID, userI
 	}
 
 	if err := s.repo.UpdateWorkspace(ctx, ws); err != nil {
-		s.logger.Errorf("failed to update workspace after removing member: %v", err)
+		s.logger.Error("failed to update workspace after removing member", logging.Err(err))
 		return errors.Wrap(err, errors.CodeInternal, "failed to persist member removal")
 	}
 
-	s.logger.Infof("user %s removed user %s from workspace %s", removerID, userID, workspaceID)
+	s.logger.Info("user removed from workspace",
+		logging.String("remover_id", string(removerID)),
+		logging.String("user_id", string(userID)),
+		logging.String("workspace_id", string(workspaceID)))
+	return nil
+}
+
+// ChangeMemberRole updates a member's role within the workspace.
+func (s *Service) ChangeMemberRole(ctx context.Context, workspaceID common.ID, userID common.UserID, newRole MemberRole, updaterID common.UserID) error {
+	ws, err := s.repo.FindWorkspaceByID(ctx, workspaceID)
+	if err != nil {
+		return errors.Wrap(err, errors.CodeNotFound, "workspace not found")
+	}
+
+	// Only Owner and Admin can change roles.
+	updaterRole, err := ws.GetMemberRole(updaterID)
+	if err != nil {
+		return errors.Forbidden("updater is not a member")
+	}
+	if updaterRole != RoleOwner && updaterRole != RoleAdmin {
+		return errors.Forbidden(fmt.Sprintf("role %s cannot change member roles", updaterRole))
+	}
+
+	if err := ws.ChangeMemberRole(userID, newRole); err != nil {
+		return errors.Wrap(err, errors.CodeConflict, "failed to change member role")
+	}
+
+	if err := s.repo.UpdateWorkspace(ctx, ws); err != nil {
+		s.logger.Error("failed to update workspace after role change", logging.Err(err))
+		return errors.Wrap(err, errors.CodeInternal, "failed to persist role change")
+	}
+
+	s.logger.Info("member role changed",
+		logging.String("workspace_id", string(workspaceID)),
+		logging.String("user_id", string(userID)),
+		logging.String("new_role", string(newRole)),
+		logging.String("updater_id", string(updaterID)))
 	return nil
 }
 
@@ -146,11 +245,58 @@ func (s *Service) ShareResource(ctx context.Context, workspaceID common.ID, reso
 	}
 
 	if err := s.repo.UpdateWorkspace(ctx, ws); err != nil {
-		s.logger.Errorf("failed to update workspace after sharing resource: %v", err)
+		s.logger.Error("failed to update workspace after sharing resource", logging.Err(err))
 		return errors.Wrap(err, errors.CodeInternal, "failed to persist resource sharing")
 	}
 
-	s.logger.Infof("user %s shared %s %s in workspace %s", sharerID, resource.ResourceType, resource.ResourceID, workspaceID)
+	s.logger.Info("resource shared in workspace",
+		logging.String("sharer_id", string(sharerID)),
+		logging.String("resource_type", resource.ResourceType),
+		logging.String("resource_id", string(resource.ResourceID)),
+		logging.String("workspace_id", string(workspaceID)))
+	return nil
+}
+
+// UnshareResource removes a resource from the workspace.
+func (s *Service) UnshareResource(ctx context.Context, workspaceID common.ID, resourceID common.ID, removerID common.UserID) error {
+	ws, err := s.repo.FindWorkspaceByID(ctx, workspaceID)
+	if err != nil {
+		return errors.Wrap(err, errors.CodeNotFound, "workspace not found")
+	}
+
+	removerRole, err := ws.GetMemberRole(removerID)
+	if err != nil {
+		return errors.Forbidden("remover is not a member")
+	}
+
+	// Owner and Admin can unshare anything.
+	if removerRole != RoleOwner && removerRole != RoleAdmin {
+		// Editors can unshare resources they shared themselves.
+		isSharer := false
+		for _, r := range ws.SharedResources {
+			if r.ResourceID == resourceID && r.SharedBy == removerID {
+				isSharer = true
+				break
+			}
+		}
+		if !isSharer {
+			return errors.Forbidden("only admins or the original sharer can unshare a resource")
+		}
+	}
+
+	if err := ws.UnshareResource(resourceID); err != nil {
+		return errors.Wrap(err, errors.CodeNotFound, "failed to unshare resource")
+	}
+
+	if err := s.repo.UpdateWorkspace(ctx, ws); err != nil {
+		s.logger.Error("failed to update workspace after unsharing resource", logging.Err(err))
+		return errors.Wrap(err, errors.CodeInternal, "failed to persist resource unsharing")
+	}
+
+	s.logger.Info("resource unshared",
+		logging.String("workspace_id", string(workspaceID)),
+		logging.String("resource_id", string(resourceID)),
+		logging.String("remover_id", string(removerID)))
 	return nil
 }
 
@@ -183,11 +329,25 @@ func (s *Service) GetUserWorkspaces(ctx context.Context, userID common.UserID, p
 
 	resp, err := s.repo.FindWorkspacesByUser(ctx, userID, page)
 	if err != nil {
-		s.logger.Errorf("failed to find workspaces for user %s: %v", userID, err)
+		s.logger.Error("failed to find workspaces for user",
+			logging.String("user_id", string(userID)),
+			logging.Err(err))
 		return nil, errors.Wrap(err, errors.CodeInternal, "failed to query workspaces")
 	}
 
 	return resp, nil
+}
+
+// GetWorkspacesByResource retrieves all workspaces that have shared the given resource.
+func (s *Service) GetWorkspacesByResource(ctx context.Context, resourceID common.ID) ([]*Workspace, error) {
+	workspaces, err := s.repo.FindWorkspacesByResource(ctx, resourceID)
+	if err != nil {
+		s.logger.Error("failed to find workspaces by resource",
+			logging.String("resource_id", string(resourceID)),
+			logging.Err(err))
+		return nil, errors.Wrap(err, errors.CodeInternal, "failed to query workspaces by resource")
+	}
+	return workspaces, nil
 }
 
 //Personal.AI order the ending

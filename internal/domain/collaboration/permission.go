@@ -79,6 +79,9 @@ var (
 
 	// PermMemberInvite grants the ability to invite new members to the workspace.
 	PermMemberInvite = Permission{Action: "invite", Resource: "member"}
+
+	// PermMemberRemove grants the ability to remove members from the workspace.
+	PermMemberRemove = Permission{Action: "remove", Resource: "member"}
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,6 +106,7 @@ var RolePermissions = map[MemberRole]PermissionSet{
 			PermReportGenerate,
 			PermWorkspaceManage,
 			PermMemberInvite,
+			PermMemberRemove,
 		},
 	},
 	RoleAdmin: {
@@ -115,6 +119,7 @@ var RolePermissions = map[MemberRole]PermissionSet{
 			PermReportGenerate,
 			PermWorkspaceManage,
 			PermMemberInvite,
+			PermMemberRemove,
 		},
 	},
 	RoleEditor: {
