@@ -53,13 +53,13 @@ func (s *Service) CreateMolecule(ctx context.Context, smiles string, molType mty
 
 	// Calculate default fingerprint (Morgan)
 	if err := mol.CalculateFingerprint(mtypes.FPMorgan); err != nil {
-		s.logger.Warn("failed to calculate Morgan fingerprint", logging.Error(err))
+		s.logger.Warn("failed to calculate Morgan fingerprint", logging.Err(err))
 		// Non-fatal: continue without fingerprint
 	}
 
 	// Calculate basic properties
 	if err := mol.CalculateProperties(); err != nil {
-		s.logger.Warn("failed to calculate molecular properties", logging.Error(err))
+		s.logger.Warn("failed to calculate molecular properties", logging.Err(err))
 		// Non-fatal: continue without properties
 	}
 
@@ -92,7 +92,7 @@ func (s *Service) GetMolecule(ctx context.Context, id common.ID) (*Molecule, err
 // SearchMolecules performs a paginated search with filtering.
 func (s *Service) SearchMolecules(ctx context.Context, req mtypes.MoleculeSearchRequest) (*mtypes.MoleculeSearchResponse, error) {
 	// Validate pagination parameters
-	if err := req.Page.Validate(); err != nil {
+	if err := req.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -191,7 +191,7 @@ func (s *Service) BatchImportMolecules(ctx context.Context, smilesLines []string
 			s.logger.Warn("skipping invalid SMILES",
 				logging.Int("line", i),
 				logging.String("smiles", smiles),
-				logging.Error(err))
+				logging.Err(err))
 			skipped++
 			continue
 		}

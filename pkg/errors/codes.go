@@ -42,6 +42,10 @@ const (
 	// CodeInternal is returned for unexpected server-side errors that are not
 	// attributable to the caller.
 	CodeInternal ErrorCode = 10007
+
+	// CodeNotImplemented is returned when a requested feature or endpoint is
+	// not yet implemented.
+	CodeNotImplemented ErrorCode = 10008
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -141,6 +145,10 @@ const (
 	// re-use a connection to PostgreSQL or Neo4j.
 	CodeDBConnectionError ErrorCode = 70001
 
+	// CodeDatabaseError is a general error for database-related failures that
+	// are not specifically connection issues.
+	CodeDatabaseError ErrorCode = 70006
+
 	// CodeCacheError is returned when a Redis operation (GET, SET, DEL, EVAL, etc.)
 	// fails due to connection loss, timeout, or an unexpected response.
 	CodeCacheError ErrorCode = 70002
@@ -185,6 +193,8 @@ func (c ErrorCode) String() string {
 		return "RATE_LIMIT"
 	case CodeInternal:
 		return "INTERNAL_ERROR"
+	case CodeNotImplemented:
+		return "NOT_IMPLEMENTED"
 
 	// Patent
 	case CodePatentNotFound:
@@ -231,6 +241,8 @@ func (c ErrorCode) String() string {
 	// Infrastructure
 	case CodeDBConnectionError:
 		return "DB_CONNECTION_ERROR"
+	case CodeDatabaseError:
+		return "DATABASE_ERROR"
 	case CodeCacheError:
 		return "CACHE_ERROR"
 	case CodeSearchError:
@@ -301,6 +313,9 @@ func (c ErrorCode) HTTPStatus() int {
 		CodeMessageQueueError,
 		CodeStorageError:
 		return http.StatusServiceUnavailable
+
+	case CodeNotImplemented:
+		return http.StatusNotImplemented
 
 	case CodeInferenceTimeout:
 		return http.StatusGatewayTimeout

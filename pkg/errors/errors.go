@@ -201,6 +201,22 @@ func IsCode(err error, code ErrorCode) bool {
 	return false
 }
 
+// IsNotFound reports whether any error in err's chain is an *AppError with
+// CodeNotFound, CodePatentNotFound, CodeMoleculeNotFound, or CodePortfolioNotFound.
+func IsNotFound(err error) bool {
+	var ae *AppError
+	for err != nil {
+		if errors.As(err, &ae) {
+			switch ae.Code {
+			case CodeNotFound, CodePatentNotFound, CodeMoleculeNotFound, CodePortfolioNotFound:
+				return true
+			}
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
+}
+
 // GetCode extracts the ErrorCode from the first *AppError found in err's chain.
 // If no *AppError is present, CodeUnknown is returned.
 //

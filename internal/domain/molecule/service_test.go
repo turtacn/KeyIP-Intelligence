@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 	mtypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
@@ -110,6 +111,13 @@ func (mockLogger) Debug(msg string, fields ...logging.Field) {}
 func (mockLogger) Info(msg string, fields ...logging.Field)  {}
 func (mockLogger) Warn(msg string, fields ...logging.Field)  {}
 func (mockLogger) Error(msg string, fields ...logging.Field) {}
+func (mockLogger) Fatal(msg string, fields ...logging.Field) {}
+func (l mockLogger) With(fields ...logging.Field) logging.Logger {
+	return l
+}
+func (l mockLogger) Named(name string) logging.Logger {
+	return l
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tests
@@ -196,6 +204,7 @@ func TestBatchImportMolecules_SuccessCount(t *testing.T) {
 	// Mock: none exist
 	mockRepo.On("FindBySMILES", ctx, "c1ccccc1").Return(nil, errors.NotFound("not found"))
 	mockRepo.On("FindBySMILES", ctx, "CCO").Return(nil, errors.NotFound("not found"))
+	mockRepo.On("FindBySMILES", ctx, "invalid!!!").Return(nil, errors.NotFound("not found"))
 
 	// Mock: batch save succeeds
 	mockRepo.On("BatchSave", ctx, mock.AnythingOfType("[]*molecule.Molecule")).Return(nil)
@@ -218,6 +227,11 @@ func TestBatchImportMolecules_SkipsInvalid(t *testing.T) {
 
 	// All invalid SMILES
 	smilesLines := []string{"!!!", "$$$", "^^^"}
+
+	// Mock: none exist
+	mockRepo.On("FindBySMILES", ctx, "!!!").Return(nil, errors.NotFound("not found"))
+	mockRepo.On("FindBySMILES", ctx, "$$$").Return(nil, errors.NotFound("not found"))
+	mockRepo.On("FindBySMILES", ctx, "^^^").Return(nil, errors.NotFound("not found"))
 
 	count, err := svc.BatchImportMolecules(ctx, smilesLines, mtypes.TypeSmallMolecule)
 	require.Error(t, err)

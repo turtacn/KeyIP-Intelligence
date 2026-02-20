@@ -94,14 +94,7 @@ func TestNewMolecule_InvalidCharacters(t *testing.T) {
 func TestNewMolecule_UnmatchedBrackets(t *testing.T) {
 	t.Parallel()
 
-	cases := []string{
-		"c1ccccc1(",   // unclosed parenthesis
-		"c1ccccc1)",   // unmatched closing
-		"c1ccc[NH]c1", // unclosed square bracket (intentionally broken)
-		"C(C(C)C",     // nested unclosed
-	}
-
-	// Note: The last one "c1ccc[NH]c1" actually has matched brackets,
+	// Note: "c1ccc[NH]c1" actually has matched brackets,
 	// so let's use actually unmatched ones
 	unmatchedCases := []string{
 		"c1ccccc1(",

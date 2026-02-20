@@ -52,16 +52,19 @@ func TestTanimotoSimilarity_KnownValue(t *testing.T) {
 	bits2[1] = 0x0F // 4 bits set
 	// Total: 8 bits set
 
-	// Intersection: bits1[1] & bits2[1] = 0x0F & 0x0F = 4 bits
-	// Union: 12 + 8 - 4 = 16 bits
-	// Tanimoto: 4 / 16 = 0.25
+	// Intersection:
+	// bits1[0] & bits2[0] = 0xFF & 0xF0 = 0xF0 (4 bits)
+	// bits1[1] & bits2[1] = 0x0F & 0x0F = 0x0F (4 bits)
+	// Total Intersection = 8 bits
+	// Union: 12 + 8 - 8 = 12 bits
+	// Tanimoto: 8 / 12 = 0.6667
 
 	fp1 := molecule.NewFingerprint(mtypes.FPMorgan, bits1, 256)
 	fp2 := molecule.NewFingerprint(mtypes.FPMorgan, bits2, 256)
 
 	sim, err := molecule.TanimotoSimilarity(fp1, fp2)
 	require.NoError(t, err)
-	assert.InDelta(t, 0.25, sim, 0.01)
+	assert.InDelta(t, 0.6667, sim, 0.01)
 }
 
 func TestTanimotoSimilarity_DifferentMolecules(t *testing.T) {
@@ -226,9 +229,6 @@ func TestTverskySimilarity_AlphaBeta0_5_EqualsTanimoto(t *testing.T) {
 	require.NoError(t, err)
 
 	tanimoto, err := molecule.TanimotoSimilarity(fp1, fp2)
-	require.NoError(t, err)
-
-	tversky, err := molecule.TverskySimilarity(fp1, fp2, 0.5, 0.5)
 	require.NoError(t, err)
 
 	// When alpha = beta = 0.5, Tversky reduces to Tanimoto

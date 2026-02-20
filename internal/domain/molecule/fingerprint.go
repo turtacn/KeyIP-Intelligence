@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"math/bits"
 	"regexp"
 	"strings"
 
@@ -37,16 +38,16 @@ type Fingerprint struct {
 }
 
 // NewFingerprint constructs a Fingerprint from raw bit data.
-func NewFingerprint(fpType mtypes.FingerprintType, bits []byte, length int) *Fingerprint {
+func NewFingerprint(fpType mtypes.FingerprintType, data []byte, length int) *Fingerprint {
 	// Calculate popcount
 	onBits := 0
-	for _, b := range bits {
+	for _, b := range data {
 		onBits += bits.OnesCount8(uint8(b))
 	}
 
 	return &Fingerprint{
 		Type:      fpType,
-		Bits:      bits,
+		Bits:      data,
 		Length:    length,
 		NumOnBits: onBits,
 	}
