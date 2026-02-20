@@ -4,8 +4,10 @@ package config
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 )
 
@@ -22,7 +24,37 @@ func newViper() *viper.Viper {
 	v.SetEnvPrefix(envPrefix)
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Bind environment variables to all fields in the Config struct.
+	// This is necessary because Viper's AutomaticEnv does not pick up
+	// nested environment variables if they are not present in the
+	// configuration file or explicitly bound.
+	bindEnvs(v, Config{})
+
 	return v
+}
+
+// bindEnvs recursively binds each field of the given struct to an environment
+// variable using its "mapstructure" tag.
+func bindEnvs(v *viper.Viper, iface interface{}, parts ...string) {
+	ift := reflect.TypeOf(iface)
+	if ift.Kind() == reflect.Ptr {
+		ift = ift.Elem()
+	}
+	for i := 0; i < ift.NumField(); i++ {
+		field := ift.Field(i)
+		tag := field.Tag.Get("mapstructure")
+		if tag == "" || tag == "," {
+			continue
+		}
+		newParts := append(parts, tag)
+		if field.Type.Kind() == reflect.Struct {
+			bindEnvs(v, reflect.New(field.Type).Elem().Interface(), newParts...)
+		} else {
+			key := strings.Join(newParts, ".")
+			_ = v.BindEnv(key)
+		}
+	}
 }
 
 // Load reads the YAML file at configPath, merges any KEYIP_* environment
@@ -88,7 +120,7 @@ func Watch(configPath string, onChange func(*Config)) {
 	_ = v.ReadInConfig()
 
 	v.WatchConfig()
-	v.OnConfigChange(func(_ interface{}) {
+	v.OnConfigChange(func(_ fsnotify.Event) {
 		cfg, err := unmarshalAndFinalize(v)
 		if err != nil {
 			// Config change produced an invalid config; skip the callback to

@@ -2,6 +2,8 @@
 // the KeyIP-Intelligence platform.
 package config
 
+import "time"
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Default value constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,6 +31,8 @@ const (
 	DefaultLogFormat = "json"
 
 	DefaultWorkerConcurrency = 10
+
+	DefaultTritonAddr = "localhost:8001"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,6 +97,22 @@ func ApplyDefaults(cfg *Config) {
 		cfg.Milvus.Addr = DefaultMilvusAddr
 	}
 
+	// ── Intelligence ──────────────────────────────────────────────────────────
+	if cfg.Intelligence.TritonAddr == "" {
+		cfg.Intelligence.TritonAddr = DefaultTritonAddr
+	}
+	if cfg.Intelligence.ModelTimeout == 0 {
+		cfg.Intelligence.ModelTimeout = 30 * time.Second
+	}
+	if cfg.Intelligence.MaxBatchSize == 0 {
+		cfg.Intelligence.MaxBatchSize = 64
+	}
+
+	// ── Multitenancy ──────────────────────────────────────────────────────────
+	if cfg.Multitenancy.TenantHeader == "" {
+		cfg.Multitenancy.TenantHeader = "X-Tenant-ID"
+	}
+
 	// ── MinIO ─────────────────────────────────────────────────────────────────
 	if cfg.MinIO.Endpoint == "" {
 		cfg.MinIO.Endpoint = DefaultMinIOEndpoint
@@ -105,8 +125,8 @@ func ApplyDefaults(cfg *Config) {
 	if cfg.Worker.Mode == "" {
 		cfg.Worker.Mode = "local"
 	}
-	if cfg.Worker.RetryAttempts == 0 {
-		cfg.Worker.RetryAttempts = 3
+	if cfg.Worker.MaxRetries == 0 {
+		cfg.Worker.MaxRetries = 3
 	}
 
 	// ── Log ───────────────────────────────────────────────────────────────────

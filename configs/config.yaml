@@ -29,17 +29,17 @@ database:
   port: 5432
   user: ${POSTGRES_USER}
   password: ${POSTGRES_PASSWORD}
-  dbname: ${POSTGRES_DB}
+  db_name: ${POSTGRES_DB}
   # disable | require | verify-full
-  sslmode: disable
+  ssl_mode: disable
   # Maximum open connections in pool
   max_conns: 25
   # Minimum idle connections
   min_conns: 5
   # Connection max lifetime (seconds)
-  max_conn_lifetime: 300
+  conn_max_lifetime: 300
   # Connection max idle time (seconds)
-  max_conn_idle_time: 60
+  conn_max_idle_time: 60
   # Migration directory path (relative to project root)
   migration_path: internal/infrastructure/database/postgres/migrations
 
@@ -180,10 +180,10 @@ worker:
   # Maximum task queue depth before backpressure kicks in
   queue_depth: 100
   # Worker heartbeat interval (seconds)
-  heartbeat_interval: 15
+  heartbeat_interval: 15s
   # Task retry policy
   max_retries: 3
-  retry_backoff_ms: 500
+  retry_backoff_ms: 500ms
 
 # ──────────────────────────────────────────────
 # Structured Logging Configuration

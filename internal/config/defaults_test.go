@@ -34,7 +34,7 @@ func TestApplyDefaults_EmptyConfig(t *testing.T) {
 
 	assert.Equal(t, config.DefaultWorkerConcurrency, cfg.Worker.Concurrency)
 	assert.Equal(t, "local", cfg.Worker.Mode)
-	assert.Equal(t, 3, cfg.Worker.RetryAttempts)
+	assert.Equal(t, 3, cfg.Worker.MaxRetries)
 
 	assert.Equal(t, config.DefaultLogLevel, cfg.Log.Level)
 	assert.Equal(t, config.DefaultLogFormat, cfg.Log.Format)
@@ -59,7 +59,7 @@ func TestApplyDefaults_DoesNotOverrideNonZeroValues(t *testing.T) {
 	cfg.MinIO.Endpoint = "minio.prod.internal:9000"
 	cfg.Worker.Concurrency = 20
 	cfg.Worker.Mode = "distributed"
-	cfg.Worker.RetryAttempts = 5
+	cfg.Worker.MaxRetries = 5
 	cfg.Log.Level = "warn"
 	cfg.Log.Format = "text"
 
@@ -80,7 +80,7 @@ func TestApplyDefaults_DoesNotOverrideNonZeroValues(t *testing.T) {
 	assert.Equal(t, "minio.prod.internal:9000", cfg.MinIO.Endpoint)
 	assert.Equal(t, 20, cfg.Worker.Concurrency)
 	assert.Equal(t, "distributed", cfg.Worker.Mode)
-	assert.Equal(t, 5, cfg.Worker.RetryAttempts)
+	assert.Equal(t, 5, cfg.Worker.MaxRetries)
 	assert.Equal(t, "warn", cfg.Log.Level)
 	assert.Equal(t, "text", cfg.Log.Format)
 }

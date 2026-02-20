@@ -156,6 +156,15 @@ func TestConfig_Validate_InvalidLogFormat(t *testing.T) {
 	assert.Contains(t, err.Error(), "log.format")
 }
 
+func TestConfig_Validate_MissingTritonAddr(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig()
+	cfg.Intelligence.TritonAddr = ""
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "intelligence.triton_addr")
+}
+
 func TestConfig_SubStructs_ZeroValues(t *testing.T) {
 	t.Parallel()
 

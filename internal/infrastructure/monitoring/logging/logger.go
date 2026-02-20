@@ -273,6 +273,12 @@ func NewLogger(cfg LogConfig) (Logger, error) {
 	return &zapLogger{z: z}, nil
 }
 
+// NewLoggerFromCore constructs a Logger from an existing zapcore.Core.
+// This is primarily used for testing with observed logs.
+func NewLoggerFromCore(core zapcore.Core) Logger {
+	return &zapLogger{z: zap.New(core, zap.AddCallerSkip(1))}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // nopLogger — no-op implementation for tests and disabled components
 // ─────────────────────────────────────────────────────────────────────────────

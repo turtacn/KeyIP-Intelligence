@@ -107,7 +107,7 @@ func newTestMoleculeDTO() molecule.MoleculeDTO {
 	return molecule.MoleculeDTO{
 		BaseEntity: common.BaseEntity{
 			ID:       common.ID("mol-001"),
-			TenantID: common.ID("tenant-abc"),
+			TenantID: common.TenantID("tenant-abc"),
 		},
 		SMILES:           "c1ccc2[nH]ccc2c1",
 		InChI:            "InChI=1S/C8H7N/c1-2-6-8-7(3-1)4-5-9-8/h1-6,9H",
