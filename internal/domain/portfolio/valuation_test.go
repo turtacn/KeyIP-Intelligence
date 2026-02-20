@@ -56,6 +56,7 @@ func TestMultiFactorValuator_ZeroRemainingLife(t *testing.T) {
 	t.Parallel()
 
 	v := portfolio.NewMultiFactorValuator()
+	v.DecayRate = 0.2 // Explicitly set high decay to test end-of-life valuation
 	factors := portfolio.ValuationFactors{
 		TechnicalScore: 0.8,
 		LegalScore:     0.8,
@@ -202,6 +203,9 @@ func TestCalculatePortfolioValuation_SinglePatent(t *testing.T) {
 	assert.Equal(t, result.MedianValue, result.HighestValue)
 	assert.Equal(t, result.LowestValue, result.HighestValue)
 	assert.Len(t, result.Breakdown, 1)
+
+	// Verify ValuationDate is set and not zero.
+	assert.False(t, result.ValuationDate.IsZero())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

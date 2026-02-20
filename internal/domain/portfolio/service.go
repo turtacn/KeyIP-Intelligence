@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
@@ -44,11 +44,15 @@ func (s *Service) CreatePortfolio(
 	}
 
 	if err := s.repo.Save(ctx, p); err != nil {
-		s.logger.Error("failed to save portfolio", "error", err, "portfolio_id", p.ID)
+		s.logger.Error("failed to save portfolio",
+			logging.Err(err),
+			logging.String("portfolio_id", string(p.ID)))
 		return nil, errors.Wrap(err, errors.CodeDBConnectionError, "failed to persist portfolio")
 	}
 
-	s.logger.Info("portfolio created", "portfolio_id", p.ID, "owner_id", ownerID)
+	s.logger.Info("portfolio created",
+		logging.String("portfolio_id", string(p.ID)),
+		logging.String("owner_id", string(ownerID)))
 	return p, nil
 }
 
@@ -56,7 +60,7 @@ func (s *Service) CreatePortfolio(
 func (s *Service) GetPortfolio(ctx context.Context, id common.ID) (*Portfolio, error) {
 	p, err := s.repo.FindByID(ctx, id)
 	if err != nil {
-		s.logger.Warn("portfolio not found", "portfolio_id", id)
+		s.logger.Warn("portfolio not found", logging.String("portfolio_id", string(id)))
 		return nil, errors.Wrap(err, errors.CodePortfolioNotFound,
 			fmt.Sprintf("portfolio %s not found", id))
 	}
@@ -79,17 +83,22 @@ func (s *Service) AddPatentToPortfolio(
 
 	if err := p.AddPatent(patentID); err != nil {
 		s.logger.Warn("failed to add patent to portfolio",
-			"portfolio_id", portfolioID, "patent_id", patentID, "error", err)
+			logging.String("portfolio_id", string(portfolioID)),
+			logging.String("patent_id", string(patentID)),
+			logging.Err(err))
 		return err
 	}
 
 	if err := s.repo.Update(ctx, p); err != nil {
 		s.logger.Error("failed to update portfolio after adding patent",
-			"portfolio_id", portfolioID, "error", err)
+			logging.String("portfolio_id", string(portfolioID)),
+			logging.Err(err))
 		return errors.Wrap(err, errors.CodeDBConnectionError, "failed to update portfolio")
 	}
 
-	s.logger.Info("patent added to portfolio", "portfolio_id", portfolioID, "patent_id", patentID)
+	s.logger.Info("patent added to portfolio",
+		logging.String("portfolio_id", string(portfolioID)),
+		logging.String("patent_id", string(patentID)))
 	return nil
 }
 
@@ -105,17 +114,22 @@ func (s *Service) RemovePatentFromPortfolio(
 
 	if err := p.RemovePatent(patentID); err != nil {
 		s.logger.Warn("failed to remove patent from portfolio",
-			"portfolio_id", portfolioID, "patent_id", patentID, "error", err)
+			logging.String("portfolio_id", string(portfolioID)),
+			logging.String("patent_id", string(patentID)),
+			logging.Err(err))
 		return err
 	}
 
 	if err := s.repo.Update(ctx, p); err != nil {
 		s.logger.Error("failed to update portfolio after removing patent",
-			"portfolio_id", portfolioID, "error", err)
+			logging.String("portfolio_id", string(portfolioID)),
+			logging.Err(err))
 		return errors.Wrap(err, errors.CodeDBConnectionError, "failed to update portfolio")
 	}
 
-	s.logger.Info("patent removed from portfolio", "portfolio_id", portfolioID, "patent_id", patentID)
+	s.logger.Info("patent removed from portfolio",
+		logging.String("portfolio_id", string(portfolioID)),
+		logging.String("patent_id", string(patentID)))
 	return nil
 }
 
@@ -145,7 +159,8 @@ func (s *Service) ValuatePortfolio(
 	result, err := CalculatePortfolioValuation(ctx, s.valuator, factors)
 	if err != nil {
 		s.logger.Error("failed to calculate portfolio valuation",
-			"portfolio_id", portfolioID, "error", err)
+			logging.String("portfolio_id", string(portfolioID)),
+			logging.Err(err))
 		return nil, errors.Wrap(err, errors.CodeInternal, "valuation computation failed")
 	}
 
@@ -153,14 +168,15 @@ func (s *Service) ValuatePortfolio(
 
 	if err := s.repo.Update(ctx, p); err != nil {
 		s.logger.Error("failed to update portfolio with valuation result",
-			"portfolio_id", portfolioID, "error", err)
+			logging.String("portfolio_id", string(portfolioID)),
+			logging.Err(err))
 		return nil, errors.Wrap(err, errors.CodeDBConnectionError, "failed to persist valuation")
 	}
 
 	s.logger.Info("portfolio valuation completed",
-		"portfolio_id", portfolioID,
-		"total_value", result.TotalValue,
-		"method", result.Method)
+		logging.String("portfolio_id", string(portfolioID)),
+		logging.Float64("total_value", result.TotalValue),
+		logging.String("method", result.Method))
 
 	return result, nil
 }
@@ -183,14 +199,15 @@ func (s *Service) GetUserPortfolios(
 	resp, err := s.repo.FindByOwner(ctx, ownerID, page)
 	if err != nil {
 		s.logger.Error("failed to retrieve user portfolios",
-			"owner_id", ownerID, "error", err)
+			logging.String("owner_id", string(ownerID)),
+			logging.Err(err))
 		return nil, errors.Wrap(err, errors.CodeDBConnectionError, "failed to query portfolios")
 	}
 
 	s.logger.Debug("retrieved user portfolios",
-		"owner_id", ownerID,
-		"count", len(resp.Items),
-		"total", resp.Total)
+		logging.String("owner_id", string(ownerID)),
+		logging.Int("count", len(resp.Items)),
+		logging.Int64("total", resp.Total))
 
 	return resp, nil
 }

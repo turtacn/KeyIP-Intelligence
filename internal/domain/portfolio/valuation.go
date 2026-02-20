@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
@@ -153,7 +154,7 @@ func CalculatePortfolioValuation(
 		MedianValue:   median,
 		HighestValue:  highest,
 		LowestValue:   lowest,
-		ValuationDate: common.Timestamp(common.Timestamp{}.UTC()),
+		ValuationDate: time.Now().UTC(),
 		Method:        "MultiFactorV1",
 		Breakdown:     breakdown,
 	}, nil

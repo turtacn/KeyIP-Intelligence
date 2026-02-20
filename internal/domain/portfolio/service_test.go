@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
@@ -86,7 +86,7 @@ func TestService_CreatePortfolio_Success(t *testing.T) {
 
 	mockRepo := new(MockRepository)
 	mockValuator := new(MockValuator)
-	logger := logging.NewNoOpLogger()
+	logger := logging.NewNopLogger()
 	svc := portfolio.NewService(mockRepo, mockValuator, logger)
 
 	mockRepo.On("Save", mock.Anything, mock.AnythingOfType("*portfolio.Portfolio")).
@@ -105,7 +105,7 @@ func TestService_CreatePortfolio_EmptyName(t *testing.T) {
 
 	mockRepo := new(MockRepository)
 	mockValuator := new(MockValuator)
-	logger := logging.NewNoOpLogger()
+	logger := logging.NewNopLogger()
 	svc := portfolio.NewService(mockRepo, mockValuator, logger)
 
 	p, err := svc.CreatePortfolio(context.Background(), "", "desc", "user-1")
@@ -119,7 +119,7 @@ func TestService_AddPatentToPortfolio_Success(t *testing.T) {
 
 	mockRepo := new(MockRepository)
 	mockValuator := new(MockValuator)
-	logger := logging.NewNoOpLogger()
+	logger := logging.NewNopLogger()
 	svc := portfolio.NewService(mockRepo, mockValuator, logger)
 
 	existingPortfolio, err := portfolio.NewPortfolio("Test", "desc", "user-1")
@@ -142,7 +142,7 @@ func TestService_AddPatentToPortfolio_PortfolioNotFound(t *testing.T) {
 
 	mockRepo := new(MockRepository)
 	mockValuator := new(MockValuator)
-	logger := logging.NewNoOpLogger()
+	logger := logging.NewNopLogger()
 	svc := portfolio.NewService(mockRepo, mockValuator, logger)
 
 	nonExistentID := common.NewID()
@@ -160,7 +160,7 @@ func TestService_ValuatePortfolio_Success(t *testing.T) {
 
 	mockRepo := new(MockRepository)
 	mockValuator := new(MockValuator)
-	logger := logging.NewNoOpLogger()
+	logger := logging.NewNopLogger()
 	svc := portfolio.NewService(mockRepo, mockValuator, logger)
 
 	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
@@ -197,7 +197,7 @@ func TestService_ValuatePortfolio_FactorCountMismatch(t *testing.T) {
 
 	mockRepo := new(MockRepository)
 	mockValuator := new(MockValuator)
-	logger := logging.NewNoOpLogger()
+	logger := logging.NewNopLogger()
 	svc := portfolio.NewService(mockRepo, mockValuator, logger)
 
 	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
