@@ -615,4 +615,3 @@ func (r *MoleculeRepository) scanMolecules(rows pgx.Rows) ([]*Molecule, error) {
 	return molecules, nil
 }
 
-//Personal.AI order the ending

@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres/repositories"
@@ -370,4 +371,3 @@ func TestPatentRepository_PaginationLargeDataset(t *testing.T) {
 	assert.NotEqual(t, r1[0].ID, r5[0].ID)
 }
 
-//Personal.AI order the ending
