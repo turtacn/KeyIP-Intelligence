@@ -32,6 +32,10 @@ KeyIP-Intelligence is the first open-source platform purpose-built for **molecul
 
 The platform addresses a fundamental gap: existing patent analytics tools treat chemistry as text. They cannot distinguish between two molecules that differ by a single substituent on a phenyl ring — a difference that, in OLED materials, can mean the boundary between freedom-to-operate and patent infringement. KeyIP-Intelligence closes this gap by operating at the atomic level.
 
+<p align="center">
+  <img src="roadmap.jpg" alt="KeyIP-Intelligence Roadmap">
+</p>
+
 ---
 
 ## Why KeyIP-Intelligence?

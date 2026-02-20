@@ -32,6 +32,11 @@ KeyIP-Intelligence 是全球首个专为 OLED 有机材料领域构建的开源*
 
 该平台解决了一个根本性的缺口：现有专利分析工具将化学视为文本。它们无法区分苯环上一个取代基位置差异的两个分子——而在OLED材料领域，这种差异可能意味着自由实施与专利侵权之间的分界线。KeyIP-Intelligence 在原子级别弥合了这一缺口。
 
+<p align="center">
+  <img src="roadmap.jpg" alt="KeyIP-Intelligence Roadmap">
+</p>
+
+
 ---
 
 ## 为什么选择 KeyIP-Intelligence？
