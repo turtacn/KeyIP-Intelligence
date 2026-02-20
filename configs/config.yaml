@@ -1,0 +1,239 @@
+# KeyIP-Intelligence Platform Configuration
+# ============================================================
+# This file defines the default runtime configuration.
+# Sensitive values are expressed as ${ENV_VAR} placeholders.
+# All structure keys MUST match internal/config/config.go Config struct.
+# ============================================================
+
+# ──────────────────────────────────────────────
+# Server Configuration
+# ──────────────────────────────────────────────
+server:
+  # HTTP listening port
+  port: 8080
+  # Gin mode: debug | release | test
+  mode: debug
+  # Read/write timeout in seconds
+  read_timeout: 30
+  write_timeout: 30
+  # Maximum allowed request body size (bytes)
+  max_body_size: 10485760   # 10 MB
+  # Graceful shutdown timeout (seconds)
+  shutdown_timeout: 15
+
+# ──────────────────────────────────────────────
+# PostgreSQL Database Configuration
+# ──────────────────────────────────────────────
+database:
+  host: ${POSTGRES_HOST}
+  port: 5432
+  user: ${POSTGRES_USER}
+  password: ${POSTGRES_PASSWORD}
+  dbname: ${POSTGRES_DB}
+  # disable | require | verify-full
+  sslmode: disable
+  # Maximum open connections in pool
+  max_conns: 25
+  # Minimum idle connections
+  min_conns: 5
+  # Connection max lifetime (seconds)
+  max_conn_lifetime: 300
+  # Connection max idle time (seconds)
+  max_conn_idle_time: 60
+  # Migration directory path (relative to project root)
+  migration_path: internal/infrastructure/database/postgres/migrations
+
+# ──────────────────────────────────────────────
+# Neo4j Graph Database Configuration
+# ──────────────────────────────────────────────
+neo4j:
+  # Bolt URI, e.g. bolt://localhost:7687 or neo4j://localhost:7687
+  uri: ${NEO4J_URI}
+  user: ${NEO4J_USER}
+  password: ${NEO4J_PASSWORD}
+  # Maximum number of drivers in the connection pool
+  max_connection_pool_size: 50
+  # Connection acquisition timeout (seconds)
+  connection_timeout: 30
+  # Target database name (leave empty for default)
+  database: neo4j
+
+# ──────────────────────────────────────────────
+# Redis Cache & Lock Configuration
+# ──────────────────────────────────────────────
+redis:
+  # host:port
+  addr: ${REDIS_ADDR}
+  password: ${REDIS_PASSWORD}
+  # Redis logical database index (0–15)
+  db: 0
+  # Connection pool size
+  pool_size: 20
+  # Dial/read/write timeout (seconds)
+  dial_timeout: 5
+  read_timeout: 3
+  write_timeout: 3
+  # Default cache TTL (seconds)
+  default_ttl: 3600
+  # Key prefix for namespace isolation
+  key_prefix: "keyip:"
+
+# ──────────────────────────────────────────────
+# Apache Kafka Message Bus Configuration
+# ──────────────────────────────────────────────
+kafka:
+  # Comma-separated or YAML list of broker addresses
+  brokers:
+    - ${KAFKA_BROKER_1}
+  # Consumer group identifier for this service
+  group_id: keyip-intelligence-consumer
+  # Producer / Consumer timeout (milliseconds)
+  timeout_ms: 10000
+  # Retry policy
+  producer_retries: 3
+  # Batch size for async producers (bytes)
+  batch_size: 16384
+  # Auto-create topics on first publish
+  auto_create_topics: true
+  # Default topic replication factor
+  replication_factor: 1
+  # Default number of partitions for new topics
+  num_partitions: 3
+
+# ──────────────────────────────────────────────
+# OpenSearch Full-Text Search Configuration
+# ──────────────────────────────────────────────
+opensearch:
+  # List of OpenSearch node addresses
+  addresses:
+    - ${OPENSEARCH_ADDR}
+  user: ${OPENSEARCH_USER}
+  password: ${OPENSEARCH_PASSWORD}
+  # Skip TLS certificate verification (development only)
+  insecure_skip_verify: true
+  # Bulk index batch size
+  bulk_batch_size: 500
+  # Scroll page size for large queries
+  scroll_size: 1000
+  # Index prefix for all managed indices
+  index_prefix: keyip_
+
+# ──────────────────────────────────────────────
+# Milvus Vector Database Configuration
+# ──────────────────────────────────────────────
+milvus:
+  # gRPC endpoint host:port
+  addr: ${MILVUS_ADDR}
+  # MolPatent-GNN embedding dimension
+  embedding_dim: 256
+  # Default index type: IVF_FLAT | HNSW | IVF_SQ8
+  index_type: HNSW
+  # HNSW M parameter (higher = more accurate, more memory)
+  hnsw_m: 16
+  # HNSW efConstruction (build-time accuracy)
+  hnsw_ef_construction: 200
+  # Default top-K for similarity searches
+  default_top_k: 20
+  # Collection name prefix
+  collection_prefix: keyip_
+
+# ──────────────────────────────────────────────
+# MinIO Object Storage Configuration
+# ──────────────────────────────────────────────
+minio:
+  # Host:port of the MinIO server
+  endpoint: ${MINIO_ENDPOINT}
+  access_key: ${MINIO_ACCESS_KEY}
+  secret_key: ${MINIO_SECRET_KEY}
+  # Default bucket for patent documents and reports
+  bucket: keyip-documents
+  # Enable TLS/HTTPS
+  use_ssl: false
+  # Presigned URL expiry (seconds)
+  presign_expiry: 3600
+
+# ──────────────────────────────────────────────
+# Keycloak Authentication & RBAC Configuration
+# ──────────────────────────────────────────────
+keycloak:
+  # Base URL of the Keycloak server (no trailing slash)
+  base_url: ${KEYCLOAK_BASE_URL}
+  # Realm name
+  realm: ${KEYCLOAK_REALM}
+  # Client ID registered in Keycloak
+  client_id: ${KEYCLOAK_CLIENT_ID}
+  # Client secret (only for confidential clients)
+  client_secret: ${KEYCLOAK_CLIENT_SECRET}
+  # JWKS cache refresh interval (seconds)
+  jwks_cache_ttl: 3600
+  # JWT audience claim expected value
+  audience: keyip-api
+
+# ──────────────────────────────────────────────
+# Background Worker Configuration
+# ──────────────────────────────────────────────
+worker:
+  # Worker mode: kafka | cron | hybrid
+  mode: kafka
+  # Number of concurrent goroutines processing tasks
+  concurrency: 10
+  # Maximum task queue depth before backpressure kicks in
+  queue_depth: 100
+  # Worker heartbeat interval (seconds)
+  heartbeat_interval: 15
+  # Task retry policy
+  max_retries: 3
+  retry_backoff_ms: 500
+
+# ──────────────────────────────────────────────
+# Structured Logging Configuration
+# ──────────────────────────────────────────────
+log:
+  # Log level: debug | info | warn | error | fatal
+  level: info
+  # Output format: json | console
+  format: json
+  # Output destination: stdout | stderr | /path/to/file.log
+  output: stdout
+  # Enable caller information (file:line) — slight performance cost
+  enable_caller: true
+  # Enable stack traces for error level and above
+  enable_stacktrace: false
+  # Sampling rate for high-volume debug logs (0 = disabled, N = 1 per N)
+  sampling_rate: 0
+
+# ──────────────────────────────────────────────
+# Intelligence / AI Model Configuration
+# ──────────────────────────────────────────────
+intelligence:
+  # Triton Inference Server address for model serving
+  triton_addr: ${TRITON_ADDR}
+  # gRPC connection timeout to model server (seconds)
+  model_timeout: 30
+  # Maximum batch size for bulk inference requests
+  max_batch_size: 64
+  # MolPatent-GNN model name registered in Triton
+  molpatent_gnn_model: molpatent_gnn_v1
+  # ClaimBERT model name
+  claim_bert_model: claim_bert_v1
+  # InfringeNet model name
+  infringe_net_model: infringe_net_v1
+  # StrategyGPT OpenAI-compatible API base URL
+  strategy_gpt_base_url: ${STRATEGY_GPT_BASE_URL}
+  # API key for StrategyGPT endpoint
+  strategy_gpt_api_key: ${STRATEGY_GPT_API_KEY}
+  # Model identifier used by StrategyGPT
+  strategy_gpt_model: gpt-4o
+  # RAG retrieval top-K documents
+  rag_top_k: 5
+
+# ──────────────────────────────────────────────
+# Multi-Tenancy Configuration
+# ──────────────────────────────────────────────
+multitenancy:
+  # Enable row-level tenant isolation in PostgreSQL
+  enable_rls: true
+  # HTTP header carrying the tenant ID
+  tenant_header: X-Tenant-ID
+
+#Personal.AI order the ending
