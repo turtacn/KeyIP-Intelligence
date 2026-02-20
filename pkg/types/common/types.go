@@ -29,6 +29,9 @@ type UserID string
 // in JSON by default (standard library behaviour).
 type Timestamp = time.Time
 
+// Time is an alias for time.Time, used in repository queries and domain entities.
+type Time = time.Time
+
 // Metadata is an open-ended key-value bag attached to entities to carry
 // domain-specific attributes without schema migrations.
 type Metadata map[string]interface{}

@@ -185,8 +185,12 @@ func (d *Deadline) DaysUntilDue() int {
 	if d.ExtendedTo != nil {
 		effectiveDue = *d.ExtendedTo
 	}
-	duration := effectiveDue.Sub(now)
-	days := int(duration.Hours() / 24)
+
+	// Normalize both to the start of the day for date-only comparison.
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	due := time.Date(effectiveDue.Year(), effectiveDue.Month(), effectiveDue.Day(), 0, 0, 0, 0, time.UTC)
+
+	days := int(due.Sub(today).Hours() / 24)
 	return days
 }
 

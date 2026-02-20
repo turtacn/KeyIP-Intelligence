@@ -235,7 +235,7 @@ func TestGenerateAnnuitySchedule_UnsupportedJurisdiction(t *testing.T) {
 	_, err := lifecycle.GenerateAnnuitySchedule("XX", filingDate, nil)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported")
+	assert.Contains(t, err.Error(), "not found")
 }
 
 //Personal.AI order the ending

@@ -159,7 +159,8 @@ func TestGetUpcomingDeadlines_ExcludesCompletedDeadlines(t *testing.T) {
 func TestMarkDeadlineCompleted_NoLongerInOverdue(t *testing.T) {
 	t.Parallel()
 
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	// Use a recent filing date so that initial deadlines (like examination) are not overdue.
+	filingDate := time.Now().UTC().AddDate(-1, 0, 0)
 	lc, err := lifecycle.NewPatentLifecycle(
 		common.NewID(),
 		"CN202010000001A",
@@ -309,6 +310,32 @@ func TestRecordPayment_InsufficientAmount(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 // TestUpdateLegalStatus
 // ─────────────────────────────────────────────────────────────────────────────
+
+func TestGrant_US_RegeneratesSchedule(t *testing.T) {
+	t.Parallel()
+
+	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	lc, _ := lifecycle.NewPatentLifecycle(
+		common.NewID(),
+		"US11123456B2",
+		ptypes.JurisdictionUS,
+		filingDate,
+	)
+
+	// US initial schedule (with nil grant date) uses filing date.
+	initialDueDate := lc.AnnuitySchedule[0].DueDate
+
+	// Grant it 2 years after filing.
+	grantDate := filingDate.AddDate(2, 0, 0)
+	err := lc.Grant(grantDate)
+	require.NoError(t, err)
+
+	// Schedule should be regenerated based on grant date.
+	// 3.5 years from grant = 5.5 years from filing.
+	newDueDate := lc.AnnuitySchedule[0].DueDate
+	assert.NotEqual(t, initialDueDate, newDueDate)
+	assert.Equal(t, grantDate.AddDate(3, 6, 0).Year(), newDueDate.Year())
+}
 
 func TestUpdateLegalStatus_RecordsInHistory(t *testing.T) {
 	t.Parallel()

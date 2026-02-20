@@ -263,6 +263,15 @@ func InvalidParam(message string) *AppError {
 	}
 }
 
+// InvalidState constructs a CodeConflict AppError, used for domain state violations.
+func InvalidState(message string) *AppError {
+	return &AppError{
+		Code:    CodeConflict,
+		Message: message,
+		Stack:   captureStack(1),
+	}
+}
+
 // Unauthorized constructs a CodeUnauthorized AppError.
 func Unauthorized(message string) *AppError {
 	return &AppError{

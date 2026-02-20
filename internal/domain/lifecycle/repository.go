@@ -35,24 +35,24 @@ type Repository interface {
 	// FindUpcomingDeadlines retrieves all lifecycles with deadlines due within
 	// the specified number of days across all tenants (or scoped to tenant if
 	// tenantID is provided).
-	FindUpcomingDeadlines(ctx context.Context, withinDays int, tenantID *common.ID) ([]*PatentLifecycle, error)
+	FindUpcomingDeadlines(ctx context.Context, withinDays int, tenantID *common.TenantID) ([]*PatentLifecycle, error)
 
 	// FindOverdueDeadlines retrieves all lifecycles with overdue deadlines.
-	FindOverdueDeadlines(ctx context.Context, tenantID *common.ID) ([]*PatentLifecycle, error)
+	FindOverdueDeadlines(ctx context.Context, tenantID *common.TenantID) ([]*PatentLifecycle, error)
 
 	// FindUpcomingAnnuities retrieves all lifecycles with annuity payments due
 	// within the specified number of days.
-	FindUpcomingAnnuities(ctx context.Context, withinDays int, tenantID *common.ID) ([]*PatentLifecycle, error)
+	FindUpcomingAnnuities(ctx context.Context, withinDays int, tenantID *common.TenantID) ([]*PatentLifecycle, error)
 
 	// FindByJurisdiction retrieves all lifecycles for a specific jurisdiction.
-	FindByJurisdiction(ctx context.Context, jurisdiction ptypes.JurisdictionCode, tenantID *common.ID) ([]*PatentLifecycle, error)
+	FindByJurisdiction(ctx context.Context, jurisdiction ptypes.JurisdictionCode, tenantID *common.TenantID) ([]*PatentLifecycle, error)
 
 	// Delete removes a PatentLifecycle from the repository.
 	// This is typically used only for test cleanup or administrative purposes.
 	Delete(ctx context.Context, id common.ID) error
 
 	// List retrieves lifecycles with pagination support.
-	List(ctx context.Context, offset, limit int, tenantID *common.ID) ([]*PatentLifecycle, int64, error)
+	List(ctx context.Context, offset, limit int, tenantID *common.TenantID) ([]*PatentLifecycle, int64, error)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ type Repository interface {
 // This can be used to implement complex queries in the repository.
 type LifecycleQuery struct {
 	// TenantID filters by tenant.
-	TenantID *common.ID
+	TenantID *common.TenantID
 
 	// PatentIDs filters by a list of patent IDs.
 	PatentIDs []common.ID

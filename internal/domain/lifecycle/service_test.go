@@ -150,6 +150,7 @@ func TestService_AddDeadline_Success(t *testing.T) {
 		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 	lc, _ := svc.CreateLifecycle(ctx, createCmd)
+	initialDeadlineCount := len(lc.Deadlines)
 
 	// Add deadline.
 	deadlineCmd := lifecycle.AddDeadlineCommand{
@@ -163,7 +164,7 @@ func TestService_AddDeadline_Success(t *testing.T) {
 
 	// Verify.
 	updated, _ := svc.GetLifecycle(ctx, lc.ID)
-	assert.Greater(t, len(updated.Deadlines), len(lc.Deadlines))
+	assert.Greater(t, len(updated.Deadlines), initialDeadlineCount)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -3,12 +3,14 @@ package lifecycle_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 	ptypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
@@ -38,7 +40,7 @@ func (r *MockLifecycleRepository) Save(ctx context.Context, lc *lifecycle.Patent
 func (r *MockLifecycleRepository) FindByID(ctx context.Context, id common.ID) (*lifecycle.PatentLifecycle, error) {
 	lc, ok := r.lifecycles[id]
 	if !ok {
-		return nil, &common.NotFoundError{Resource: "PatentLifecycle", ID: string(id)}
+		return nil, errors.NotFound(fmt.Sprintf("PatentLifecycle %s not found", id))
 	}
 	return lc, nil
 }
@@ -49,7 +51,7 @@ func (r *MockLifecycleRepository) FindByPatentID(ctx context.Context, patentID c
 			return lc, nil
 		}
 	}
-	return nil, &common.NotFoundError{Resource: "PatentLifecycle", ID: string(patentID)}
+	return nil, errors.NotFound(fmt.Sprintf("PatentLifecycle for patent %s not found", patentID))
 }
 
 func (r *MockLifecycleRepository) FindByPatentNumber(ctx context.Context, patentNumber string) (*lifecycle.PatentLifecycle, error) {
@@ -58,10 +60,10 @@ func (r *MockLifecycleRepository) FindByPatentNumber(ctx context.Context, patent
 			return lc, nil
 		}
 	}
-	return nil, &common.NotFoundError{Resource: "PatentLifecycle", ID: patentNumber}
+	return nil, errors.NotFound(fmt.Sprintf("PatentLifecycle for patent number %s not found", patentNumber))
 }
 
-func (r *MockLifecycleRepository) FindUpcomingDeadlines(ctx context.Context, withinDays int, tenantID *common.ID) ([]*lifecycle.PatentLifecycle, error) {
+func (r *MockLifecycleRepository) FindUpcomingDeadlines(ctx context.Context, withinDays int, tenantID *common.TenantID) ([]*lifecycle.PatentLifecycle, error) {
 	var result []*lifecycle.PatentLifecycle
 	for _, lc := range r.lifecycles {
 		if tenantID != nil && lc.TenantID != *tenantID {
@@ -75,7 +77,7 @@ func (r *MockLifecycleRepository) FindUpcomingDeadlines(ctx context.Context, wit
 	return result, nil
 }
 
-func (r *MockLifecycleRepository) FindOverdueDeadlines(ctx context.Context, tenantID *common.ID) ([]*lifecycle.PatentLifecycle, error) {
+func (r *MockLifecycleRepository) FindOverdueDeadlines(ctx context.Context, tenantID *common.TenantID) ([]*lifecycle.PatentLifecycle, error) {
 	var result []*lifecycle.PatentLifecycle
 	for _, lc := range r.lifecycles {
 		if tenantID != nil && lc.TenantID != *tenantID {
@@ -89,7 +91,7 @@ func (r *MockLifecycleRepository) FindOverdueDeadlines(ctx context.Context, tena
 	return result, nil
 }
 
-func (r *MockLifecycleRepository) FindUpcomingAnnuities(ctx context.Context, withinDays int, tenantID *common.ID) ([]*lifecycle.PatentLifecycle, error) {
+func (r *MockLifecycleRepository) FindUpcomingAnnuities(ctx context.Context, withinDays int, tenantID *common.TenantID) ([]*lifecycle.PatentLifecycle, error) {
 	var result []*lifecycle.PatentLifecycle
 	now := time.Now().UTC()
 	cutoff := now.AddDate(0, 0, withinDays)
@@ -108,7 +110,7 @@ func (r *MockLifecycleRepository) FindUpcomingAnnuities(ctx context.Context, wit
 	return result, nil
 }
 
-func (r *MockLifecycleRepository) FindByJurisdiction(ctx context.Context, jurisdiction ptypes.JurisdictionCode, tenantID *common.ID) ([]*lifecycle.PatentLifecycle, error) {
+func (r *MockLifecycleRepository) FindByJurisdiction(ctx context.Context, jurisdiction ptypes.JurisdictionCode, tenantID *common.TenantID) ([]*lifecycle.PatentLifecycle, error) {
 	var result []*lifecycle.PatentLifecycle
 	for _, lc := range r.lifecycles {
 		if tenantID != nil && lc.TenantID != *tenantID {
@@ -126,7 +128,7 @@ func (r *MockLifecycleRepository) Delete(ctx context.Context, id common.ID) erro
 	return nil
 }
 
-func (r *MockLifecycleRepository) List(ctx context.Context, offset, limit int, tenantID *common.ID) ([]*lifecycle.PatentLifecycle, int64, error) {
+func (r *MockLifecycleRepository) List(ctx context.Context, offset, limit int, tenantID *common.TenantID) ([]*lifecycle.PatentLifecycle, int64, error) {
 	var result []*lifecycle.PatentLifecycle
 	for _, lc := range r.lifecycles {
 		if tenantID != nil && lc.TenantID != *tenantID {

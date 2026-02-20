@@ -351,6 +351,29 @@ func (lc *PatentLifecycle) RecordPayment(paymentID common.ID, amount float64, da
 // Legal status methods
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Grant records the official grant of the patent, updates legal status,
+// and regenerates the annuity schedule if necessary.
+func (lc *PatentLifecycle) Grant(grantDate time.Time) error {
+	lc.GrantDate = &grantDate
+
+	// Update legal status.
+	if err := lc.UpdateLegalStatus("granted", "patent granted by examiner"); err != nil {
+		return err
+	}
+
+	// Regenerate annuity schedule if it depends on grant date (e.g., US maintenance fees).
+	if lc.Jurisdiction == ptypes.JurisdictionUS {
+		newSchedule, err := GenerateAnnuitySchedule(lc.Jurisdiction, lc.FilingDate, lc.GrantDate)
+		if err != nil {
+			return errors.Wrap(err, errors.CodeInternal, "failed to regenerate annuity schedule after grant")
+		}
+		lc.AnnuitySchedule = newSchedule
+	}
+
+	lc.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
 // UpdateLegalStatus transitions the patent to a new legal status and records
 // the change in the history.
 func (lc *PatentLifecycle) UpdateLegalStatus(newStatus, reason string) error {

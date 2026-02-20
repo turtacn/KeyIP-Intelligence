@@ -44,16 +44,16 @@ type Service interface {
 	UpdateLegalStatus(ctx context.Context, lifecycleID common.ID, newStatus, reason string) error
 
 	// GetUpcomingDeadlines retrieves all lifecycles with upcoming deadlines.
-	GetUpcomingDeadlines(ctx context.Context, withinDays int, tenantID *common.ID) ([]*PatentLifecycle, error)
+	GetUpcomingDeadlines(ctx context.Context, withinDays int, tenantID *common.TenantID) ([]*PatentLifecycle, error)
 
 	// GetOverdueDeadlines retrieves all lifecycles with overdue deadlines.
-	GetOverdueDeadlines(ctx context.Context, tenantID *common.ID) ([]*PatentLifecycle, error)
+	GetOverdueDeadlines(ctx context.Context, tenantID *common.TenantID) ([]*PatentLifecycle, error)
 
 	// GetUpcomingAnnuities retrieves all lifecycles with upcoming annuity payments.
-	GetUpcomingAnnuities(ctx context.Context, withinDays int, tenantID *common.ID) ([]*PatentLifecycle, error)
+	GetUpcomingAnnuities(ctx context.Context, withinDays int, tenantID *common.TenantID) ([]*PatentLifecycle, error)
 
 	// ListLifecycles retrieves lifecycles with pagination.
-	ListLifecycles(ctx context.Context, offset, limit int, tenantID *common.ID) ([]*PatentLifecycle, int64, error)
+	ListLifecycles(ctx context.Context, offset, limit int, tenantID *common.TenantID) ([]*PatentLifecycle, int64, error)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,10 +114,11 @@ func (s *service) CreateLifecycle(ctx context.Context, cmd CreateLifecycleComman
 		return nil, err
 	}
 
-	// If grant date is provided, update legal status.
+	// If grant date is provided, update legal status and regenerate schedule.
 	if cmd.GrantDate != nil {
-		lc.GrantDate = cmd.GrantDate
-		_ = lc.UpdateLegalStatus("granted", "patent granted by examiner")
+		if err := lc.Grant(*cmd.GrantDate); err != nil {
+			return nil, err
+		}
 	}
 
 	// Persist.
@@ -225,19 +226,19 @@ func (s *service) UpdateLegalStatus(ctx context.Context, lifecycleID common.ID, 
 	return s.repo.Save(ctx, lc)
 }
 
-func (s *service) GetUpcomingDeadlines(ctx context.Context, withinDays int, tenantID *common.ID) ([]*PatentLifecycle, error) {
+func (s *service) GetUpcomingDeadlines(ctx context.Context, withinDays int, tenantID *common.TenantID) ([]*PatentLifecycle, error) {
 	return s.repo.FindUpcomingDeadlines(ctx, withinDays, tenantID)
 }
 
-func (s *service) GetOverdueDeadlines(ctx context.Context, tenantID *common.ID) ([]*PatentLifecycle, error) {
+func (s *service) GetOverdueDeadlines(ctx context.Context, tenantID *common.TenantID) ([]*PatentLifecycle, error) {
 	return s.repo.FindOverdueDeadlines(ctx, tenantID)
 }
 
-func (s *service) GetUpcomingAnnuities(ctx context.Context, withinDays int, tenantID *common.ID) ([]*PatentLifecycle, error) {
+func (s *service) GetUpcomingAnnuities(ctx context.Context, withinDays int, tenantID *common.TenantID) ([]*PatentLifecycle, error) {
 	return s.repo.FindUpcomingAnnuities(ctx, withinDays, tenantID)
 }
 
-func (s *service) ListLifecycles(ctx context.Context, offset, limit int, tenantID *common.ID) ([]*PatentLifecycle, int64, error) {
+func (s *service) ListLifecycles(ctx context.Context, offset, limit int, tenantID *common.TenantID) ([]*PatentLifecycle, int64, error) {
 	return s.repo.List(ctx, offset, limit, tenantID)
 }
 
