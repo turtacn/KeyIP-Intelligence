@@ -40,9 +40,9 @@ func TestDomainEvent_InterfaceSatisfaction(t *testing.T) {
 	aggID := newAggregateID()
 	expiry := time.Now().Add(30 * 24 * time.Hour)
 
-	var _ patent.DomainEvent = patent.NewPatentCreated(aggID, "CN000001A", "Title", ptypes.JurisdictionCN)
-	var _ patent.DomainEvent = patent.NewPatentStatusChanged(aggID, ptypes.PatentStatusPending, ptypes.PatentStatusGranted)
-	var _ patent.DomainEvent = patent.NewClaimAdded(aggID, 1, ptypes.ClaimTypeIndependent)
+	var _ patent.DomainEvent = patent.NewPatentCreatedEvent(aggID, "CN000001A", "Title", ptypes.JurisdictionCN)
+	var _ patent.DomainEvent = patent.NewPatentStatusChangedEvent(aggID, "CN000001A", ptypes.StatusFiled, ptypes.StatusGranted)
+	var _ patent.DomainEvent = patent.NewClaimAdded(aggID, 1, ptypes.ClaimIndependent)
 	var _ patent.DomainEvent = patent.NewMarkushAdded(aggID, common.NewID(), 42)
 	var _ patent.DomainEvent = patent.NewPatentExpiring(aggID, expiry, 30)
 }
@@ -55,7 +55,7 @@ func TestNewPatentCreated_Fields(t *testing.T) {
 	t.Parallel()
 
 	aggID := newAggregateID()
-	evt := patent.NewPatentCreated(aggID, "CN202310001234A", "Organic LED Material", ptypes.JurisdictionCN)
+	evt := patent.NewPatentCreatedEvent(aggID, "CN202310001234A", "Organic LED Material", ptypes.JurisdictionCN)
 
 	require.NotNil(t, evt)
 	assertBaseEvent(t, evt, patent.PatentCreatedEventName, aggID)
@@ -67,14 +67,14 @@ func TestNewPatentCreated_Fields(t *testing.T) {
 func TestNewPatentCreated_EventName(t *testing.T) {
 	t.Parallel()
 
-	evt := patent.NewPatentCreated(newAggregateID(), "US10000001B2", "T", ptypes.JurisdictionUS)
+	evt := patent.NewPatentCreatedEvent(newAggregateID(), "US10000001B2", "T", ptypes.JurisdictionUS)
 	assert.Equal(t, "patent.created", evt.EventName())
 }
 
 func TestNewPatentCreated_OccurredAtIsUTC(t *testing.T) {
 	t.Parallel()
 
-	evt := patent.NewPatentCreated(newAggregateID(), "EP3000001A1", "T", ptypes.JurisdictionEP)
+	evt := patent.NewPatentCreatedEvent(newAggregateID(), "EP3000001A1", "T", ptypes.JurisdictionEP)
 	assert.Equal(t, time.UTC, evt.OccurredAt().Location())
 }
 
@@ -86,18 +86,19 @@ func TestNewPatentStatusChanged_Fields(t *testing.T) {
 	t.Parallel()
 
 	aggID := newAggregateID()
-	evt := patent.NewPatentStatusChanged(aggID, ptypes.PatentStatusPending, ptypes.PatentStatusGranted)
+	evt := patent.NewPatentStatusChangedEvent(aggID, "CN000001A", ptypes.StatusFiled, ptypes.StatusGranted)
 
 	require.NotNil(t, evt)
 	assertBaseEvent(t, evt, patent.PatentStatusChangedEventName, aggID)
-	assert.Equal(t, ptypes.PatentStatusPending, evt.OldStatus)
-	assert.Equal(t, ptypes.PatentStatusGranted, evt.NewStatus)
+	assert.Equal(t, "CN000001A", evt.PatentNumber)
+	assert.Equal(t, ptypes.StatusFiled, evt.OldStatus)
+	assert.Equal(t, ptypes.StatusGranted, evt.NewStatus)
 }
 
 func TestNewPatentStatusChanged_EventName(t *testing.T) {
 	t.Parallel()
 
-	evt := patent.NewPatentStatusChanged(newAggregateID(), ptypes.PatentStatusGranted, ptypes.PatentStatusExpired)
+	evt := patent.NewPatentStatusChangedEvent(newAggregateID(), "US10123456B2", ptypes.StatusGranted, ptypes.StatusExpired)
 	assert.Equal(t, "patent.status_changed", evt.EventName())
 }
 
@@ -108,16 +109,16 @@ func TestNewPatentStatusChanged_DifferentTransitions(t *testing.T) {
 		from ptypes.PatentStatus
 		to   ptypes.PatentStatus
 	}{
-		{ptypes.PatentStatusPending, ptypes.PatentStatusGranted},
-		{ptypes.PatentStatusGranted, ptypes.PatentStatusExpired},
-		{ptypes.PatentStatusGranted, ptypes.PatentStatusWithdrawn},
+		{ptypes.StatusFiled, ptypes.StatusGranted},
+		{ptypes.StatusGranted, ptypes.StatusExpired},
+		{ptypes.StatusGranted, ptypes.StatusAbandoned},
 	}
 
 	for _, tr := range transitions {
 		tr := tr
 		t.Run(string(tr.from)+"->"+string(tr.to), func(t *testing.T) {
 			t.Parallel()
-			evt := patent.NewPatentStatusChanged(newAggregateID(), tr.from, tr.to)
+			evt := patent.NewPatentStatusChangedEvent(newAggregateID(), "EP1234567A1", tr.from, tr.to)
 			assert.Equal(t, tr.from, evt.OldStatus)
 			assert.Equal(t, tr.to, evt.NewStatus)
 		})
@@ -132,18 +133,18 @@ func TestNewClaimAdded_Fields(t *testing.T) {
 	t.Parallel()
 
 	aggID := newAggregateID()
-	evt := patent.NewClaimAdded(aggID, 3, ptypes.ClaimTypeDependent)
+	evt := patent.NewClaimAdded(aggID, 3, ptypes.ClaimDependent)
 
 	require.NotNil(t, evt)
 	assertBaseEvent(t, evt, patent.ClaimAddedEventName, aggID)
 	assert.Equal(t, 3, evt.ClaimNumber)
-	assert.Equal(t, ptypes.ClaimTypeDependent, evt.ClaimType)
+	assert.Equal(t, ptypes.ClaimDependent, evt.ClaimType)
 }
 
 func TestNewClaimAdded_EventName(t *testing.T) {
 	t.Parallel()
 
-	evt := patent.NewClaimAdded(newAggregateID(), 1, ptypes.ClaimTypeIndependent)
+	evt := patent.NewClaimAdded(newAggregateID(), 1, ptypes.ClaimIndependent)
 	assert.Equal(t, "patent.claim_added", evt.EventName())
 }
 
@@ -151,8 +152,8 @@ func TestNewClaimAdded_IndependentClaim(t *testing.T) {
 	t.Parallel()
 
 	aggID := newAggregateID()
-	evt := patent.NewClaimAdded(aggID, 1, ptypes.ClaimTypeIndependent)
-	assert.Equal(t, ptypes.ClaimTypeIndependent, evt.ClaimType)
+	evt := patent.NewClaimAdded(aggID, 1, ptypes.ClaimIndependent)
+	assert.Equal(t, ptypes.ClaimIndependent, evt.ClaimType)
 	assert.Equal(t, 1, evt.ClaimNumber)
 }
 

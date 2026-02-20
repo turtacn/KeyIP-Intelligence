@@ -48,12 +48,12 @@ func (r *mockRepository) Save(ctx context.Context, p *patent.Patent) error {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.byNum[p.Number]; exists {
+	if _, exists := r.byNum[p.PatentNumber]; exists {
 		return pkgerrors.New(pkgerrors.CodeConflict, "patent number already exists")
 	}
 	clone := *p
 	r.byID[p.BaseEntity.ID] = &clone
-	r.byNum[p.Number] = &clone
+	r.byNum[p.PatentNumber] = &clone
 	if p.FamilyID != "" {
 		r.byFamily[p.FamilyID] = append(r.byFamily[p.FamilyID], &clone)
 	}
@@ -111,7 +111,7 @@ func (r *mockRepository) Update(ctx context.Context, p *patent.Patent) error {
 	}
 	clone := *p
 	r.byID[p.BaseEntity.ID] = &clone
-	r.byNum[p.Number] = &clone
+	r.byNum[p.PatentNumber] = &clone
 	return nil
 }
 
@@ -122,7 +122,7 @@ func (r *mockRepository) Delete(ctx context.Context, id common.ID) error {
 	if !ok {
 		return pkgerrors.NotFound("patent not found")
 	}
-	delete(r.byNum, p.Number)
+	delete(r.byNum, p.PatentNumber)
 	delete(r.byID, id)
 	return nil
 }
@@ -132,7 +132,7 @@ func (r *mockRepository) FindByApplicant(ctx context.Context, applicant string, 
 	defer r.mu.RUnlock()
 	var items []*patent.Patent
 	for _, p := range r.byID {
-		for _, a := range p.Applicants {
+		for _, a := range []string{p.Applicant} {
 			if a == applicant {
 				clone := *p
 				items = append(items, &clone)
@@ -229,7 +229,7 @@ func TestService_CreatePatent_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, p)
-	assert.Equal(t, "CN202310001234A", p.Number)
+	assert.Equal(t, "CN202310001234A", p.PatentNumber)
 	assert.NotEmpty(t, string(p.BaseEntity.ID))
 }
 
@@ -254,7 +254,7 @@ func TestService_CreatePatent_ThenGetPatent(t *testing.T) {
 	found, err := svc.GetPatent(context.Background(), created.BaseEntity.ID)
 	require.NoError(t, err)
 	assert.Equal(t, created.BaseEntity.ID, found.BaseEntity.ID)
-	assert.Equal(t, "CN202310001235A", found.Number)
+	assert.Equal(t, "CN202310001235A", found.PatentNumber)
 }
 
 func TestService_CreatePatent_InvalidParams_EmptyNumber(t *testing.T) {
@@ -313,7 +313,7 @@ func TestService_AddClaimToPatent_Success(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	claim, err := patent.NewClaim(1, "A compound comprising indole.", ptypes.ClaimTypeIndependent, nil)
+	claim, err := patent.NewClaim(1, "A compound comprising indole.", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, svc.AddClaimToPatent(context.Background(), p.BaseEntity.ID, *claim))
@@ -329,7 +329,7 @@ func TestService_AddClaimToPatent_PatentNotFound(t *testing.T) {
 	t.Parallel()
 
 	svc := newTestService(newMockRepo())
-	claim, _ := patent.NewClaim(1, "A compound.", ptypes.ClaimTypeIndependent, nil)
+	claim, _ := patent.NewClaim(1, "A compound.", ptypes.ClaimIndependent, nil)
 
 	err := svc.AddClaimToPatent(context.Background(), common.NewID(), *claim)
 	require.Error(t, err)
@@ -357,16 +357,18 @@ func TestService_UpdatePatentStatus_ValidTransition(t *testing.T) {
 		time.Now().Add(-300*24*time.Hour),
 	)
 	require.NoError(t, err)
-	// Initial status should be Pending.
-	assert.Equal(t, ptypes.PatentStatusPending, p.Status)
+	// Initial status should be Filed.
+	assert.Equal(t, ptypes.StatusFiled, p.Status)
 
-	// Pending → Granted is a valid transition.
+	// Filed → Published → Granted are valid transitions.
 	require.NoError(t, svc.UpdatePatentStatus(
-		context.Background(), p.BaseEntity.ID, ptypes.PatentStatusGranted))
+		context.Background(), p.BaseEntity.ID, ptypes.StatusPublished))
+	require.NoError(t, svc.UpdatePatentStatus(
+		context.Background(), p.BaseEntity.ID, ptypes.StatusGranted))
 
 	updated, err := svc.GetPatent(context.Background(), p.BaseEntity.ID)
 	require.NoError(t, err)
-	assert.Equal(t, ptypes.PatentStatusGranted, updated.Status)
+	assert.Equal(t, ptypes.StatusGranted, updated.Status)
 }
 
 func TestService_UpdatePatentStatus_InvalidTransition(t *testing.T) {
@@ -389,7 +391,7 @@ func TestService_UpdatePatentStatus_InvalidTransition(t *testing.T) {
 
 	// Pending → Expired is not a valid direct transition in the domain model.
 	err = svc.UpdatePatentStatus(
-		context.Background(), p.BaseEntity.ID, ptypes.PatentStatusExpired)
+		context.Background(), p.BaseEntity.ID, ptypes.StatusExpired)
 	require.Error(t, err, "invalid status transition should return an error")
 }
 

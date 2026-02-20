@@ -251,6 +251,28 @@ func (m *Markush) ToDTO() ptypes.MarkushDTO {
 	}
 }
 
+// MarkushFromDTO reconstructs a Markush value object from its DTO.
+func MarkushFromDTO(dto ptypes.MarkushDTO) Markush {
+	rGroups := make([]RGroup, len(dto.RGroups))
+	for i, rg := range dto.RGroups {
+		rGroups[i] = RGroup{
+			Position:     rg.Position,
+			Alternatives: rg.Alternatives,
+			Description:  rg.Description,
+		}
+	}
+
+	return Markush{
+		ID:              dto.ID,
+		PatentID:        dto.PatentID,
+		ClaimID:         dto.ClaimID,
+		CoreStructure:   dto.CoreStructure,
+		RGroups:         rGroups,
+		Description:     dto.Description,
+		EnumeratedCount: dto.EnumeratedCount,
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────

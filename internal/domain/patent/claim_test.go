@@ -24,12 +24,12 @@ func intPtr(n int) *int { return &n }
 func TestNewClaim_ValidIndependentClaim(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(1, "A compound comprising a benzene ring.", ptypes.ClaimTypeIndependent, nil)
+	c, err := patent.NewClaim(1, "A compound comprising a benzene ring.", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 	require.NotNil(t, c)
 	assert.Equal(t, 1, c.Number)
 	assert.Equal(t, "A compound comprising a benzene ring.", c.Text)
-	assert.Equal(t, ptypes.ClaimTypeIndependent, c.Type)
+	assert.Equal(t, ptypes.ClaimIndependent, c.Type)
 	assert.Nil(t, c.ParentClaimNumber)
 	assert.NotEmpty(t, string(c.ID))
 }
@@ -38,11 +38,11 @@ func TestNewClaim_ValidDependentClaim(t *testing.T) {
 	t.Parallel()
 
 	parent := intPtr(1)
-	c, err := patent.NewClaim(2, "The compound of claim 1, wherein R1 is methyl.", ptypes.ClaimTypeDependent, parent)
+	c, err := patent.NewClaim(2, "The compound of claim 1, wherein R1 is methyl.", ptypes.ClaimDependent, parent)
 	require.NoError(t, err)
 	require.NotNil(t, c)
 	assert.Equal(t, 2, c.Number)
-	assert.Equal(t, ptypes.ClaimTypeDependent, c.Type)
+	assert.Equal(t, ptypes.ClaimDependent, c.Type)
 	require.NotNil(t, c.ParentClaimNumber)
 	assert.Equal(t, 1, *c.ParentClaimNumber)
 }
@@ -50,7 +50,7 @@ func TestNewClaim_ValidDependentClaim(t *testing.T) {
 func TestNewClaim_ZeroNumber(t *testing.T) {
 	t.Parallel()
 
-	_, err := patent.NewClaim(0, "Some claim text.", ptypes.ClaimTypeIndependent, nil)
+	_, err := patent.NewClaim(0, "Some claim text.", ptypes.ClaimIndependent, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "number")
 }
@@ -58,14 +58,14 @@ func TestNewClaim_ZeroNumber(t *testing.T) {
 func TestNewClaim_NegativeNumber(t *testing.T) {
 	t.Parallel()
 
-	_, err := patent.NewClaim(-3, "Some claim text.", ptypes.ClaimTypeIndependent, nil)
+	_, err := patent.NewClaim(-3, "Some claim text.", ptypes.ClaimIndependent, nil)
 	require.Error(t, err)
 }
 
 func TestNewClaim_EmptyText(t *testing.T) {
 	t.Parallel()
 
-	_, err := patent.NewClaim(1, "", ptypes.ClaimTypeIndependent, nil)
+	_, err := patent.NewClaim(1, "", ptypes.ClaimIndependent, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "text")
 }
@@ -73,14 +73,14 @@ func TestNewClaim_EmptyText(t *testing.T) {
 func TestNewClaim_WhitespaceOnlyText(t *testing.T) {
 	t.Parallel()
 
-	_, err := patent.NewClaim(1, "   \t\n  ", ptypes.ClaimTypeIndependent, nil)
+	_, err := patent.NewClaim(1, "   \t\n  ", ptypes.ClaimIndependent, nil)
 	require.Error(t, err)
 }
 
 func TestNewClaim_DependentWithoutParent(t *testing.T) {
 	t.Parallel()
 
-	_, err := patent.NewClaim(2, "The compound of claim 1.", ptypes.ClaimTypeDependent, nil)
+	_, err := patent.NewClaim(2, "The compound of claim 1.", ptypes.ClaimDependent, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parent")
 }
@@ -89,7 +89,7 @@ func TestNewClaim_DependentParentNotLessThanNumber(t *testing.T) {
 	t.Parallel()
 
 	// Parent == number is invalid.
-	_, err := patent.NewClaim(2, "Dependent on itself.", ptypes.ClaimTypeDependent, intPtr(2))
+	_, err := patent.NewClaim(2, "Dependent on itself.", ptypes.ClaimDependent, intPtr(2))
 	require.Error(t, err)
 }
 
@@ -97,14 +97,14 @@ func TestNewClaim_IndependentWithParent(t *testing.T) {
 	t.Parallel()
 
 	// Independent claims must not carry a parent reference.
-	_, err := patent.NewClaim(3, "Independent claim.", ptypes.ClaimTypeIndependent, intPtr(1))
+	_, err := patent.NewClaim(3, "Independent claim.", ptypes.ClaimIndependent, intPtr(1))
 	require.Error(t, err)
 }
 
 func TestNewClaim_TextIsTrimmed(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(1, "  A method.  ", ptypes.ClaimTypeIndependent, nil)
+	c, err := patent.NewClaim(1, "  A method.  ", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "A method.", c.Text)
 }
@@ -116,7 +116,7 @@ func TestNewClaim_TextIsTrimmed(t *testing.T) {
 func TestIsIndependent_ReturnsTrue(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(1, "An independent claim.", ptypes.ClaimTypeIndependent, nil)
+	c, err := patent.NewClaim(1, "An independent claim.", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 	assert.True(t, c.IsIndependent())
 }
@@ -124,7 +124,7 @@ func TestIsIndependent_ReturnsTrue(t *testing.T) {
 func TestIsIndependent_ReturnsFalse(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(2, "A dependent claim of claim 1.", ptypes.ClaimTypeDependent, intPtr(1))
+	c, err := patent.NewClaim(2, "A dependent claim of claim 1.", ptypes.ClaimDependent, intPtr(1))
 	require.NoError(t, err)
 	assert.False(t, c.IsIndependent())
 }
@@ -136,7 +136,7 @@ func TestIsIndependent_ReturnsFalse(t *testing.T) {
 func TestContainsChemicalEntity_True(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(1, "A compound comprising a benzene ring.", ptypes.ClaimTypeIndependent, nil)
+	c, err := patent.NewClaim(1, "A compound comprising a benzene ring.", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	el := patent.ClaimElement{
@@ -151,7 +151,7 @@ func TestContainsChemicalEntity_True(t *testing.T) {
 func TestContainsChemicalEntity_False_NoElements(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(1, "A method of treatment.", ptypes.ClaimTypeIndependent, nil)
+	c, err := patent.NewClaim(1, "A method of treatment.", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 	assert.False(t, c.ContainsChemicalEntity())
 }
@@ -159,7 +159,7 @@ func TestContainsChemicalEntity_False_NoElements(t *testing.T) {
 func TestContainsChemicalEntity_False_ElementsWithoutChemicals(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(1, "A device comprising a housing.", ptypes.ClaimTypeIndependent, nil)
+	c, err := patent.NewClaim(1, "A device comprising a housing.", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	el := patent.ClaimElement{
@@ -180,7 +180,7 @@ func TestExtractKeyTerms_NonEmpty(t *testing.T) {
 
 	c, err := patent.NewClaim(1,
 		"A pharmaceutical composition comprising an active compound and a pharmaceutically acceptable carrier.",
-		ptypes.ClaimTypeIndependent, nil)
+		ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	terms := c.ExtractKeyTerms()
@@ -192,7 +192,7 @@ func TestExtractKeyTerms_ExcludesStopWords(t *testing.T) {
 
 	c, err := patent.NewClaim(1,
 		"A composition comprising an organic molecule wherein said molecule is active.",
-		ptypes.ClaimTypeIndependent, nil)
+		ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	terms := c.ExtractKeyTerms()
@@ -210,7 +210,7 @@ func TestExtractKeyTerms_Deduplicated(t *testing.T) {
 
 	c, err := patent.NewClaim(1,
 		"A compound, wherein the compound comprises a ring, the ring being aromatic.",
-		ptypes.ClaimTypeIndependent, nil)
+		ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	terms := c.ExtractKeyTerms()
@@ -226,7 +226,7 @@ func TestExtractKeyTerms_ShortTokensExcluded(t *testing.T) {
 
 	c, err := patent.NewClaim(1,
 		"A method of treating a disease by administering a compound.",
-		ptypes.ClaimTypeIndependent, nil)
+		ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	terms := c.ExtractKeyTerms()
@@ -242,7 +242,7 @@ func TestExtractKeyTerms_ShortTokensExcluded(t *testing.T) {
 func TestAddElement_Success(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(1, "A compound.", ptypes.ClaimTypeIndependent, nil)
+	c, err := patent.NewClaim(1, "A compound.", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	el := patent.ClaimElement{Text: "a benzene core", IsStructural: true}
@@ -253,7 +253,7 @@ func TestAddElement_Success(t *testing.T) {
 func TestAddElement_EmptyTextReturnsError(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(1, "A compound.", ptypes.ClaimTypeIndependent, nil)
+	c, err := patent.NewClaim(1, "A compound.", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	el := patent.ClaimElement{Text: ""}
@@ -264,7 +264,7 @@ func TestAddElement_EmptyTextReturnsError(t *testing.T) {
 func TestAddElement_IDIsAutoAssigned(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(1, "A compound.", ptypes.ClaimTypeIndependent, nil)
+	c, err := patent.NewClaim(1, "A compound.", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	el := patent.ClaimElement{Text: "a ring system"}
@@ -279,7 +279,7 @@ func TestAddElement_IDIsAutoAssigned(t *testing.T) {
 func TestToDTO_FieldsMatch(t *testing.T) {
 	t.Parallel()
 
-	c, err := patent.NewClaim(1, "A compound comprising indole.", ptypes.ClaimTypeIndependent, nil)
+	c, err := patent.NewClaim(1, "A compound comprising indole.", ptypes.ClaimIndependent, nil)
 	require.NoError(t, err)
 
 	_ = c.AddElement(patent.ClaimElement{

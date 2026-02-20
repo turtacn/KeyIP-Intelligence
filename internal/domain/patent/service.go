@@ -61,19 +61,31 @@ func (s *Service) CreatePatent(
 	inventors []string,
 	filingDate time.Time,
 ) (*Patent, error) {
-	s.logger.Info(ctx, "creating patent", "number", number, "jurisdiction", string(jurisdiction))
+	s.logger.Info("creating patent",
+		logging.String("number", number),
+		logging.String("jurisdiction", string(jurisdiction)))
 
-	p, err := NewPatent(number, title, abstract, jurisdiction, applicants, inventors, filingDate)
+	applicant := ""
+	if len(applicants) > 0 {
+		applicant = applicants[0]
+	}
+
+	p, err := NewPatent(number, title, abstract, applicant, jurisdiction, filingDate)
 	if err != nil {
 		return nil, pkgerrors.Wrap(err, pkgerrors.CodeInvalidParam, "invalid patent parameters")
 	}
+	p.Inventors = inventors
 
 	if err = s.repo.Save(ctx, p); err != nil {
-		s.logger.Error(ctx, "failed to save patent", "error", err, "number", number)
+		s.logger.Error("failed to save patent",
+			logging.Err(err),
+			logging.String("number", number))
 		return nil, pkgerrors.Wrap(err, pkgerrors.CodeDBConnectionError, "failed to persist patent")
 	}
 
-	s.logger.Info(ctx, "patent created", "id", string(p.BaseEntity.ID), "number", number)
+	s.logger.Info("patent created",
+		logging.String("id", string(p.BaseEntity.ID)),
+		logging.String("number", number))
 	return p, nil
 }
 
@@ -121,7 +133,7 @@ func (s *Service) SearchPatents(
 
 	resp, err := s.repo.Search(ctx, req)
 	if err != nil {
-		s.logger.Error(ctx, "patent search failed", "error", err)
+		s.logger.Error("patent search failed", logging.Err(err))
 		return nil, pkgerrors.Wrap(err, pkgerrors.CodeSearchError, "patent search failed")
 	}
 	return resp, nil
@@ -152,13 +164,16 @@ func (s *Service) AddClaimToPatent(
 
 	p.Version++
 	if err = s.repo.Update(ctx, p); err != nil {
-		s.logger.Error(ctx, "failed to update patent after adding claim",
-			"patentID", string(patentID), "claimNumber", claim.Number, "error", err)
+		s.logger.Error("failed to update patent after adding claim",
+			logging.String("patentID", string(patentID)),
+			logging.Int("claimNumber", claim.Number),
+			logging.Err(err))
 		return pkgerrors.Wrap(err, pkgerrors.CodeDBConnectionError, "failed to persist claim")
 	}
 
-	s.logger.Info(ctx, "claim added to patent",
-		"patentID", string(patentID), "claimNumber", claim.Number)
+	s.logger.Info("claim added to patent",
+		logging.String("patentID", string(patentID)),
+		logging.Int("claimNumber", claim.Number))
 	return nil
 }
 
@@ -184,13 +199,16 @@ func (s *Service) AddMarkushToPatent(
 
 	p.Version++
 	if err = s.repo.Update(ctx, p); err != nil {
-		s.logger.Error(ctx, "failed to update patent after adding Markush",
-			"patentID", string(patentID), "markushID", string(markush.ID), "error", err)
+		s.logger.Error("failed to update patent after adding Markush",
+			logging.String("patentID", string(patentID)),
+			logging.String("markushID", string(markush.ID)),
+			logging.Err(err))
 		return pkgerrors.Wrap(err, pkgerrors.CodeDBConnectionError, "failed to persist Markush")
 	}
 
-	s.logger.Info(ctx, "Markush added to patent",
-		"patentID", string(patentID), "markushID", string(markush.ID))
+	s.logger.Info("Markush added to patent",
+		logging.String("patentID", string(patentID)),
+		logging.String("markushID", string(markush.ID)))
 	return nil
 }
 
@@ -212,24 +230,24 @@ func (s *Service) UpdatePatentStatus(
 	}
 
 	oldStatus := p.Status
-	if err = p.TransitionStatus(status); err != nil {
+	if err = p.UpdateStatus(status); err != nil {
 		return pkgerrors.Wrap(err, pkgerrors.CodeInvalidParam, "invalid status transition")
 	}
 
 	p.Version++
 	if err = s.repo.Update(ctx, p); err != nil {
-		s.logger.Error(ctx, "failed to persist status transition",
-			"patentID", string(patentID),
-			"oldStatus", string(oldStatus),
-			"newStatus", string(status),
-			"error", err)
+		s.logger.Error("failed to persist status transition",
+			logging.String("patentID", string(patentID)),
+			logging.String("oldStatus", string(oldStatus)),
+			logging.String("newStatus", string(status)),
+			logging.Err(err))
 		return pkgerrors.Wrap(err, pkgerrors.CodeDBConnectionError, "failed to persist status change")
 	}
 
-	s.logger.Info(ctx, "patent status updated",
-		"patentID", string(patentID),
-		"oldStatus", string(oldStatus),
-		"newStatus", string(status))
+	s.logger.Info("patent status updated",
+		logging.String("patentID", string(patentID)),
+		logging.String("oldStatus", string(oldStatus)),
+		logging.String("newStatus", string(status)))
 	return nil
 }
 
@@ -270,9 +288,9 @@ func (s *Service) FindExpiringPatents(ctx context.Context, withinDays int) ([]*P
 		return nil, pkgerrors.Wrap(err, pkgerrors.CodeDBConnectionError, "failed to query expiring patents")
 	}
 
-	s.logger.Info(ctx, "found expiring patents",
-		"withinDays", withinDays,
-		"count", len(patents))
+	s.logger.Info("found expiring patents",
+		logging.Int("withinDays", withinDays),
+		logging.Int("count", len(patents)))
 	return patents, nil
 }
 

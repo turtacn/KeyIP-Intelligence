@@ -163,18 +163,18 @@ func TestAddClaim_ValidIndependentClaim_Succeeds(t *testing.T) {
 	t.Parallel()
 
 	p := newValidPatent(t)
-	cl := patent.Claim{ClaimNumber: 1, Text: "A compound comprising...", ClaimType: "independent"}
+	cl := patent.Claim{Number: 1, Text: "A compound comprising...", Type: ptypes.ClaimIndependent}
 
 	require.NoError(t, p.AddClaim(cl))
 	require.Len(t, p.Claims, 1)
-	assert.Equal(t, 1, p.Claims[0].ClaimNumber)
+	assert.Equal(t, 1, p.Claims[0].Number)
 }
 
 func TestAddClaim_DuplicateNumber_ReturnsError(t *testing.T) {
 	t.Parallel()
 
 	p := newValidPatent(t)
-	cl := patent.Claim{ClaimNumber: 1, Text: "A compound comprising...", ClaimType: "independent"}
+	cl := patent.Claim{Number: 1, Text: "A compound comprising...", Type: ptypes.ClaimIndependent}
 
 	require.NoError(t, p.AddClaim(cl))
 	err := p.AddClaim(cl)
@@ -186,8 +186,8 @@ func TestAddClaim_DependentClaimReferencesExistingParent_Succeeds(t *testing.T) 
 	t.Parallel()
 
 	p := newValidPatent(t)
-	indep := patent.Claim{ClaimNumber: 1, Text: "A compound...", ClaimType: "independent"}
-	dep := patent.Claim{ClaimNumber: 2, Text: "The compound of claim 1...", ClaimType: "dependent", ParentClaimNumber: 1}
+	indep := patent.Claim{Number: 1, Text: "A compound...", Type: ptypes.ClaimIndependent}
+	dep := patent.Claim{Number: 2, Text: "The compound of claim 1...", Type: ptypes.ClaimDependent, ParentClaimNumber: intPtr(1)}
 
 	require.NoError(t, p.AddClaim(indep))
 	require.NoError(t, p.AddClaim(dep))
@@ -198,7 +198,7 @@ func TestAddClaim_DependentClaimReferencesNonExistentParent_ReturnsError(t *test
 	t.Parallel()
 
 	p := newValidPatent(t)
-	dep := patent.Claim{ClaimNumber: 2, Text: "Depends on 1...", ClaimType: "dependent", ParentClaimNumber: 1}
+	dep := patent.Claim{Number: 2, Text: "Depends on 1...", Type: ptypes.ClaimDependent, ParentClaimNumber: intPtr(1)}
 
 	err := p.AddClaim(dep)
 	require.Error(t, err)
@@ -210,7 +210,7 @@ func TestAddClaim_BumpsVersion(t *testing.T) {
 
 	p := newValidPatent(t)
 	versionBefore := p.Version
-	cl := patent.Claim{ClaimNumber: 1, Text: "A compound...", ClaimType: "independent"}
+	cl := patent.Claim{Number: 1, Text: "A compound...", Type: ptypes.ClaimIndependent}
 
 	require.NoError(t, p.AddClaim(cl))
 	assert.Greater(t, p.Version, versionBefore)
@@ -450,13 +450,13 @@ func TestGetIndependentClaims_ReturnsOnlyTopLevelClaims(t *testing.T) {
 	t.Parallel()
 
 	p := newValidPatent(t)
-	require.NoError(t, p.AddClaim(patent.Claim{ClaimNumber: 1, Text: "Indep 1", ClaimType: "independent"}))
-	require.NoError(t, p.AddClaim(patent.Claim{ClaimNumber: 2, Text: "Dep of 1", ClaimType: "dependent", ParentClaimNumber: 1}))
-	require.NoError(t, p.AddClaim(patent.Claim{ClaimNumber: 3, Text: "Indep 3", ClaimType: "independent"}))
+	require.NoError(t, p.AddClaim(patent.Claim{Number: 1, Text: "Indep 1", Type: ptypes.ClaimIndependent}))
+	require.NoError(t, p.AddClaim(patent.Claim{Number: 2, Text: "Dep of 1", Type: ptypes.ClaimDependent, ParentClaimNumber: intPtr(1)}))
+	require.NoError(t, p.AddClaim(patent.Claim{Number: 3, Text: "Indep 3", Type: ptypes.ClaimIndependent}))
 
 	indep := p.GetIndependentClaims()
 	require.Len(t, indep, 2)
-	nums := []int{indep[0].ClaimNumber, indep[1].ClaimNumber}
+	nums := []int{indep[0].Number, indep[1].Number}
 	assert.Contains(t, nums, 1)
 	assert.Contains(t, nums, 3)
 }
@@ -465,14 +465,14 @@ func TestGetDependentClaims_ReturnsDirectDependents(t *testing.T) {
 	t.Parallel()
 
 	p := newValidPatent(t)
-	require.NoError(t, p.AddClaim(patent.Claim{ClaimNumber: 1, Text: "Indep", ClaimType: "independent"}))
-	require.NoError(t, p.AddClaim(patent.Claim{ClaimNumber: 2, Text: "Dep of 1", ClaimType: "dependent", ParentClaimNumber: 1}))
-	require.NoError(t, p.AddClaim(patent.Claim{ClaimNumber: 3, Text: "Dep of 1", ClaimType: "dependent", ParentClaimNumber: 1}))
-	require.NoError(t, p.AddClaim(patent.Claim{ClaimNumber: 4, Text: "Dep of 2", ClaimType: "dependent", ParentClaimNumber: 2}))
+	require.NoError(t, p.AddClaim(patent.Claim{Number: 1, Text: "Indep", Type: ptypes.ClaimIndependent}))
+	require.NoError(t, p.AddClaim(patent.Claim{Number: 2, Text: "Dep of 1", Type: ptypes.ClaimDependent, ParentClaimNumber: intPtr(1)}))
+	require.NoError(t, p.AddClaim(patent.Claim{Number: 3, Text: "Dep of 1", Type: ptypes.ClaimDependent, ParentClaimNumber: intPtr(1)}))
+	require.NoError(t, p.AddClaim(patent.Claim{Number: 4, Text: "Dep of 2", Type: ptypes.ClaimDependent, ParentClaimNumber: intPtr(2)}))
 
 	deps := p.GetDependentClaims(1)
 	require.Len(t, deps, 2)
-	nums := []int{deps[0].ClaimNumber, deps[1].ClaimNumber}
+	nums := []int{deps[0].Number, deps[1].Number}
 	assert.Contains(t, nums, 2)
 	assert.Contains(t, nums, 3)
 	// Claim 4 depends on 2, not directly on 1.
@@ -483,7 +483,7 @@ func TestGetDependentClaims_NoDependents_ReturnsEmpty(t *testing.T) {
 	t.Parallel()
 
 	p := newValidPatent(t)
-	require.NoError(t, p.AddClaim(patent.Claim{ClaimNumber: 1, Text: "Indep", ClaimType: "independent"}))
+	require.NoError(t, p.AddClaim(patent.Claim{Number: 1, Text: "Indep", Type: ptypes.ClaimIndependent}))
 
 	deps := p.GetDependentClaims(1)
 	assert.Empty(t, deps)
@@ -500,7 +500,7 @@ func TestEvents_NewPatent_ContainsPatentCreatedEvent(t *testing.T) {
 	evts := p.Events()
 
 	require.Len(t, evts, 1)
-	assert.Equal(t, "PatentCreated", evts[0].EventType())
+	assert.Equal(t, patent.PatentCreatedEventName, evts[0].EventName())
 }
 
 func TestEvents_AfterStatusChange_ContainsStatusChangedEvent(t *testing.T) {
@@ -513,7 +513,7 @@ func TestEvents_AfterStatusChange_ContainsStatusChangedEvent(t *testing.T) {
 	evts := p.Events()
 
 	require.Len(t, evts, 1)
-	assert.Equal(t, "PatentStatusChanged", evts[0].EventType())
+	assert.Equal(t, patent.PatentStatusChangedEventName, evts[0].EventName())
 }
 
 func TestEvents_CallClearsBuffer(t *testing.T) {
@@ -538,8 +538,8 @@ func TestEvents_MultipleStatusChanges_EachProducesEvent(t *testing.T) {
 	evts := p.Events()
 
 	require.Len(t, evts, 2)
-	assert.Equal(t, "PatentStatusChanged", evts[0].EventType())
-	assert.Equal(t, "PatentStatusChanged", evts[1].EventType())
+	assert.Equal(t, patent.PatentStatusChangedEventName, evts[0].EventName())
+	assert.Equal(t, patent.PatentStatusChangedEventName, evts[1].EventName())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -574,7 +574,7 @@ func TestPatentFromDTO_RoundTrip_FieldsMatch(t *testing.T) {
 	original := newValidPatent(t)
 	original.Inventors = []string{"Alice"}
 	require.NoError(t, original.AddClaim(patent.Claim{
-		ClaimNumber: 1, Text: "A compound...", ClaimType: "independent",
+		Number: 1, Text: "A compound...", Type: ptypes.ClaimIndependent,
 	}))
 	require.NoError(t, original.UpdateStatus(ptypes.StatusPublished))
 	_ = original.Events() // drain events — not part of DTO
@@ -592,7 +592,7 @@ func TestPatentFromDTO_RoundTrip_FieldsMatch(t *testing.T) {
 	assert.Equal(t, original.Jurisdiction, reconstructed.Jurisdiction)
 	assert.Equal(t, original.Version, reconstructed.Version)
 	require.Len(t, reconstructed.Claims, 1)
-	assert.Equal(t, 1, reconstructed.Claims[0].ClaimNumber)
+	assert.Equal(t, 1, reconstructed.Claims[0].Number)
 }
 
 func TestPatentFromDTO_EventsBufferIsEmpty(t *testing.T) {

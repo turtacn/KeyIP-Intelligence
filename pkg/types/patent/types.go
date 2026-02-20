@@ -109,13 +109,16 @@ const (
 	// JurisdictionWO represents a PCT (Patent Cooperation Treaty) international
 	// application filed via WIPO.
 	JurisdictionWO JurisdictionCode = "WO"
+
+	// JurisdictionOther represents any other jurisdiction not explicitly listed.
+	JurisdictionOther JurisdictionCode = "OTHER"
 )
 
 // IsValid reports whether the JurisdictionCode is one of the recognised constants.
 func (j JurisdictionCode) IsValid() bool {
 	switch j {
 	case JurisdictionCN, JurisdictionUS, JurisdictionEP,
-		JurisdictionJP, JurisdictionKR, JurisdictionWO:
+		JurisdictionJP, JurisdictionKR, JurisdictionWO, JurisdictionOther:
 		return true
 	}
 	return false
@@ -184,6 +187,9 @@ type PatentDTO struct {
 	// Claims is a summary list of the patent's claims.  Full claim text
 	// is stored in each ClaimDTO.
 	Claims []ClaimDTO `json:"claims,omitempty"`
+
+	// MarkushStructures is a list of chemical structures extracted from the claims.
+	MarkushStructures []MarkushDTO `json:"markush_structures,omitempty"`
 
 	// FamilyID is the canonical identifier of the patent family to which this
 	// patent belongs, linking equivalent applications across jurisdictions.
@@ -281,6 +287,9 @@ type MarkushDTO struct {
 
 	// Description is a free-text summary of the Markush structure for human readers.
 	Description string `json:"description,omitempty"`
+
+	// EnumeratedCount is the computed cardinality of the Markush virtual library.
+	EnumeratedCount int64 `json:"enumerated_count"`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

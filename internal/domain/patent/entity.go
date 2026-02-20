@@ -231,7 +231,7 @@ func NewPatent(
 	}
 
 	// Record the creation domain event.
-	p.recordEvent(NewPatentCreatedEvent(p.ID, p.PatentNumber, p.Jurisdiction))
+	p.recordEvent(NewPatentCreatedEvent(p.ID, p.PatentNumber, p.Title, p.Jurisdiction))
 
 	return p, nil
 }
@@ -273,25 +273,25 @@ func validatePatentNumber(number string, jurisdiction ptypes.JurisdictionCode) e
 // ─────────────────────────────────────────────────────────────────────────────
 
 // AddClaim appends a Claim to the patent, enforcing:
-//   - no two claims share the same ClaimNumber.
-//   - if the claim has a non-zero ParentClaimNumber, that parent must already
+//   - no two claims share the same Number.
+//   - if the claim has a non-nil ParentClaimNumber, that parent must already
 //     exist in p.Claims (forward references are not allowed).
 func (p *Patent) AddClaim(claim Claim) error {
 	// Duplicate number check.
 	for _, existing := range p.Claims {
-		if existing.ClaimNumber == claim.ClaimNumber {
+		if existing.Number == claim.Number {
 			return errors.New(errors.CodeInvalidParam,
 				fmt.Sprintf("claim number %d already exists on patent %s",
-					claim.ClaimNumber, p.PatentNumber),
+					claim.Number, p.PatentNumber),
 			)
 		}
 	}
 
 	// Dependency check: dependent claims must reference an existing parent.
-	if claim.ParentClaimNumber != 0 {
+	if claim.ParentClaimNumber != nil {
 		found := false
 		for _, existing := range p.Claims {
-			if existing.ClaimNumber == claim.ParentClaimNumber {
+			if existing.Number == *claim.ParentClaimNumber {
 				found = true
 				break
 			}
@@ -299,7 +299,7 @@ func (p *Patent) AddClaim(claim Claim) error {
 		if !found {
 			return errors.New(errors.CodeInvalidParam,
 				fmt.Sprintf("dependent claim %d references non-existent parent claim %d on patent %s",
-					claim.ClaimNumber, claim.ParentClaimNumber, p.PatentNumber),
+					claim.Number, *claim.ParentClaimNumber, p.PatentNumber),
 			)
 		}
 	}
@@ -320,7 +320,7 @@ func (p *Patent) AddMarkush(markush Markush) error {
 	if markush.ClaimID != "" {
 		found := false
 		for _, c := range p.Claims {
-			if string(c.ID) == markush.ClaimID {
+			if c.ID == markush.ClaimID {
 				found = true
 				break
 			}
@@ -443,12 +443,12 @@ func (p *Patent) IsExpired() bool {
 // Claim accessors
 // ─────────────────────────────────────────────────────────────────────────────
 
-// GetIndependentClaims returns all claims with a zero ParentClaimNumber
+// GetIndependentClaims returns all claims with a nil ParentClaimNumber
 // (i.e., claims that do not depend on any other claim).
 func (p *Patent) GetIndependentClaims() []Claim {
 	result := make([]Claim, 0)
 	for _, c := range p.Claims {
-		if c.ParentClaimNumber == 0 {
+		if c.ParentClaimNumber == nil {
 			result = append(result, c)
 		}
 	}
@@ -462,7 +462,7 @@ func (p *Patent) GetIndependentClaims() []Claim {
 func (p *Patent) GetDependentClaims(independentClaimNumber int) []Claim {
 	result := make([]Claim, 0)
 	for _, c := range p.Claims {
-		if c.ParentClaimNumber == independentClaimNumber {
+		if c.ParentClaimNumber != nil && *c.ParentClaimNumber == independentClaimNumber {
 			result = append(result, c)
 		}
 	}

@@ -85,8 +85,8 @@ type PatentCreated struct {
 	Jurisdiction ptypes.JurisdictionCode
 }
 
-// NewPatentCreated constructs a PatentCreated event for the given aggregate.
-func NewPatentCreated(
+// NewPatentCreatedEvent constructs a PatentCreated event for the given aggregate.
+func NewPatentCreatedEvent(
 	aggregateID common.ID,
 	patentNumber string,
 	title string,
@@ -115,6 +115,9 @@ const PatentStatusChangedEventName = "patent.status_changed"
 type PatentStatusChanged struct {
 	baseEvent
 
+	// PatentNumber is the official publication number.
+	PatentNumber string
+
 	// OldStatus is the status before the transition.
 	OldStatus ptypes.PatentStatus
 
@@ -122,16 +125,18 @@ type PatentStatusChanged struct {
 	NewStatus ptypes.PatentStatus
 }
 
-// NewPatentStatusChanged constructs a PatentStatusChanged event.
-func NewPatentStatusChanged(
+// NewPatentStatusChangedEvent constructs a PatentStatusChanged event.
+func NewPatentStatusChangedEvent(
 	aggregateID common.ID,
+	patentNumber string,
 	oldStatus ptypes.PatentStatus,
 	newStatus ptypes.PatentStatus,
 ) *PatentStatusChanged {
 	return &PatentStatusChanged{
-		baseEvent: newBaseEvent(PatentStatusChangedEventName, aggregateID),
-		OldStatus: oldStatus,
-		NewStatus: newStatus,
+		baseEvent:    newBaseEvent(PatentStatusChangedEventName, aggregateID),
+		PatentNumber: patentNumber,
+		OldStatus:    oldStatus,
+		NewStatus:    newStatus,
 	}
 }
 

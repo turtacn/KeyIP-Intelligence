@@ -36,13 +36,13 @@ func newMemRepository() *memRepository {
 func (r *memRepository) Save(ctx context.Context, p *patent.Patent) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.byNum[p.Number]; exists {
+	if _, exists := r.byNum[p.PatentNumber]; exists {
 		return pkgerrors.New(pkgerrors.CodeConflict, "patent number already exists").
-			WithDetail("number=" + p.Number)
+			WithDetail("number=" + p.PatentNumber)
 	}
 	clone := *p
 	r.byID[p.BaseEntity.ID] = &clone
-	r.byNum[p.Number] = &clone
+	r.byNum[p.PatentNumber] = &clone
 	return nil
 }
 
@@ -105,10 +105,10 @@ func (r *memRepository) Update(ctx context.Context, p *patent.Patent) error {
 	}
 	clone := *p
 	r.byID[p.BaseEntity.ID] = &clone
-	if existing.Number != p.Number {
-		delete(r.byNum, existing.Number)
+	if existing.PatentNumber != p.PatentNumber {
+		delete(r.byNum, existing.PatentNumber)
 	}
-	r.byNum[p.Number] = &clone
+	r.byNum[p.PatentNumber] = &clone
 	return nil
 }
 
@@ -119,7 +119,7 @@ func (r *memRepository) Delete(ctx context.Context, id common.ID) error {
 	if !ok {
 		return pkgerrors.NotFound("patent not found").WithDetail("id=" + string(id))
 	}
-	delete(r.byNum, p.Number)
+	delete(r.byNum, p.PatentNumber)
 	delete(r.byID, id)
 	return nil
 }
@@ -129,12 +129,9 @@ func (r *memRepository) FindByApplicant(ctx context.Context, applicant string, p
 	defer r.mu.RUnlock()
 	var items []*patent.Patent
 	for _, p := range r.byID {
-		for _, a := range p.Applicants {
-			if a == applicant {
-				clone := *p
-				items = append(items, &clone)
-				break
-			}
+		if p.Applicant == applicant {
+			clone := *p
+			items = append(items, &clone)
 		}
 	}
 	resp := common.NewPageResponse(items, int64(len(items)), page)
@@ -213,7 +210,7 @@ func RepositoryContractTest(t *testing.T, repo patent.Repository) {
 		found, err := repo.FindByID(ctx, p.BaseEntity.ID)
 		require.NoError(t, err)
 		assert.Equal(t, p.BaseEntity.ID, found.BaseEntity.ID)
-		assert.Equal(t, p.Number, found.Number)
+		assert.Equal(t, p.PatentNumber, found.PatentNumber)
 		assert.Equal(t, p.Title, found.Title)
 	})
 
@@ -222,9 +219,9 @@ func RepositoryContractTest(t *testing.T, repo patent.Repository) {
 		p := buildTestPatent(t, "CN202300002A", ptypes.JurisdictionCN)
 		require.NoError(t, repo.Save(ctx, p))
 
-		found, err := repo.FindByNumber(ctx, p.Number)
+		found, err := repo.FindByNumber(ctx, p.PatentNumber)
 		require.NoError(t, err)
-		assert.Equal(t, p.Number, found.Number)
+		assert.Equal(t, p.PatentNumber, found.PatentNumber)
 	})
 
 	t.Run("FindByID_NotFound", func(t *testing.T) {
@@ -319,12 +316,12 @@ func buildTestPatent(t *testing.T, number string, jurisdiction ptypes.Jurisdicti
 		number,
 		"Test Patent Title "+number,
 		"Test abstract.",
+		"Test Corp",
 		jurisdiction,
-		[]string{"Test Corp"},
-		[]string{"Inventor A"},
 		time.Now(),
 	)
 	require.NoError(t, err)
+	p.Inventors = []string{"Inventor A"}
 	return p
 }
 

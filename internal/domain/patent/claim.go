@@ -80,7 +80,7 @@ type Claim struct {
 // Validation rules:
 //   - number must be > 0
 //   - text must be non-empty
-//   - dependent claims (type ptypes.ClaimTypeDependent) must supply a non-nil parentNumber
+//   - dependent claims (type ptypes.ClaimDependent) must supply a non-nil parentNumber
 //   - parentNumber, when supplied, must be > 0 and < number
 func NewClaim(
 	number int,
@@ -99,7 +99,7 @@ func NewClaim(
 	}
 
 	// Dependent claims must reference a parent claim.
-	if claimType == ptypes.ClaimTypeDependent {
+	if claimType == ptypes.ClaimDependent {
 		if parentNumber == nil {
 			return nil, errors.InvalidParam(
 				"dependent claim must have a parent claim number")
@@ -116,7 +116,7 @@ func NewClaim(
 	}
 
 	// Independent claim types must not carry a parent reference.
-	if claimType != ptypes.ClaimTypeDependent && parentNumber != nil {
+	if claimType != ptypes.ClaimDependent && parentNumber != nil {
 		return nil, errors.InvalidParam(
 			"non-dependent claim must not specify a parent claim number").
 			WithDetail("claimType=" + string(claimType))
@@ -226,6 +226,28 @@ func (c *Claim) ToDTO() ptypes.ClaimDTO {
 	}
 }
 
+// ClaimFromDTO reconstructs a Claim value object from its DTO.
+func ClaimFromDTO(dto ptypes.ClaimDTO) Claim {
+	elements := make([]ClaimElement, len(dto.Elements))
+	for i, el := range dto.Elements {
+		elements[i] = ClaimElement{
+			ID:               el.ID,
+			Text:             el.Text,
+			IsStructural:     el.IsStructural,
+			ChemicalEntities: el.ChemicalEntities,
+		}
+	}
+
+	return Claim{
+		ID:                dto.ID,
+		Number:            dto.Number,
+		Text:              dto.Text,
+		Type:              dto.Type,
+		ParentClaimNumber: dto.ParentClaimNumber,
+		Elements:          elements,
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Package-level helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -241,7 +263,7 @@ var claimStopWords = map[string]struct{}{
 	"and": {}, "or": {}, "but": {}, "nor": {}, "not": {}, "as": {}, "than": {},
 	// Common patent boilerplate
 	"claim": {}, "claims": {}, "wherein": {}, "comprising": {}, "comprising:": {},
-	"consists": {}, "consisting": {}, "essentially": {}, "consists": {},
+	"consisting": {}, "essentially": {}, "consists": {},
 	"according": {}, "defined": {}, "described": {}, "said": {}, "thereof": {},
 	"therein": {}, "whereby": {}, "wherein,": {}, "further": {}, "least": {},
 	"one": {}, "two": {}, "more": {}, "plurality": {}, "set": {}, "group": {},
