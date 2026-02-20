@@ -67,6 +67,8 @@ var allCodes = []codeEntry{
 	{errors.CodeSearchError, "SEARCH_ERROR", http.StatusInternalServerError},
 	{errors.CodeMessageQueueError, "MESSAGE_QUEUE_ERROR", http.StatusServiceUnavailable},
 	{errors.CodeStorageError, "STORAGE_ERROR", http.StatusServiceUnavailable},
+	{errors.CodeDatabaseError, "DATABASE_ERROR", http.StatusInternalServerError},
+	{errors.CodeDBQueryError, "DB_QUERY_ERROR", http.StatusInternalServerError},
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -287,6 +289,8 @@ func TestErrorCode_DomainRanges(t *testing.T) {
 		{errors.CodeSearchError, 70000, 79999, "CodeSearchError"},
 		{errors.CodeMessageQueueError, 70000, 79999, "CodeMessageQueueError"},
 		{errors.CodeStorageError, 70000, 79999, "CodeStorageError"},
+		{errors.CodeDatabaseError, 70000, 79999, "CodeDatabaseError"},
+		{errors.CodeDBQueryError, 70000, 79999, "CodeDBQueryError"},
 	}
 
 	for _, r := range ranges {

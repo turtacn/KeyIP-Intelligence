@@ -145,6 +145,11 @@ const (
 	// re-use a connection to PostgreSQL or Neo4j.
 	CodeDBConnectionError ErrorCode = 70001
 
+	// CodeDBQueryError is returned when a database query fails due to syntax
+	// errors, constraint violations (not covered by CodeConflict), or other
+	// execution-time failures.
+	CodeDBQueryError ErrorCode = 70007
+
 	// CodeDatabaseError is a general error for database-related failures that
 	// are not specifically connection issues.
 	CodeDatabaseError ErrorCode = 70006
@@ -241,6 +246,8 @@ func (c ErrorCode) String() string {
 	// Infrastructure
 	case CodeDBConnectionError:
 		return "DB_CONNECTION_ERROR"
+	case CodeDBQueryError:
+		return "DB_QUERY_ERROR"
 	case CodeDatabaseError:
 		return "DATABASE_ERROR"
 	case CodeCacheError:
@@ -313,6 +320,9 @@ func (c ErrorCode) HTTPStatus() int {
 		CodeMessageQueueError,
 		CodeStorageError:
 		return http.StatusServiceUnavailable
+
+	case CodeDBQueryError:
+		return http.StatusInternalServerError
 
 	case CodeNotImplemented:
 		return http.StatusNotImplemented

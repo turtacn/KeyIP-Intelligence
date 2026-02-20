@@ -674,4 +674,3 @@ func (r *CollaborationRepository) scanWorkspaces(rows pgx.Rows) ([]*Workspace, e
 	return workspaces, nil
 }
 
-//Personal.AI order the ending

@@ -725,4 +725,3 @@ func (r *LifecycleRepository) scanLifecycles(rows pgx.Rows) ([]*Lifecycle, error
 	return lifecycles, nil
 }
 
-//Personal.AI order the ending

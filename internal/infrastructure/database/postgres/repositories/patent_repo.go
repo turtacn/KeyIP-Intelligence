@@ -14,22 +14,7 @@ import (
 
 	appErrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	patentTypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Logger interface (minimal, avoids hard coupling to concrete logger)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Logger is the minimal logging contract required by repository implementations.
-// It is satisfied by the platform's monitoring/logging.Logger and by most
-// structured-logging libraries.
-type Logger interface {
-	Debug(msg string, keysAndValues ...interface{})
-	Info(msg string, keysAndValues ...interface{})
-	Warn(msg string, keysAndValues ...interface{})
-	Error(msg string, keysAndValues ...interface{})
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Domain entity stubs — thin mirrors of internal/domain/patent types
@@ -864,4 +849,3 @@ func (r *PatentRepository) scanPatents(rows pgx.Rows) ([]*Patent, error) {
 	return patents, nil
 }
 
-//Personal.AI order the ending

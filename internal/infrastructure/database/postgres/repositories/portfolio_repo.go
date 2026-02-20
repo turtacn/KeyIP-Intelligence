@@ -457,4 +457,3 @@ func (r *PortfolioRepository) scanPortfolios(rows pgx.Rows) ([]*Portfolio, error
 	return portfolios, nil
 }
 
-//Personal.AI order the ending
