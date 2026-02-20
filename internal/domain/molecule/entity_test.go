@@ -458,4 +458,3 @@ func TestMoleculeFromDTO_RoundTrip(t *testing.T) {
 	assert.InDelta(t, *original.Properties.HOMO, *reconstructed.Properties.HOMO, 1e-9)
 }
 
-//Personal.AI order the ending

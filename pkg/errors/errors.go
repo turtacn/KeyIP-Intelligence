@@ -319,4 +319,3 @@ func RateLimit(message string) *AppError {
 	}
 }
 
-//Personal.AI order the ending

@@ -336,4 +336,3 @@ func TestService_GetWorkspacesByResource(t *testing.T) {
 	assert.Equal(t, ws.ID, workspaces[0].ID)
 }
 
-//Personal.AI order the ending

@@ -13,4 +13,3 @@ DROP TABLE IF EXISTS audit_logs CASCADE;
 
 DROP FUNCTION IF EXISTS create_audit_log_partition(DATE) CASCADE;
 
--- Personal.AI order the ending

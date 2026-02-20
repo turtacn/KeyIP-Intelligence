@@ -193,4 +193,3 @@ func ForceMigrationVersion(dbURL string, migrationsPath string, version int) err
 	return nil
 }
 
-//Personal.AI order the ending

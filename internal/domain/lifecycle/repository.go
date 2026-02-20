@@ -94,4 +94,3 @@ type AdvancedRepository interface {
 	FindByQuery(ctx context.Context, query *LifecycleQuery, offset, limit int) ([]*PatentLifecycle, int64, error)
 }
 
-//Personal.AI order the ending

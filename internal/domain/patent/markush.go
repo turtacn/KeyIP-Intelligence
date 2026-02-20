@@ -329,4 +329,3 @@ func validateSMILESBasic(smiles string) error {
 	return nil
 }
 
-//Personal.AI order the ending

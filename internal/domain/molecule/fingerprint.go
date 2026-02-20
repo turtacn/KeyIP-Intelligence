@@ -299,4 +299,3 @@ func hashPath(path string) uint64 {
 	return binary.BigEndian.Uint64(hash[:8])
 }
 
-//Personal.AI order the ending

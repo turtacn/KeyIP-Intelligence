@@ -643,4 +643,3 @@ func TestClaimElementDTO_StructuralFlag(t *testing.T) {
 	assert.False(t, functional.IsStructural)
 }
 
-//Personal.AI order the ending

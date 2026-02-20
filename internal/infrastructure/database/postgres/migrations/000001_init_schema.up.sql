@@ -253,4 +253,3 @@ CREATE TRIGGER trigger_lifecycles_updated_at BEFORE UPDATE ON patent_lifecycles
 CREATE TRIGGER trigger_workspaces_updated_at BEFORE UPDATE ON workspaces
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Personal.AI order the ending

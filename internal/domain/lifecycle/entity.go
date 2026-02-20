@@ -420,4 +420,3 @@ func (lc *PatentLifecycle) RemainingLifeYears() float64 {
 	return years
 }
 
-//Personal.AI order the ending

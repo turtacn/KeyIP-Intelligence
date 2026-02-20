@@ -257,4 +257,3 @@ func TestEventNameConstants_Values(t *testing.T) {
 	assert.Equal(t, "patent.expiring", patent.PatentExpiringEventName)
 }
 
-//Personal.AI order the ending

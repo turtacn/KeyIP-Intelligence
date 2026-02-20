@@ -245,4 +245,3 @@ func (p *Portfolio) ContainsPatent(patentID common.ID) bool {
 	return false
 }
 
-//Personal.AI order the ending

@@ -293,4 +293,3 @@ func TestMarkushToDTO_FieldsMatch(t *testing.T) {
 	assert.Equal(t, []string{"C", "N", "O"}, dto.RGroups[0].Alternatives)
 }
 
-//Personal.AI order the ending

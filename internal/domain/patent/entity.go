@@ -607,4 +607,3 @@ func (p *Patent) touch() {
 	p.Version++
 }
 
-//Personal.AI order the ending

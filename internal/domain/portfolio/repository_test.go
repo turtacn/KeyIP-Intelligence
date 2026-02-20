@@ -126,4 +126,3 @@ func RepositoryContractTest(t *testing.T, repo portfolio.Repository) {
 	})
 }
 
-//Personal.AI order the ending

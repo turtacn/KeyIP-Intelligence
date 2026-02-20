@@ -294,4 +294,3 @@ func (s *Service) FindExpiringPatents(ctx context.Context, withinDays int) ([]*P
 	return patents, nil
 }
 
-//Personal.AI order the ending

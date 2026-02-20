@@ -99,4 +99,3 @@ type Repository interface {
 	FindExpiring(ctx context.Context, before time.Time) ([]*Patent, error)
 }
 
-//Personal.AI order the ending

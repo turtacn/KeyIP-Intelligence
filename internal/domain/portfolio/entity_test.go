@@ -299,4 +299,3 @@ func TestSetValuation_UpdatesValueAndVersion(t *testing.T) {
 	assert.Equal(t, initialVersion+1, p.Version)
 }
 
-//Personal.AI order the ending

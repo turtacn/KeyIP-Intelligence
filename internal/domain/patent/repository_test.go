@@ -332,4 +332,3 @@ func buildTestPatentWithExpiry(t *testing.T, number string, jurisdiction ptypes.
 	return p
 }
 
-//Personal.AI order the ending

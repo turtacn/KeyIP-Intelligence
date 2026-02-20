@@ -138,4 +138,3 @@ func ApplyDefaults(cfg *Config) {
 	}
 }
 
-//Personal.AI order the ending

@@ -242,4 +242,3 @@ func (s *Service) GetMoleculesByPatent(ctx context.Context, patentID common.ID) 
 	return mols, nil
 }
 
-//Personal.AI order the ending

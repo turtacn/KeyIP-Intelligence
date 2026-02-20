@@ -162,4 +162,3 @@ func RepositoryContractTest(t *testing.T, repo molecule.Repository) {
 	})
 }
 
-//Personal.AI order the ending

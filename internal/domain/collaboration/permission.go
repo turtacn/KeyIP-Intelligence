@@ -154,4 +154,3 @@ func HasPermission(role MemberRole, action, resource string) bool {
 	return ps.Contains(action, resource)
 }
 
-//Personal.AI order the ending

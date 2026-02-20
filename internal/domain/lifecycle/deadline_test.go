@@ -372,4 +372,3 @@ func TestNeedsAttention_Completed(t *testing.T) {
 	assert.False(t, d.NeedsAttention())
 }
 
-//Personal.AI order the ending

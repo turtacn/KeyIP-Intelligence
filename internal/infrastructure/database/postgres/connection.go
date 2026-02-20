@@ -75,11 +75,11 @@ func NewConnectionPool(cfg config.DatabaseConfig, logger logging.Logger) (*pgxpo
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		logger.Info("attempting database connection",
-			"attempt", attempt,
-			"max_attempts", maxRetries,
-			"host", cfg.Host,
-			"port", cfg.Port,
-			"database", cfg.Database,
+			logging.Int("attempt", attempt),
+			logging.Int("max_attempts", maxRetries),
+			logging.String("host", cfg.Host),
+			logging.Int("port", cfg.Port),
+			logging.String("database", cfg.DBName),
 		)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -94,10 +94,10 @@ func NewConnectionPool(cfg config.DatabaseConfig, logger logging.Logger) (*pgxpo
 
 			if err == nil {
 				logger.Info("database connection established",
-					"host", cfg.Host,
-					"port", cfg.Port,
-					"database", cfg.Database,
-					"max_conns", poolConfig.MaxConns,
+					logging.String("host", cfg.Host),
+					logging.Int("port", cfg.Port),
+					logging.String("database", cfg.DBName),
+					logging.Int("max_conns", int(poolConfig.MaxConns)),
 				)
 				return pool, nil
 			}
@@ -105,13 +105,13 @@ func NewConnectionPool(cfg config.DatabaseConfig, logger logging.Logger) (*pgxpo
 			// Ping failed; close pool and retry.
 			pool.Close()
 			logger.Warn("database ping failed",
-				"attempt", attempt,
-				"error", err,
+				logging.Int("attempt", attempt),
+				logging.Err(err),
 			)
 		} else {
 			logger.Warn("failed to create connection pool",
-				"attempt", attempt,
-				"error", err,
+				logging.Int("attempt", attempt),
+				logging.Err(err),
 			)
 		}
 
@@ -122,7 +122,7 @@ func NewConnectionPool(cfg config.DatabaseConfig, logger logging.Logger) (*pgxpo
 
 		// Exponential backoff before next retry.
 		logger.Info("retrying database connection",
-			"delay_seconds", retryDelay.Seconds(),
+			logging.Float64("delay_seconds", retryDelay.Seconds()),
 		)
 		time.Sleep(retryDelay)
 		retryDelay *= 2
@@ -187,7 +187,7 @@ func buildConnString(cfg config.DatabaseConfig) string {
 		cfg.Password,
 		cfg.Host,
 		cfg.Port,
-		cfg.Database,
+		cfg.DBName,
 		cfg.SSLMode,
 	)
 }
@@ -201,29 +201,29 @@ func buildConnString(cfg config.DatabaseConfig) string {
 // are zero.
 func configurePool(poolConfig *pgxpool.Config, cfg config.DatabaseConfig) {
 	// MaxConns: maximum number of connections in the pool.
-	if cfg.MaxOpenConnections > 0 {
-		poolConfig.MaxConns = int32(cfg.MaxOpenConnections)
+	if cfg.MaxConns > 0 {
+		poolConfig.MaxConns = int32(cfg.MaxConns)
 	} else {
 		poolConfig.MaxConns = defaultMaxConns
 	}
 
 	// MinConns: minimum number of idle connections to maintain.
-	if cfg.MaxIdleConnections > 0 {
-		poolConfig.MinConns = int32(cfg.MaxIdleConnections)
+	if cfg.MinConns > 0 {
+		poolConfig.MinConns = int32(cfg.MinConns)
 	} else {
 		poolConfig.MinConns = defaultMinConns
 	}
 
 	// MaxConnLifetime: maximum duration a connection can be reused.
-	if cfg.ConnectionMaxLifetime > 0 {
-		poolConfig.MaxConnLifetime = cfg.ConnectionMaxLifetime
+	if cfg.ConnMaxLifetime > 0 {
+		poolConfig.MaxConnLifetime = cfg.ConnMaxLifetime
 	} else {
 		poolConfig.MaxConnLifetime = defaultMaxConnLifetime
 	}
 
 	// MaxConnIdleTime: maximum duration a connection can remain idle.
-	if cfg.ConnectionMaxIdleTime > 0 {
-		poolConfig.MaxConnIdleTime = cfg.ConnectionMaxIdleTime
+	if cfg.ConnMaxIdleTime > 0 {
+		poolConfig.MaxConnIdleTime = cfg.ConnMaxIdleTime
 	} else {
 		poolConfig.MaxConnIdleTime = defaultMaxConnIdleTime
 	}
@@ -236,6 +236,9 @@ func configurePool(poolConfig *pgxpool.Config, cfg config.DatabaseConfig) {
 // WithTransaction — transaction wrapper with savepoint support
 // ─────────────────────────────────────────────────────────────────────────────
 
+// txKey is the context key used to store the active transaction.
+type txKey struct{}
+
 // WithTransaction executes the provided function within a database transaction.
 // If fn returns an error or panics, the transaction is rolled back; otherwise,
 // it is committed.
@@ -246,16 +249,46 @@ func configurePool(poolConfig *pgxpool.Config, cfg config.DatabaseConfig) {
 //
 // Usage:
 //
-//	err := WithTransaction(ctx, pool, func(tx pgx.Tx) error {
-//	    _, err := tx.Exec(ctx, "INSERT INTO patents (...) VALUES (...)")
+//	err := WithTransaction(ctx, pool, func(tx pgx.Tx, txCtx context.Context) error {
+//	    _, err := tx.Exec(txCtx, "INSERT INTO patents (...) VALUES (...)")
 //	    return err
 //	})
-func WithTransaction(ctx context.Context, pool *pgxpool.Pool, fn func(tx pgx.Tx) error) (err error) {
-	// Begin a new transaction.
+func WithTransaction(ctx context.Context, pool *pgxpool.Pool, fn func(tx pgx.Tx, txCtx context.Context) error) (err error) {
+	// Check if we are already inside a transaction.
+	if activeTx, ok := ctx.Value(txKey{}).(pgx.Tx); ok {
+		// Nested transaction: use a savepoint.
+		savepointName := fmt.Sprintf("sp_%d", time.Now().UnixNano())
+		_, err = activeTx.Exec(ctx, "SAVEPOINT "+savepointName)
+		if err != nil {
+			return fmt.Errorf("failed to create savepoint: %w", err)
+		}
+
+		// Ensure the savepoint is released or rolled back.
+		defer func() {
+			if p := recover(); p != nil {
+				_, _ = activeTx.Exec(ctx, "ROLLBACK TO SAVEPOINT "+savepointName)
+				panic(p)
+			} else if err != nil {
+				_, _ = activeTx.Exec(ctx, "ROLLBACK TO SAVEPOINT "+savepointName)
+			} else {
+				_, cmtErr := activeTx.Exec(ctx, "RELEASE SAVEPOINT "+savepointName)
+				if cmtErr != nil {
+					err = fmt.Errorf("failed to release savepoint: %w", cmtErr)
+				}
+			}
+		}()
+
+		return fn(activeTx, ctx)
+	}
+
+	// Begin a new top-level transaction.
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
+
+	// Put the transaction in the context so nested calls can find it.
+	txCtx := context.WithValue(ctx, txKey{}, tx)
 
 	// Ensure the transaction is finalized (commit or rollback).
 	defer func() {
@@ -276,9 +309,8 @@ func WithTransaction(ctx context.Context, pool *pgxpool.Pool, fn func(tx pgx.Tx)
 		}
 	}()
 
-	// Execute the user-provided function within the transaction.
-	err = fn(tx)
+	// Execute the user-provided function within the transaction context.
+	err = fn(tx, txCtx)
 	return err
 }
 
-//Personal.AI order the ending

@@ -218,4 +218,3 @@ func TestPermissionSet_Merge_PreservesDuplicates(t *testing.T) {
 	assert.Len(t, merged.Permissions, 2, "Merge does not deduplicate")
 }
 
-//Personal.AI order the ending

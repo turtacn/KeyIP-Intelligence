@@ -426,4 +426,3 @@ multitenancy:
   # Example header: "X-Tenant-ID: acme-corp"
   tenant_header: X-Tenant-ID
 
-#Personal.AI order the ending

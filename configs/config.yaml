@@ -236,4 +236,3 @@ multitenancy:
   # HTTP header carrying the tenant ID
   tenant_header: X-Tenant-ID
 
-#Personal.AI order the ending

@@ -290,4 +290,3 @@ func TestCalculateMorganFingerprint_InvalidSMILES(t *testing.T) {
 	}
 }
 
-//Personal.AI order the ending

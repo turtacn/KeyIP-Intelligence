@@ -351,4 +351,3 @@ func TestService_GetUpcomingDeadlines_Success(t *testing.T) {
 	assert.NotEmpty(t, results)
 }
 
-//Personal.AI order the ending

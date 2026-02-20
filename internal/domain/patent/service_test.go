@@ -477,4 +477,3 @@ func TestService_GetPatentFamily_EmptyFamilyIDReturnsError(t *testing.T) {
 	assert.True(t, pkgerrors.IsCode(err, pkgerrors.CodeInvalidParam))
 }
 
-//Personal.AI order the ending

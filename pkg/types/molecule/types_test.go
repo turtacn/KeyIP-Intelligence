@@ -471,4 +471,3 @@ func TestSubstructureSearchResponse_JSONRoundTrip(t *testing.T) {
 	assert.Equal(t, original.Total, decoded.Total)
 }
 
-//Personal.AI order the ending

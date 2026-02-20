@@ -365,4 +365,3 @@ func TestBaseEntity_VersionOptimisticLock(t *testing.T) {
 	assert.Equal(t, 1, e.Version)
 }
 
-//Personal.AI order the ending

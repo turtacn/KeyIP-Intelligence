@@ -130,4 +130,3 @@ func TestMockRepository(t *testing.T) {
 	RepositoryContractTest(t, repo, cleanup)
 }
 
-//Personal.AI order the ending

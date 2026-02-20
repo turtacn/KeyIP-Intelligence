@@ -299,4 +299,3 @@ func TestToDTO_FieldsMatch(t *testing.T) {
 	assert.Equal(t, []string{"c1ccc2[nH]ccc2c1"}, dto.Elements[0].ChemicalEntities)
 }
 
-//Personal.AI order the ending

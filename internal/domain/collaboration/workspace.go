@@ -349,4 +349,3 @@ func (w *Workspace) HasAccess(userID common.UserID, resourceID common.ID, requir
 	return role == RoleEditor || role == RoleViewer
 }
 
-//Personal.AI order the ending

@@ -438,4 +438,3 @@ help:
 	@echo "  make test-pkg PKG=./internal/...    # Test specific package"
 	@echo ""
 
-#Personal.AI order the ending

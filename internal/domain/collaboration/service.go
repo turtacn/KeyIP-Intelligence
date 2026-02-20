@@ -350,4 +350,3 @@ func (s *Service) GetWorkspacesByResource(ctx context.Context, resourceID common
 	return workspaces, nil
 }
 
-//Personal.AI order the ending

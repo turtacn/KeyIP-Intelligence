@@ -109,4 +109,3 @@ func TestApplyDefaults_PartialConfig(t *testing.T) {
 	assert.Equal(t, config.DefaultDBPort, cfg.Database.Port)
 }
 
-//Personal.AI order the ending

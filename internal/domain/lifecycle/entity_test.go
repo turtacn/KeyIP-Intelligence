@@ -409,4 +409,3 @@ func TestRemainingLifeYears_CorrectCalculation(t *testing.T) {
 	assert.Equal(t, 0.0, remaining, "expired patent should have 0 remaining years")
 }
 
-//Personal.AI order the ending

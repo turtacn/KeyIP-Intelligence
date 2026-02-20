@@ -289,4 +289,3 @@ func TestHasAccess_AdminHasFullAccess(t *testing.T) {
 	assert.True(t, ws.HasAccess(adminID, resourceID, "read"))
 }
 
-//Personal.AI order the ending

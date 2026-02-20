@@ -241,4 +241,3 @@ func TestBatchImportMolecules_SkipsInvalid(t *testing.T) {
 	mockRepo.AssertNotCalled(t, "BatchSave")
 }
 
-//Personal.AI order the ending

@@ -621,4 +621,3 @@ func TestToDTO_PriorityEntries_Preserved(t *testing.T) {
 	assert.Equal(t, "US62123456", dto.Priority[0].Number)
 }
 
-//Personal.AI order the ending

@@ -243,4 +243,3 @@ func NewPatentExpiring(
 	}
 }
 
-//Personal.AI order the ending

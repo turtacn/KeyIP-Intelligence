@@ -180,4 +180,3 @@ func TestConfig_SubStructs_ZeroValues(t *testing.T) {
 	assert.Equal(t, 0, cfg.Worker.Concurrency)
 }
 
-//Personal.AI order the ending

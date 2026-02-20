@@ -38,4 +38,3 @@ type Repository interface {
 	FindWorkspacesByResource(ctx context.Context, resourceID common.ID) ([]*Workspace, error)
 }
 
-//Personal.AI order the ending

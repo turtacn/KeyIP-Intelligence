@@ -8,7 +8,7 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     user_id UUID,
     action VARCHAR(50) NOT NULL CHECK (action IN ('create', 'update', 'delete', 'view', 'export', 'import', 'share', 'revoke')),
@@ -18,7 +18,8 @@ CREATE TABLE audit_logs (
     new_value JSONB,
     ip_address INET,
     user_agent TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id, created_at)
 ) PARTITION BY RANGE (created_at);
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -99,4 +100,3 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Personal.AI order the ending

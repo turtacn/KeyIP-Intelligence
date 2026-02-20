@@ -33,4 +33,3 @@ DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
 
 -- DROP EXTENSION IF EXISTS "pgcrypto" CASCADE;
 
--- Personal.AI order the ending

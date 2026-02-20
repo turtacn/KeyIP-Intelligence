@@ -222,4 +222,3 @@ type SubstructureSearchResponse struct {
 	Total int `json:"total"`
 }
 
-//Personal.AI order the ending

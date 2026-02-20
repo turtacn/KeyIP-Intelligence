@@ -212,4 +212,3 @@ func (s *Service) GetUserPortfolios(
 	return resp, nil
 }
 
-//Personal.AI order the ending

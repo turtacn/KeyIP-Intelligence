@@ -228,4 +228,3 @@ func TestMustLoad_InvalidPathPanics(t *testing.T) {
 	assert.Panics(t, func() { config.MustLoad("/no/such/file/config.yaml") })
 }
 
-//Personal.AI order the ending

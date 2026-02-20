@@ -196,4 +196,3 @@ func TestGetAllJurisdictions(t *testing.T) {
 	assert.True(t, codes[ptypes.JurisdictionWO])
 }
 
-//Personal.AI order the ending

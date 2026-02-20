@@ -6,12 +6,18 @@
 package postgres_test
 
 import (
+	"context"
 	"os"
 	"testing"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/turtacn/KeyIP-Intelligence/internal/config"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -208,11 +214,11 @@ func TestRunMigrations_CreatesExpectedTables(t *testing.T) {
 		Port:     5432,
 		User:     "test",
 		Password: "test",
-		Database: "test_keyip",
+		DBName:   "test_keyip",
 		SSLMode:  "disable",
 	}
 
-	logger := logging.NewNoOpLogger()
+	logger := logging.NewNopLogger()
 	pool, err := postgres.NewConnectionPool(cfg, logger)
 	require.NoError(t, err)
 	defer postgres.Close(pool)
@@ -243,4 +249,3 @@ func TestRunMigrations_CreatesExpectedTables(t *testing.T) {
 	}
 }
 
-//Personal.AI order the ending

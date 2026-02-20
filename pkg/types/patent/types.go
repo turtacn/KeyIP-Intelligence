@@ -409,4 +409,3 @@ type SimilarityResult struct {
 	MatchedClaims []int `json:"matched_claims,omitempty"`
 }
 
-//Personal.AI order the ending
