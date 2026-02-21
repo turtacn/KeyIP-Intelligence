@@ -115,8 +115,17 @@ func (mockLogger) Fatal(msg string, fields ...logging.Field) {}
 func (l mockLogger) With(fields ...logging.Field) logging.Logger {
 	return l
 }
+func (l mockLogger) WithContext(ctx context.Context) logging.Logger {
+	return l
+}
+func (l mockLogger) WithError(err error) logging.Logger {
+	return l
+}
 func (l mockLogger) Named(name string) logging.Logger {
 	return l
+}
+func (l mockLogger) Sync() error {
+	return nil
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

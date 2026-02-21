@@ -1,224 +1,243 @@
-// Package molecule defines all molecule-domain Data Transfer Objects, enumerations,
-// and request/response structures used across every layer of the KeyIP-Intelligence
-// platform.  No domain logic lives here — only plain data types that are safe to
-// import from any layer without creating circular dependencies.
 package molecule
 
 import (
+	"fmt"
+
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MoleculeType — classification of a molecule's functional role
-// ─────────────────────────────────────────────────────────────────────────────
-
-// MoleculeType categorises a molecule by its primary chemical function within
-// the patent corpus that KeyIP-Intelligence analyses.
+// MoleculeType categorises a molecule by its primary chemical function.
 type MoleculeType string
 
 const (
-	// TypeSmallMolecule covers drug-like, agrochemical, and general organic molecules.
 	TypeSmallMolecule MoleculeType = "small_molecule"
-
-	// TypePolymer covers macromolecular structures represented by repeating units.
-	TypePolymer MoleculeType = "polymer"
-
-	// TypeOLEDMaterial covers organic light-emitting diode host and emitter materials,
-	// including thermally activated delayed fluorescence (TADF) compounds.
-	TypeOLEDMaterial MoleculeType = "oled_material"
-
-	// TypeCatalyst covers transition-metal complexes and organocatalysts.
-	TypeCatalyst MoleculeType = "catalyst"
-
-	// TypeIntermediate covers synthetic intermediates that appear in patent
-	// synthesis routes but are not themselves end-use materials.
-	TypeIntermediate MoleculeType = "intermediate"
+	TypePolymer       MoleculeType = "polymer"
+	TypeOLEDMaterial  MoleculeType = "oled_material"
+	TypeCatalyst      MoleculeType = "catalyst"
+	TypeIntermediate  MoleculeType = "intermediate"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FingerprintType — molecular fingerprint algorithm identifier
-// ─────────────────────────────────────────────────────────────────────────────
+// MolecularProperties holds computed physicochemical descriptors for a molecule.
+type MolecularProperties struct {
+	LogP           float64  `json:"log_p"`
+	TPSA           float64  `json:"tpsa"`
+	HBondDonors    int      `json:"h_bond_donors"`
+	HBondAcceptors int      `json:"h_bond_acceptors"`
+	RotatableBonds int      `json:"rotatable_bonds"`
+	AromaticRings  int      `json:"aromatic_rings"`
+	HOMO           *float64 `json:"homo,omitempty"`
+	LUMO           *float64 `json:"lumo,omitempty"`
+	BandGap        *float64 `json:"band_gap,omitempty"`
+}
 
-// FingerprintType identifies which fingerprint algorithm was used to generate
-// a particular bit-vector or count-vector for a molecule.
+// MoleculeFormat defines the input format for a molecule.
+type MoleculeFormat string
+
+const (
+	FormatSMILES  MoleculeFormat = "smiles"
+	FormatInChI   MoleculeFormat = "inchi"
+	FormatMolfile MoleculeFormat = "molfile"
+	FormatSDF     MoleculeFormat = "sdf"
+	FormatCDXML   MoleculeFormat = "cdxml"
+)
+
+// IsValid checks if the MoleculeFormat is supported.
+func (f MoleculeFormat) IsValid() bool {
+	switch f {
+	case FormatSMILES, FormatInChI, FormatMolfile, FormatSDF, FormatCDXML:
+		return true
+	default:
+		return false
+	}
+}
+
+// FingerprintType defines the algorithm used for molecular fingerprinting.
 type FingerprintType string
 
 const (
-	// FPMorgan is the circular Morgan / ECFP fingerprint (default radius 2 → ECFP4).
-	FPMorgan FingerprintType = "morgan"
-
-	// FPMACCS is the 166-bit MACCS structural keys fingerprint.
-	FPMACCS FingerprintType = "maccs"
-
-	// FPTopological is the RDKit topological (Daylight-style) path fingerprint.
-	FPTopological FingerprintType = "topological"
-
-	// FPAtomPair is the atom-pair fingerprint (counts of atom-pair descriptors).
-	FPAtomPair FingerprintType = "atom_pair"
+	FingerprintMorgan   FingerprintType = "morgan"
+	FingerprintMACCS    FingerprintType = "maccs"
+	FingerprintRDKit    FingerprintType = "rdkit"
+	FingerprintAtomPair FingerprintType = "atom_pair"
+	FingerprintFCFP     FingerprintType = "fcfp"
+	FingerprintGNN      FingerprintType = "gnn"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MolecularProperties — physicochemical and optoelectronic descriptor set
-// ─────────────────────────────────────────────────────────────────────────────
+// Aliases for backward compatibility
+const (
+	FPMorgan      = FingerprintMorgan
+	FPMACCS       = FingerprintMACCS
+	FPTopological = FingerprintRDKit
+	FPAtomPair    = FingerprintAtomPair
+)
 
-// MolecularProperties holds computed physicochemical descriptors for a molecule.
-// Fields marked as pointer types are optional and may be nil when the property
-// has not been computed or is not applicable to the molecule type.
-//
-// OLED-specific properties (HOMO, LUMO, BandGap) are computed only for
-// TypeOLEDMaterial molecules and remain nil for all other types.
-type MolecularProperties struct {
-	// LogP is the calculated octanol-water partition coefficient (Crippen method).
-	LogP float64 `json:"log_p"`
-
-	// TPSA is the topological polar surface area in Å².
-	TPSA float64 `json:"tpsa"`
-
-	// HBondDonors is the number of hydrogen-bond donor groups (NH, OH).
-	HBondDonors int `json:"h_bond_donors"`
-
-	// HBondAcceptors is the number of hydrogen-bond acceptor groups (N, O).
-	HBondAcceptors int `json:"h_bond_acceptors"`
-
-	// RotatableBonds is the count of non-terminal, non-ring single bonds.
-	RotatableBonds int `json:"rotatable_bonds"`
-
-	// AromaticRings is the count of aromatic ring systems in the molecule.
-	AromaticRings int `json:"aromatic_rings"`
-
-	// HOMO is the highest occupied molecular orbital energy in eV.
-	// Populated only for TypeOLEDMaterial; nil otherwise.
-	HOMO *float64 `json:"homo,omitempty"`
-
-	// LUMO is the lowest unoccupied molecular orbital energy in eV.
-	// Populated only for TypeOLEDMaterial; nil otherwise.
-	LUMO *float64 `json:"lumo,omitempty"`
-
-	// BandGap is the HOMO-LUMO energy gap in eV (BandGap = LUMO − HOMO).
-	// Populated only for TypeOLEDMaterial; nil otherwise.
-	BandGap *float64 `json:"band_gap,omitempty"`
+// IsValid checks if the FingerprintType is supported.
+func (f FingerprintType) IsValid() bool {
+	switch f {
+	case FingerprintMorgan, FingerprintMACCS, FingerprintRDKit, FingerprintAtomPair, FingerprintFCFP, FingerprintGNN:
+		return true
+	default:
+		return false
+	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MoleculeDTO — cross-layer data transfer object for a molecule
-// ─────────────────────────────────────────────────────────────────────────────
-
-// MoleculeDTO is the canonical molecule representation passed between the
-// application, interface, and client layers.  It embeds common.BaseEntity so
-// that it carries audit metadata (ID, created/updated timestamps, tenant ID)
-// without duplicating field definitions.
-//
-// Fingerprints are stored as raw byte slices keyed by FingerprintType so that
-// the transport layer can choose to include or omit them depending on the use
-// case (e.g., HTTP responses omit fingerprints; Milvus indexing includes them).
+// MoleculeDTO represents a molecule with its properties and metadata.
 type MoleculeDTO struct {
-	// BaseEntity provides ID, CreatedAt, UpdatedAt, and TenantID.
 	common.BaseEntity
-
-	// SMILES is the canonical SMILES string (RDKit-canonicalised).
-	SMILES string `json:"smiles"`
-
-	// InChI is the IUPAC International Chemical Identifier.
-	InChI string `json:"inchi,omitempty"`
-
-	// InChIKey is the 27-character hashed InChI key used as a globally unique
-	// identifier for structural de-duplication.
-	InChIKey string `json:"inchi_key"`
-
-	// MolecularFormula is the Hill-system molecular formula (e.g., "C12H10N2O").
-	MolecularFormula string `json:"molecular_formula"`
-
-	// MolecularWeight is the average molecular weight in g/mol.
-	MolecularWeight float64 `json:"molecular_weight"`
-
-	// Name is the preferred IUPAC or trade name for the molecule.
-	Name string `json:"name,omitempty"`
-
-	// Synonyms lists alternative names, registry numbers (CAS, PubChem CID, etc.),
-	// and trade names.
-	Synonyms []string `json:"synonyms,omitempty"`
-
-	// Type classifies the molecule by functional role.
-	Type MoleculeType `json:"type"`
-
-	// Properties contains computed physicochemical and optoelectronic descriptors.
-	Properties MolecularProperties `json:"properties"`
-
-	// Fingerprints maps each computed fingerprint algorithm to its byte-encoded
-	// bit-vector.  Omitted from JSON responses by default; populated internally
-	// by the similarity-search and Milvus-indexing pipelines.
-	Fingerprints map[FingerprintType][]byte `json:"fingerprints,omitempty"`
-
-	// SourcePatentIDs lists the IDs of patents from which this molecule was
-	// extracted by the ChemExtractor NER pipeline.
-	SourcePatentIDs []common.ID `json:"source_patent_ids,omitempty"`
+	SMILES            string                 `json:"smiles"`
+	InChI             string                 `json:"inchi"`
+	InChIKey          string                 `json:"inchi_key"`
+	MolecularFormula  string                 `json:"molecular_formula"`
+	MolecularWeight   float64                `json:"molecular_weight"`
+	LogP              float64                `json:"log_p,omitempty"`
+	TPSA              float64                `json:"tpsa,omitempty"`
+	NumHeavyAtoms     int                    `json:"num_heavy_atoms"`
+	NumRotatableBonds int                    `json:"num_rotatable_bonds"`
+	Name              string                 `json:"name,omitempty"`
+	Synonyms          []string               `json:"synonyms,omitempty"`
+	Type              MoleculeType           `json:"type"`
+	Source            string                 `json:"source"` // patent / experiment / literature / user_input
+	Metadata          map[string]interface{} `json:"metadata,omitempty"`
+	Properties        MolecularProperties    `json:"properties"`
+	Fingerprints      map[FingerprintType][]byte `json:"fingerprints,omitempty"`
+	SourcePatentIDs   []common.ID            `json:"source_patent_ids,omitempty"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Search request / response types
-// ─────────────────────────────────────────────────────────────────────────────
-
-// MoleculeSearchRequest is the input DTO for paginated molecule search queries.
-// All filter fields are optional pointers; a nil pointer means "no filter on
-// this dimension".  At least one of SMILES or Name should be non-nil for
-// meaningful results, but the service layer enforces that constraint.
-type MoleculeSearchRequest struct {
-	// SMILES, when set, triggers a fingerprint-similarity search against the
-	// Milvus vector store using the specified FingerprintType.
-	SMILES *string `json:"smiles,omitempty"`
-
-	// Name, when set, performs a text search against molecule names and synonyms
-	// in OpenSearch.
-	Name *string `json:"name,omitempty"`
-
-	// Type, when set, restricts results to molecules of the given classification.
-	Type *MoleculeType `json:"type,omitempty"`
-
-	// MinSimilarity is the minimum Tanimoto coefficient (0.0–1.0) required for
-	// a molecule to be included in the similarity-search results.
-	// Ignored when SMILES is nil.  Defaults to 0.7 in the service layer.
-	MinSimilarity *float64 `json:"min_similarity,omitempty"`
-
-	// FingerprintType selects which fingerprint algorithm to use for similarity
-	// computation.  Defaults to FPMorgan when nil.
-	FingerprintType *FingerprintType `json:"fingerprint_type,omitempty"`
-
-	// PageRequest carries page number and page size for result pagination.
-	common.PageRequest
+// FingerprintDTO represents a molecular fingerprint.
+type FingerprintDTO struct {
+	Type   FingerprintType `json:"type"`
+	Bits   []byte          `json:"bits"`
+	Radius int             `json:"radius,omitempty"` // for Morgan
+	NBits  int             `json:"nbits"`
+	Version string         `json:"version"`
 }
 
-// MoleculeSearchResponse is the paginated output DTO for molecule search queries.
-// It reuses the generic common.PageResponse wrapper so that pagination metadata
-// (total count, current page, page size) is consistent across all search APIs.
+// SimilarityResult represents a result from a similarity search.
+type SimilarityResult struct {
+	TargetMolecule       MoleculeDTO                `json:"target_molecule"`
+	Scores               map[FingerprintType]float64 `json:"scores"`
+	WeightedScore        float64                    `json:"weighted_score"`
+	StructuralComparison *StructuralDiff            `json:"structural_comparison,omitempty"`
+}
+
+// StructuralDiff represents structural differences between two molecules.
+type StructuralDiff struct {
+	CommonScaffold string            `json:"common_scaffold"`
+	Differences    []SubstituentDiff `json:"differences"`
+}
+
+// SubstituentDiff represents a difference in a substituent.
+type SubstituentDiff struct {
+	Position    string `json:"position"`
+	QueryGroup  string `json:"query_group"`
+	TargetGroup string `json:"target_group"`
+	Significance string `json:"significance"` // low / moderate / high
+}
+
+// MoleculeInput represents a molecule provided as input.
+type MoleculeInput struct {
+	Format MoleculeFormat `json:"format"`
+	Value  string         `json:"value"`
+	Name   string         `json:"name,omitempty"`
+}
+
+// Validate checks if the MoleculeInput is valid.
+func (i MoleculeInput) Validate() error {
+	if !i.Format.IsValid() {
+		return fmt.Errorf("invalid molecule format: %s", i.Format)
+	}
+	if i.Value == "" {
+		return fmt.Errorf("molecule value cannot be empty")
+	}
+	return nil
+}
+
+// SimilaritySearchRequest carries parameters for a molecular similarity search.
+type SimilaritySearchRequest struct {
+	Molecule                  MoleculeInput          `json:"molecule"`
+	FingerprintTypes          []FingerprintType      `json:"fingerprint_types"`
+	Threshold                 float64                `json:"threshold"`
+	MaxResults                int                    `json:"max_results"`
+	PatentOffices             []string               `json:"patent_offices,omitempty"`
+	DateRange                 *common.DateRange      `json:"date_range,omitempty"`
+	AssigneesFilter           []string               `json:"assignees_filter,omitempty"`
+	TechDomains               []string               `json:"tech_domains,omitempty"`
+	IncludeClaimAnalysis      bool                   `json:"include_claim_analysis"`
+	IncludeInfringementRisk   bool                   `json:"include_infringement_risk"`
+	IncludeDesignAround       bool                   `json:"include_design_around"`
+}
+
+// Validate checks if the SimilaritySearchRequest is valid.
+func (r SimilaritySearchRequest) Validate() error {
+	if err := r.Molecule.Validate(); err != nil {
+		return err
+	}
+	if len(r.FingerprintTypes) == 0 {
+		return fmt.Errorf("at least one fingerprint type must be specified")
+	}
+	for _, ft := range r.FingerprintTypes {
+		if !ft.IsValid() {
+			return fmt.Errorf("invalid fingerprint type: %s", ft)
+		}
+	}
+	if r.Threshold < 0.0 || r.Threshold > 1.0 {
+		return fmt.Errorf("threshold must be between 0.0 and 1.0")
+	}
+	if r.MaxResults < 1 || r.MaxResults > 500 {
+		return fmt.Errorf("max_results must be between 1 and 500")
+	}
+	return nil
+}
+
+// MoleculeSearchRequest is an alias for SimilaritySearchRequest for backward compatibility.
+type MoleculeSearchRequest = SimilaritySearchRequest
+
+// MoleculeSearchResponse is a generic wrapper for molecule search results.
 type MoleculeSearchResponse = common.PageResponse[MoleculeDTO]
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Substructure search request / response
-// ─────────────────────────────────────────────────────────────────────────────
-
-// SubstructureSearchRequest is the input DTO for SMARTS-based substructure
-// queries executed against the molecule corpus.
-type SubstructureSearchRequest struct {
-	// SMARTS is the query pattern expressed in SMILES-like SMARTS notation.
-	// Example: "c1ccc2[nH]ccc2c1" (indole core).
-	SMARTS string `json:"smarts"`
-
-	// MaxResults caps the number of matching molecules returned.
-	// Must be between 1 and 10 000; the service layer enforces this range.
-	// Defaults to 100 when zero.
-	MaxResults int `json:"max_results,omitempty"`
+// SimilaritySearchResponse represents the result of a similarity search.
+type SimilaritySearchResponse struct {
+	QueryMolecule           MoleculeDTO       `json:"query_molecule"`
+	Results                 []SimilarityResult `json:"results"`
+	TotalSearched           int64             `json:"total_searched"`
+	TotalMoleculesCompared  int64             `json:"total_molecules_compared"`
+	SearchTimeMs            int64             `json:"search_time_ms"`
+	ModelVersions           map[string]string `json:"model_versions"`
 }
 
-// SubstructureSearchResponse is the output DTO for SMARTS-based substructure
-// search queries.
-type SubstructureSearchResponse struct {
-	// Results is the list of molecules whose structures contain the queried
-	// SMARTS pattern as a subgraph.
-	Results []MoleculeDTO `json:"results"`
-
-	// Total is the total number of matching molecules in the corpus before the
-	// MaxResults cap was applied.  Useful for informing callers that results
-	// were truncated.
-	Total int `json:"total"`
+// MaterialProperty represents a physical or chemical property of a material.
+type MaterialProperty struct {
+	PropertyType  string  `json:"property_type"`
+	Value         float64 `json:"value"`
+	Unit          string  `json:"unit"`
+	TestCondition string  `json:"test_condition,omitempty"`
+	Source        string  `json:"source"`
 }
 
+// MoleculeSource enums.
+const (
+	SourcePatent     = "patent"
+	SourceExperiment = "experiment"
+	SourceLiterature = "literature"
+	SourceUserInput  = "user_input"
+)
+
+// SignificanceLevel enums.
+const (
+	SignificanceLow      = "low"
+	SignificanceModerate = "moderate"
+	SignificanceHigh     = "high"
+)
+
+// Default weights for similarity calculations.
+const (
+	DefaultMorganWeight      = 0.30
+	DefaultRDKitWeight       = 0.20
+	DefaultAtomPairWeight    = 0.15
+	DefaultGNNWeight         = 0.35
+	DefaultSimilarityThreshold = 0.65
+	DefaultMaxResults        = 50
+	MaxResultsLimit          = 500
+)
+
+//Personal.AI order the ending

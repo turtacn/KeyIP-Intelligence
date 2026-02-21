@@ -1,200 +1,265 @@
-// Package common provides foundational types shared across every layer of the
-// KeyIP-Intelligence platform: domain entities, DTOs, request/response wrappers,
-// and pagination primitives.  No business logic lives here.
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Primitive type aliases
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ID is the platform-wide primary-key type, represented as a UUID string.
-// Using a named type prevents accidental mixing of different ID domains at
-// compile time.
+// ID is a string alias for UUID v4.
 type ID string
 
-// TenantID identifies a tenant in the multi-tenant deployment model.
-type TenantID string
-
-// UserID identifies an individual user (human or service account).
+// UserID is a string alias for a user identifier.
 type UserID string
 
-// Timestamp is a named alias for time.Time.  It serialises to / from RFC 3339
-// in JSON by default (standard library behaviour).
-type Timestamp = time.Time
+// TenantID is a string alias for a tenant identifier.
+type TenantID string
 
-// Time is an alias for time.Time, used in repository queries and domain entities.
-type Time = time.Time
-
-// Metadata is an open-ended key-value bag attached to entities to carry
-// domain-specific attributes without schema migrations.
+// Metadata is an open-ended key-value bag.
 type Metadata map[string]interface{}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Status — generic lifecycle status for platform entities
-// ─────────────────────────────────────────────────────────────────────────────
 
 // Status represents the lifecycle state of a platform entity.
 type Status string
 
 const (
-	// StatusActive indicates the entity is live and fully operational.
-	StatusActive Status = "active"
-
-	// StatusInactive indicates the entity has been administratively disabled
-	// but not permanently removed.
+	StatusActive   Status = "active"
 	StatusInactive Status = "inactive"
-
-	// StatusPending indicates the entity has been created but is awaiting
-	// a workflow step (e.g., ingestion, review, enrichment) before becoming active.
-	StatusPending Status = "pending"
-
-	// StatusArchived indicates the entity has been moved to long-term storage
-	// and is no longer visible in default queries.
+	StatusPending  Status = "pending"
 	StatusArchived Status = "archived"
-
-	// StatusDeleted indicates a soft-deleted entity that is retained for audit
-	// purposes but excluded from all normal business operations.
-	StatusDeleted Status = "deleted"
+	StatusDeleted  Status = "deleted"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ID generation
-// ─────────────────────────────────────────────────────────────────────────────
-
-// NewID generates a new random UUID v4 and returns it as an ID.
-// It panics only if the underlying entropy source is broken, which is
-// exceedingly rare on modern operating systems.
-func NewID() ID {
-	return ID(uuid.New().String())
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BaseEntity — common audit fields embedded by all domain entities and DTOs
-// ─────────────────────────────────────────────────────────────────────────────
-
-// BaseEntity carries audit and concurrency-control metadata that every
-// persistent domain entity and DTO in the platform must include.  Structs
-// that need these fields should embed BaseEntity rather than redeclaring them.
-//
-// JSON tags use snake_case to match the PostgreSQL column naming convention
-// and the OpenAPI specification generated from these types.
+// BaseEntity carries audit metadata for domain entities and DTOs.
 type BaseEntity struct {
-	// ID is the globally unique identifier (UUID v4) for this entity.
-	ID ID `json:"id"`
-
-	// TenantID scopes the entity to a specific tenant in the multi-tenant model.
-	TenantID TenantID `json:"tenant_id"`
-
-	// CreatedAt is the UTC timestamp at which the entity was first persisted.
+	ID        ID        `json:"id"`
+	TenantID  TenantID  `json:"tenant_id"`
 	CreatedAt time.Time `json:"created_at"`
-
-	// UpdatedAt is the UTC timestamp of the most recent mutation to the entity.
 	UpdatedAt time.Time `json:"updated_at"`
-
-	// CreatedBy records the UserID (human or service account) that created
-	// the entity, used for audit logging.
-	CreatedBy UserID `json:"created_by,omitempty"`
-
-	// Version is an integer optimistic-lock counter incremented on every
-	// successful write.  Conflicts are detected when a writer's Version does
-	// not match the persisted value.
-	Version int `json:"version"`
+	Version   int       `json:"version"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pagination primitives
-// ─────────────────────────────────────────────────────────────────────────────
-
-const (
-	// defaultPageSize is applied by service layers when PageSize is zero.
-	defaultPageSize = 20
-
-	// maxPageSize is the hard upper bound enforced by Validate.
-	maxPageSize = 1000
-)
-
-// PageRequest carries pagination and sorting parameters for list/search APIs.
-// Page is 1-indexed (first page = 1).
-type PageRequest struct {
-	// Page is the 1-based page number to retrieve.
-	Page int `json:"page" form:"page"`
-
-	// PageSize is the maximum number of items per page (1–1000).
-	PageSize int `json:"page_size" form:"page_size"`
-
-	// SortBy is the field name on which results should be ordered.
-	// An empty string means the repository uses its default ordering.
-	SortBy string `json:"sort_by,omitempty" form:"sort_by"`
-
-	// SortOrder controls the direction of sorting.
-	// Accepted values: "asc", "desc".  Defaults to "asc" in the service layer.
-	SortOrder string `json:"sort_order,omitempty" form:"sort_order"`
-}
-
-// Validate checks that the pagination parameters are within accepted bounds.
-// Returns a descriptive error for the first violation found.
-//
-//   - Page must be ≥ 1.
-//   - PageSize must be between 1 and maxPageSize (1 000) inclusive.
-//   - SortOrder, when non-empty, must be "asc" or "desc".
-func (r *PageRequest) Validate() error {
-	if r.Page < 1 {
-		return fmt.Errorf("page must be ≥ 1, got %d", r.Page)
+// Validate checks if the ID is a valid UUID v4.
+func (id ID) Validate() error {
+	if id == "" {
+		return fmt.Errorf("ID cannot be empty")
 	}
-	if r.PageSize < 1 {
-		return fmt.Errorf("page_size must be ≥ 1, got %d", r.PageSize)
-	}
-	if r.PageSize > maxPageSize {
-		return fmt.Errorf("page_size must be ≤ %d, got %d", maxPageSize, r.PageSize)
-	}
-	if r.SortOrder != "" && r.SortOrder != "asc" && r.SortOrder != "desc" {
-		return fmt.Errorf("sort_order must be \"asc\" or \"desc\", got %q", r.SortOrder)
+	_, err := uuid.Parse(string(id))
+	if err != nil {
+		return fmt.Errorf("invalid ID format: %w", err)
 	}
 	return nil
 }
 
-// Offset returns the zero-based record offset corresponding to this page,
-// useful for SQL OFFSET clauses.
-func (r *PageRequest) Offset() int {
-	if r.Page < 1 {
-		return 0
+// Timestamp is a time.Time alias with custom JSON serialization.
+type Timestamp time.Time
+
+// Time is an alias for time.Time for backward compatibility.
+type Time = time.Time
+
+// ToUnixMilli returns the timestamp in milliseconds since Unix epoch.
+func (t Timestamp) ToUnixMilli() int64 {
+	return time.Time(t).UnixMilli()
+}
+
+// FromUnixMilli converts milliseconds since Unix epoch to a Timestamp.
+func FromUnixMilli(msec int64) Timestamp {
+	return Timestamp(time.UnixMilli(msec).UTC())
+}
+
+// MarshalJSON implements json.Marshaler, using ISO 8601 format.
+func (t Timestamp) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Time(t).Format(time.RFC3339Nano))
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (t *Timestamp) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
 	}
-	return (r.Page - 1) * r.PageSize
+	parsed, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		// Try fallback to RFC3339 if Nano fails
+		parsed, err = time.Parse(time.RFC3339, s)
+		if err != nil {
+			return err
+		}
+	}
+	*t = Timestamp(parsed.UTC())
+	return nil
 }
 
-// PageResponse is the generic paginated response wrapper used by all list and
-// search APIs in the platform.  T is the element type (e.g., PatentDTO,
-// MoleculeDTO).
+// Pagination parameters for list requests and responses.
+type Pagination struct {
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
+	Total    int64 `json:"total,omitempty"`
+}
+
+// PageRequest is an alias for Pagination for backward compatibility.
+type PageRequest = Pagination
+
+// PageResponse is a generic wrapper for paginated results.
 type PageResponse[T any] struct {
-	// Items holds the current page of results.
-	Items []T `json:"items"`
-
-	// Total is the total number of matching records across all pages.
-	Total int64 `json:"total"`
-
-	// Page is the 1-based index of the current page.
-	Page int `json:"page"`
-
-	// PageSize is the maximum number of items returned per page.
-	PageSize int `json:"page_size"`
-
-	// TotalPages is the computed ceiling of Total / PageSize.
-	TotalPages int `json:"total_pages"`
+	Items      []T `json:"items"`
+	Total      int64 `json:"total"`
+	Page       int   `json:"page"`
+	PageSize   int   `json:"page_size"`
+	TotalPages int   `json:"total_pages"`
 }
 
-// NewPageResponse constructs a PageResponse from the full result set,
-// computing TotalPages automatically.
+// Validate checks if pagination parameters are within valid bounds.
+func (p Pagination) Validate() error {
+	if p.Page < 1 {
+		return fmt.Errorf("page must be >= 1")
+	}
+	if p.PageSize < 1 || p.PageSize > 500 {
+		return fmt.Errorf("page_size must be between 1 and 500")
+	}
+	return nil
+}
+
+// Offset returns the SQL OFFSET value.
+func (p Pagination) Offset() int {
+	return (p.Page - 1) * p.PageSize
+}
+
+// SortOrder defines the direction of sorting.
+type SortOrder string
+
+const (
+	SortAsc  SortOrder = "asc"
+	SortDesc SortOrder = "desc"
+)
+
+// SortField defines a field and its sort order.
+type SortField struct {
+	Field string    `json:"field"`
+	Order SortOrder `json:"order"`
+}
+
+// DateRange defines a time interval.
+type DateRange struct {
+	From Timestamp `json:"from"`
+	To   Timestamp `json:"to"`
+}
+
+// Validate checks if the date range is valid.
+func (dr DateRange) Validate() error {
+	if time.Time(dr.From).After(time.Time(dr.To)) {
+		return fmt.Errorf("invalid date range: 'from' must be before or equal to 'to'")
+	}
+	return nil
+}
+
+// ErrorDetail provides structured error information for API responses.
+type ErrorDetail struct {
+	Code    string                 `json:"code"`
+	Message string                 `json:"message"`
+	Details map[string]interface{} `json:"details,omitempty"`
+}
+
+// APIResponse is the generic wrapper for all API responses.
+type APIResponse[T any] struct {
+	Success   bool         `json:"success"`
+	Data      T            `json:"data,omitempty"`
+	Error     *ErrorDetail `json:"error,omitempty"`
+	Pagination *Pagination  `json:"pagination,omitempty"`
+	RequestID string       `json:"request_id"`
+	Timestamp Timestamp    `json:"timestamp"`
+}
+
+// ListRequest carries parameters for listing resources.
+type ListRequest struct {
+	Pagination Pagination             `json:"pagination"`
+	Sort       []SortField            `json:"sort,omitempty"`
+	Filters    map[string]interface{} `json:"filters,omitempty"`
+}
+
+// BatchRequest carries a list of items for batch operations.
+type BatchRequest[T any] struct {
+	Items       []T  `json:"items"`
+	StopOnError bool `json:"stop_on_error"`
+}
+
+// BatchError describes an error in a batch operation.
+type BatchError struct {
+	Index int         `json:"index"`
+	Error ErrorDetail `json:"error"`
+}
+
+// BatchResponse summarizes the result of a batch operation.
+type BatchResponse[T any] struct {
+	Succeeded      []T          `json:"succeeded"`
+	Failed         []BatchError `json:"failed"`
+	TotalProcessed int          `json:"total_processed"`
+}
+
+// HealthStatus indicates the health of a component or service.
+type HealthStatus string
+
+const (
+	HealthUp       HealthStatus = "up"
+	HealthDown     HealthStatus = "down"
+	HealthDegraded HealthStatus = "degraded"
+)
+
+// ComponentHealth provides health information for a specific component.
+type ComponentHealth struct {
+	Name    string        `json:"name"`
+	Status  HealthStatus  `json:"status"`
+	Latency time.Duration `json:"latency"`
+	Message string        `json:"message,omitempty"`
+}
+
+// NewID generates a new UUID v4.
+func NewID() ID {
+	return ID(uuid.New().String())
+}
+
+// NewTimestamp returns the current UTC time as a Timestamp.
+func NewTimestamp() Timestamp {
+	return Timestamp(time.Now().UTC())
+}
+
+// NewSuccessResponse creates a successful APIResponse.
+func NewSuccessResponse[T any](data T) APIResponse[T] {
+	return APIResponse[T]{
+		Success:   true,
+		Data:      data,
+		Timestamp: NewTimestamp(),
+	}
+}
+
+// NewErrorResponse creates an error APIResponse.
+func NewErrorResponse(code string, message string) APIResponse[any] {
+	return APIResponse[any]{
+		Success: false,
+		Error: &ErrorDetail{
+			Code:    code,
+			Message: message,
+		},
+		Timestamp: NewTimestamp(),
+	}
+}
+
+// NewPaginatedResponse creates a successful paginated APIResponse.
+func NewPaginatedResponse[T any](data T, pagination Pagination) APIResponse[T] {
+	return APIResponse[T]{
+		Success:    true,
+		Data:       data,
+		Pagination: &pagination,
+		Timestamp:  NewTimestamp(),
+	}
+}
+
+// NewPageResponse constructs a PageResponse.
 func NewPageResponse[T any](items []T, total int64, req PageRequest) PageResponse[T] {
 	ps := req.PageSize
 	if ps <= 0 {
-		ps = defaultPageSize
+		ps = 20
 	}
 	totalPages := 0
 	if ps > 0 && total > 0 {
@@ -209,3 +274,4 @@ func NewPageResponse[T any](items []T, total int64, req PageRequest) PageRespons
 	}
 }
 
+//Personal.AI order the ending

@@ -383,15 +383,20 @@ func (m *Molecule) SetOLEDProperties(homo, lumo, bandGap float64) {
 // cross-layer communication.
 func (m *Molecule) ToDTO() mtypes.MoleculeDTO {
 	dto := mtypes.MoleculeDTO{
-		BaseEntity:       m.BaseEntity,
-		SMILES:           m.SMILES,
-		InChI:            m.InChI,
-		InChIKey:         m.InChIKey,
-		MolecularFormula: m.MolecularFormula,
-		MolecularWeight:  m.MolecularWeight,
-		Name:             m.Name,
-		Synonyms:         m.Synonyms,
-		Type:             m.Type,
+		BaseEntity:        m.BaseEntity,
+		SMILES:            m.SMILES,
+		InChI:             m.InChI,
+		InChIKey:          m.InChIKey,
+		MolecularFormula:  m.MolecularFormula,
+		MolecularWeight:   m.MolecularWeight,
+		Name:              m.Name,
+		Synonyms:          m.Synonyms,
+		Type:              m.Type,
+		LogP:              m.Properties.LogP,
+		TPSA:              m.Properties.TPSA,
+		NumRotatableBonds: m.Properties.RotatableBonds,
+		Source:            "experiment", // Default or extract from metadata
+		SourcePatentIDs:   m.SourcePatentIDs,
 		Properties: mtypes.MolecularProperties{
 			LogP:           m.Properties.LogP,
 			TPSA:           m.Properties.TPSA,
@@ -403,7 +408,6 @@ func (m *Molecule) ToDTO() mtypes.MoleculeDTO {
 			LUMO:           m.Properties.LUMO,
 			BandGap:        m.Properties.BandGap,
 		},
-		SourcePatentIDs: m.SourcePatentIDs,
 	}
 
 	// Convert fingerprints to byte slices

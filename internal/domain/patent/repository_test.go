@@ -88,7 +88,7 @@ func (r *memRepository) Search(ctx context.Context, req ptypes.PatentSearchReque
 	for _, p := range r.byID {
 		items = append(items, p.ToDTO())
 	}
-	resp := common.NewPageResponse(items, int64(len(items)), req.PageRequest)
+	resp := common.NewPageResponse(items, int64(len(items)), req.Pagination)
 	patentResp := ptypes.PatentSearchResponse(resp)
 	return &patentResp, nil
 }
@@ -263,7 +263,7 @@ func RepositoryContractTest(t *testing.T, repo patent.Repository) {
 		require.NoError(t, repo.Save(ctx, p))
 
 		req := ptypes.PatentSearchRequest{
-			PageRequest: common.PageRequest{Page: 1, PageSize: 20},
+			Pagination: common.Pagination{Page: 1, PageSize: 20},
 		}
 		resp, err := repo.Search(ctx, req)
 		require.NoError(t, err)

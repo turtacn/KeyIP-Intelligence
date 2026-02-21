@@ -127,7 +127,7 @@ func (s *Service) SearchPatents(
 	ctx context.Context,
 	req ptypes.PatentSearchRequest,
 ) (*ptypes.PatentSearchResponse, error) {
-	if err := req.PageRequest.Validate(); err != nil {
+	if err := req.Pagination.Validate(); err != nil {
 		return nil, pkgerrors.InvalidParam("invalid pagination parameters").WithCause(err)
 	}
 

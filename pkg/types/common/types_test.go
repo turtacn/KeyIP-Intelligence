@@ -1,367 +1,196 @@
-// Package common_test provides unit tests for the foundational types defined
-// in pkg/types/common/types.go.
-package common_test
+package common
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNewID
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestNewID_ReturnsValidUUIDFormat(t *testing.T) {
-	t.Parallel()
-
-	id := common.NewID()
-	s := string(id)
-
-	// UUID v4 canonical form: 8-4-4-4-12 hex groups separated by hyphens.
-	parts := strings.Split(s, "-")
-	require.Len(t, parts, 5, "UUID must have 5 hyphen-separated groups, got: %s", s)
-	assert.Len(t, parts[0], 8)
-	assert.Len(t, parts[1], 4)
-	assert.Len(t, parts[2], 4)
-	assert.Len(t, parts[3], 4)
-	assert.Len(t, parts[4], 12)
+func TestID_Validate_ValidUUID(t *testing.T) {
+	id := ID("550e8400-e29b-41d4-a716-446655440000")
+	err := id.Validate()
+	assert.NoError(t, err)
 }
 
-func TestNewID_IsUnique(t *testing.T) {
-	t.Parallel()
-
-	const n = 1000
-	seen := make(map[common.ID]struct{}, n)
-	for i := 0; i < n; i++ {
-		id := common.NewID()
-		_, dup := seen[id]
-		assert.False(t, dup, "NewID() generated a duplicate: %s", id)
-		seen[id] = struct{}{}
-	}
+func TestID_Validate_EmptyString(t *testing.T) {
+	id := ID("")
+	err := id.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be empty")
 }
 
-func TestNewID_TotalLength(t *testing.T) {
-	t.Parallel()
-
-	id := common.NewID()
-	// Standard UUID string length is 36 characters (32 hex + 4 hyphens).
-	assert.Len(t, string(id), 36)
+func TestID_Validate_InvalidFormat(t *testing.T) {
+	id := ID("not-a-uuid")
+	err := id.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid ID format")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestPageRequest_Validate
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestPageRequest_Validate_ValidParams(t *testing.T) {
-	t.Parallel()
-
-	cases := []common.PageRequest{
-		{Page: 1, PageSize: 1},
-		{Page: 1, PageSize: 20},
-		{Page: 100, PageSize: 1000},
-		{Page: 1, PageSize: 50, SortBy: "created_at", SortOrder: "asc"},
-		{Page: 1, PageSize: 50, SortBy: "name", SortOrder: "desc"},
-		{Page: 1, PageSize: 50, SortOrder: ""}, // empty SortOrder is allowed
-		{Page: 1, PageSize: 50, SortBy: ""},    // empty SortBy is allowed
-	}
-
-	for _, req := range cases {
-		req := req
-		t.Run("", func(t *testing.T) {
-			t.Parallel()
-			assert.NoError(t, req.Validate())
-		})
-	}
+func TestNewID_GeneratesValidUUID(t *testing.T) {
+	id := NewID()
+	err := id.Validate()
+	assert.NoError(t, err)
 }
 
-func TestPageRequest_Validate_PageLessThanOne(t *testing.T) {
-	t.Parallel()
-
-	cases := []int{0, -1, -100}
-	for _, p := range cases {
-		p := p
-		t.Run("", func(t *testing.T) {
-			t.Parallel()
-			req := common.PageRequest{Page: p, PageSize: 20}
-			err := req.Validate()
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "page")
-		})
-	}
+func TestTimestamp_MarshalJSON(t *testing.T) {
+	now := time.Date(2023, 10, 27, 10, 0, 0, 0, time.UTC)
+	ts := Timestamp(now)
+	data, err := json.Marshal(ts)
+	assert.NoError(t, err)
+	assert.Equal(t, "\"2023-10-27T10:00:00Z\"", string(data))
 }
 
-func TestPageRequest_Validate_PageSizeLessThanOne(t *testing.T) {
-	t.Parallel()
-
-	cases := []int{0, -1, -50}
-	for _, ps := range cases {
-		ps := ps
-		t.Run("", func(t *testing.T) {
-			t.Parallel()
-			req := common.PageRequest{Page: 1, PageSize: ps}
-			err := req.Validate()
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "page_size")
-		})
-	}
+func TestTimestamp_UnmarshalJSON_Valid(t *testing.T) {
+	data := []byte("\"2023-10-27T10:00:00Z\"")
+	var ts Timestamp
+	err := json.Unmarshal(data, &ts)
+	assert.NoError(t, err)
+	assert.Equal(t, time.Date(2023, 10, 27, 10, 0, 0, 0, time.UTC), time.Time(ts))
 }
 
-func TestPageRequest_Validate_PageSizeExceedsMax(t *testing.T) {
-	t.Parallel()
-
-	cases := []int{1001, 5000, 100000}
-	for _, ps := range cases {
-		ps := ps
-		t.Run("", func(t *testing.T) {
-			t.Parallel()
-			req := common.PageRequest{Page: 1, PageSize: ps}
-			err := req.Validate()
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "page_size")
-		})
-	}
+func TestTimestamp_UnmarshalJSON_Invalid(t *testing.T) {
+	data := []byte("\"invalid-date\"")
+	var ts Timestamp
+	err := json.Unmarshal(data, &ts)
+	assert.Error(t, err)
 }
 
-func TestPageRequest_Validate_InvalidSortOrder(t *testing.T) {
-	t.Parallel()
-
-	cases := []string{"ASC", "DESC", "ascending", "1", "up", "random"}
-	for _, so := range cases {
-		so := so
-		t.Run(so, func(t *testing.T) {
-			t.Parallel()
-			req := common.PageRequest{Page: 1, PageSize: 20, SortOrder: so}
-			err := req.Validate()
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "sort_order")
-		})
-	}
+func TestTimestamp_ToUnixMilli_RoundTrip(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	ts := Timestamp(now)
+	msec := ts.ToUnixMilli()
+	ts2 := FromUnixMilli(msec)
+	assert.Equal(t, ts, ts2)
 }
 
-func TestPageRequest_Validate_ValidSortOrders(t *testing.T) {
-	t.Parallel()
-
-	for _, so := range []string{"asc", "desc", ""} {
-		so := so
-		t.Run(so, func(t *testing.T) {
-			t.Parallel()
-			req := common.PageRequest{Page: 1, PageSize: 20, SortOrder: so}
-			assert.NoError(t, req.Validate())
-		})
-	}
+func TestPagination_Validate_Valid(t *testing.T) {
+	p := Pagination{Page: 1, PageSize: 20}
+	err := p.Validate()
+	assert.NoError(t, err)
 }
 
-func TestPageRequest_Offset(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		page     int
-		pageSize int
-		want     int
-	}{
-		{1, 20, 0},
-		{2, 20, 20},
-		{3, 20, 40},
-		{1, 50, 0},
-		{5, 10, 40},
-	}
-
-	for _, tc := range cases {
-		tc := tc
-		t.Run("", func(t *testing.T) {
-			t.Parallel()
-			req := common.PageRequest{Page: tc.page, PageSize: tc.pageSize}
-			assert.Equal(t, tc.want, req.Offset())
-		})
-	}
+func TestPagination_Validate_PageZero(t *testing.T) {
+	p := Pagination{Page: 0, PageSize: 20}
+	err := p.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "page must be >= 1")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestPageResponse — generic instantiation
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestPageResponse_WithStringItems(t *testing.T) {
-	t.Parallel()
-
-	items := []string{"alpha", "beta", "gamma"}
-	req := common.PageRequest{Page: 1, PageSize: 10}
-	resp := common.NewPageResponse(items, 3, req)
-
-	assert.Equal(t, items, resp.Items)
-	assert.Equal(t, int64(3), resp.Total)
-	assert.Equal(t, 1, resp.Page)
-	assert.Equal(t, 10, resp.PageSize)
-	assert.Equal(t, 1, resp.TotalPages)
+func TestPagination_Validate_PageSizeExceedsMax(t *testing.T) {
+	p := Pagination{Page: 1, PageSize: 501}
+	err := p.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "page_size must be between 1 and 500")
 }
 
-func TestPageResponse_TotalPagesCalculation(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		total     int64
-		pageSize  int
-		wantPages int
-	}{
-		{0, 10, 0},
-		{1, 10, 1},
-		{10, 10, 1},
-		{11, 10, 2},
-		{100, 10, 10},
-		{101, 10, 11},
-		{999, 100, 10},
-		{1000, 100, 10},
-		{1001, 100, 11},
-	}
-
-	type item struct{ V int }
-	for _, tc := range cases {
-		tc := tc
-		t.Run("", func(t *testing.T) {
-			t.Parallel()
-			req := common.PageRequest{Page: 1, PageSize: tc.pageSize}
-			resp := common.NewPageResponse([]item{}, tc.total, req)
-			assert.Equal(t, tc.wantPages, resp.TotalPages,
-				"total=%d pageSize=%d", tc.total, tc.pageSize)
-		})
-	}
+func TestPagination_Validate_PageSizeZero(t *testing.T) {
+	p := Pagination{Page: 1, PageSize: 0}
+	err := p.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "page_size must be between 1 and 500")
 }
 
-func TestPageResponse_WithCustomStruct(t *testing.T) {
-	t.Parallel()
-
-	type Record struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-	}
-
-	records := []Record{
-		{ID: "1", Name: "alpha"},
-		{ID: "2", Name: "beta"},
-	}
-	req := common.PageRequest{Page: 2, PageSize: 2}
-	resp := common.NewPageResponse(records, 10, req)
-
-	assert.Len(t, resp.Items, 2)
-	assert.Equal(t, int64(10), resp.Total)
-	assert.Equal(t, 2, resp.Page)
-	assert.Equal(t, 2, resp.PageSize)
-	assert.Equal(t, 5, resp.TotalPages)
+func TestPagination_Offset(t *testing.T) {
+	p := Pagination{Page: 3, PageSize: 20}
+	assert.Equal(t, 40, p.Offset())
 }
 
-func TestPageResponse_JSONRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	type Widget struct {
-		ID    string `json:"id"`
-		Color string `json:"color"`
-	}
-
-	original := common.NewPageResponse(
-		[]Widget{{ID: "w1", Color: "red"}, {ID: "w2", Color: "blue"}},
-		42,
-		common.PageRequest{Page: 3, PageSize: 10},
-	)
-
-	data, err := json.Marshal(original)
-	require.NoError(t, err)
-
-	var decoded common.PageResponse[Widget]
-	require.NoError(t, json.Unmarshal(data, &decoded))
-
-	assert.Equal(t, int64(42), decoded.Total)
-	assert.Equal(t, 3, decoded.Page)
-	assert.Equal(t, 10, decoded.PageSize)
-	assert.Equal(t, 5, decoded.TotalPages)
-	require.Len(t, decoded.Items, 2)
-	assert.Equal(t, "red", decoded.Items[0].Color)
-	assert.Equal(t, "blue", decoded.Items[1].Color)
+func TestDateRange_Validate_Valid(t *testing.T) {
+	from := NewTimestamp()
+	to := Timestamp(time.Time(from).Add(time.Hour))
+	dr := DateRange{From: from, To: to}
+	err := dr.Validate()
+	assert.NoError(t, err)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestStatus — constant values
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestStatus_ConstantValues(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		val  common.Status
-		want string
-	}{
-		{common.StatusActive, "active"},
-		{common.StatusInactive, "inactive"},
-		{common.StatusPending, "pending"},
-		{common.StatusArchived, "archived"},
-		{common.StatusDeleted, "deleted"},
-	}
-
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.want, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, common.Status(tc.want), tc.val)
-		})
-	}
+func TestDateRange_Validate_FromAfterTo(t *testing.T) {
+	to := NewTimestamp()
+	from := Timestamp(time.Time(to).Add(time.Hour))
+	dr := DateRange{From: from, To: to}
+	err := dr.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must be before or equal to")
 }
 
-func TestStatus_Distinct(t *testing.T) {
-	t.Parallel()
-
-	all := []common.Status{
-		common.StatusActive,
-		common.StatusInactive,
-		common.StatusPending,
-		common.StatusArchived,
-		common.StatusDeleted,
-	}
-	seen := make(map[common.Status]bool)
-	for _, s := range all {
-		assert.False(t, seen[s], "duplicate Status value: %s", s)
-		seen[s] = true
-	}
+func TestDateRange_Validate_Equal(t *testing.T) {
+	now := NewTimestamp()
+	dr := DateRange{From: now, To: now}
+	err := dr.Validate()
+	assert.NoError(t, err)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestBaseEntity — struct field accessibility and JSON tags
-// ─────────────────────────────────────────────────────────────────────────────
+func TestNewSuccessResponse(t *testing.T) {
+	data := "test-data"
+	resp := NewSuccessResponse(data)
+	assert.True(t, resp.Success)
+	assert.Equal(t, data, resp.Data)
+	assert.Nil(t, resp.Error)
+}
 
-func TestBaseEntity_JSONRoundTrip(t *testing.T) {
-	t.Parallel()
+func TestNewErrorResponse(t *testing.T) {
+	code := "ERR001"
+	message := "error message"
+	resp := NewErrorResponse(code, message)
+	assert.False(t, resp.Success)
+	require.NotNil(t, resp.Error)
+	assert.Equal(t, code, resp.Error.Code)
+	assert.Equal(t, message, resp.Error.Message)
+}
 
-	import_time := "2025-06-01T12:00:00Z"
-	_ = import_time
+func TestNewPaginatedResponse(t *testing.T) {
+	data := []string{"item1", "item2"}
+	pagination := Pagination{Page: 1, PageSize: 10, Total: 2}
+	resp := NewPaginatedResponse(data, pagination)
+	assert.True(t, resp.Success)
+	assert.Equal(t, data, resp.Data)
+	require.NotNil(t, resp.Pagination)
+	assert.Equal(t, pagination, *resp.Pagination)
+}
 
-	original := common.BaseEntity{
-		ID:        common.NewID(),
-		TenantID:  common.TenantID("tenant-xyz"),
-		CreatedBy: common.UserID("user-abc"),
-		Version:   3,
+func TestAPIResponse_JSONRoundTrip(t *testing.T) {
+	resp := NewSuccessResponse("data")
+	resp.RequestID = "req-123"
+
+	data, err := json.Marshal(resp)
+	assert.NoError(t, err)
+
+	var resp2 APIResponse[string]
+	err = json.Unmarshal(data, &resp2)
+	assert.NoError(t, err)
+
+	assert.Equal(t, resp.Success, resp2.Success)
+	assert.Equal(t, resp.Data, resp2.Data)
+	assert.Equal(t, resp.RequestID, resp2.RequestID)
+	assert.Equal(t, resp.Timestamp.ToUnixMilli(), resp2.Timestamp.ToUnixMilli())
+}
+
+func TestBatchRequest_StopOnError_Default(t *testing.T) {
+	req := BatchRequest[string]{}
+	assert.False(t, req.StopOnError)
+}
+
+func TestBatchResponse_Counts(t *testing.T) {
+	resp := BatchResponse[string]{
+		Succeeded:      []string{"ok1", "ok2"},
+		Failed:         []BatchError{{Index: 2, Error: ErrorDetail{Code: "ERR"}}},
+		TotalProcessed: 3,
 	}
-
-	data, err := json.Marshal(original)
-	require.NoError(t, err)
-
-	var decoded common.BaseEntity
-	require.NoError(t, json.Unmarshal(data, &decoded))
-
-	assert.Equal(t, original.ID, decoded.ID)
-	assert.Equal(t, original.TenantID, decoded.TenantID)
-	assert.Equal(t, original.CreatedBy, decoded.CreatedBy)
-	assert.Equal(t, original.Version, decoded.Version)
+	assert.Equal(t, 3, len(resp.Succeeded)+len(resp.Failed))
+	assert.Equal(t, 3, resp.TotalProcessed)
 }
 
-func TestBaseEntity_VersionOptimisticLock(t *testing.T) {
-	t.Parallel()
-
-	e := common.BaseEntity{Version: 0}
-	assert.Equal(t, 0, e.Version)
-
-	e.Version++
-	assert.Equal(t, 1, e.Version)
+func TestSortOrder_Values(t *testing.T) {
+	assert.Equal(t, SortOrder("asc"), SortAsc)
+	assert.Equal(t, SortOrder("desc"), SortDesc)
 }
 
+func TestHealthStatus_Values(t *testing.T) {
+	assert.Equal(t, HealthStatus("up"), HealthUp)
+	assert.Equal(t, HealthStatus("down"), HealthDown)
+	assert.Equal(t, HealthStatus("degraded"), HealthDegraded)
+}
+
+//Personal.AI order the ending

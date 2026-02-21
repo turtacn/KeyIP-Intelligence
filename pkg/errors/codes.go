@@ -1,336 +1,355 @@
-// Package errors provides centralized error code definitions for the KeyIP-Intelligence platform.
-// All error codes are grouped by business domain and mapped to HTTP status codes.
 package errors
 
-import "net/http"
-
-// ErrorCode represents a typed error code used throughout the KeyIP-Intelligence platform.
-// Codes are partitioned by domain to avoid conflicts and simplify maintenance.
-type ErrorCode int
-
-// ─────────────────────────────────────────────────────────────────────────────
-// General / cross-cutting error codes  (1xxxx)
-// ─────────────────────────────────────────────────────────────────────────────
-const (
-	// CodeOK indicates no error.
-	CodeOK ErrorCode = 0
-
-	// CodeUnknown is a catch-all for errors that have not been categorised.
-	CodeUnknown ErrorCode = 10000
-
-	// CodeInvalidParam is returned when one or more request parameters fail
-	// validation (missing required fields, type mismatch, out-of-range values, etc.).
-	CodeInvalidParam ErrorCode = 10001
-
-	// CodeUnauthorized is returned when a request lacks valid authentication credentials.
-	CodeUnauthorized ErrorCode = 10002
-
-	// CodeForbidden is returned when authenticated credentials do not grant access
-	// to the requested resource or action.
-	CodeForbidden ErrorCode = 10003
-
-	// CodeNotFound is returned when the requested resource does not exist.
-	CodeNotFound ErrorCode = 10004
-
-	// CodeConflict is returned when a create/update operation violates a uniqueness
-	// or state constraint (e.g., duplicate resource, optimistic lock failure).
-	CodeConflict ErrorCode = 10005
-
-	// CodeRateLimit is returned when the caller has exceeded the allowed request rate.
-	CodeRateLimit ErrorCode = 10006
-
-	// CodeInternal is returned for unexpected server-side errors that are not
-	// attributable to the caller.
-	CodeInternal ErrorCode = 10007
-
-	// CodeNotImplemented is returned when a requested feature or endpoint is
-	// not yet implemented.
-	CodeNotImplemented ErrorCode = 10008
+import (
+	"net/http"
+	"strings"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Patent domain error codes  (2xxxx)
-// ─────────────────────────────────────────────────────────────────────────────
-const (
-	// CodePatentNotFound is returned when a patent with the requested identifier
-	// cannot be located in any backing store (PostgreSQL, OpenSearch, etc.).
-	CodePatentNotFound ErrorCode = 20001
+// ErrorCode is a string representation of a specific error condition.
+type ErrorCode string
 
-	// CodePatentDuplicate is returned when an attempt is made to ingest or register
-	// a patent that already exists (matched by publication number or canonical hash).
-	CodePatentDuplicate ErrorCode = 20002
-
-	// CodeClaimParseError is returned when the ClaimBERT model or claim parser
-	// fails to parse or tokenise a patent claim text.
-	CodeClaimParseError ErrorCode = 20003
-
-	// CodeMarkushInvalid is returned when a Markush structure definition is
-	// structurally invalid, incomplete, or cannot be expanded by the chemistry engine.
-	CodeMarkushInvalid ErrorCode = 20004
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Molecule domain error codes  (3xxxx)
-// ─────────────────────────────────────────────────────────────────────────────
-const (
-	// CodeMoleculeInvalidSMILES is returned when a provided SMILES string cannot
-	// be parsed into a valid molecular graph.
-	CodeMoleculeInvalidSMILES ErrorCode = 30001
-
-	// CodeMoleculeNotFound is returned when a molecule with the requested
-	// InChIKey, canonical SMILES, or internal ID cannot be located.
-	CodeMoleculeNotFound ErrorCode = 30002
-
-	// CodeFingerprintError is returned when fingerprint generation (Morgan, ECFP,
-	// topological, etc.) fails for a given molecule.
-	CodeFingerprintError ErrorCode = 30003
-
-	// CodeSimilarityCalcError is returned when a pairwise or batch similarity
-	// computation fails due to invalid inputs or a downstream model error.
-	CodeSimilarityCalcError ErrorCode = 30004
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Portfolio domain error codes  (4xxxx)
-// ─────────────────────────────────────────────────────────────────────────────
-const (
-	// CodePortfolioNotFound is returned when a patent portfolio with the requested
-	// ID does not exist or is inaccessible to the current tenant.
-	CodePortfolioNotFound ErrorCode = 40001
-
-	// CodeValuationError is returned when the portfolio valuation algorithm fails
-	// to compute a result (insufficient data, model error, numeric overflow, etc.).
-	CodeValuationError ErrorCode = 40002
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Lifecycle domain error codes  (5xxxx)
-// ─────────────────────────────────────────────────────────────────────────────
-const (
-	// CodeDeadlineMissed is returned when a lifecycle action (renewal, response,
-	// grant fee payment) cannot be recorded because the statutory deadline has passed.
-	CodeDeadlineMissed ErrorCode = 50001
-
-	// CodeAnnuityCalcError is returned when the annuity fee calculation engine
-	// fails to produce a result for a given jurisdiction and patent age.
-	CodeAnnuityCalcError ErrorCode = 50002
-
-	// CodeJurisdictionUnknown is returned when an unsupported or unrecognised
-	// jurisdiction code is supplied to the lifecycle or annuity subsystem.
-	CodeJurisdictionUnknown ErrorCode = 50003
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Intelligence layer error codes  (6xxxx)
-// ─────────────────────────────────────────────────────────────────────────────
-const (
-	// CodeModelLoadError is returned when an AI model (GNN, BERT, GPT, etc.)
-	// cannot be loaded from the model registry or serving backend.
-	CodeModelLoadError ErrorCode = 60001
-
-	// CodeInferenceTimeout is returned when a model inference call exceeds the
-	// configured deadline (default: 30 s for online; 5 min for batch).
-	CodeInferenceTimeout ErrorCode = 60002
-
-	// CodeModelNotReady is returned when a request is made against a model that
-	// has not yet completed warm-up or is undergoing a rolling update.
-	CodeModelNotReady ErrorCode = 60003
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Infrastructure error codes  (7xxxx)
-// ─────────────────────────────────────────────────────────────────────────────
-const (
-	// CodeDBConnectionError is returned when the application cannot establish or
-	// re-use a connection to PostgreSQL or Neo4j.
-	CodeDBConnectionError ErrorCode = 70001
-
-	// CodeDatabaseError is a general error for database-related failures that
-	// are not specifically connection issues.
-	CodeDatabaseError ErrorCode = 70006
-
-	// CodeDBQueryError is returned when a database query execution fails.
-	CodeDBQueryError ErrorCode = 70007
-
-	// CodeCacheError is returned when a Redis operation (GET, SET, DEL, EVAL, etc.)
-	// fails due to connection loss, timeout, or an unexpected response.
-	CodeCacheError ErrorCode = 70002
-
-	// CodeSearchError is returned when an OpenSearch or Milvus query or indexing
-	// operation fails.
-	CodeSearchError ErrorCode = 70003
-
-	// CodeMessageQueueError is returned when producing to or consuming from a
-	// Kafka topic fails (broker unavailable, serialisation error, offset commit, etc.).
-	CodeMessageQueueError ErrorCode = 70004
-
-	// CodeStorageError is returned when a MinIO object storage operation (upload,
-	// download, stat, delete) fails.
-	CodeStorageError ErrorCode = 70005
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// String — human-readable name of the error code
-// ─────────────────────────────────────────────────────────────────────────────
-
-// String returns the human-readable name associated with an ErrorCode.
-// It is safe to call on any value, including unknown codes.
 func (c ErrorCode) String() string {
-	switch c {
-	// General
-	case CodeOK:
-		return "OK"
-	case CodeUnknown:
-		return "UNKNOWN"
-	case CodeInvalidParam:
-		return "INVALID_PARAM"
-	case CodeUnauthorized:
-		return "UNAUTHORIZED"
-	case CodeForbidden:
-		return "FORBIDDEN"
-	case CodeNotFound:
-		return "NOT_FOUND"
-	case CodeConflict:
-		return "CONFLICT"
-	case CodeRateLimit:
-		return "RATE_LIMIT"
-	case CodeInternal:
-		return "INTERNAL_ERROR"
-	case CodeNotImplemented:
-		return "NOT_IMPLEMENTED"
-
-	// Patent
-	case CodePatentNotFound:
-		return "PATENT_NOT_FOUND"
-	case CodePatentDuplicate:
-		return "PATENT_DUPLICATE"
-	case CodeClaimParseError:
-		return "CLAIM_PARSE_ERROR"
-	case CodeMarkushInvalid:
-		return "MARKUSH_INVALID"
-
-	// Molecule
-	case CodeMoleculeInvalidSMILES:
-		return "MOLECULE_INVALID_SMILES"
-	case CodeMoleculeNotFound:
-		return "MOLECULE_NOT_FOUND"
-	case CodeFingerprintError:
-		return "FINGERPRINT_ERROR"
-	case CodeSimilarityCalcError:
-		return "SIMILARITY_CALC_ERROR"
-
-	// Portfolio
-	case CodePortfolioNotFound:
-		return "PORTFOLIO_NOT_FOUND"
-	case CodeValuationError:
-		return "VALUATION_ERROR"
-
-	// Lifecycle
-	case CodeDeadlineMissed:
-		return "DEADLINE_MISSED"
-	case CodeAnnuityCalcError:
-		return "ANNUITY_CALC_ERROR"
-	case CodeJurisdictionUnknown:
-		return "JURISDICTION_UNKNOWN"
-
-	// Intelligence
-	case CodeModelLoadError:
-		return "MODEL_LOAD_ERROR"
-	case CodeInferenceTimeout:
-		return "INFERENCE_TIMEOUT"
-	case CodeModelNotReady:
-		return "MODEL_NOT_READY"
-
-	// Infrastructure
-	case CodeDBConnectionError:
-		return "DB_CONNECTION_ERROR"
-	case CodeDatabaseError:
-		return "DATABASE_ERROR"
-	case CodeDBQueryError:
-		return "DB_QUERY_ERROR"
-	case CodeCacheError:
-		return "CACHE_ERROR"
-	case CodeSearchError:
-		return "SEARCH_ERROR"
-	case CodeMessageQueueError:
-		return "MESSAGE_QUEUE_ERROR"
-	case CodeStorageError:
-		return "STORAGE_ERROR"
-
-	default:
-		return "UNKNOWN_CODE"
-	}
+	return string(c)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HTTPStatus — mapping from domain error codes to HTTP status codes
-// ─────────────────────────────────────────────────────────────────────────────
+// Common Error Codes
+const (
+	ErrCodeInternal           ErrorCode = "COMMON_001"
+	ErrCodeBadRequest         ErrorCode = "COMMON_002"
+	ErrCodeUnauthorized       ErrorCode = "COMMON_003"
+	ErrCodeForbidden          ErrorCode = "COMMON_004"
+	ErrCodeNotFound           ErrorCode = "COMMON_005"
+	ErrCodeConflict           ErrorCode = "COMMON_006"
+	ErrCodeTooManyRequests    ErrorCode = "COMMON_007"
+	ErrCodeServiceUnavailable ErrorCode = "COMMON_008"
+	ErrCodeTimeout             ErrorCode = "COMMON_009"
+	ErrCodeValidation         ErrorCode = "COMMON_010"
+	ErrCodeSerialization      ErrorCode = "COMMON_011"
+	ErrCodeDatabaseError      ErrorCode = "COMMON_012"
+	ErrCodeCacheError         ErrorCode = "COMMON_013"
+	ErrCodeExternalService    ErrorCode = "COMMON_014"
+	ErrCodeFeatureDisabled    ErrorCode = "COMMON_015"
+	ErrCodeNotImplemented     ErrorCode = "COMMON_016"
+)
 
-// HTTPStatus returns the most appropriate HTTP status code for the given ErrorCode.
-// The mapping follows RFC 9110 semantics and is used by HTTP handlers in
-// internal/interfaces/http/handlers/ to translate domain errors into HTTP responses.
-//
-// Decision matrix:
-//   - 200 OK              → CodeOK
-//   - 400 Bad Request     → CodeInvalidParam, CodeMarkushInvalid, CodeMoleculeInvalidSMILES, CodeClaimParseError
-//   - 401 Unauthorized    → CodeUnauthorized
-//   - 403 Forbidden       → CodeForbidden
-//   - 404 Not Found       → CodeNotFound, CodePatentNotFound, CodeMoleculeNotFound, CodePortfolioNotFound
-//   - 409 Conflict        → CodeConflict, CodePatentDuplicate
-//   - 429 Too Many Req.   → CodeRateLimit
-//   - 503 Service Unavail → CodeModelNotReady, CodeDBConnectionError, CodeMessageQueueError
-//   - 504 Gateway Timeout → CodeInferenceTimeout
-//   - 500 Internal Server → everything else
-func (c ErrorCode) HTTPStatus() int {
-	switch c {
-	case CodeOK:
-		return http.StatusOK
+// Aliases for backward compatibility
+const (
+	CodeInternal       = ErrCodeInternal
+	CodeInvalidParam   = ErrCodeBadRequest
+	CodeUnauthorized   = ErrCodeUnauthorized
+	CodeForbidden      = ErrCodeForbidden
+	CodeNotFound       = ErrCodeNotFound
+	CodeConflict       = ErrCodeConflict
+	CodeRateLimit      = ErrCodeTooManyRequests
+	CodeNotImplemented = ErrCodeNotImplemented
+	CodeOK             = ErrorCode("OK")
 
-	case CodeInvalidParam,
-		CodeMarkushInvalid,
-		CodeMoleculeInvalidSMILES,
-		CodeClaimParseError,
-		CodeJurisdictionUnknown:
-		return http.StatusBadRequest
+	// Domain specific aliases
+	CodePatentNotFound        = ErrCodePatentNotFound
+	CodePortfolioNotFound     = ErrCodePortfolioNotFound
+	CodeMoleculeInvalidSMILES = ErrCodeMoleculeInvalidSMILES
+	CodeMoleculeNotFound      = ErrCodeMoleculeNotFound
+)
 
-	case CodeUnauthorized:
-		return http.StatusUnauthorized
+// Molecule Module Error Codes
+const (
+	ErrCodeMoleculeInvalidSMILES      ErrorCode = "MOL_001"
+	ErrCodeMoleculeInvalidInChI       ErrorCode = "MOL_002"
+	ErrCodeMoleculeInvalidFormat      ErrorCode = "MOL_003"
+	ErrCodeMoleculeNotFound           ErrorCode = "MOL_004"
+	ErrCodeMoleculeAlreadyExists      ErrorCode = "MOL_005"
+	ErrCodeMoleculeParsingFailed      ErrorCode = "MOL_006"
+	ErrCodeFingerprintGenerationFailed ErrorCode = "MOL_007"
+	ErrCodeFingerprintTypeUnsupported ErrorCode = "MOL_008"
+	ErrCodeSimilaritySearchFailed     ErrorCode = "MOL_009"
+	ErrCodeSimilarityThresholdInvalid ErrorCode = "MOL_010"
+	ErrCodeMoleculeConversionFailed   ErrorCode = "MOL_011"
+	ErrCodeSubstructureSearchFailed   ErrorCode = "MOL_012"
+	ErrCodePropertyPredictionFailed   ErrorCode = "MOL_013"
+	ErrCodeGNNModelError              ErrorCode = "MOL_014"
+	ErrCodeGNNModelNotLoaded          ErrorCode = "MOL_015"
+)
 
-	case CodeForbidden:
-		return http.StatusForbidden
+// Patent Module Error Codes
+const (
+	ErrCodePatentNotFound        ErrorCode = "PAT_001"
+	ErrCodePatentAlreadyExists   ErrorCode = "PAT_002"
+	ErrCodePatentNumberInvalid   ErrorCode = "PAT_003"
+	ErrCodePatentOfficeUnsupported ErrorCode = "PAT_004"
+	ErrCodePatentFetchFailed     ErrorCode = "PAT_005"
+	ErrCodePatentParseFailed     ErrorCode = "PAT_006"
+	ErrCodeClaimAnalysisFailed   ErrorCode = "PAT_007"
+	ErrCodeMarkushParseFailed     ErrorCode = "PAT_008"
+	ErrCodePatentFamilyNotFound  ErrorCode = "PAT_009"
+	ErrCodePatentExpired         ErrorCode = "PAT_010"
+	ErrCodePatentStatusInvalid   ErrorCode = "PAT_011"
+	ErrCodePortfolioNotFound     ErrorCode = "PAT_012"
+)
 
-	case CodeNotFound,
-		CodePatentNotFound,
-		CodeMoleculeNotFound,
-		CodePortfolioNotFound:
-		return http.StatusNotFound
+// Infringement Module Error Codes
+const (
+	ErrCodeInfringementAnalysisFailed ErrorCode = "INF_001"
+	ErrCodeInfringementDataInsufficient ErrorCode = "INF_002"
+	ErrCodeEquivalentsAnalysisFailed ErrorCode = "INF_003"
+	ErrCodeProsecutionHistoryUnavailable ErrorCode = "INF_004"
+)
 
-	case CodeConflict,
-		CodePatentDuplicate,
-		CodeDeadlineMissed:
-		return http.StatusConflict
+// FTO Module Error Codes
+const (
+	ErrCodeFTOAnalysisFailed           ErrorCode = "FTO_001"
+	ErrCodeFTOJurisdictionUnsupported  ErrorCode = "FTO_002"
+	ErrCodeFTOReportGenerationFailed   ErrorCode = "FTO_003"
+)
 
-	case CodeRateLimit:
-		return http.StatusTooManyRequests
+// Design Around Module Error Codes
+const (
+	ErrCodeDesignAroundFailed             ErrorCode = "DES_001"
+	ErrCodeDesignAroundNoSuggestions      ErrorCode = "DES_002"
+	ErrCodeDesignAroundConstraintConflict ErrorCode = "DES_003"
+)
 
-	case CodeModelNotReady,
-		CodeDBConnectionError,
-		CodeMessageQueueError,
-		CodeStorageError:
-		return http.StatusServiceUnavailable
+// Valuation Module Error Codes
+const (
+	ErrCodeValuationFailed         ErrorCode = "VAL_001"
+	ErrCodeValuationDataInsufficient ErrorCode = "VAL_002"
+)
 
-	case CodeNotImplemented:
-		return http.StatusNotImplemented
+// Watchlist Module Error Codes
+const (
+	ErrCodeWatchlistNotFound      ErrorCode = "WTC_001"
+	ErrCodeWatchlistLimitExceeded ErrorCode = "WTC_002"
+	ErrCodeWatchlistConfigInvalid ErrorCode = "WTC_003"
+	ErrCodeAlertDeliveryFailed    ErrorCode = "WTC_004"
+	ErrCodeAlertChannelUnsupported ErrorCode = "WTC_005"
+)
 
-	case CodeInferenceTimeout:
-		return http.StatusGatewayTimeout
+// Data Source Error Codes
+const (
+	ErrCodeDataSourceUnavailable ErrorCode = "SRC_001"
+	ErrCodeDataSourceRateLimited ErrorCode = "SRC_002"
+	ErrCodeDataSourceAuthFailed  ErrorCode = "SRC_003"
+	ErrCodeDataSourceParseError  ErrorCode = "SRC_004"
+)
 
-	default:
-		// CodeUnknown, CodeInternal, CodeFingerprintError, CodeSimilarityCalcError,
-		// CodeValuationError, CodeAnnuityCalcError, CodeModelLoadError,
-		// CodeCacheError, CodeSearchError, and all unrecognised codes.
-		return http.StatusInternalServerError
+// AI/ML Module Error Codes
+const (
+	ErrCodeAIModelNotAvailable    ErrorCode = "AI_001"
+	ErrCodeAIInferenceFailed      ErrorCode = "AI_002"
+	ErrCodeAIModelVersionMismatch ErrorCode = "AI_003"
+	ErrCodeAIInputInvalid         ErrorCode = "AI_004"
+	ErrCodeAIResourceExhausted    ErrorCode = "AI_005"
+)
+
+// Infrastructure Error Codes (mapped from old names)
+const (
+	CodeDBConnectionError = ErrCodeDatabaseError
+	CodeDatabaseError     = ErrCodeDatabaseError
+	CodeDBQueryError      = ErrCodeDatabaseError
+	CodeCacheError        = ErrCodeCacheError
+	CodeSearchError       = ErrCodeSimilaritySearchFailed
+	CodeMessageQueueError = ErrCodeInternal
+	CodeStorageError      = ErrCodeInternal
+)
+
+// ErrorCodeHTTPStatus maps ErrorCodes to HTTP status codes.
+var ErrorCodeHTTPStatus = map[ErrorCode]int{
+	ErrCodeInternal:           http.StatusInternalServerError,
+	ErrCodeBadRequest:         http.StatusBadRequest,
+	ErrCodeUnauthorized:       http.StatusUnauthorized,
+	ErrCodeForbidden:          http.StatusForbidden,
+	ErrCodeNotFound:           http.StatusNotFound,
+	ErrCodeConflict:           http.StatusConflict,
+	ErrCodeTooManyRequests:    http.StatusTooManyRequests,
+	ErrCodeServiceUnavailable: http.StatusServiceUnavailable,
+	ErrCodeTimeout:             http.StatusGatewayTimeout,
+	ErrCodeValidation:         http.StatusUnprocessableEntity,
+	ErrCodeSerialization:      http.StatusInternalServerError,
+	ErrCodeDatabaseError:      http.StatusInternalServerError,
+	ErrCodeCacheError:         http.StatusInternalServerError,
+	ErrCodeExternalService:    http.StatusInternalServerError,
+	ErrCodeFeatureDisabled:    http.StatusForbidden,
+
+	ErrCodeMoleculeInvalidSMILES:      http.StatusBadRequest,
+	ErrCodeMoleculeInvalidInChI:       http.StatusBadRequest,
+	ErrCodeMoleculeInvalidFormat:      http.StatusBadRequest,
+	ErrCodeMoleculeNotFound:           http.StatusNotFound,
+	ErrCodeMoleculeAlreadyExists:      http.StatusConflict,
+	ErrCodeMoleculeParsingFailed:      http.StatusInternalServerError,
+	ErrCodeFingerprintGenerationFailed: http.StatusInternalServerError,
+	ErrCodeFingerprintTypeUnsupported: http.StatusInternalServerError,
+	ErrCodeSimilaritySearchFailed:     http.StatusInternalServerError,
+	ErrCodeSimilarityThresholdInvalid: http.StatusBadRequest,
+	ErrCodeMoleculeConversionFailed:   http.StatusInternalServerError,
+	ErrCodeSubstructureSearchFailed:   http.StatusInternalServerError,
+	ErrCodePropertyPredictionFailed:   http.StatusInternalServerError,
+	ErrCodeGNNModelError:              http.StatusInternalServerError,
+	ErrCodeGNNModelNotLoaded:          http.StatusInternalServerError,
+
+	ErrCodePatentNotFound:        http.StatusNotFound,
+	ErrCodePatentAlreadyExists:   http.StatusConflict,
+	ErrCodePatentNumberInvalid:   http.StatusBadRequest,
+	ErrCodePatentOfficeUnsupported: http.StatusBadRequest,
+	ErrCodePatentFetchFailed:     http.StatusInternalServerError,
+	ErrCodePatentParseFailed:     http.StatusInternalServerError,
+	ErrCodeClaimAnalysisFailed:   http.StatusInternalServerError,
+	ErrCodeMarkushParseFailed:     http.StatusInternalServerError,
+	ErrCodePatentFamilyNotFound:  http.StatusNotFound,
+	ErrCodePatentExpired:         http.StatusInternalServerError,
+	ErrCodePatentStatusInvalid:   http.StatusBadRequest,
+	ErrCodePortfolioNotFound:     http.StatusNotFound,
+
+	ErrCodeInfringementAnalysisFailed:    http.StatusInternalServerError,
+	ErrCodeInfringementDataInsufficient: http.StatusInternalServerError,
+	ErrCodeEquivalentsAnalysisFailed:     http.StatusInternalServerError,
+	ErrCodeProsecutionHistoryUnavailable: http.StatusInternalServerError,
+
+	ErrCodeFTOAnalysisFailed:          http.StatusInternalServerError,
+	ErrCodeFTOJurisdictionUnsupported: http.StatusBadRequest,
+	ErrCodeFTOReportGenerationFailed:  http.StatusInternalServerError,
+
+	ErrCodeDesignAroundFailed:             http.StatusInternalServerError,
+	ErrCodeDesignAroundNoSuggestions:      http.StatusNotFound,
+	ErrCodeDesignAroundConstraintConflict: http.StatusBadRequest,
+
+	ErrCodeValuationFailed:         http.StatusInternalServerError,
+	ErrCodeValuationDataInsufficient: http.StatusInternalServerError,
+
+	ErrCodeWatchlistNotFound:      http.StatusNotFound,
+	ErrCodeWatchlistLimitExceeded: http.StatusTooManyRequests,
+	ErrCodeWatchlistConfigInvalid: http.StatusBadRequest,
+	ErrCodeAlertDeliveryFailed:    http.StatusInternalServerError,
+	ErrCodeAlertChannelUnsupported: http.StatusInternalServerError,
+
+	ErrCodeDataSourceUnavailable: http.StatusServiceUnavailable,
+	ErrCodeDataSourceRateLimited: http.StatusTooManyRequests,
+	ErrCodeDataSourceAuthFailed:  http.StatusBadGateway,
+	ErrCodeDataSourceParseError:  http.StatusBadGateway,
+
+	ErrCodeAIModelNotAvailable:    http.StatusServiceUnavailable,
+	ErrCodeAIInferenceFailed:      http.StatusInternalServerError,
+	ErrCodeAIModelVersionMismatch: http.StatusInternalServerError,
+	ErrCodeAIInputInvalid:         http.StatusBadRequest,
+	ErrCodeAIResourceExhausted:    http.StatusServiceUnavailable,
+	ErrCodeNotImplemented:         http.StatusNotImplemented,
+}
+
+// ErrorCodeMessage maps ErrorCodes to default messages.
+var ErrorCodeMessage = map[ErrorCode]string{
+	ErrCodeInternal:           "internal server error",
+	ErrCodeBadRequest:         "bad request",
+	ErrCodeUnauthorized:       "unauthorized",
+	ErrCodeForbidden:          "forbidden",
+	ErrCodeNotFound:           "resource not found",
+	ErrCodeConflict:           "resource conflict",
+	ErrCodeTooManyRequests:    "too many requests",
+	ErrCodeServiceUnavailable: "service unavailable",
+	ErrCodeTimeout:             "request timeout",
+	ErrCodeValidation:         "validation failed",
+	ErrCodeSerialization:      "serialization failed",
+	ErrCodeDatabaseError:      "database error",
+	ErrCodeCacheError:         "cache error",
+	ErrCodeExternalService:    "external service error",
+	ErrCodeFeatureDisabled:    "feature disabled",
+
+	ErrCodeMoleculeInvalidSMILES:      "invalid SMILES format",
+	ErrCodeMoleculeInvalidInChI:       "invalid InChI format",
+	ErrCodeMoleculeInvalidFormat:      "unsupported molecule format",
+	ErrCodeMoleculeNotFound:           "molecule not found",
+	ErrCodeMoleculeAlreadyExists:      "molecule already exists",
+	ErrCodeMoleculeParsingFailed:      "failed to parse molecule",
+	ErrCodeFingerprintGenerationFailed: "failed to generate fingerprint",
+	ErrCodeFingerprintTypeUnsupported: "unsupported fingerprint type",
+	ErrCodeSimilaritySearchFailed:     "similarity search failed",
+	ErrCodeSimilarityThresholdInvalid: "invalid similarity threshold",
+	ErrCodeMoleculeConversionFailed:   "molecule format conversion failed",
+	ErrCodeSubstructureSearchFailed:   "substructure search failed",
+	ErrCodePropertyPredictionFailed:   "property prediction failed",
+	ErrCodeGNNModelError:              "GNN model inference error",
+	ErrCodeGNNModelNotLoaded:          "GNN model not loaded",
+
+	ErrCodePatentNotFound:        "patent not found",
+	ErrCodePatentAlreadyExists:   "patent already exists",
+	ErrCodePatentNumberInvalid:   "invalid patent number",
+	ErrCodePatentOfficeUnsupported: "unsupported patent office",
+	ErrCodePatentFetchFailed:     "failed to fetch patent data",
+	ErrCodePatentParseFailed:     "failed to parse patent document",
+	ErrCodeClaimAnalysisFailed:   "claim analysis failed",
+	ErrCodeMarkushParseFailed:     "Markush structure parsing failed",
+	ErrCodePatentFamilyNotFound:  "patent family not found",
+	ErrCodePatentExpired:         "patent has expired",
+	ErrCodePatentStatusInvalid:   "invalid patent status",
+	ErrCodePortfolioNotFound:     "portfolio not found",
+
+	ErrCodeInfringementAnalysisFailed:    "infringement analysis failed",
+	ErrCodeInfringementDataInsufficient: "insufficient data for infringement analysis",
+	ErrCodeEquivalentsAnalysisFailed:     "doctrine of equivalents analysis failed",
+	ErrCodeProsecutionHistoryUnavailable: "prosecution history not available",
+
+	ErrCodeFTOAnalysisFailed:          "FTO analysis failed",
+	ErrCodeFTOJurisdictionUnsupported: "unsupported FTO jurisdiction",
+	ErrCodeFTOReportGenerationFailed:  "failed to generate FTO report",
+
+	ErrCodeDesignAroundFailed:             "design-around failed",
+	ErrCodeDesignAroundNoSuggestions:      "no design-around suggestions found",
+	ErrCodeDesignAroundConstraintConflict: "design-around constraints conflict",
+
+	ErrCodeValuationFailed:         "patent valuation failed",
+	ErrCodeValuationDataInsufficient: "insufficient data for valuation",
+
+	ErrCodeWatchlistNotFound:      "watchlist not found",
+	ErrCodeWatchlistLimitExceeded: "watchlist limit exceeded",
+	ErrCodeWatchlistConfigInvalid: "invalid watchlist configuration",
+	ErrCodeAlertDeliveryFailed:    "failed to deliver alert",
+	ErrCodeAlertChannelUnsupported: "unsupported alert channel",
+
+	ErrCodeDataSourceUnavailable: "data source unavailable",
+	ErrCodeDataSourceRateLimited: "data source rate limited",
+	ErrCodeDataSourceAuthFailed:  "data source authentication failed",
+	ErrCodeDataSourceParseError:  "failed to parse data source response",
+
+	ErrCodeAIModelNotAvailable:    "AI model not available",
+	ErrCodeAIInferenceFailed:      "AI inference failed",
+	ErrCodeAIModelVersionMismatch: "AI model version mismatch",
+	ErrCodeAIInputInvalid:         "invalid input for AI model",
+	ErrCodeAIResourceExhausted:    "AI calculation resource exhausted",
+	ErrCodeNotImplemented:         "not implemented",
+}
+
+// HTTPStatusForCode returns the HTTP status code for an ErrorCode.
+func HTTPStatusForCode(code ErrorCode) int {
+	if status, ok := ErrorCodeHTTPStatus[code]; ok {
+		return status
 	}
+	return http.StatusInternalServerError
+}
+
+// DefaultMessageForCode returns the default message for an ErrorCode.
+func DefaultMessageForCode(code ErrorCode) string {
+	if msg, ok := ErrorCodeMessage[code]; ok {
+		return msg
+	}
+	return "unknown error"
+}
+
+// IsClientError returns true if the ErrorCode corresponds to a 4xx HTTP status.
+func IsClientError(code ErrorCode) bool {
+	status := HTTPStatusForCode(code)
+	return status >= 400 && status < 500
+}
+
+// IsServerError returns true if the ErrorCode corresponds to a 5xx HTTP status.
+func IsServerError(code ErrorCode) bool {
+	status := HTTPStatusForCode(code)
+	return status >= 500 && status < 600
+}
+
+// ModuleForCode returns the module prefix of an ErrorCode.
+func ModuleForCode(code ErrorCode) string {
+	parts := strings.Split(string(code), "_")
+	if len(parts) > 0 && parts[0] != "" {
+		return parts[0]
+	}
+	return "UNKNOWN"
 }
 
 //Personal.AI order the ending

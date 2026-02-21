@@ -503,15 +503,24 @@ func (p *Patent) ToDTO() ptypes.PatentDTO {
 		Abstract:        p.Abstract,
 		Applicant:       p.Applicant,
 		Inventors:       p.Inventors,
-		FilingDate:      p.FilingDate,
-		PublicationDate: p.PublicationDate,
-		GrantDate:       p.GrantDate,
-		ExpiryDate:      p.ExpiryDate,
+		FilingDate:      common.Timestamp(p.FilingDate),
 		Status:          p.Status,
 		Jurisdiction:    p.Jurisdiction,
 		IPCCodes:        p.IPCCodes,
 		CPCCodes:        p.CPCCodes,
 		FamilyID:        p.FamilyID,
+	}
+	if p.PublicationDate != nil {
+		ts := common.Timestamp(*p.PublicationDate)
+		dto.PublicationDate = ts
+	}
+	if p.GrantDate != nil {
+		ts := common.Timestamp(*p.GrantDate)
+		dto.GrantDate = &ts
+	}
+	if p.ExpiryDate != nil {
+		ts := common.Timestamp(*p.ExpiryDate)
+		dto.ExpiryDate = &ts
 	}
 
 	// Convert Claims.
@@ -537,7 +546,7 @@ func (p *Patent) ToDTO() ptypes.PatentDTO {
 			dto.Priority[i] = ptypes.PriorityDTO{
 				Country: pr.Country,
 				Number:  pr.Number,
-				Date:    pr.Date,
+				Date:    common.Timestamp(pr.Date),
 			}
 		}
 	}
@@ -560,15 +569,24 @@ func PatentFromDTO(dto ptypes.PatentDTO) *Patent {
 		Abstract:        dto.Abstract,
 		Applicant:       dto.Applicant,
 		Inventors:       dto.Inventors,
-		FilingDate:      dto.FilingDate,
-		PublicationDate: dto.PublicationDate,
-		GrantDate:       dto.GrantDate,
-		ExpiryDate:      dto.ExpiryDate,
+		FilingDate:      time.Time(dto.FilingDate),
 		Status:          dto.Status,
 		Jurisdiction:    dto.Jurisdiction,
 		IPCCodes:        dto.IPCCodes,
 		CPCCodes:        dto.CPCCodes,
 		FamilyID:        dto.FamilyID,
+	}
+	if !time.Time(dto.PublicationDate).IsZero() {
+		t := time.Time(dto.PublicationDate)
+		p.PublicationDate = &t
+	}
+	if dto.GrantDate != nil {
+		t := time.Time(*dto.GrantDate)
+		p.GrantDate = &t
+	}
+	if dto.ExpiryDate != nil {
+		t := time.Time(*dto.ExpiryDate)
+		p.ExpiryDate = &t
 	}
 
 	// Rehydrate Claims.
@@ -589,7 +607,7 @@ func PatentFromDTO(dto ptypes.PatentDTO) *Patent {
 		p.Priority[i] = Priority{
 			Country: prdto.Country,
 			Number:  prdto.Number,
-			Date:    prdto.Date,
+			Date:    time.Time(prdto.Date),
 		}
 	}
 

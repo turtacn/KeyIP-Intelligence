@@ -95,7 +95,7 @@ func (r *mockRepository) Search(ctx context.Context, req ptypes.PatentSearchRequ
 	for _, p := range r.byID {
 		dtos = append(dtos, p.ToDTO())
 	}
-	resp := common.NewPageResponse(dtos, int64(len(dtos)), req.PageRequest)
+	resp := common.NewPageResponse(dtos, int64(len(dtos)), req.Pagination)
 	pr := ptypes.PatentSearchResponse(resp)
 	return &pr, nil
 }

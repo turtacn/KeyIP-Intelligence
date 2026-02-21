@@ -1,35 +1,131 @@
-// Package errors provides the unified error type and factory functions for the
-// KeyIP-Intelligence platform.  Every layer of the application (domain, application,
-// infrastructure, interfaces) uses AppError as the single carrier for structured
-// error information, enabling consistent HTTP responses, logging, and monitoring.
 package errors
 
 import (
-	"errors"
+	stdliberrors "errors"
 	"fmt"
 	"runtime"
 	"strings"
+	"time"
+
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Build-tag / compile-time stack-capture control
-//
-// By default stack traces are captured on every New/Wrap call.  In
-// performance-sensitive production deployments set the build tag
-// "nostack" to compile out the runtime.Callers call entirely:
-//
-//   go build -tags nostack ./...
-// ─────────────────────────────────────────────────────────────────────────────
+// AppError is the custom error type for the platform.
+type AppError struct {
+	Code            ErrorCode              `json:"code"`
+	Message         string                 `json:"message"`
+	InternalMessage string                 `json:"internal_message,omitempty"`
+	Details         map[string]interface{} `json:"details,omitempty"`
+	Cause           error                  `json:"-"`
+	Stack           string                 `json:"stack,omitempty"`
+	Timestamp       time.Time              `json:"timestamp"`
+	RequestID       string                 `json:"request_id,omitempty"`
+	Module          string                 `json:"module"`
+}
 
-// stackDepth is the maximum number of frames captured per error.
-const stackDepth = 32
+// Error implements the error interface.
+func (e *AppError) Error() string {
+	return fmt.Sprintf("[%s] %s", e.Code, e.Message)
+}
 
-// captureStack returns a formatted call-stack string starting two frames above
-// the caller (skipping captureStack itself and New/Wrap).  When compiled with
-// the "nostack" build tag this function is replaced by a no-op stub in
-// stack_disabled.go so there is zero runtime overhead.
+// Unwrap implements the error unwrap interface.
+func (e *AppError) Unwrap() error {
+	return e.Cause
+}
+
+// WithDetails adds details to the error.
+func (e *AppError) WithDetails(key string, value interface{}) *AppError {
+	if e == nil {
+		return nil
+	}
+	if e.Details == nil {
+		e.Details = make(map[string]interface{})
+	}
+	e.Details[key] = value
+	return e
+}
+
+// WithDetail is an alias for WithDetails for backward compatibility.
+func (e *AppError) WithDetail(detail string) *AppError {
+	return e.WithDetails("detail", detail)
+}
+
+// WithCause sets the underlying cause of the error.
+func (e *AppError) WithCause(err error) *AppError {
+	if e == nil {
+		return nil
+	}
+	e.Cause = err
+	return e
+}
+
+// WithRequestID sets the request ID associated with the error.
+func (e *AppError) WithRequestID(requestID string) *AppError {
+	if e == nil {
+		return nil
+	}
+	e.RequestID = requestID
+	return e
+}
+
+// WithInternalMessage sets the internal developer-focused message.
+func (e *AppError) WithInternalMessage(msg string) *AppError {
+	if e == nil {
+		return nil
+	}
+	e.InternalMessage = msg
+	return e
+}
+
+// HTTPStatus returns the associated HTTP status code.
+func (e *AppError) HTTPStatus() int {
+	return HTTPStatusForCode(e.Code)
+}
+
+// IsClientError returns true if the error is a client-side error.
+func (e *AppError) IsClientError() bool {
+	return IsClientError(e.Code)
+}
+
+// IsServerError returns true if the error is a server-side error.
+func (e *AppError) IsServerError() bool {
+	return IsServerError(e.Code)
+}
+
+// ToErrorDetail converts the AppError to a common.ErrorDetail.
+func (e *AppError) ToErrorDetail() common.ErrorDetail {
+	return common.ErrorDetail{
+		Code:    string(e.Code),
+		Message: e.Message,
+		Details: e.Details,
+	}
+}
+
+// LogFields returns a map of fields for structured logging.
+func (e *AppError) LogFields() map[string]interface{} {
+	fields := map[string]interface{}{
+		"error_code":       e.Code,
+		"message":          e.Message,
+		"module":           e.Module,
+		"timestamp":        e.Timestamp,
+		"internal_message": e.InternalMessage,
+		"request_id":       e.RequestID,
+	}
+	if e.Cause != nil {
+		fields["cause"] = e.Cause.Error()
+	}
+	if e.Stack != "" {
+		fields["stack"] = e.Stack
+	}
+	for k, v := range e.Details {
+		fields["detail."+k] = v
+	}
+	return fields
+}
+
 func captureStack(skip int) string {
-	pcs := make([]uintptr, stackDepth)
+	const maxDepth = 32
+	pcs := make([]uintptr, maxDepth)
 	n := runtime.Callers(skip+2, pcs)
 	if n == 0 {
 		return ""
@@ -38,7 +134,6 @@ func captureStack(skip int) string {
 	var sb strings.Builder
 	for {
 		f, more := frames.Next()
-		// Trim standard-library noise to keep traces readable.
 		if !strings.Contains(f.File, "runtime/") {
 			fmt.Fprintf(&sb, "\n\t%s:%d %s", f.File, f.Line, f.Function)
 		}
@@ -49,273 +144,278 @@ func captureStack(skip int) string {
 	return sb.String()
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AppError — the canonical platform error type
-// ─────────────────────────────────────────────────────────────────────────────
-
-// AppError is the single structured error type used throughout KeyIP-Intelligence.
-// It satisfies the standard error interface and supports Go 1.13+ error wrapping
-// so that errors.Is / errors.As / errors.Unwrap work transparently across all
-// layers of the application.
-//
-// Usage:
-//
-//	return errors.New(errors.CodePatentNotFound, "patent CN202310001234A not found")
-//	return errors.Wrap(repoErr, errors.CodeDBConnectionError, "failed to query patent")
-//	return errors.NotFound("molecule with InChIKey XXXXXXXXXXXXXXXX not found").
-//	           WithDetail("searched in postgres and milvus")
-type AppError struct {
-	// Code is the typed error code that uniquely identifies the failure category.
-	Code ErrorCode
-
-	// Message is the primary human-readable description of the error, suitable
-	// for inclusion in API responses returned to callers.
-	Message string
-
-	// Detail carries supplementary context (query parameters, entity IDs, etc.)
-	// that aids debugging without leaking sensitive internals to end users.
-	Detail string
-
-	// Cause is the underlying error that triggered this AppError, enabling
-	// errors.Is / errors.As traversal of the full error chain.
-	Cause error
-
-	// Stack contains the formatted call-stack captured at the point of error
-	// creation.  It is populated by New and Wrap but omitted when the "nostack"
-	// build tag is set.  Stack is intentionally not included in Error() output
-	// to keep API error messages clean; callers that need it can inspect the
-	// field directly (e.g., structured logger middleware).
-	Stack string
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// error interface implementation
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Error implements the standard error interface.
-// Format: "[<code_name>(<code_int>)] <message>: <detail>"
-// The detail segment is omitted when Detail is empty.
-func (e *AppError) Error() string {
-	if e.Detail != "" {
-		return fmt.Sprintf("[%s(%d)] %s: %s", e.Code.String(), int(e.Code), e.Message, e.Detail)
-	}
-	return fmt.Sprintf("[%s(%d)] %s", e.Code.String(), int(e.Code), e.Message)
-}
-
-// Unwrap returns the underlying cause error, enabling errors.Is and errors.As
-// to traverse the full error chain without any additional boilerplate at call sites.
-func (e *AppError) Unwrap() error {
-	return e.Cause
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Fluent builder methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-// WithDetail returns a shallow copy of the receiver with Detail set to the
-// supplied string.  It is safe to call on a nil pointer (returns nil).
-// Example:
-//
-//	return errors.NotFound("patent not found").WithDetail("id=" + id)
-func (e *AppError) WithDetail(detail string) *AppError {
-	if e == nil {
-		return nil
-	}
-	clone := *e
-	clone.Detail = detail
-	return &clone
-}
-
-// WithCause returns a shallow copy of the receiver with Cause set to err.
-// Use this when you want to attach a lower-level error to an already-constructed
-// AppError without going through Wrap.
-func (e *AppError) WithCause(err error) *AppError {
-	if e == nil {
-		return nil
-	}
-	clone := *e
-	clone.Cause = err
-	return &clone
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Primary factory functions
-// ─────────────────────────────────────────────────────────────────────────────
-
-// New constructs a fresh AppError with the given code and message.
-// A call-stack snapshot is captured automatically (unless compiled with -tags nostack).
-//
-// New is the preferred factory for errors that originate in the current layer
-// without an underlying cause from a lower layer.
-func New(code ErrorCode, message string) *AppError {
+func newAppError(code ErrorCode, message string) *AppError {
 	return &AppError{
-		Code:    code,
-		Message: message,
-		Stack:   captureStack(1),
+		Code:      code,
+		Message:   message,
+		Timestamp: time.Now().UTC(),
+		Module:    ModuleForCode(code),
+		Stack:     captureStack(2),
 	}
 }
 
-// Wrap constructs an AppError that wraps an existing error.
-// If err is nil, Wrap returns nil so it can be used inline:
-//
-//	return errors.Wrap(repo.FindByID(ctx, id), errors.CodeDBConnectionError, "query failed")
-//
-// When err is already an *AppError and code is CodeUnknown the original code is
-// preserved, preventing loss of the original domain classification during
-// cross-layer propagation.
+// Factory Functions
+
+func New(code ErrorCode, message string) *AppError {
+	return newAppError(code, message)
+}
+
+func Newf(code ErrorCode, format string, args ...interface{}) *AppError {
+	return newAppError(code, fmt.Sprintf(format, args...))
+}
+
 func Wrap(err error, code ErrorCode, message string) *AppError {
 	if err == nil {
 		return nil
 	}
-	// Preserve original code when the caller is just adding context.
-	if code == CodeUnknown {
-		var ae *AppError
-		if errors.As(err, &ae) {
-			code = ae.Code
+	// Preserve original code if current code is common or unknown
+	if code == ErrCodeInternal || code == "" {
+		var existing *AppError
+		if stdliberrors.As(err, &existing) {
+			code = existing.Code
 		}
 	}
-	return &AppError{
-		Code:    code,
-		Message: message,
-		Cause:   err,
-		Stack:   captureStack(1),
-	}
+	ae := newAppError(code, message)
+	ae.Cause = err
+	return ae
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Error-chain inspection helpers
-// ─────────────────────────────────────────────────────────────────────────────
+func Wrapf(err error, code ErrorCode, format string, args ...interface{}) *AppError {
+	if err == nil {
+		return nil
+	}
+	ae := newAppError(code, fmt.Sprintf(format, args...))
+	ae.Cause = err
+	return ae
+}
 
-// IsCode reports whether any error in err's chain is an *AppError with the
-// given code.  It is the idiomatic way to check domain-specific failure modes:
-//
-//	if errors.IsCode(err, errors.CodePatentNotFound) { ... }
+func FromCode(code ErrorCode) *AppError {
+	return newAppError(code, DefaultMessageForCode(code))
+}
+
+// Common convenient factory functions
+
+func ErrInternal(message string) *AppError {
+	return New(ErrCodeInternal, message)
+}
+
+func ErrBadRequest(message string) *AppError {
+	return New(ErrCodeBadRequest, message)
+}
+
+func ErrNotFound(resource string, id string) *AppError {
+	return New(ErrCodeNotFound, fmt.Sprintf("%s not found: %s", resource, id)).
+		WithDetails("resource", resource).
+		WithDetails("id", id)
+}
+
+func ErrUnauthorized(message string) *AppError {
+	return New(ErrCodeUnauthorized, message)
+}
+
+func ErrForbidden(message string) *AppError {
+	return New(ErrCodeForbidden, message)
+}
+
+func ErrConflict(resource string, identifier string) *AppError {
+	return New(ErrCodeConflict, fmt.Sprintf("%s conflict: %s", resource, identifier)).
+		WithDetails("resource", resource).
+		WithDetails("identifier", identifier)
+}
+
+// Aliases for backward compatibility
+func Internal(message string) *AppError     { return ErrInternal(message) }
+func InvalidParam(message string) *AppError { return ErrBadRequest(message) }
+func Unauthorized(message string) *AppError { return ErrUnauthorized(message) }
+func Forbidden(message string) *AppError    { return ErrForbidden(message) }
+func NotFound(message string) *AppError     { return New(ErrCodeNotFound, message) }
+func Conflict(message string) *AppError     { return New(ErrCodeConflict, message) }
+func InvalidState(message string) *AppError { return New(ErrCodeConflict, message) }
+func RateLimit(message string) *AppError    { return New(ErrCodeTooManyRequests, message) }
+
+func ErrValidation(message string, details map[string]interface{}) *AppError {
+	ae := New(ErrCodeValidation, message)
+	ae.Details = details
+	return ae
+}
+
+func ErrTimeout(operation string) *AppError {
+	return New(ErrCodeTimeout, fmt.Sprintf("operation timed out: %s", operation)).
+		WithDetails("operation", operation)
+}
+
+func ErrServiceUnavailable(service string) *AppError {
+	return New(ErrCodeServiceUnavailable, fmt.Sprintf("service unavailable: %s", service)).
+		WithDetails("service", service)
+}
+
+func ErrExternalService(service string, err error) *AppError {
+	return Wrap(err, ErrCodeExternalService, fmt.Sprintf("external service error: %s", service)).
+		WithDetails("service", service)
+}
+
+func ErrDatabase(operation string, err error) *AppError {
+	return Wrap(err, ErrCodeDatabaseError, fmt.Sprintf("database error during %s", operation)).
+		WithDetails("operation", operation)
+}
+
+func ErrCache(operation string, err error) *AppError {
+	return Wrap(err, ErrCodeCacheError, fmt.Sprintf("cache error during %s", operation)).
+		WithDetails("operation", operation)
+}
+
+// Molecule module convenient factory functions
+
+func ErrInvalidSMILES(smiles string) *AppError {
+	return New(ErrCodeMoleculeInvalidSMILES, "invalid SMILES format").
+		WithDetails("smiles", smiles)
+}
+
+func ErrInvalidInChI(inchi string) *AppError {
+	return New(ErrCodeMoleculeInvalidInChI, "invalid InChI format").
+		WithDetails("inchi", inchi)
+}
+
+func ErrMoleculeNotFound(id string) *AppError {
+	return New(ErrCodeMoleculeNotFound, fmt.Sprintf("molecule not found: %s", id)).
+		WithDetails("molecule_id", id)
+}
+
+func ErrMoleculeAlreadyExists(inchiKey string) *AppError {
+	return New(ErrCodeMoleculeAlreadyExists, "molecule already exists").
+		WithDetails("inchi_key", inchiKey)
+}
+
+func ErrFingerprintGeneration(moleculeID string, fpType string, err error) *AppError {
+	return Wrap(err, ErrCodeFingerprintGenerationFailed, "failed to generate fingerprint").
+		WithDetails("molecule_id", moleculeID).
+		WithDetails("fingerprint_type", fpType)
+}
+
+func ErrGNNModel(operation string, err error) *AppError {
+	return Wrap(err, ErrCodeGNNModelError, fmt.Sprintf("GNN model error during %s", operation)).
+		WithDetails("operation", operation)
+}
+
+func ErrSimilaritySearch(err error) *AppError {
+	return Wrap(err, ErrCodeSimilaritySearchFailed, "similarity search failed")
+}
+
+// Patent module convenient factory functions
+
+func ErrPatentNotFound(patentNumber string) *AppError {
+	return New(ErrCodePatentNotFound, fmt.Sprintf("patent not found: %s", patentNumber)).
+		WithDetails("patent_number", patentNumber)
+}
+
+func ErrPatentAlreadyExists(patentNumber string) *AppError {
+	return New(ErrCodePatentAlreadyExists, fmt.Sprintf("patent already exists: %s", patentNumber)).
+		WithDetails("patent_number", patentNumber)
+}
+
+func ErrPatentNumberInvalid(patentNumber string) *AppError {
+	return New(ErrCodePatentNumberInvalid, fmt.Sprintf("invalid patent number: %s", patentNumber)).
+		WithDetails("patent_number", patentNumber)
+}
+
+func ErrClaimAnalysis(patentNumber string, err error) *AppError {
+	return Wrap(err, ErrCodeClaimAnalysisFailed, fmt.Sprintf("claim analysis failed for patent %s", patentNumber)).
+		WithDetails("patent_number", patentNumber)
+}
+
+func ErrMarkushParse(patentNumber string, err error) *AppError {
+	return Wrap(err, ErrCodeMarkushParseFailed, fmt.Sprintf("Markush parse failed for patent %s", patentNumber)).
+		WithDetails("patent_number", patentNumber)
+}
+
+// FTO/Infringement module convenient factory functions
+
+func ErrFTOAnalysis(err error) *AppError {
+	return Wrap(err, ErrCodeFTOAnalysisFailed, "FTO analysis failed")
+}
+
+func ErrInfringementAnalysis(err error) *AppError {
+	return Wrap(err, ErrCodeInfringementAnalysisFailed, "infringement analysis failed")
+}
+
+func ErrDesignAround(err error) *AppError {
+	return Wrap(err, ErrCodeDesignAroundFailed, "design-around failed")
+}
+
+// Judgment Functions
+
 func IsCode(err error, code ErrorCode) bool {
 	var ae *AppError
-	for err != nil {
-		if errors.As(err, &ae) && ae.Code == code {
-			return true
-		}
-		err = errors.Unwrap(err)
+	if stdliberrors.As(err, &ae) {
+		return ae.Code == code
 	}
 	return false
 }
 
-// IsNotFound reports whether any error in err's chain is an *AppError with
-// CodeNotFound, CodePatentNotFound, CodeMoleculeNotFound, or CodePortfolioNotFound.
 func IsNotFound(err error) bool {
 	var ae *AppError
-	for err != nil {
-		if errors.As(err, &ae) {
-			switch ae.Code {
-			case CodeNotFound, CodePatentNotFound, CodeMoleculeNotFound, CodePortfolioNotFound:
-				return true
-			}
+	if stdliberrors.As(err, &ae) {
+		switch ae.Code {
+		case ErrCodeNotFound, ErrCodeMoleculeNotFound, ErrCodePatentNotFound, ErrCodePatentFamilyNotFound, ErrCodeWatchlistNotFound, ErrCodeDesignAroundNoSuggestions, ErrCodePortfolioNotFound:
+			return true
 		}
-		err = errors.Unwrap(err)
 	}
 	return false
 }
 
-// GetCode extracts the ErrorCode from the first *AppError found in err's chain.
-// If no *AppError is present, CodeUnknown is returned.
-//
-// This is useful in middleware / logging layers that need a single code to emit
-// as a metric label without coupling to specific domain errors.
-func GetCode(err error) ErrorCode {
-	if err == nil {
-		return CodeOK
-	}
+func IsConflict(err error) bool {
 	var ae *AppError
-	if errors.As(err, &ae) {
-		return ae.Code
+	if stdliberrors.As(err, &ae) {
+		switch ae.Code {
+		case ErrCodeConflict, ErrCodeMoleculeAlreadyExists, ErrCodePatentAlreadyExists:
+			return true
+		}
 	}
-	return CodeUnknown
+	return false
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Convenience factory functions for the most common error conditions
-// ─────────────────────────────────────────────────────────────────────────────
-// Each function mirrors the pattern used in well-known Go HTTP frameworks so
-// that call sites read naturally:
-//
-//   return errors.NotFound("patent CN202310001234A")
-//   return errors.InvalidParam("SMILES must not be empty")
-
-// NotFound constructs a CodeNotFound AppError.
-// Prefer CodePatentNotFound / CodeMoleculeNotFound / CodePortfolioNotFound for
-// domain-specific variants; this generic form is appropriate in generic
-// repository or router layers.
-func NotFound(message string) *AppError {
-	return &AppError{
-		Code:    CodeNotFound,
-		Message: message,
-		Stack:   captureStack(1),
-	}
+func IsValidation(err error) bool {
+	return IsCode(err, ErrCodeValidation)
 }
 
-// InvalidParam constructs a CodeInvalidParam AppError.
-func InvalidParam(message string) *AppError {
-	return &AppError{
-		Code:    CodeInvalidParam,
-		Message: message,
-		Stack:   captureStack(1),
+func IsClientErr(err error) bool {
+	var ae *AppError
+	if stdliberrors.As(err, &ae) {
+		return ae.IsClientError()
 	}
+	return false
 }
 
-// InvalidState constructs a CodeConflict AppError, used for domain state violations.
-func InvalidState(message string) *AppError {
-	return &AppError{
-		Code:    CodeConflict,
-		Message: message,
-		Stack:   captureStack(1),
+func IsServerErr(err error) bool {
+	var ae *AppError
+	if stdliberrors.As(err, &ae) {
+		return ae.IsServerError()
 	}
+	return false
 }
 
-// Unauthorized constructs a CodeUnauthorized AppError.
-func Unauthorized(message string) *AppError {
-	return &AppError{
-		Code:    CodeUnauthorized,
-		Message: message,
-		Stack:   captureStack(1),
+func GetCode(err error) (ErrorCode, bool) {
+	var ae *AppError
+	if stdliberrors.As(err, &ae) {
+		return ae.Code, true
 	}
+	return "", false
 }
 
-// Forbidden constructs a CodeForbidden AppError.
-func Forbidden(message string) *AppError {
-	return &AppError{
-		Code:    CodeForbidden,
-		Message: message,
-		Stack:   captureStack(1),
+func GetAppError(err error) (*AppError, bool) {
+	var ae *AppError
+	if stdliberrors.As(err, &ae) {
+		return ae, true
 	}
+	return nil, false
 }
 
-// Internal constructs a CodeInternal AppError.
-// Use this for unexpected server-side failures where no more specific code
-// applies.  Always log the underlying cause before or after calling Internal.
-func Internal(message string) *AppError {
-	return &AppError{
-		Code:    CodeInternal,
-		Message: message,
-		Stack:   captureStack(1),
-	}
-}
+// Sentinel Errors
 
-// Conflict constructs a CodeConflict AppError.
-func Conflict(message string) *AppError {
-	return &AppError{
-		Code:    CodeConflict,
-		Message: message,
-		Stack:   captureStack(1),
-	}
-}
+var (
+	ErrInvalidPagination = New(ErrCodeValidation, "invalid pagination parameters")
+	ErrInvalidDateRange  = New(ErrCodeValidation, "invalid date range: from must be before or equal to to")
+	ErrInvalidSortOrder  = New(ErrCodeValidation, "invalid sort order")
+)
 
-// RateLimit constructs a CodeRateLimit AppError.
-func RateLimit(message string) *AppError {
-	return &AppError{
-		Code:    CodeRateLimit,
-		Message: message,
-		Stack:   captureStack(1),
-	}
-}
-
+//Personal.AI order the ending

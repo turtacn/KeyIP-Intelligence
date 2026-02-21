@@ -1,411 +1,674 @@
-// Package patent defines all Data Transfer Objects (DTOs) and enumeration types
-// used across the patent domain of the KeyIP-Intelligence platform.
-//
-// These types serve as the canonical contract between layers:
-//   - HTTP handlers use them for request / response serialisation
-//   - Application services accept and return them as parameters / results
-//   - Domain entities expose conversion helpers to/from these DTOs
-//   - The SDK client (pkg/client/patents.go) exposes them to external callers
-//
-// All types are safe for concurrent read access once constructed.
 package patent
 
 import (
-	"time"
+	"fmt"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Enumeration types
-// ─────────────────────────────────────────────────────────────────────────────
-
-// PatentStatus represents the lifecycle stage of a patent application or grant.
-// The string underlying type is used so that JSON marshalling / unmarshalling
-// produces human-readable values without a custom codec.
+// PatentStatus represents the lifecycle stage of a patent.
 type PatentStatus string
 
 const (
-	// StatusFiled indicates the patent application has been filed with the
-	// relevant patent office but has not yet been published.
-	StatusFiled PatentStatus = "FILED"
+	StatusPending          PatentStatus = "pending"
+	StatusUnderExamination PatentStatus = "under_examination"
+	StatusPublished        PatentStatus = "published"
+	StatusGranted          PatentStatus = "granted"
+	StatusExpired          PatentStatus = "expired"
+	StatusAbandoned        PatentStatus = "abandoned"
+	StatusRevoked          PatentStatus = "revoked"
+	StatusLapsed           PatentStatus = "lapsed"
 
-	// StatusPublished indicates the application has been published (typically
-	// 18 months after the earliest priority date) but has not yet been granted.
-	StatusPublished PatentStatus = "PUBLISHED"
-
-	// StatusGranted indicates the patent has been examined and granted by the
-	// patent office.  The patent is in force subject to annuity payment.
-	StatusGranted PatentStatus = "GRANTED"
-
-	// StatusExpired indicates the patent term has elapsed (20 years from the
-	// filing date for most jurisdictions) or annuities were not paid.
-	StatusExpired PatentStatus = "EXPIRED"
-
-	// StatusAbandoned indicates the applicant has voluntarily abandoned the
-	// application or prosecution has been discontinued.
-	StatusAbandoned PatentStatus = "ABANDONED"
-
-	// StatusRevoked indicates a granted patent has been revoked by the patent
-	// office or a court (e.g., following an opposition or invalidity proceeding).
-	StatusRevoked PatentStatus = "REVOKED"
+	// Aliases for backward compatibility
+	StatusFiled = StatusPending
 )
 
-// IsValid reports whether the PatentStatus value is one of the recognised constants.
+// IsValid checks if the PatentStatus is valid.
 func (s PatentStatus) IsValid() bool {
 	switch s {
-	case StatusFiled, StatusPublished, StatusGranted,
-		StatusExpired, StatusAbandoned, StatusRevoked:
+	case StatusPending, StatusUnderExamination, StatusPublished, StatusGranted, StatusExpired, StatusAbandoned, StatusRevoked, StatusLapsed:
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// IsActive checks if the patent is in an active state.
+func (s PatentStatus) IsActive() bool {
+	return s == StatusPending || s == StatusUnderExamination || s == StatusPublished || s == StatusGranted
+}
 
-// ClaimType classifies a patent claim as either independent or dependent.
+// PatentOffice identifies a patent office.
+type PatentOffice string
+
+const (
+	OfficeCNIPA PatentOffice = "CNIPA"
+	OfficeUSPTO PatentOffice = "USPTO"
+	OfficeEPO   PatentOffice = "EPO"
+	OfficeJPO   PatentOffice = "JPO"
+	OfficeKIPO  PatentOffice = "KIPO"
+	OfficeWIPO  PatentOffice = "WIPO"
+	OfficeOther PatentOffice = "OTHER"
+)
+
+// JurisdictionCode is an alias for PatentOffice for backward compatibility.
+type JurisdictionCode = PatentOffice
+
+const (
+	JurisdictionCN = OfficeCNIPA
+	JurisdictionUS = OfficeUSPTO
+	JurisdictionEP = OfficeEPO
+	JurisdictionJP = OfficeJPO
+	JurisdictionKR    = OfficeKIPO
+	JurisdictionWO    = OfficeWIPO
+	JurisdictionOther = OfficeOther
+)
+
+// IsValid checks if the PatentOffice is supported.
+func (o PatentOffice) IsValid() bool {
+	switch o {
+	case OfficeCNIPA, OfficeUSPTO, OfficeEPO, OfficeJPO, OfficeKIPO, OfficeWIPO, OfficeOther:
+		return true
+	default:
+		return false
+	}
+}
+
+// ClaimType classifies a claim as independent or dependent.
 type ClaimType string
 
 const (
-	// ClaimIndependent identifies a claim that stands on its own without
-	// reference to any other claim.
-	ClaimIndependent ClaimType = "INDEPENDENT"
-
-	// ClaimDependent identifies a claim that incorporates by reference all
-	// limitations of one or more preceding claims.
-	ClaimDependent ClaimType = "DEPENDENT"
+	ClaimIndependent ClaimType = "independent"
+	ClaimDependent   ClaimType = "dependent"
 )
 
-// IsValid reports whether the ClaimType value is one of the recognised constants.
-func (ct ClaimType) IsValid() bool {
-	return ct == ClaimIndependent || ct == ClaimDependent
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-// JurisdictionCode is an ISO/WIPO-based two-or-three-letter code identifying
-// the patent office or treaty under which a patent application was filed.
-type JurisdictionCode string
+// ClaimCategory classifies a claim by its subject matter.
+type ClaimCategory string
 
 const (
-	// JurisdictionCN represents the China National Intellectual Property
-	// Administration (CNIPA).
-	JurisdictionCN JurisdictionCode = "CN"
-
-	// JurisdictionUS represents the United States Patent and Trademark Office
-	// (USPTO).
-	JurisdictionUS JurisdictionCode = "US"
-
-	// JurisdictionEP represents the European Patent Office (EPO), covering
-	// contracting states of the European Patent Convention.
-	JurisdictionEP JurisdictionCode = "EP"
-
-	// JurisdictionJP represents the Japan Patent Office (JPO).
-	JurisdictionJP JurisdictionCode = "JP"
-
-	// JurisdictionKR represents the Korean Intellectual Property Office (KIPO).
-	JurisdictionKR JurisdictionCode = "KR"
-
-	// JurisdictionWO represents a PCT (Patent Cooperation Treaty) international
-	// application filed via WIPO.
-	JurisdictionWO JurisdictionCode = "WO"
-
-	// JurisdictionOther represents any other jurisdiction not explicitly listed.
-	JurisdictionOther JurisdictionCode = "OTHER"
+	ClaimProduct     ClaimCategory = "product"
+	ClaimMethod      ClaimCategory = "method"
+	ClaimUse         ClaimCategory = "use"
+	ClaimComposition ClaimCategory = "composition"
 )
 
-// IsValid reports whether the JurisdictionCode is one of the recognised constants.
-func (j JurisdictionCode) IsValid() bool {
-	switch j {
-	case JurisdictionCN, JurisdictionUS, JurisdictionEP,
-		JurisdictionJP, JurisdictionKR, JurisdictionWO, JurisdictionOther:
+// InfringementRiskLevel defines levels of infringement risk.
+type InfringementRiskLevel string
+
+const (
+	RiskCritical InfringementRiskLevel = "critical"
+	RiskHigh     InfringementRiskLevel = "high"
+	RiskMedium   InfringementRiskLevel = "medium"
+	RiskLow      InfringementRiskLevel = "low"
+	RiskNone     InfringementRiskLevel = "none"
+)
+
+// IsValid checks if the InfringementRiskLevel is valid.
+func (l InfringementRiskLevel) IsValid() bool {
+	switch l {
+	case RiskCritical, RiskHigh, RiskMedium, RiskLow, RiskNone:
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Core DTOs
-// ─────────────────────────────────────────────────────────────────────────────
-
-// PatentDTO is the primary data transfer object for a patent document.
-// It carries all bibliographic data, claim summaries, and metadata required
-// by the API layer, application services, and SDK clients.
-//
-// Pointer fields represent optional or not-yet-available data (e.g., grant date
-// for a patent that has not yet been granted).  All dates are in UTC.
-type PatentDTO struct {
-	// BaseEntity supplies ID, CreatedAt, UpdatedAt, and Version from the common package.
-	common.BaseEntity
-
-	// PatentNumber is the official publication or grant number assigned by the
-	// patent office (e.g., "CN202310001234A", "US11234567B2").
-	PatentNumber string `json:"patent_number"`
-
-	// Title is the invention title as it appears in the patent document.
-	Title string `json:"title"`
-
-	// Abstract is the abstract section of the patent document.
-	Abstract string `json:"abstract"`
-
-	// Applicant is the name of the primary applicant / assignee.
-	Applicant string `json:"applicant"`
-
-	// Inventors is an ordered list of inventor full names.
-	Inventors []string `json:"inventors"`
-
-	// FilingDate is the date on which the application was filed with the patent office.
-	FilingDate time.Time `json:"filing_date"`
-
-	// PublicationDate is the date on which the application was published.
-	// Nil if the application has not yet been published.
-	PublicationDate *time.Time `json:"publication_date,omitempty"`
-
-	// GrantDate is the date on which the patent was granted.
-	// Nil if the application has not yet been granted.
-	GrantDate *time.Time `json:"grant_date,omitempty"`
-
-	// ExpiryDate is the date on which the patent will expire or has expired.
-	// Nil if the expiry date has not yet been calculated (e.g., application stage).
-	ExpiryDate *time.Time `json:"expiry_date,omitempty"`
-
-	// Status is the current lifecycle status of the patent.
-	Status PatentStatus `json:"status"`
-
-	// Jurisdiction identifies the patent office / treaty under which this
-	// patent was filed or granted.
-	Jurisdiction JurisdictionCode `json:"jurisdiction"`
-
-	// IPCCodes contains the International Patent Classification codes assigned
-	// to the patent (e.g., ["C07D209/14", "C09K11/06"]).
-	IPCCodes []string `json:"ipc_codes,omitempty"`
-
-	// CPCCodes contains the Cooperative Patent Classification codes assigned
-	// to the patent (e.g., ["C07D209/14", "C09K11/06"]).
-	CPCCodes []string `json:"cpc_codes,omitempty"`
-
-	// Claims is a summary list of the patent's claims.  Full claim text
-	// is stored in each ClaimDTO.
-	Claims []ClaimDTO `json:"claims,omitempty"`
-
-	// MarkushStructures is a list of chemical structures extracted from the claims.
-	MarkushStructures []MarkushDTO `json:"markush_structures,omitempty"`
-
-	// FamilyID is the canonical identifier of the patent family to which this
-	// patent belongs, linking equivalent applications across jurisdictions.
-	FamilyID string `json:"family_id,omitempty"`
-
-	// Priority is the list of priority documents (earlier applications) from
-	// which this patent claims priority.
-	Priority []PriorityDTO `json:"priority,omitempty"`
+// Severity returns a numerical value representing the severity of the risk.
+func (l InfringementRiskLevel) Severity() int {
+	switch l {
+	case RiskCritical:
+		return 4
+	case RiskHigh:
+		return 3
+	case RiskMedium:
+		return 2
+	case RiskLow:
+		return 1
+	default:
+		return 0
+	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ClaimDTO represents a single claim within a patent document.
-type ClaimDTO struct {
-	// ID is the internal unique identifier for this claim record.
-	ID common.ID `json:"id"`
-
-	// Number is the sequential claim number as it appears in the patent document (1-based).
-	Number int `json:"number"`
-
-	// Text is the full verbatim text of the claim.
-	Text string `json:"text"`
-
-	// Type classifies the claim as independent or dependent.
-	Type ClaimType `json:"type"`
-
-	// ParentClaimNumber is the number of the claim that this dependent claim
-	// refers back to.  Nil for independent claims.
-	ParentClaimNumber *int `json:"parent_claim_number,omitempty"`
-
-	// Elements contains the parsed structural elements of the claim produced by
-	// the ClaimBERT model (preamble, transition, body elements).
-	Elements []ClaimElementDTO `json:"elements,omitempty"`
+// PriorityInfo represents a priority claim.
+type PriorityInfo struct {
+	Country string           `json:"country"`
+	Number  string           `json:"number"`
+	Date    common.Timestamp `json:"date"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ClaimElementDTO represents a single parsed element within a claim, as
-// produced by the ClaimBERT model and ChemExtractor NER pipeline.
-type ClaimElementDTO struct {
-	// ID is the internal unique identifier for this element record.
-	ID common.ID `json:"id"`
-
-	// Text is the verbatim text of the claim element.
-	Text string `json:"text"`
-
-	// IsStructural indicates whether the element constitutes a structural
-	// limitation of the claim (as opposed to a functional or method step).
-	IsStructural bool `json:"is_structural"`
-
-	// ChemicalEntities is the list of chemical entity names or SMILES strings
-	// extracted from the element text by the ChemExtractor NER model.
-	ChemicalEntities []string `json:"chemical_entities,omitempty"`
+// ClaimElement represents a parsed element of a claim.
+type ClaimElement struct {
+	ID               common.ID `json:"id"`
+	Index            int       `json:"index"`
+	Text             string    `json:"text"`
+	Type             string    `json:"type"` // structural / functional / process / property
+	Keywords         []string  `json:"keywords,omitempty"`
+	IsStructural     bool      `json:"is_structural"`
+	ChemicalEntities []string  `json:"chemical_entities,omitempty"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ClaimElementDTO is an alias for ClaimElement for backward compatibility.
+type ClaimElementDTO = ClaimElement
 
-// PriorityDTO represents a single priority claim in a patent application,
-// referencing an earlier application filed in the same or a different jurisdiction.
-type PriorityDTO struct {
-	// Country is the ISO 3166-1 alpha-2 country code of the priority application.
-	Country string `json:"country"`
-
-	// Number is the application number of the priority document.
-	Number string `json:"number"`
-
-	// Date is the filing date of the priority application.
-	Date time.Time `json:"date"`
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Markush structure DTOs
-// ─────────────────────────────────────────────────────────────────────────────
-
-// MarkushDTO represents a Markush structure extracted from a patent claim.
-// Markush structures define families of chemical compounds using a core scaffold
-// with enumerable R-group substituents, which is the standard way of claiming
-// broad chemical space in pharmaceutical and chemistry patents.
+// MarkushDTO represents a Markush structure.
 type MarkushDTO struct {
-	// ID is the internal unique identifier for this Markush record.
-	ID common.ID `json:"id"`
-
-	// PatentID is the identifier of the patent from which this structure was extracted.
-	PatentID common.ID `json:"patent_id"`
-
-	// ClaimID is the identifier of the specific claim that defines this Markush structure.
-	ClaimID common.ID `json:"claim_id"`
-
-	// CoreStructure is the SMILES representation of the invariant scaffold.
-	// R-group attachment points are indicated using conventional R-notation (R1, R2, …).
-	CoreStructure string `json:"core_structure"`
-
-	// RGroups describes each substitution position and the set of allowed substituents.
-	RGroups []RGroupDTO `json:"r_groups,omitempty"`
-
-	// Description is a free-text summary of the Markush structure for human readers.
-	Description string `json:"description,omitempty"`
-
-	// EnumeratedCount is the computed cardinality of the Markush virtual library.
-	EnumeratedCount int64 `json:"enumerated_count"`
+	ID              common.ID   `json:"id"`
+	PatentID        common.ID   `json:"patent_id"`
+	ClaimID         common.ID   `json:"claim_id"`
+	CoreStructure   string      `json:"core_structure"`
+	RGroups         []RGroupDTO `json:"r_groups,omitempty"`
+	Description     string      `json:"description,omitempty"`
+	EnumeratedCount int64       `json:"enumerated_count"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-// RGroupDTO describes a single substitution position (R-group) in a Markush structure,
-// listing all the substituents that are explicitly or generically claimed at that position.
+// RGroupDTO is an alias for MarkushGroupDTO or similar?
+// Old code had RGroupDTO.
 type RGroupDTO struct {
-	// Position is the label of the substitution point as it appears in the
-	// CoreStructure SMILES (e.g., "R1", "R2", "R3").
-	Position string `json:"position"`
-
-	// Alternatives is an ordered list of SMILES strings representing the
-	// individual substituents that are permitted at this position.
-	// Wildcard or generic group notation (e.g., "alkyl") is stored as a
-	// human-readable string prefixed with "~" to distinguish it from a
-	// concrete SMILES (e.g., "~alkyl").
+	Position     string   `json:"position"`
 	Alternatives []string `json:"alternatives,omitempty"`
-
-	// Description is a free-text explanation of the substituent class at this
-	// position, as extracted from the claim text.
-	Description string `json:"description,omitempty"`
+	Description  string   `json:"description,omitempty"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Search request / response DTOs
-// ─────────────────────────────────────────────────────────────────────────────
+// MarkushGroupDTO represents a Markush structure group.
+type MarkushGroupDTO struct {
+	Position             string   `json:"position"`
+	Options              []string `json:"options"`
+	Description          string   `json:"description,omitempty"`
+	EstimatedCombinations int64    `json:"estimated_combinations"`
+}
 
-// PatentSearchRequest encapsulates the parameters for a full-text or structured
-// patent search.  All filter fields are optional; supplying none is equivalent to
-// a broad search across all patents accessible to the current tenant.
+// ClaimDTO represents a patent claim.
+type ClaimDTO struct {
+	ID                common.ID         `json:"id"`
+	ClaimNumber       int               `json:"claim_number"`
+	Number            int               `json:"number"` // Alias for ClaimNumber
+	Type              ClaimType         `json:"type"`
+	Category          ClaimCategory     `json:"category"`
+	Text              string            `json:"text"`
+	DependsOn         []int             `json:"depends_on,omitempty"`
+	ParentClaimNumber *int              `json:"parent_claim_number,omitempty"`
+	Elements          []ClaimElement    `json:"elements,omitempty"`
+	HasMarkush        bool              `json:"has_markush"`
+	MarkushGroups     []MarkushGroupDTO `json:"markush_groups,omitempty"`
+}
+
+// PriorityDTO is an alias for PriorityInfo.
+type PriorityDTO = PriorityInfo
+
+// PatentDTO represents a patent document.
+type PatentDTO struct {
+	common.BaseEntity
+	PatentNumber      string                  `json:"patent_number"`
+	Title             string                  `json:"title"`
+	Abstract          string                  `json:"abstract"`
+	Assignee          string                  `json:"assignee"`
+	Applicant         string                  `json:"applicant"` // Alias for Assignee
+	Assignees         []string                `json:"assignees"`
+	Inventors         []string                `json:"inventors"`
+	FilingDate        common.Timestamp        `json:"filing_date"`
+	PublicationDate   common.Timestamp        `json:"publication_date"`
+	GrantDate         *common.Timestamp       `json:"grant_date,omitempty"`
+	ExpiryDate        *common.Timestamp       `json:"expiry_date,omitempty"`
+	Status            PatentStatus            `json:"status"`
+	Office            PatentOffice            `json:"office"`
+	Jurisdiction      JurisdictionCode        `json:"jurisdiction"` // Alias for Office
+	IPCCodes          []string                `json:"ipc_codes,omitempty"`
+	CPCCodes          []string                `json:"cpc_codes,omitempty"`
+	FamilyID          string                  `json:"family_id,omitempty"`
+	Priority          []PriorityInfo          `json:"priority,omitempty"`
+	Claims            []ClaimDTO              `json:"claims,omitempty"`
+	MarkushStructures []MarkushDTO            `json:"markush_structures,omitempty"`
+	Molecules         []molecule.MoleculeDTO  `json:"molecules,omitempty"`
+	CitedBy           []string                `json:"cited_by,omitempty"`
+	Cites             []string                `json:"cites,omitempty"`
+	FullTextAvailable bool                    `json:"full_text_available"`
+	Metadata          map[string]interface{}  `json:"metadata,omitempty"`
+}
+
+// InfringementRiskDTO represents the result of an infringement risk analysis.
+type InfringementRiskDTO struct {
+	Level                        InfringementRiskLevel `json:"level"`
+	Score                        float64               `json:"score"`
+	LiteralInfringementProbability float64               `json:"literal_infringement_probability"`
+	EquivalentsProbability       float64               `json:"equivalents_probability"`
+	ProsecutionHistoryEstoppel   bool                  `json:"prosecution_history_estoppel"`
+	RelevantClaims               []int                 `json:"relevant_claims,omitempty"`
+	Recommendation               string                `json:"recommendation,omitempty"`
+	Confidence                   float64               `json:"confidence"`
+	AnalyzedAt                   common.Timestamp      `json:"analyzed_at"`
+}
+
+// FTOAnalysisRequest carries parameters for a Freedom to Operate analysis.
+type FTOAnalysisRequest struct {
+	TargetMolecules    []molecule.MoleculeInput `json:"target_molecules"`
+	Jurisdictions      []PatentOffice           `json:"jurisdictions"`
+	IncludeExpired     bool                     `json:"include_expired"`
+	IncludeEquivalents bool                     `json:"include_equivalents"`
+	IncludeDesignAround bool                    `json:"include_design_around"`
+}
+
+// Validate checks if the FTOAnalysisRequest is valid.
+func (r FTOAnalysisRequest) Validate() error {
+	if len(r.TargetMolecules) == 0 {
+		return fmt.Errorf("at least one target molecule is required")
+	}
+	for _, m := range r.TargetMolecules {
+		if err := m.Validate(); err != nil {
+			return err
+		}
+	}
+	if len(r.Jurisdictions) == 0 {
+		return fmt.Errorf("at least one jurisdiction is required")
+	}
+	for _, j := range r.Jurisdictions {
+		if !j.IsValid() {
+			return fmt.Errorf("invalid jurisdiction: %s", j)
+		}
+	}
+	return nil
+}
+
+// FTORiskPatent pairs a patent with its infringement risk for a specific molecule.
+type FTORiskPatent struct {
+	Patent                 PatentDTO                   `json:"patent"`
+	Risk                   InfringementRiskDTO         `json:"risk"`
+	MatchedMolecules       []molecule.SimilarityResult `json:"matched_molecules,omitempty"`
+	DesignAroundSuggestions []molecule.MoleculeDTO      `json:"design_around_suggestions,omitempty"`
+}
+
+// FTOAnalysisResponse represents the result of an FTO analysis.
+type FTOAnalysisResponse struct {
+	RequestID       common.ID              `json:"request_id"`
+	TargetMolecules []molecule.MoleculeDTO `json:"target_molecules"`
+	RiskPatents     []FTORiskPatent        `json:"risk_patents"`
+	OverallRisk     InfringementRiskLevel  `json:"overall_risk"`
+	Summary         string                 `json:"summary"`
+	AnalyzedAt      common.Timestamp       `json:"analyzed_at"`
+}
+
+// ScoreDimension represents a scored dimension of a patent.
+type ScoreDimension struct {
+	Score       float64            `json:"score"`
+	MaxScore    float64            `json:"max_score"`
+	Factors     map[string]float64 `json:"factors,omitempty"`
+	Explanation string             `json:"explanation,omitempty"`
+}
+
+// PatentRecommendation represents a recommendation for a patent.
+type PatentRecommendation struct {
+	Type     string `json:"type"` // maintain / strengthen / enforce / abandon / license
+	Priority string `json:"priority"` // critical / high / medium / low
+	Action   string `json:"action"`
+	Reason   string `json:"reason"`
+}
+
+// PatentValueDTO represents the assessed value of a patent.
+type PatentValueDTO struct {
+	PatentID            common.ID              `json:"patent_id"`
+	PatentNumber        string                 `json:"patent_number"`
+	TechnicalValue      ScoreDimension         `json:"technical_value"`
+	LegalValue          ScoreDimension         `json:"legal_value"`
+	CommercialValue     ScoreDimension         `json:"commercial_value"`
+	StrategicValue      ScoreDimension         `json:"strategic_value"`
+	OverallScore        float64                `json:"overall_score"`
+	Tier                string                 `json:"tier"` // S / A / B / C / D
+	TierDescription     string                 `json:"tier_description,omitempty"`
+	WeightedCalculation string                 `json:"weighted_calculation,omitempty"`
+	Recommendations     []PatentRecommendation `json:"recommendations,omitempty"`
+	AssessedAt          common.Timestamp       `json:"assessed_at"`
+}
+
+// PatentSearchRequest carries parameters for searching patents.
 type PatentSearchRequest struct {
-	// Query is the full-text search query string.  When empty, results are
-	// returned ordered by relevance score descending.
-	Query string `json:"query"`
-
-	// Jurisdiction filters results to a specific patent office / treaty.
-	// Nil means all jurisdictions.
-	Jurisdiction *JurisdictionCode `json:"jurisdiction,omitempty"`
-
-	// DateFrom restricts results to patents with a filing date on or after
-	// this value.  Nil means no lower bound.
-	DateFrom *time.Time `json:"date_from,omitempty"`
-
-	// DateTo restricts results to patents with a filing date on or before
-	// this value.  Nil means no upper bound.
-	DateTo *time.Time `json:"date_to,omitempty"`
-
-	// Applicant filters results to patents filed by the named applicant.
-	// Nil means all applicants.  The value is matched as a case-insensitive
-	// prefix in the OpenSearch index.
-	Applicant *string `json:"applicant,omitempty"`
-
-	// IPCCode restricts results to patents classified under the given IPC code
-	// or any of its sub-codes.  Nil means all IPC codes.
-	// Example: "C07D" matches C07D209/14, C07D401/00, etc.
-	IPCCode *string `json:"ipc_code,omitempty"`
-
-	// PageRequest embeds pagination parameters (page number and page size).
-	common.PageRequest
+	Query       string             `json:"query,omitempty"`
+	Offices     []PatentOffice     `json:"offices,omitempty"`
+	Assignees   []string           `json:"assignees,omitempty"`
+	Inventors   []string           `json:"inventors,omitempty"`
+	IPCCodes    []string           `json:"ipc_codes,omitempty"`
+	DateRange   *common.DateRange  `json:"date_range,omitempty"`
+	Status      []PatentStatus     `json:"status,omitempty"`
+	HasMolecule *bool              `json:"has_molecule,omitempty"`
+	Pagination  common.Pagination  `json:"pagination"`
+	Sort        []common.SortField `json:"sort,omitempty"`
 }
 
-// PatentSearchResponse is the paginated response type for patent search results.
-// It embeds the generic PageResponse, which carries the total count, current page,
-// and the slice of matched PatentDTOs.
+// PatentSearchResponse is a generic wrapper for patent search results.
 type PatentSearchResponse = common.PageResponse[PatentDTO]
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-// SimilaritySearchRequest encapsulates parameters for a molecule-to-patent
-// similarity search driven by the MolPatent-GNN model.
-// The search finds patents whose claimed chemical space overlaps with the
-// query molecule above the specified similarity threshold.
-type SimilaritySearchRequest struct {
-	// SMILES is the canonical SMILES string of the query molecule.
-	// Must be a valid, parseable SMILES; an invalid value returns CodeMoleculeInvalidSMILES.
-	SMILES string `json:"smiles"`
-
-	// Threshold is the minimum similarity score (Tanimoto coefficient or GNN
-	// embedding cosine similarity, depending on the configured algorithm)
-	// required for a patent to appear in the results.
-	// Valid range: [0.0, 1.0].  Default: 0.7.
-	Threshold float64 `json:"threshold"`
-
-	// MaxResults caps the number of results returned.  Must be in [1, 1000].
-	// Default: 50.
-	MaxResults int `json:"max_results"`
-
-	// Jurisdiction optionally restricts the search to a specific patent office.
-	// Nil means all jurisdictions.
-	Jurisdiction *JurisdictionCode `json:"jurisdiction,omitempty"`
+// Validate checks if the PatentSearchRequest is valid.
+func (r PatentSearchRequest) Validate() error {
+	if r.Query == "" && len(r.Offices) == 0 && len(r.Assignees) == 0 && len(r.Inventors) == 0 &&
+		len(r.IPCCodes) == 0 && r.DateRange == nil && len(r.Status) == 0 && r.HasMolecule == nil {
+		return fmt.Errorf("search request must contain at least one query or filter")
+	}
+	if err := r.Pagination.Validate(); err != nil {
+		return err
+	}
+	if r.DateRange != nil {
+		if err := r.DateRange.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-// SimilaritySearchResponse is the response type for a molecule-to-patent
-// similarity search, containing an ordered list of matching patents.
-type SimilaritySearchResponse struct {
-	// Results is the ordered list of matching patents, sorted by Score descending.
-	Results []SimilarityResult `json:"results"`
+// CompetitorActivity represents recent patent activity of a competitor.
+type CompetitorActivity struct {
+	CompetitorName string           `json:"competitor_name"`
+	Office         PatentOffice     `json:"office"`
+	RecentFilings  int              `json:"recent_filings"`
+	TechDomains    []string         `json:"tech_domains,omitempty"`
+	KeyInventors   []string         `json:"key_inventors,omitempty"`
+	TrendDirection string           `json:"trend_direction"` // increasing / stable / decreasing
+	Period         common.DateRange `json:"period"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-// SimilarityResult pairs a matched patent with its computed similarity score
-// and the claim numbers that were most directly responsible for the match.
-type SimilarityResult struct {
-	// Patent is the matching patent document.
-	Patent PatentDTO `json:"patent"`
-
-	// Score is the similarity score between the query molecule and the patent's
-	// claimed chemical space.  Range: [0.0, 1.0]; higher is more similar.
-	Score float64 `json:"score"`
-
-	// MatchedClaims contains the claim numbers (1-based) that contributed most
-	// to the similarity score, allowing the user to focus review on the most
-	// relevant claims.
-	MatchedClaims []int `json:"matched_claims,omitempty"`
+// WatchTarget represents a target to be monitored.
+type WatchTarget struct {
+	Type      string                 `json:"type"` // molecule / keyword / assignee / inventor / ipc_code
+	Value     string                 `json:"value"`
+	Threshold float64                `json:"threshold,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
+// WatchScope defines the scope of monitoring.
+type WatchScope struct {
+	Offices          []PatentOffice    `json:"offices,omitempty"`
+	IPCCodes         []string          `json:"ipc_codes,omitempty"`
+	Assignees        []string          `json:"assignees,omitempty"`
+	ExcludeAssignees []string          `json:"exclude_assignees,omitempty"`
+	DateRange        *common.DateRange `json:"date_range,omitempty"`
+}
+
+// AlertConfig defines how alerts should be delivered.
+type AlertConfig struct {
+	Channels           []string              `json:"channels"` // email / webhook / slack / dingtalk
+	MinRiskLevel       InfringementRiskLevel `json:"min_risk_level"`
+	Recipients         []string              `json:"recipients,omitempty"`
+	WebhookURL         string                `json:"webhook_url,omitempty"`
+	IncludeFullAnalysis bool                  `json:"include_full_analysis"`
+	Cooldown           string                `json:"cooldown,omitempty"`
+}
+
+// ScheduleConfig defines the execution schedule.
+type ScheduleConfig struct {
+	Frequency  string `json:"frequency"` // daily / weekly / biweekly / monthly / realtime
+	DayOfWeek  *int   `json:"day_of_week,omitempty"`
+	DayOfMonth *int   `json:"day_of_month,omitempty"`
+	TimeOfDay  string `json:"time_of_day"` // HH:MM
+	Timezone   string `json:"timezone"`
+}
+
+// Validate checks if the ScheduleConfig is valid.
+func (s ScheduleConfig) Validate() error {
+	switch s.Frequency {
+	case "daily", "weekly", "biweekly", "monthly", "realtime":
+	default:
+		return fmt.Errorf("invalid frequency: %s", s.Frequency)
+	}
+	if s.TimeOfDay != "" {
+		var h, m int
+		if _, err := fmt.Sscanf(s.TimeOfDay, "%d:%d", &h, &m); err != nil {
+			return fmt.Errorf("invalid time_of_day format: %s", s.TimeOfDay)
+		}
+		if h < 0 || h > 23 || m < 0 || m > 59 {
+			return fmt.Errorf("invalid time values in time_of_day: %s", s.TimeOfDay)
+		}
+	}
+	return nil
+}
+
+// AutoAnalysisConfig defines automatic analysis settings.
+type AutoAnalysisConfig struct {
+	EnableSimilaritySearch bool                       `json:"enable_similarity_search"`
+	EnableInfringementRisk bool                       `json:"enable_infringement_risk"`
+	EnableClaimAnalysis    bool                       `json:"enable_claim_analysis"`
+	EnableDesignAround     bool                       `json:"enable_design_around"`
+	EnablePatentValue      bool                       `json:"enable_patent_value"`
+	SimilarityThreshold    float64                    `json:"similarity_threshold"`
+	FingerprintTypes       []molecule.FingerprintType `json:"fingerprint_types,omitempty"`
+}
+
+// WatchlistConfig represents a configuration for monitoring patent activity.
+type WatchlistConfig struct {
+	ID           common.ID          `json:"id"`
+	Name         string             `json:"name"`
+	Description  string             `json:"description,omitempty"`
+	WatchType    string             `json:"watch_type"` // molecule_similarity / keyword / assignee / inventor
+	Targets      []WatchTarget      `json:"targets"`
+	Scope        WatchScope         `json:"scope"`
+	AlertConfig  AlertConfig        `json:"alert_config"`
+	Schedule     ScheduleConfig     `json:"schedule"`
+	AutoAnalysis AutoAnalysisConfig `json:"auto_analysis"`
+	Status       string             `json:"status"` // active / paused / archived
+	CreatedAt    common.Timestamp   `json:"created_at"`
+	UpdatedAt    common.Timestamp   `json:"updated_at"`
+}
+
+// Validate checks if the WatchlistConfig is valid.
+func (c WatchlistConfig) Validate() error {
+	if c.Name == "" {
+		return fmt.Errorf("name cannot be empty")
+	}
+	if c.WatchType == "" {
+		return fmt.Errorf("watch_type cannot be empty")
+	}
+	if len(c.Targets) == 0 {
+		return fmt.Errorf("at least one target is required")
+	}
+	if err := c.Schedule.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// WatchAlert represents an alert triggered by a watchlist.
+type WatchAlert struct {
+	ID               common.ID                 `json:"id"`
+	WatchlistID      common.ID                 `json:"watchlist_id"`
+	WatchlistName    string                    `json:"watchlist_name"`
+	AlertType        string                    `json:"alert_type"` // new_patent / status_change / similarity_match / competitor_activity
+	Severity         string                    `json:"severity"`   // critical / high / medium / low / info
+	Title            string                    `json:"title"`
+	Summary          string                    `json:"summary"`
+	Patent           *PatentDTO                `json:"patent,omitempty"`
+	SimilarityResult *molecule.SimilarityResult `json:"similarity_result,omitempty"`
+	InfringementRisk *InfringementRiskDTO      `json:"infringement_risk,omitempty"`
+	IsRead           bool                      `json:"is_read"`
+	IsAcknowledged   bool                      `json:"is_acknowledged"`
+	CreatedAt        common.Timestamp          `json:"created_at"`
+}
+
+// PatentLandscapeRequest carries parameters for generating a patent landscape.
+type PatentLandscapeRequest struct {
+	TechDomain                string            `json:"tech_domain"`
+	IPCCodes                  []string          `json:"ipc_codes,omitempty"`
+	Offices                   []PatentOffice    `json:"offices,omitempty"`
+	DateRange                 common.DateRange  `json:"date_range"`
+	TopAssignees              int               `json:"top_assignees"`
+	IncludeTrends             bool              `json:"include_trends"`
+	IncludeWhiteSpace         bool              `json:"include_white_space"`
+	IncludeCompetitorAnalysis bool              `json:"include_competitor_analysis"`
+	Pagination                common.Pagination `json:"pagination"`
+}
+
+// Validate checks if the PatentLandscapeRequest is valid.
+func (r PatentLandscapeRequest) Validate() error {
+	if r.TechDomain == "" && len(r.IPCCodes) == 0 {
+		return fmt.Errorf("either tech_domain or ipc_codes must be specified")
+	}
+	if err := r.DateRange.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// AssigneeStats represents statistics for a patent assignee.
+type AssigneeStats struct {
+	Name                string   `json:"name"`
+	TotalPatents        int      `json:"total_patents"`
+	ActivePatents       int      `json:"active_patents"`
+	RecentFilings       int      `json:"recent_filings"`
+	TopIPCCodes         []string `json:"top_ipc_codes,omitempty"`
+	AveragePatentValue  float64  `json:"average_patent_value"`
+}
+
+// YearlyTrend represents patent trends for a specific year.
+type YearlyTrend struct {
+	Year             int      `json:"year"`
+	FilingCount      int      `json:"filing_count"`
+	GrantCount       int      `json:"grant_count"`
+	TopAssignees     []string `json:"top_assignees,omitempty"`
+	EmergingKeywords []string `json:"emerging_keywords,omitempty"`
+}
+
+// TechDistributionItem represents technical distribution of patents.
+type TechDistributionItem struct {
+	IPCCode     string  `json:"ipc_code"`
+	Description string  `json:"description"`
+	Count       int     `json:"count"`
+	Percentage  float64 `json:"percentage"`
+}
+
+// WhiteSpaceArea represents a potential opportunity area in the patent landscape.
+type WhiteSpaceArea struct {
+	Description      string                 `json:"description"`
+	RelatedIPCCodes []string               `json:"related_ipc_codes,omitempty"`
+	OpportunityScore float64                `json:"opportunity_score"`
+	Rationale        string                 `json:"rationale"`
+	SuggestedMolecules []molecule.MoleculeDTO `json:"suggested_molecules,omitempty"`
+}
+
+// PatentLandscapeResponse represents the result of a patent landscape analysis.
+type PatentLandscapeResponse struct {
+	TechDomain                string                 `json:"tech_domain"`
+	TotalPatents              int64                  `json:"total_patents"`
+	ActivePatents             int64                  `json:"active_patents"`
+	TopAssignees              []AssigneeStats        `json:"top_assignees"`
+	YearlyTrends              []YearlyTrend          `json:"yearly_trends"`
+	TechDistribution          []TechDistributionItem `json:"tech_distribution"`
+	WhiteSpaceAreas           []WhiteSpaceArea       `json:"white_space_areas,omitempty"`
+	CompetitorActivities      []CompetitorActivity   `json:"competitor_activities,omitempty"`
+	GeneratedAt               common.Timestamp       `json:"generated_at"`
+}
+
+// PatentabilityRequest carries parameters for a patentability analysis.
+type PatentabilityRequest struct {
+	Molecule                     molecule.MoleculeInput `json:"molecule"`
+	TechDomain                   string                 `json:"tech_domain"`
+	Offices                      []PatentOffice         `json:"offices"`
+	IncludeNoveltyAnalysis       bool                   `json:"include_novelty_analysis"`
+	IncludeInventiveStepAnalysis bool                   `json:"include_inventive_step_analysis"`
+	IncludePriorArtSearch        bool                   `json:"include_prior_art_search"`
+}
+
+// Validate checks if the PatentabilityRequest is valid.
+func (r PatentabilityRequest) Validate() error {
+	if err := r.Molecule.Validate(); err != nil {
+		return err
+	}
+	if len(r.Offices) == 0 {
+		return fmt.Errorf("at least one office is required")
+	}
+	return nil
+}
+
+// PatentabilityResponse represents the result of a patentability analysis.
+type PatentabilityResponse struct {
+	Molecule                     molecule.MoleculeDTO `json:"molecule"`
+	OverallScore                float64              `json:"overall_score"`
+	NoveltyScore                float64              `json:"novelty_score"`
+	InventiveStepScore          float64              `json:"inventive_step_score"`
+	IndustrialApplicabilityScore float64              `json:"industrial_applicability_score"`
+	PriorArt                    []PatentDTO          `json:"prior_art,omitempty"`
+	NoveltyAnalysis             string               `json:"novelty_analysis,omitempty"`
+	InventiveStepAnalysis       string               `json:"inventive_step_analysis,omitempty"`
+	Recommendations             []string             `json:"recommendations,omitempty"`
+	AnalyzedAt                  common.Timestamp     `json:"analyzed_at"`
+}
+
+// DesignAroundConstraints defines constraints for a design-around task.
+type DesignAroundConstraints struct {
+	MaintainActivity      bool                        `json:"maintain_activity"`
+	MaxStructuralChanges int                         `json:"max_structural_changes"`
+	PreserveScaffold      bool                        `json:"preserve_scaffold"`
+	ExcludedSubstructures []string                    `json:"excluded_substructures,omitempty"`
+	TargetProperties      []molecule.MaterialProperty `json:"target_properties,omitempty"`
+}
+
+// DesignAroundRequest carries parameters for a design-around analysis.
+type DesignAroundRequest struct {
+	TargetPatent PatentDTO               `json:"target_patent"`
+	TargetClaims []int                   `json:"target_claims"`
+	BaseMolecule molecule.MoleculeInput  `json:"base_molecule"`
+	Constraints  DesignAroundConstraints `json:"constraints"`
+}
+
+// Validate checks if the DesignAroundRequest is valid.
+func (r DesignAroundRequest) Validate() error {
+	if len(r.TargetClaims) == 0 {
+		return fmt.Errorf("at least one target claim is required")
+	}
+	if err := r.BaseMolecule.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DesignAroundSuggestion represents a suggested molecule for design-around.
+type DesignAroundSuggestion struct {
+	Molecule           molecule.MoleculeDTO       `json:"molecule"`
+	Modifications      []string                   `json:"modifications"`
+	InfringementRisk   InfringementRiskDTO        `json:"infringement_risk"`
+	PredictedProperties []molecule.MaterialProperty `json:"predicted_properties,omitempty"`
+	Confidence         float64                    `json:"confidence"`
+	Rationale          string                     `json:"rationale,omitempty"`
+}
+
+// DesignAroundResponse represents the result of a design-around analysis.
+type DesignAroundResponse struct {
+	BaseMolecule molecule.MoleculeDTO     `json:"base_molecule"`
+	TargetPatent PatentDTO               `json:"target_patent"`
+	Suggestions  []DesignAroundSuggestion `json:"suggestions"`
+	AnalyzedAt   common.Timestamp         `json:"analyzed_at"`
+}
+
+// NewPatentSearchRequest creates a new PatentSearchRequest with default pagination.
+func NewPatentSearchRequest(query string) PatentSearchRequest {
+	return PatentSearchRequest{
+		Query: query,
+		Pagination: common.Pagination{
+			Page:     1,
+			PageSize: 20,
+		},
+	}
+}
+
+// NewFTOAnalysisRequest creates a new FTOAnalysisRequest.
+func NewFTOAnalysisRequest(molecules []molecule.MoleculeInput, jurisdictions []PatentOffice) FTOAnalysisRequest {
+	return FTOAnalysisRequest{
+		TargetMolecules: molecules,
+		Jurisdictions:   jurisdictions,
+	}
+}
+
+// NewWatchlistConfig creates a new WatchlistConfig with default settings.
+func NewWatchlistConfig(name string, watchType string) WatchlistConfig {
+	return WatchlistConfig{
+		Name:      name,
+		WatchType: watchType,
+		Status:    "active",
+		Schedule: ScheduleConfig{
+			Frequency: "daily",
+			TimeOfDay: "00:00",
+			Timezone:  "UTC",
+		},
+		AlertConfig: AlertConfig{
+			Channels:     []string{"email"},
+			MinRiskLevel: RiskMedium,
+		},
+	}
+}
+
+//Personal.AI order the ending
