@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	appErrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
@@ -76,11 +77,11 @@ type WorkspaceSearchCriteria struct {
 // are stored as JSONB columns, enabling rich containment queries.
 type CollaborationRepository struct {
 	pool   *pgxpool.Pool
-	logger Logger
+	logger logging.Logger
 }
 
 // NewCollaborationRepository constructs a ready-to-use CollaborationRepository.
-func NewCollaborationRepository(pool *pgxpool.Pool, logger Logger) *CollaborationRepository {
+func NewCollaborationRepository(pool *pgxpool.Pool, logger logging.Logger) *CollaborationRepository {
 	return &CollaborationRepository{pool: pool, logger: logger}
 }
 
@@ -89,7 +90,7 @@ func NewCollaborationRepository(pool *pgxpool.Pool, logger Logger) *Collaboratio
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) Save(ctx context.Context, ws *Workspace) error {
-	r.logger.Debug("CollaborationRepository.Save", "workspace_id", ws.ID)
+	r.logger.Debug("CollaborationRepository.Save", logging.String("workspace_id", string(ws.ID)))
 
 	membersJSON, _ := json.Marshal(ws.Members)
 	resourcesJSON, _ := json.Marshal(ws.SharedResources)
@@ -114,7 +115,7 @@ func (r *CollaborationRepository) Save(ctx context.Context, ws *Workspace) error
 		ws.CreatedAt, ws.UpdatedAt, ws.CreatedBy, ws.Version,
 	)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.Save", "error", err)
+		r.logger.Error("CollaborationRepository.Save", logging.Err(err))
 		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to insert workspace")
 	}
 	return nil
@@ -125,7 +126,7 @@ func (r *CollaborationRepository) Save(ctx context.Context, ws *Workspace) error
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) FindByID(ctx context.Context, id common.ID) (*Workspace, error) {
-	r.logger.Debug("CollaborationRepository.FindByID", "id", id)
+	r.logger.Debug("CollaborationRepository.FindByID", logging.String("id", string(id)))
 
 	return r.scanWorkspace(r.pool.QueryRow(ctx, `
 		SELECT id, tenant_id, name, description, owner_id,
@@ -140,7 +141,7 @@ func (r *CollaborationRepository) FindByID(ctx context.Context, id common.ID) (*
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) FindByOwner(ctx context.Context, ownerID common.UserID, page, pageSize int) ([]*Workspace, int64, error) {
-	r.logger.Debug("CollaborationRepository.FindByOwner", "owner_id", ownerID)
+	r.logger.Debug("CollaborationRepository.FindByOwner", logging.String("owner_id", string(ownerID)))
 
 	where := "WHERE owner_id = $1"
 
@@ -148,7 +149,7 @@ func (r *CollaborationRepository) FindByOwner(ctx context.Context, ownerID commo
 	if err := r.pool.QueryRow(ctx,
 		fmt.Sprintf("SELECT COUNT(*) FROM workspaces %s", where), ownerID,
 	).Scan(&total); err != nil {
-		r.logger.Error("CollaborationRepository.FindByOwner: count", "error", err)
+		r.logger.Error("CollaborationRepository.FindByOwner: count", logging.Err(err))
 		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "count failed")
 	}
 
@@ -169,7 +170,7 @@ func (r *CollaborationRepository) FindByOwner(ctx context.Context, ownerID commo
 		ORDER BY updated_at DESC
 		LIMIT $2 OFFSET $3`, where), ownerID, pageSize, offset)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.FindByOwner: query", "error", err)
+		r.logger.Error("CollaborationRepository.FindByOwner: query", logging.Err(err))
 		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "query failed")
 	}
 	defer rows.Close()
@@ -179,20 +180,13 @@ func (r *CollaborationRepository) FindByOwner(ctx context.Context, ownerID commo
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FindWorkspacesByUser — JSONB containment query on members
-//
-// Uses the @> operator to check whether the members JSONB array contains an
-// element with the specified user_id:
-//
-//   members @> '[{"user_id": "..."}]'::jsonb
-//
-// This leverages a GIN index on the members column for efficient lookups.
+// FindWorkspacesByUser
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) FindWorkspacesByUser(
 	ctx context.Context, userID common.UserID, page, pageSize int,
 ) ([]*Workspace, int64, error) {
-	r.logger.Debug("CollaborationRepository.FindWorkspacesByUser", "user_id", userID)
+	r.logger.Debug("CollaborationRepository.FindWorkspacesByUser", logging.String("user_id", string(userID)))
 
 	// Build the JSONB containment pattern.
 	pattern := fmt.Sprintf(`[{"user_id": "%s"}]`, string(userID))
@@ -203,7 +197,7 @@ func (r *CollaborationRepository) FindWorkspacesByUser(
 	if err := r.pool.QueryRow(ctx,
 		fmt.Sprintf("SELECT COUNT(*) FROM workspaces %s", where), pattern,
 	).Scan(&total); err != nil {
-		r.logger.Error("CollaborationRepository.FindWorkspacesByUser: count", "error", err)
+		r.logger.Error("CollaborationRepository.FindWorkspacesByUser: count", logging.Err(err))
 		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "count failed")
 	}
 
@@ -224,7 +218,7 @@ func (r *CollaborationRepository) FindWorkspacesByUser(
 		ORDER BY updated_at DESC
 		LIMIT $2 OFFSET $3`, where), pattern, pageSize, offset)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.FindWorkspacesByUser: query", "error", err)
+		r.logger.Error("CollaborationRepository.FindWorkspacesByUser: query", logging.Err(err))
 		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "query failed")
 	}
 	defer rows.Close()
@@ -234,17 +228,12 @@ func (r *CollaborationRepository) FindWorkspacesByUser(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FindWorkspacesByResource — JSONB containment query on shared_resources
-//
-// Uses the @> operator to check whether the shared_resources JSONB array
-// contains an element with the specified resource_id:
-//
-//   shared_resources @> '[{"resource_id": "..."}]'::jsonb
+// FindWorkspacesByResource
 // ─────────────────────────────────────────────────────────────────────
 func (r *CollaborationRepository) FindWorkspacesByResource(
 	ctx context.Context, resourceID common.ID, page, pageSize int,
 ) ([]*Workspace, int64, error) {
-	r.logger.Debug("CollaborationRepository.FindWorkspacesByResource", "resource_id", resourceID)
+	r.logger.Debug("CollaborationRepository.FindWorkspacesByResource", logging.String("resource_id", string(resourceID)))
 
 	// Build the JSONB containment pattern.
 	pattern := fmt.Sprintf(`[{"resource_id": "%s"}]`, string(resourceID))
@@ -255,7 +244,7 @@ func (r *CollaborationRepository) FindWorkspacesByResource(
 	if err := r.pool.QueryRow(ctx,
 		fmt.Sprintf("SELECT COUNT(*) FROM workspaces %s", where), pattern,
 	).Scan(&total); err != nil {
-		r.logger.Error("CollaborationRepository.FindWorkspacesByResource: count", "error", err)
+		r.logger.Error("CollaborationRepository.FindWorkspacesByResource: count", logging.Err(err))
 		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "count failed")
 	}
 
@@ -276,7 +265,7 @@ func (r *CollaborationRepository) FindWorkspacesByResource(
 		ORDER BY updated_at DESC
 		LIMIT $2 OFFSET $3`, where), pattern, pageSize, offset)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.FindWorkspacesByResource: query", "error", err)
+		r.logger.Error("CollaborationRepository.FindWorkspacesByResource: query", logging.Err(err))
 		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "query failed")
 	}
 	defer rows.Close()
@@ -290,7 +279,8 @@ func (r *CollaborationRepository) FindWorkspacesByResource(
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) Search(ctx context.Context, criteria WorkspaceSearchCriteria) ([]*Workspace, int64, error) {
-	r.logger.Debug("CollaborationRepository.Search", "criteria", criteria)
+	// Cannot log criteria directly as it's a struct and logging package might not support Any or requires conversion
+	r.logger.Debug("CollaborationRepository.Search")
 
 	var (
 		conditions []string
@@ -330,7 +320,7 @@ func (r *CollaborationRepository) Search(ctx context.Context, criteria Workspace
 	if err := r.pool.QueryRow(ctx,
 		fmt.Sprintf("SELECT COUNT(*) FROM workspaces %s", whereClause), args...,
 	).Scan(&total); err != nil {
-		r.logger.Error("CollaborationRepository.Search: count", "error", err)
+		r.logger.Error("CollaborationRepository.Search: count", logging.Err(err))
 		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "count failed")
 	}
 
@@ -356,7 +346,7 @@ func (r *CollaborationRepository) Search(ctx context.Context, criteria Workspace
 		ORDER BY updated_at DESC
 		LIMIT %s OFFSET %s`, whereClause, phLimit, phOffset), args...)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.Search: query", "error", err)
+		r.logger.Error("CollaborationRepository.Search: query", logging.Err(err))
 		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "search query failed")
 	}
 	defer rows.Close()
@@ -370,7 +360,10 @@ func (r *CollaborationRepository) Search(ctx context.Context, criteria Workspace
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) Update(ctx context.Context, ws *Workspace) error {
-	r.logger.Debug("CollaborationRepository.Update", "workspace_id", ws.ID, "version", ws.Version)
+	r.logger.Debug("CollaborationRepository.Update",
+		logging.String("workspace_id", string(ws.ID)),
+		logging.Int("version", ws.Version),
+	)
 
 	membersJSON, _ := json.Marshal(ws.Members)
 	resourcesJSON, _ := json.Marshal(ws.SharedResources)
@@ -392,7 +385,7 @@ func (r *CollaborationRepository) Update(ctx context.Context, ws *Workspace) err
 		ws.ID, ws.Version,
 	)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.Update", "error", err)
+		r.logger.Error("CollaborationRepository.Update", logging.Err(err))
 		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to update workspace")
 	}
 	if tag.RowsAffected() == 0 {
@@ -403,11 +396,14 @@ func (r *CollaborationRepository) Update(ctx context.Context, ws *Workspace) err
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AddMember — atomic JSONB array append
+// AddMember
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) AddMember(ctx context.Context, workspaceID common.ID, member WorkspaceMember) error {
-	r.logger.Debug("CollaborationRepository.AddMember", "workspace_id", workspaceID, "user_id", member.UserID)
+	r.logger.Debug("CollaborationRepository.AddMember",
+		logging.String("workspace_id", string(workspaceID)),
+		logging.String("user_id", member.UserID),
+	)
 
 	memberJSON, _ := json.Marshal(member)
 
@@ -418,7 +414,7 @@ func (r *CollaborationRepository) AddMember(ctx context.Context, workspaceID com
 		`SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = $1 AND members @> $2::jsonb)`,
 		workspaceID, pattern,
 	).Scan(&exists); err != nil {
-		r.logger.Error("CollaborationRepository.AddMember: check", "error", err)
+		r.logger.Error("CollaborationRepository.AddMember: check", logging.Err(err))
 		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to check membership")
 	}
 	if exists {
@@ -431,7 +427,7 @@ func (r *CollaborationRepository) AddMember(ctx context.Context, workspaceID com
 		    updated_at = NOW()
 		WHERE id = $2`, string(memberJSON), workspaceID)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.AddMember", "error", err)
+		r.logger.Error("CollaborationRepository.AddMember", logging.Err(err))
 		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to add member")
 	}
 	if tag.RowsAffected() == 0 {
@@ -441,11 +437,14 @@ func (r *CollaborationRepository) AddMember(ctx context.Context, workspaceID com
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RemoveMember — atomic JSONB array element removal
+// RemoveMember
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) RemoveMember(ctx context.Context, workspaceID common.ID, userID common.UserID) error {
-	r.logger.Debug("CollaborationRepository.RemoveMember", "workspace_id", workspaceID, "user_id", userID)
+	r.logger.Debug("CollaborationRepository.RemoveMember",
+		logging.String("workspace_id", string(workspaceID)),
+		logging.String("user_id", string(userID)),
+	)
 
 	// Rebuild the JSONB array excluding the target user.
 	tag, err := r.pool.Exec(ctx, `
@@ -458,7 +457,7 @@ func (r *CollaborationRepository) RemoveMember(ctx context.Context, workspaceID 
 		updated_at = NOW()
 		WHERE id = $2`, string(userID), workspaceID)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.RemoveMember", "error", err)
+		r.logger.Error("CollaborationRepository.RemoveMember", logging.Err(err))
 		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to remove member")
 	}
 	if tag.RowsAffected() == 0 {
@@ -468,14 +467,17 @@ func (r *CollaborationRepository) RemoveMember(ctx context.Context, workspaceID 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UpdateMemberRole — atomic JSONB element update
+// UpdateMemberRole
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) UpdateMemberRole(
 	ctx context.Context, workspaceID common.ID, userID common.UserID, newRole string,
 ) error {
 	r.logger.Debug("CollaborationRepository.UpdateMemberRole",
-		"workspace_id", workspaceID, "user_id", userID, "role", newRole)
+		logging.String("workspace_id", string(workspaceID)),
+		logging.String("user_id", string(userID)),
+		logging.String("role", newRole),
+	)
 
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE workspaces
@@ -492,7 +494,7 @@ func (r *CollaborationRepository) UpdateMemberRole(
 		updated_at = NOW()
 		WHERE id = $3`, string(userID), newRole, workspaceID)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.UpdateMemberRole", "error", err)
+		r.logger.Error("CollaborationRepository.UpdateMemberRole", logging.Err(err))
 		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to update member role")
 	}
 	if tag.RowsAffected() == 0 {
@@ -502,12 +504,14 @@ func (r *CollaborationRepository) UpdateMemberRole(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ShareResource — atomic JSONB array append
+// ShareResource
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) ShareResource(ctx context.Context, workspaceID common.ID, res SharedResource) error {
 	r.logger.Debug("CollaborationRepository.ShareResource",
-		"workspace_id", workspaceID, "resource_id", res.ResourceID)
+		logging.String("workspace_id", string(workspaceID)),
+		logging.String("resource_id", res.ResourceID),
+	)
 
 	// Check for duplicate.
 	pattern := fmt.Sprintf(`[{"resource_id": "%s"}]`, res.ResourceID)
@@ -516,7 +520,7 @@ func (r *CollaborationRepository) ShareResource(ctx context.Context, workspaceID
 		`SELECT EXISTS(SELECT 1 FROM workspaces WHERE id = $1 AND shared_resources @> $2::jsonb)`,
 		workspaceID, pattern,
 	).Scan(&exists); err != nil {
-		r.logger.Error("CollaborationRepository.ShareResource: check", "error", err)
+		r.logger.Error("CollaborationRepository.ShareResource: check", logging.Err(err))
 		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to check resource sharing")
 	}
 	if exists {
@@ -531,7 +535,7 @@ func (r *CollaborationRepository) ShareResource(ctx context.Context, workspaceID
 		    updated_at = NOW()
 		WHERE id = $2`, string(resJSON), workspaceID)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.ShareResource", "error", err)
+		r.logger.Error("CollaborationRepository.ShareResource", logging.Err(err))
 		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to share resource")
 	}
 	if tag.RowsAffected() == 0 {
@@ -541,12 +545,14 @@ func (r *CollaborationRepository) ShareResource(ctx context.Context, workspaceID
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UnshareResource — atomic JSONB array element removal
+// UnshareResource
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) UnshareResource(ctx context.Context, workspaceID common.ID, resourceID common.ID) error {
 	r.logger.Debug("CollaborationRepository.UnshareResource",
-		"workspace_id", workspaceID, "resource_id", resourceID)
+		logging.String("workspace_id", string(workspaceID)),
+		logging.String("resource_id", string(resourceID)),
+	)
 
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE workspaces
@@ -558,7 +564,7 @@ func (r *CollaborationRepository) UnshareResource(ctx context.Context, workspace
 		updated_at = NOW()
 		WHERE id = $2`, string(resourceID), workspaceID)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.UnshareResource", "error", err)
+		r.logger.Error("CollaborationRepository.UnshareResource", logging.Err(err))
 		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to unshare resource")
 	}
 	if tag.RowsAffected() == 0 {
@@ -572,11 +578,11 @@ func (r *CollaborationRepository) UnshareResource(ctx context.Context, workspace
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (r *CollaborationRepository) Delete(ctx context.Context, id common.ID) error {
-	r.logger.Debug("CollaborationRepository.Delete", "id", id)
+	r.logger.Debug("CollaborationRepository.Delete", logging.String("id", string(id)))
 
 	tag, err := r.pool.Exec(ctx, `DELETE FROM workspaces WHERE id = $1`, id)
 	if err != nil {
-		r.logger.Error("CollaborationRepository.Delete", "error", err)
+		r.logger.Error("CollaborationRepository.Delete", logging.Err(err))
 		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to delete workspace")
 	}
 	if tag.RowsAffected() == 0 {
@@ -594,7 +600,7 @@ func (r *CollaborationRepository) Count(ctx context.Context) (int64, error) {
 
 	var count int64
 	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM workspaces`).Scan(&count); err != nil {
-		r.logger.Error("CollaborationRepository.Count", "error", err)
+		r.logger.Error("CollaborationRepository.Count", logging.Err(err))
 		return 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to count workspaces")
 	}
 	return count, nil
@@ -618,7 +624,7 @@ func (r *CollaborationRepository) scanWorkspace(row pgx.Row) (*Workspace, error)
 		if err == pgx.ErrNoRows {
 			return nil, appErrors.New(appErrors.CodeNotFound, "workspace not found")
 		}
-		r.logger.Error("scanWorkspace", "error", err)
+		r.logger.Error("scanWorkspace", logging.Err(err))
 		return nil, appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to scan workspace")
 	}
 
@@ -650,7 +656,7 @@ func (r *CollaborationRepository) scanWorkspaces(rows pgx.Rows) ([]*Workspace, e
 			&ws.CreatedAt, &ws.UpdatedAt, &ws.CreatedBy, &ws.Version,
 		)
 		if err != nil {
-			r.logger.Error("scanWorkspaces", "error", err)
+			r.logger.Error("scanWorkspaces", logging.Err(err))
 			return nil, appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to scan workspace row")
 		}
 

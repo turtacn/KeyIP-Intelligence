@@ -40,6 +40,40 @@ type BaseEntity struct {
 	Version   int       `json:"version"`
 }
 
+// DomainEvent represents a significant event in the domain.
+type DomainEvent interface {
+	EventID() string
+	OccurredAt() time.Time
+	AggregateID() string
+}
+
+// BaseEvent provides common fields for domain events.
+type BaseEvent struct {
+	ID        string    `json:"event_id"`
+	Timestamp time.Time `json:"occurred_at"`
+	AggID     string    `json:"aggregate_id"`
+}
+
+func NewBaseEvent(aggID string) BaseEvent {
+	return BaseEvent{
+		ID:        uuid.New().String(),
+		Timestamp: time.Now().UTC(),
+		AggID:     aggID,
+	}
+}
+
+func (e BaseEvent) EventID() string {
+	return e.ID
+}
+
+func (e BaseEvent) OccurredAt() time.Time {
+	return e.Timestamp
+}
+
+func (e BaseEvent) AggregateID() string {
+	return e.AggID
+}
+
 // Validate checks if the ID is a valid UUID v4.
 func (id ID) Validate() error {
 	if id == "" {

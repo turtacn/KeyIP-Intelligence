@@ -2,103 +2,59 @@ package portfolio
 
 import (
 	"context"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 )
 
-// QueryOptions aggregate all optional query parameters.
-type QueryOptions struct {
-	Offset        int
-	Limit         int
-	SortField     string
-	SortAscending bool
-	NameKeyword   string
-	TagFilters    map[string]string
-}
-
-// QueryOption defines a function signature for providing query options.
-type QueryOption func(*QueryOptions)
-
-// WithPagination sets the pagination parameters.
-func WithPagination(offset, limit int) QueryOption {
-	return func(o *QueryOptions) {
-		if offset < 0 {
-			offset = 0
-		}
-		if limit <= 0 {
-			limit = 20
-		}
-		if limit > 100 {
-			limit = 100
-		}
-		o.Offset = offset
-		o.Limit = limit
-	}
-}
-
-// WithSortBy sets the sorting parameters.
-func WithSortBy(field string, ascending bool) QueryOption {
-	return func(o *QueryOptions) {
-		o.SortField = field
-		o.SortAscending = ascending
-	}
-}
-
-// WithNameFilter sets a name keyword filter.
-func WithNameFilter(keyword string) QueryOption {
-	return func(o *QueryOptions) {
-		o.NameKeyword = keyword
-	}
-}
-
-// WithTagFilter adds a tag filter.
-func WithTagFilter(key, value string) QueryOption {
-	return func(o *QueryOptions) {
-		if o.TagFilters == nil {
-			o.TagFilters = make(map[string]string)
-		}
-		o.TagFilters[key] = value
-	}
-}
-
-// ApplyOptions applies the provided options to a default QueryOptions.
-func ApplyOptions(opts ...QueryOption) QueryOptions {
-	options := QueryOptions{
-		Offset: 0,
-		Limit:  20,
-	}
-	for _, opt := range opts {
-		opt(&options)
-	}
-	return options
-}
-
-// PortfolioRepository defines the persistence contract for Portfolio aggregates.
+// PortfolioRepository defines the persistence contract for portfolio domain.
 type PortfolioRepository interface {
-	// Save creates or updates a portfolio.
-	Save(ctx context.Context, portfolio *Portfolio) error
+	// Portfolio
+	Create(ctx context.Context, p *Portfolio) error
+	GetByID(ctx context.Context, id uuid.UUID) (*Portfolio, error)
+	Update(ctx context.Context, p *Portfolio) error
+	SoftDelete(ctx context.Context, id uuid.UUID) error
+	List(ctx context.Context, ownerID uuid.UUID, status *Status, limit, offset int) ([]*Portfolio, int64, error)
+	GetByOwner(ctx context.Context, ownerID uuid.UUID) ([]*Portfolio, error)
 
-	// FindByID retrieves a portfolio by its ID.
-	FindByID(ctx context.Context, id string) (*Portfolio, error)
+	// Patents
+	AddPatent(ctx context.Context, portfolioID, patentID uuid.UUID, role string, addedBy uuid.UUID) error
+	RemovePatent(ctx context.Context, portfolioID, patentID uuid.UUID) error
+	GetPatents(ctx context.Context, portfolioID uuid.UUID, role *string, limit, offset int) ([]*patent.Patent, int64, error)
+	IsPatentInPortfolio(ctx context.Context, portfolioID, patentID uuid.UUID) (bool, error)
+	BatchAddPatents(ctx context.Context, portfolioID uuid.UUID, patentIDs []uuid.UUID, role string, addedBy uuid.UUID) error
+	GetPortfoliosByPatent(ctx context.Context, patentID uuid.UUID) ([]*Portfolio, error)
 
-	// FindByOwnerID retrieves portfolios belonging to a specific owner.
-	FindByOwnerID(ctx context.Context, ownerID string, opts ...QueryOption) ([]*Portfolio, error)
+	// Valuation
+	CreateValuation(ctx context.Context, v *Valuation) error
+	GetLatestValuation(ctx context.Context, patentID uuid.UUID) (*Valuation, error)
+	GetValuationHistory(ctx context.Context, patentID uuid.UUID, limit int) ([]*Valuation, error)
+	GetValuationsByPortfolio(ctx context.Context, portfolioID uuid.UUID) ([]*Valuation, error)
+	GetValuationDistribution(ctx context.Context, portfolioID uuid.UUID) (map[ValuationTier]int64, error)
+	BatchCreateValuations(ctx context.Context, valuations []*Valuation) error
 
-	// FindByStatus retrieves portfolios with a specific status.
-	FindByStatus(ctx context.Context, status PortfolioStatus, opts ...QueryOption) ([]*Portfolio, error)
+	// HealthScore
+	CreateHealthScore(ctx context.Context, score *HealthScore) error
+	GetLatestHealthScore(ctx context.Context, portfolioID uuid.UUID) (*HealthScore, error)
+	GetHealthScoreHistory(ctx context.Context, portfolioID uuid.UUID, limit int) ([]*HealthScore, error)
+	GetHealthScoreTrend(ctx context.Context, portfolioID uuid.UUID, startDate, endDate time.Time) ([]*HealthScore, error)
 
-	// FindByTechDomain retrieves portfolios associated with a specific tech domain.
-	FindByTechDomain(ctx context.Context, techDomain string, opts ...QueryOption) ([]*Portfolio, error)
+	// Suggestions
+	CreateSuggestion(ctx context.Context, s *OptimizationSuggestion) error
+	GetSuggestions(ctx context.Context, portfolioID uuid.UUID, status *string, limit, offset int) ([]*OptimizationSuggestion, int64, error)
+	UpdateSuggestionStatus(ctx context.Context, id uuid.UUID, status string, resolvedBy uuid.UUID) error
+	GetPendingSuggestionCount(ctx context.Context, portfolioID uuid.UUID) (int64, error)
 
-	// Delete performs a logical deletion of a portfolio.
-	Delete(ctx context.Context, id string) error
+	// Analytics
+	GetPortfolioSummary(ctx context.Context, portfolioID uuid.UUID) (*Summary, error)
+	GetJurisdictionCoverage(ctx context.Context, portfolioID uuid.UUID) (map[string]int64, error)
+	GetTechDomainCoverage(ctx context.Context, portfolioID uuid.UUID) (map[string]int64, error)
+	GetExpiryTimeline(ctx context.Context, portfolioID uuid.UUID) ([]*ExpiryTimelineEntry, error)
+	ComparePortfolios(ctx context.Context, portfolioIDs []uuid.UUID) ([]*ComparisonResult, error)
 
-	// Count returns the total number of portfolios for an owner.
-	Count(ctx context.Context, ownerID string) (int64, error)
-
-	// ListSummaries retrieves summary views of portfolios for an owner.
-	ListSummaries(ctx context.Context, ownerID string, opts ...QueryOption) ([]*PortfolioSummary, error)
-
-	// FindContainingPatent finds all portfolios that contain the specified patent.
-	FindContainingPatent(ctx context.Context, patentID string) ([]*Portfolio, error)
+	// Transaction
+	WithTx(ctx context.Context, fn func(PortfolioRepository) error) error
 }
 
 //Personal.AI order the ending

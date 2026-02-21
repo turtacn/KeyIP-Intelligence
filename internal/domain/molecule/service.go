@@ -218,7 +218,7 @@ func (s *MoleculeService) CalculateFingerprints(ctx context.Context, moleculeID 
 		if mol.HasFingerprint(ft) {
 			continue
 		}
-		fp, err := s.fpCalculator.Calculate(ctx, mol.SMILES(), ft, opts)
+		fp, err := s.fpCalculator.Calculate(ctx, mol.SMILES, ft, opts)
 		if err != nil {
 			s.logger.Error("failed to calculate fingerprint", logging.String("molecule_id", moleculeID), logging.String("type", string(ft)), logging.Error(err))
 			continue

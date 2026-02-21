@@ -1,317 +1,234 @@
-// Package postgres provides PostgreSQL connection pool management, transaction
-// handling, and health-check utilities for the KeyIP-Intelligence platform.
-// The connection pool is created once at application startup and injected into
-// all repository implementations.
 package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"net/url"
+	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/turtacn/KeyIP-Intelligence/internal/config"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/lib/pq"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants for connection retry and pool configuration
-// ─────────────────────────────────────────────────────────────────────────────
-
-const (
-	// maxRetries is the maximum number of connection attempts before giving up.
-	maxRetries = 5
-
-	// initialRetryDelay is the starting delay between retry attempts.
-	// Subsequent attempts use exponential backoff: 1s, 2s, 4s, 8s, 16s.
-	initialRetryDelay = 1 * time.Second
-
-	// defaultMaxConns is the default maximum number of connections in the pool.
-	defaultMaxConns = 25
-
-	// defaultMinConns is the default minimum number of idle connections in the pool.
-	defaultMinConns = 5
-
-	// defaultMaxConnLifetime is the maximum duration a connection can be reused.
-	defaultMaxConnLifetime = 1 * time.Hour
-
-	// defaultMaxConnIdleTime is the maximum duration a connection can be idle.
-	defaultMaxConnIdleTime = 30 * time.Minute
-
-	// defaultHealthCheckPeriod is the interval between automatic health checks.
-	defaultHealthCheckPeriod = 1 * time.Minute
-)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NewConnectionPool — connection pool factory with retry logic
-// ─────────────────────────────────────────────────────────────────────────────
-
-// NewConnectionPool creates and initializes a pgxpool.Pool with exponential
-// backoff retry logic. The pool is ready to use upon successful return.
-//
-// Retry strategy:
-// - Attempts up to maxRetries (5) connections
-// - Initial delay: 1s, then doubles each attempt (2s, 4s, 8s, 16s)
-// - Logs each attempt and final success/failure
-//
-// The returned pool must be closed by the caller via Close() when the
-// application shuts down.
-func NewConnectionPool(cfg config.DatabaseConfig, logger logging.Logger) (*pgxpool.Pool, error) {
-	connString := buildConnString(cfg)
-
-	// Parse connection string and build pool config.
-	poolConfig, err := pgxpool.ParseConfig(connString)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse connection string: %w", err)
-	}
-
-	// Apply custom pool configuration.
-	configurePool(poolConfig, cfg)
-
-	// Attempt to establish connection pool with exponential backoff.
-	var pool *pgxpool.Pool
-	retryDelay := initialRetryDelay
-
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		logger.Info("attempting database connection",
-			logging.Int("attempt", attempt),
-			logging.Int("max_attempts", maxRetries),
-			logging.String("host", cfg.Postgres.Host),
-			logging.Int("port", cfg.Postgres.Port),
-			logging.String("database", cfg.Postgres.DBName),
-		)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		pool, err = pgxpool.NewWithConfig(ctx, poolConfig)
-		cancel()
-
-		if err == nil {
-			// Verify connectivity with ping.
-			pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			err = pool.Ping(pingCtx)
-			pingCancel()
-
-			if err == nil {
-				logger.Info("database connection established",
-					logging.String("host", cfg.Postgres.Host),
-					logging.Int("port", cfg.Postgres.Port),
-					logging.String("database", cfg.Postgres.DBName),
-					logging.Int("max_conns", int(poolConfig.MaxConns)),
-				)
-				return pool, nil
-			}
-
-			// Ping failed; close pool and retry.
-			pool.Close()
-			logger.Warn("database ping failed",
-				logging.Int("attempt", attempt),
-				logging.Err(err),
-			)
-		} else {
-			logger.Warn("failed to create connection pool",
-				logging.Int("attempt", attempt),
-				logging.Err(err),
-			)
-		}
-
-		// Last attempt failed; return error.
-		if attempt == maxRetries {
-			return nil, fmt.Errorf("failed to connect to database after %d attempts: %w", maxRetries, err)
-		}
-
-		// Exponential backoff before next retry.
-		logger.Info("retrying database connection",
-			logging.Float64("delay_seconds", retryDelay.Seconds()),
-		)
-		time.Sleep(retryDelay)
-		retryDelay *= 2
-	}
-
-	// Unreachable code; satisfies compiler.
-	return nil, fmt.Errorf("connection retry logic exhausted")
+// anyDB matches sql.DB return type for mocking
+type anyDB interface {
+	PingContext(ctx context.Context) error
+	SetMaxOpenConns(n int)
+	SetMaxIdleConns(n int)
+	SetConnMaxLifetime(d time.Duration)
+	SetConnMaxIdleTime(d time.Duration)
+	Close() error
+	Stats() sql.DBStats
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Close — graceful connection pool shutdown
-// ─────────────────────────────────────────────────────────────────────────────
+// sqlOpen is a variable to allow mocking in tests.
+var sqlOpen = func(driverName, dataSourceName string) (*sql.DB, error) {
+	return sql.Open(driverName, dataSourceName)
+}
 
-// Close gracefully shuts down the connection pool, waiting for all active
-// connections to be released. This should be called during application shutdown.
-//
-// The pool must not be used after calling Close.
-func Close(pool *pgxpool.Pool) {
-	if pool != nil {
-		pool.Close()
+// PostgresConfig holds the database configuration.
+type PostgresConfig struct {
+	Host             string        `yaml:"host" env:"POSTGRES_HOST"`
+	Port             int           `yaml:"port" env:"POSTGRES_PORT"`
+	Database         string        `yaml:"database" env:"POSTGRES_DB"`
+	Username         string        `yaml:"username" env:"POSTGRES_USER"`
+	Password         string        `yaml:"password" env:"POSTGRES_PASSWORD"`
+	SSLMode          string        `yaml:"ssl_mode" env:"POSTGRES_SSL_MODE"`
+	MaxOpenConns     int           `yaml:"max_open_conns"`
+	MaxIdleConns     int           `yaml:"max_idle_conns"`
+	ConnMaxLifetime  time.Duration `yaml:"conn_max_lifetime"`
+	ConnMaxIdleTime  time.Duration `yaml:"conn_max_idle_time"`
+	StatementTimeout time.Duration `yaml:"statement_timeout"`
+	LockTimeout      time.Duration `yaml:"lock_timeout"`
+}
+
+// Connection manages the PostgreSQL database connection pool.
+type Connection struct {
+	db     *sql.DB
+	cfg    PostgresConfig
+	logger logging.Logger
+	once   sync.Once
+}
+
+// NewConnection establishes a connection to the PostgreSQL database.
+func NewConnection(cfg PostgresConfig, log logging.Logger) (*Connection, error) {
+	dsn := buildDSN(cfg)
+
+	db, err := sqlOpen("postgres", dsn)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to open database connection")
+	}
+
+	// Set connection pool settings
+	if cfg.MaxOpenConns > 0 {
+		db.SetMaxOpenConns(cfg.MaxOpenConns)
+	} else {
+		db.SetMaxOpenConns(25) // Default
+	}
+
+	if cfg.MaxIdleConns > 0 {
+		db.SetMaxIdleConns(cfg.MaxIdleConns)
+	} else {
+		db.SetMaxIdleConns(10) // Default
+	}
+
+	if cfg.ConnMaxLifetime > 0 {
+		db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	} else {
+		db.SetConnMaxLifetime(30 * time.Minute) // Default
+	}
+
+	if cfg.ConnMaxIdleTime > 0 {
+		db.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
+	} else {
+		db.SetConnMaxIdleTime(5 * time.Minute) // Default
+	}
+
+	// Verify connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to ping database")
+	}
+
+	log.Info("Connected to PostgreSQL database",
+		logging.String("host", cfg.Host),
+		logging.Int("port", cfg.Port),
+		logging.String("database", cfg.Database),
+	)
+
+	return &Connection{
+		db:     db,
+		cfg:    cfg,
+		logger: log,
+	}, nil
+}
+
+// DB returns the underlying sql.DB instance.
+func (c *Connection) DB() *sql.DB {
+	return c.db
+}
+
+// NewConnectionWithDB creates a Connection with an existing sql.DB (for testing).
+func NewConnectionWithDB(db *sql.DB, log logging.Logger) *Connection {
+	return &Connection{
+		db:     db,
+		logger: log,
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HealthCheck — connection liveness verification
-// ─────────────────────────────────────────────────────────────────────────────
-
-// HealthCheck executes a simple `SELECT 1` query to verify that the database
-// is reachable and the connection pool is healthy. This is typically called by
-// health-check HTTP endpoints or monitoring probes.
-func HealthCheck(ctx context.Context, pool *pgxpool.Pool) error {
-	if pool == nil {
-		return fmt.Errorf("connection pool is nil")
+// HealthCheck verifies the database connection status.
+func (c *Connection) HealthCheck(ctx context.Context) error {
+	if err := c.db.PingContext(ctx); err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "database health check failed")
 	}
 
-	// Execute a lightweight query to verify connectivity.
-	var result int
-	err := pool.QueryRow(ctx, "SELECT 1").Scan(&result)
-	if err != nil {
-		return fmt.Errorf("health check query failed: %w", err)
-	}
-
-	if result != 1 {
-		return fmt.Errorf("health check returned unexpected value: %d", result)
+	// Check pool stats
+	stats := c.Stats()
+	if stats.OpenConnections > 0 {
+		usage := float64(stats.InUse) / float64(stats.OpenConnections)
+		if usage > 0.8 {
+			c.logger.Warn("High database connection pool usage",
+				logging.Int("in_use", stats.InUse),
+				logging.Int("open", stats.OpenConnections),
+				logging.Float64("usage", usage),
+			)
+		}
 	}
 
 	return nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildConnString — construct PostgreSQL connection string
-// ─────────────────────────────────────────────────────────────────────────────
-
-// buildConnString constructs a PostgreSQL connection string in the standard
-// URL format from the provided DatabaseConfig.
-//
-// Format: postgres://user:password@host:port/dbname?sslmode=xxx
-func buildConnString(cfg config.DatabaseConfig) string {
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		cfg.Postgres.User,
-		cfg.Postgres.Password,
-		cfg.Postgres.Host,
-		cfg.Postgres.Port,
-		cfg.Postgres.DBName,
-		cfg.Postgres.SSLMode,
-	)
+// Stats returns database statistics.
+func (c *Connection) Stats() sql.DBStats {
+	return c.db.Stats()
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// configurePool — apply custom pool settings
-// ─────────────────────────────────────────────────────────────────────────────
-
-// configurePool applies connection pool configuration from DatabaseConfig to
-// the pgxpool.Config. This function sets sensible defaults when config values
-// are zero.
-func configurePool(poolConfig *pgxpool.Config, cfg config.DatabaseConfig) {
-	// MaxConns: maximum number of connections in the pool.
-	if cfg.Postgres.MaxOpenConns > 0 {
-		poolConfig.MaxConns = int32(cfg.Postgres.MaxOpenConns)
-	} else {
-		poolConfig.MaxConns = defaultMaxConns
-	}
-
-	// MinConns: minimum number of idle connections to maintain.
-	if cfg.Postgres.MaxIdleConns > 0 {
-		poolConfig.MinConns = int32(cfg.Postgres.MaxIdleConns)
-	} else {
-		poolConfig.MinConns = defaultMinConns
-	}
-
-	// MaxConnLifetime: maximum duration a connection can be reused.
-	if cfg.Postgres.ConnMaxLifetime > 0 {
-		poolConfig.MaxConnLifetime = cfg.Postgres.ConnMaxLifetime
-	} else {
-		poolConfig.MaxConnLifetime = defaultMaxConnLifetime
-	}
-
-	// MaxConnIdleTime: maximum duration a connection can remain idle.
-	if cfg.Postgres.ConnMaxIdleTime > 0 {
-		poolConfig.MaxConnIdleTime = cfg.Postgres.ConnMaxIdleTime
-	} else {
-		poolConfig.MaxConnIdleTime = defaultMaxConnIdleTime
-	}
-
-	// HealthCheckPeriod: interval between automatic connection health checks.
-	poolConfig.HealthCheckPeriod = defaultHealthCheckPeriod
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WithTransaction — transaction wrapper with savepoint support
-// ─────────────────────────────────────────────────────────────────────────────
-
-// txKey is the context key used to store the active transaction.
-type txKey struct{}
-
-// WithTransaction executes the provided function within a database transaction.
-// If fn returns an error or panics, the transaction is rolled back; otherwise,
-// it is committed.
-//
-// Nested transactions are supported via PostgreSQL savepoints. If a transaction
-// is already active in the context, a savepoint is created instead of starting
-// a new top-level transaction.
-//
-// Usage:
-//
-//	err := WithTransaction(ctx, pool, func(tx pgx.Tx, txCtx context.Context) error {
-//	    _, err := tx.Exec(txCtx, "INSERT INTO patents (...) VALUES (...)")
-//	    return err
-//	})
-func WithTransaction(ctx context.Context, pool *pgxpool.Pool, fn func(tx pgx.Tx, txCtx context.Context) error) (err error) {
-	// Check if we are already inside a transaction.
-	if activeTx, ok := ctx.Value(txKey{}).(pgx.Tx); ok {
-		// Nested transaction: use a savepoint.
-		savepointName := fmt.Sprintf("sp_%d", time.Now().UnixNano())
-		_, err = activeTx.Exec(ctx, "SAVEPOINT "+savepointName)
-		if err != nil {
-			return fmt.Errorf("failed to create savepoint: %w", err)
-		}
-
-		// Ensure the savepoint is released or rolled back.
-		defer func() {
-			if p := recover(); p != nil {
-				_, _ = activeTx.Exec(ctx, "ROLLBACK TO SAVEPOINT "+savepointName)
-				panic(p)
-			} else if err != nil {
-				_, _ = activeTx.Exec(ctx, "ROLLBACK TO SAVEPOINT "+savepointName)
-			} else {
-				_, cmtErr := activeTx.Exec(ctx, "RELEASE SAVEPOINT "+savepointName)
-				if cmtErr != nil {
-					err = fmt.Errorf("failed to release savepoint: %w", cmtErr)
-				}
-			}
-		}()
-
-		return fn(activeTx, ctx)
-	}
-
-	// Begin a new top-level transaction.
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-
-	// Put the transaction in the context so nested calls can find it.
-	txCtx := context.WithValue(ctx, txKey{}, tx)
-
-	// Ensure the transaction is finalized (commit or rollback).
-	defer func() {
-		if p := recover(); p != nil {
-			// Panic occurred; rollback and re-panic.
-			_ = tx.Rollback(ctx)
-			panic(p)
-		} else if err != nil {
-			// Function returned an error; rollback.
-			if rbErr := tx.Rollback(ctx); rbErr != nil {
-				err = fmt.Errorf("rollback failed: %w (original error: %v)", rbErr, err)
-			}
+// Close closes the database connection.
+func (c *Connection) Close() error {
+	var err error
+	c.once.Do(func() {
+		err = c.db.Close()
+		if err == nil {
+			c.logger.Info("Closed PostgreSQL database connection")
 		} else {
-			// Function succeeded; commit.
-			if cmtErr := tx.Commit(ctx); cmtErr != nil {
-				err = fmt.Errorf("commit failed: %w", cmtErr)
-			}
+			c.logger.Error("Failed to close PostgreSQL database connection", logging.Err(err))
 		}
-	}()
-
-	// Execute the user-provided function within the transaction context.
-	err = fn(tx, txCtx)
+	})
 	return err
+}
+
+// RunMigrations runs database migrations.
+func (c *Connection) RunMigrations(migrationsDir string) error {
+	driver, err := postgres.WithInstance(c.db, &postgres.Config{})
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeInternal, "failed to create migration driver")
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://"+migrationsDir,
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeInternal, "failed to create migrate instance")
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		version, _, _ := m.Version()
+		return errors.Wrap(err, errors.ErrCodeInternal, fmt.Sprintf("failed to run migrations (current version: %d)", version))
+	}
+
+	version, dirty, err := m.Version()
+	if err != nil && err != migrate.ErrNilVersion {
+		c.logger.Warn("Failed to get migration version", logging.Err(err))
+	}
+
+	c.logger.Info("Database migrations completed",
+		logging.Int64("version", int64(version)),
+		logging.Bool("dirty", dirty),
+	)
+
+	return nil
+}
+
+// buildDSN constructs the PostgreSQL connection string.
+func buildDSN(cfg PostgresConfig) string {
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.Username, cfg.Password),
+		Host:   fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Path:   cfg.Database,
+	}
+
+	q := u.Query()
+	if cfg.SSLMode != "" {
+		q.Set("sslmode", cfg.SSLMode)
+	} else {
+		q.Set("sslmode", "disable")
+	}
+
+	if cfg.StatementTimeout > 0 {
+		q.Set("statement_timeout", fmt.Sprintf("%d", cfg.StatementTimeout.Milliseconds()))
+	} else {
+		q.Set("statement_timeout", "30000") // Default 30s
+	}
+
+	if cfg.LockTimeout > 0 {
+		q.Set("lock_timeout", fmt.Sprintf("%d", cfg.LockTimeout.Milliseconds()))
+	} else {
+		q.Set("lock_timeout", "10000") // Default 10s
+	}
+
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 //Personal.AI order the ending

@@ -1,233 +1,139 @@
 package portfolio
 
 import (
-	"fmt"
 	"time"
 
-	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	"github.com/google/uuid"
 )
 
 // PortfolioStatus defines the lifecycle state of a portfolio.
-type PortfolioStatus string
+type Status string
 
 const (
-	PortfolioStatusActive   PortfolioStatus = "Active"
-	PortfolioStatusArchived PortfolioStatus = "Archived"
-	PortfolioStatusDraft    PortfolioStatus = "Draft"
+	StatusActive   Status = "active"
+	StatusArchived Status = "archived"
+	StatusDraft    Status = "draft"
 )
 
-// HealthScore is a value object representing the quality snapshot of a portfolio.
-type HealthScore struct {
-	CoverageScore      float64   `json:"coverage_score"`
-	ConcentrationScore float64   `json:"concentration_score"`
-	AgingScore         float64   `json:"aging_score"`
-	QualityScore       float64   `json:"quality_score"`
-	OverallScore       float64   `json:"overall_score"`
-	EvaluatedAt        time.Time `json:"evaluated_at"`
-}
+// ValuationTier defines the valuation grade.
+type ValuationTier string
 
-// Portfolio is an aggregate root representing a collection of patents.
+const (
+	ValuationTierS ValuationTier = "S"
+	ValuationTierA ValuationTier = "A"
+	ValuationTierB ValuationTier = "B"
+	ValuationTierC ValuationTier = "C"
+	ValuationTierD ValuationTier = "D"
+)
+
+// Portfolio represents a collection of patents.
 type Portfolio struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	OwnerID     string            `json:"owner_id"`
-	TechDomains []string          `json:"tech_domains"`
-	PatentIDs   []string          `json:"patent_ids"`
-	Tags        map[string]string `json:"tags"`
-	Status      PortfolioStatus   `json:"status"`
-	HealthScore *HealthScore      `json:"health_score"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	ID                 uuid.UUID      `json:"id"`
+	Name               string         `json:"name"`
+	Description        string         `json:"description,omitempty"`
+	OwnerID            uuid.UUID      `json:"owner_id"`
+	Status             Status         `json:"status"`
+	TechDomains        []string       `json:"tech_domains,omitempty"`
+	TargetJurisdictions []string      `json:"target_jurisdictions,omitempty"`
+	Metadata           map[string]any `json:"metadata,omitempty"`
+	PatentCount        int            `json:"patent_count,omitempty"` // Aggregated field
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          *time.Time     `json:"deleted_at,omitempty"`
 }
 
-// PortfolioSummary provides a lightweight view of a portfolio.
-type PortfolioSummary struct {
-	ID                 string          `json:"id"`
-	Name               string          `json:"name"`
-	Status             PortfolioStatus `json:"status"`
-	PatentCount        int             `json:"patent_count"`
-	OverallHealthScore float64         `json:"overall_health_score"`
-	UpdatedAt          time.Time       `json:"updated_at"`
+// Valuation represents a patent valuation.
+type Valuation struct {
+	ID                uuid.UUID      `json:"id"`
+	PatentID          uuid.UUID      `json:"patent_id"`
+	PortfolioID       *uuid.UUID     `json:"portfolio_id,omitempty"`
+	TechnicalScore    float64        `json:"technical_score"`
+	LegalScore        float64        `json:"legal_score"`
+	MarketScore       float64        `json:"market_score"`
+	StrategicScore    float64        `json:"strategic_score"`
+	CompositeScore    float64        `json:"composite_score"`
+	Tier              ValuationTier  `json:"tier"`
+	MonetaryValueLow  *int64         `json:"monetary_value_low,omitempty"`
+	MonetaryValueMid  *int64         `json:"monetary_value_mid,omitempty"`
+	MonetaryValueHigh *int64         `json:"monetary_value_high,omitempty"`
+	Currency          string         `json:"currency"`
+	ValuationMethod   string         `json:"valuation_method"`
+	ModelVersion      string         `json:"model_version,omitempty"`
+	ScoringDetails    map[string]any `json:"scoring_details"`
+	ComparablePatents []string       `json:"comparable_patents,omitempty"` // IDs or Numbers
+	Assumptions       map[string]any `json:"assumptions,omitempty"`
+	ValidFrom         time.Time      `json:"valid_from"`
+	ValidUntil        *time.Time     `json:"valid_until,omitempty"`
+	EvaluatedBy       *uuid.UUID     `json:"evaluated_by,omitempty"`
+	CreatedAt         time.Time      `json:"created_at"`
 }
 
-// NewPortfolio constructs a new Portfolio in Draft status.
-func NewPortfolio(name, ownerID string) (*Portfolio, error) {
-	if name == "" {
-		return nil, errors.InvalidParam("portfolio name cannot be empty")
-	}
-	if len(name) > 256 {
-		return nil, errors.InvalidParam("portfolio name exceeds maximum length of 256 characters")
-	}
-	if ownerID == "" {
-		return nil, errors.InvalidParam("owner ID cannot be empty")
-	}
-
-	now := time.Now().UTC()
-	return &Portfolio{
-		ID:          string(common.NewID()),
-		Name:        name,
-		OwnerID:     ownerID,
-		TechDomains: make([]string, 0),
-		PatentIDs:   make([]string, 0),
-		Tags:        make(map[string]string),
-		Status:      PortfolioStatusDraft,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-	}, nil
+// HealthScore represents the health of a portfolio.
+type HealthScore struct {
+	ID                       uuid.UUID      `json:"id"`
+	PortfolioID              uuid.UUID      `json:"portfolio_id"`
+	OverallScore             float64        `json:"overall_score"`
+	CoverageScore            float64        `json:"coverage_score"`
+	DiversityScore           float64        `json:"diversity_score"`
+	FreshnessScore           float64        `json:"freshness_score"`
+	StrengthScore            float64        `json:"strength_score"`
+	RiskScore                float64        `json:"risk_score"`
+	TotalPatents             int            `json:"total_patents"`
+	ActivePatents            int            `json:"active_patents"`
+	ExpiringWithinYear       int            `json:"expiring_within_year"`
+	ExpiringWithin3Years     int            `json:"expiring_within_3years"`
+	JurisdictionDistribution map[string]int `json:"jurisdiction_distribution"`
+	TechDomainDistribution   map[string]int `json:"tech_domain_distribution"`
+	TierDistribution         map[string]int `json:"tier_distribution"`
+	Recommendations          []string       `json:"recommendations,omitempty"`
+	ModelVersion             string         `json:"model_version,omitempty"`
+	EvaluatedAt              time.Time      `json:"evaluated_at"`
+	CreatedAt                time.Time      `json:"created_at"`
 }
 
-// Validate ensures the portfolio entity is in a valid state.
-func (p *Portfolio) Validate() error {
-	if p.ID == "" {
-		return errors.InvalidParam("portfolio ID cannot be empty")
-	}
-	if p.Name == "" || len(p.Name) > 256 {
-		return errors.InvalidParam("invalid portfolio name")
-	}
-	if p.OwnerID == "" {
-		return errors.InvalidParam("owner ID cannot be empty")
-	}
-
-	switch p.Status {
-	case PortfolioStatusActive, PortfolioStatusArchived, PortfolioStatusDraft:
-		// Valid
-	default:
-		return errors.InvalidParam(fmt.Sprintf("invalid portfolio status: %s", p.Status))
-	}
-
-	// Check for duplicate patent IDs
-	ids := make(map[string]bool)
-	for _, id := range p.PatentIDs {
-		if ids[id] {
-			return errors.InvalidParam(fmt.Sprintf("duplicate patent ID in portfolio: %s", id))
-		}
-		ids[id] = true
-	}
-
-	return nil
+// OptimizationSuggestion represents a suggestion for portfolio optimization.
+type OptimizationSuggestion struct {
+	ID               uuid.UUID      `json:"id"`
+	PortfolioID      uuid.UUID      `json:"portfolio_id"`
+	HealthScoreID    *uuid.UUID     `json:"health_score_id,omitempty"`
+	SuggestionType   string         `json:"suggestion_type"`
+	Priority         string         `json:"priority"`
+	Title            string         `json:"title"`
+	Description      string         `json:"description"`
+	TargetPatentID   *uuid.UUID     `json:"target_patent_id,omitempty"`
+	TargetTechDomain string         `json:"target_tech_domain,omitempty"`
+	TargetJurisdiction string       `json:"target_jurisdiction,omitempty"`
+	EstimatedImpact  *float64       `json:"estimated_impact,omitempty"`
+	EstimatedCost    *int64         `json:"estimated_cost,omitempty"`
+	Rationale        map[string]any `json:"rationale"`
+	Status           string         `json:"status"`
+	ResolvedBy       *uuid.UUID     `json:"resolved_by,omitempty"`
+	ResolvedAt       *time.Time     `json:"resolved_at,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
 }
 
-// AddPatent adds a patent to the portfolio.
-func (p *Portfolio) AddPatent(patentID string) error {
-	if patentID == "" {
-		return errors.InvalidParam("patent ID cannot be empty")
-	}
-
-	if p.ContainsPatent(patentID) {
-		return errors.Conflict(fmt.Sprintf("patent %s is already in portfolio %s", patentID, p.ID))
-	}
-
-	p.PatentIDs = append(p.PatentIDs, patentID)
-	p.UpdatedAt = time.Now().UTC()
-	return nil
+// Summary represents a high-level summary of a portfolio.
+type Summary struct {
+	TotalPatents   int            `json:"total_patents"`
+	ActivePatents  int            `json:"active_patents"`
+	StatusCounts   map[string]int `json:"status_counts"`
+	AverageScore   float64        `json:"average_score"`
+	TotalValuation int64          `json:"total_valuation"`
+	HealthScore    float64        `json:"health_score"`
 }
 
-// RemovePatent removes a patent from the portfolio.
-func (p *Portfolio) RemovePatent(patentID string) error {
-	if patentID == "" {
-		return errors.InvalidParam("patent ID cannot be empty")
-	}
-
-	idx := -1
-	for i, id := range p.PatentIDs {
-		if id == patentID {
-			idx = i
-			break
-		}
-	}
-
-	if idx == -1 {
-		return errors.NotFound(fmt.Sprintf("patent %s not found in portfolio %s", patentID, p.ID))
-	}
-
-	p.PatentIDs = append(p.PatentIDs[:idx], p.PatentIDs[idx+1:]...)
-	p.UpdatedAt = time.Now().UTC()
-	return nil
+// ExpiryTimelineEntry represents an entry in the expiry timeline.
+type ExpiryTimelineEntry struct {
+	Year  int `json:"year"`
+	Count int `json:"count"`
 }
 
-// ContainsPatent checks if a patent is in the portfolio.
-func (p *Portfolio) ContainsPatent(patentID string) bool {
-	for _, id := range p.PatentIDs {
-		if id == patentID {
-			return true
-		}
-	}
-	return false
-}
-
-// PatentCount returns the number of patents in the portfolio.
-func (p *Portfolio) PatentCount() int {
-	return len(p.PatentIDs)
-}
-
-// Activate transitions the portfolio from Draft to Active.
-func (p *Portfolio) Activate() error {
-	if p.Status != PortfolioStatusDraft {
-		return errors.InvalidState(fmt.Sprintf("cannot activate portfolio in %s status", p.Status))
-	}
-	p.Status = PortfolioStatusActive
-	p.UpdatedAt = time.Now().UTC()
-	return nil
-}
-
-// Archive transitions the portfolio from Active to Archived.
-func (p *Portfolio) Archive() error {
-	if p.Status != PortfolioStatusActive {
-		return errors.InvalidState(fmt.Sprintf("cannot archive portfolio in %s status", p.Status))
-	}
-	p.Status = PortfolioStatusArchived
-	p.UpdatedAt = time.Now().UTC()
-	return nil
-}
-
-// SetHealthScore sets the health score for the portfolio.
-func (p *Portfolio) SetHealthScore(score HealthScore) error {
-	if err := score.Validate(); err != nil {
-		return err
-	}
-	p.HealthScore = &score
-	p.UpdatedAt = time.Now().UTC()
-	return nil
-}
-
-// ToSummary converts the portfolio to a summary view.
-func (p *Portfolio) ToSummary() PortfolioSummary {
-	var overallScore float64
-	if p.HealthScore != nil {
-		overallScore = p.HealthScore.OverallScore
-	}
-
-	return PortfolioSummary{
-		ID:                 p.ID,
-		Name:               p.Name,
-		Status:             p.Status,
-		PatentCount:        len(p.PatentIDs),
-		OverallHealthScore: overallScore,
-		UpdatedAt:          p.UpdatedAt,
-	}
-}
-
-// Validate ensures the health score values are within range [0, 100].
-func (hs HealthScore) Validate() error {
-	scores := []struct {
-		val  float64
-		name string
-	}{
-		{hs.CoverageScore, "CoverageScore"},
-		{hs.ConcentrationScore, "ConcentrationScore"},
-		{hs.AgingScore, "AgingScore"},
-		{hs.QualityScore, "QualityScore"},
-		{hs.OverallScore, "OverallScore"},
-	}
-
-	for _, s := range scores {
-		if s.val < 0 || s.val > 100 {
-			return errors.InvalidParam(fmt.Sprintf("%s must be between 0 and 100", s.name))
-		}
-	}
-	return nil
+// ComparisonResult represents a comparison between portfolios.
+type ComparisonResult struct {
+	PortfolioID uuid.UUID `json:"portfolio_id"`
+	Metric      string    `json:"metric"`
+	Value       float64   `json:"value"`
 }
 
 //Personal.AI order the ending

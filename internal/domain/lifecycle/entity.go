@@ -1,216 +1,167 @@
 package lifecycle
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// LifecyclePhase defines the phases of a patent lifecycle.
-type LifecyclePhase string
+// AnnuityStatus represents the status of an annuity payment.
+type AnnuityStatus string
 
 const (
-	PhaseApplication LifecyclePhase = "Application"
-	PhaseExamination LifecyclePhase = "Examination"
-	PhaseGranted     LifecyclePhase = "Granted"
-	PhaseMaintenance LifecyclePhase = "Maintenance"
-	PhaseExpired     LifecyclePhase = "Expired"
-	PhaseAbandoned   LifecyclePhase = "Abandoned"
-	PhaseRevoked     LifecyclePhase = "Revoked"
-	PhaseLapsed      LifecyclePhase = "Lapsed"
+	AnnuityStatusUpcoming    AnnuityStatus = "upcoming"
+	AnnuityStatusDue         AnnuityStatus = "due"
+	AnnuityStatusOverdue     AnnuityStatus = "overdue"
+	AnnuityStatusPaid        AnnuityStatus = "paid"
+	AnnuityStatusGracePeriod AnnuityStatus = "grace_period"
+	AnnuityStatusWaived      AnnuityStatus = "waived"
+	AnnuityStatusAbandoned   AnnuityStatus = "abandoned"
 )
 
-// LifecycleEvent represents an event in the patent lifecycle.
+// DeadlineStatus represents the status of a deadline.
+type DeadlineStatus string
+
+const (
+	DeadlineStatusActive    DeadlineStatus = "active"
+	DeadlineStatusCompleted DeadlineStatus = "completed"
+	DeadlineStatusMissed    DeadlineStatus = "missed"
+	DeadlineStatusExtended  DeadlineStatus = "extended"
+	DeadlineStatusWaived    DeadlineStatus = "waived"
+)
+
+// EventType represents the type of lifecycle event.
+type EventType string
+
+const (
+	EventTypeFiling             EventType = "filing"
+	EventTypePublication        EventType = "publication"
+	EventTypeExaminationRequest EventType = "examination_request"
+	EventTypeOfficeAction       EventType = "office_action"
+	EventTypeResponseFiled      EventType = "response_filed"
+	EventTypeGrant              EventType = "grant"
+	EventTypeAnnuityPayment     EventType = "annuity_payment"
+	EventTypeAnnuityMissed      EventType = "annuity_missed"
+	EventTypeRenewal            EventType = "renewal"
+	EventTypeAssignment         EventType = "assignment"
+	EventTypeLicense            EventType = "license"
+	EventTypeOpposition         EventType = "opposition"
+	EventTypeInvalidation       EventType = "invalidation"
+	EventTypeExpiry             EventType = "expiry"
+	EventTypeRestoration        EventType = "restoration"
+	EventTypeAbandonment        EventType = "abandonment"
+	EventTypeStatusChange       EventType = "status_change"
+	EventTypeCustom             EventType = "custom"
+)
+
+// Annuity represents a yearly fee.
+type Annuity struct {
+	ID               uuid.UUID      `json:"id"`
+	PatentID         uuid.UUID      `json:"patent_id"`
+	YearNumber       int            `json:"year_number"`
+	DueDate          time.Time      `json:"due_date"`
+	GraceDeadline    *time.Time     `json:"grace_deadline,omitempty"`
+	Status           AnnuityStatus  `json:"status"`
+	Amount           *int64         `json:"amount,omitempty"`
+	Currency         string         `json:"currency"`
+	PaidAmount       *int64         `json:"paid_amount,omitempty"`
+	PaidDate         *time.Time     `json:"paid_date,omitempty"`
+	PaymentReference string         `json:"payment_reference,omitempty"`
+	AgentName        string         `json:"agent_name,omitempty"`
+	AgentReference   string         `json:"agent_reference,omitempty"`
+	Notes            string         `json:"notes,omitempty"`
+	ReminderSentAt   *time.Time     `json:"reminder_sent_at,omitempty"`
+	ReminderCount    int            `json:"reminder_count"`
+	Metadata         map[string]any `json:"metadata,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+}
+
+// Deadline represents a critical date.
+type Deadline struct {
+	ID              uuid.UUID      `json:"id"`
+	PatentID        uuid.UUID      `json:"patent_id"`
+	DeadlineType    string         `json:"deadline_type"`
+	Title           string         `json:"title"`
+	Description     string         `json:"description,omitempty"`
+	DueDate         time.Time      `json:"due_date"`
+	OriginalDueDate time.Time      `json:"original_due_date"`
+	Status          DeadlineStatus `json:"status"`
+	Priority        string         `json:"priority"`
+	AssigneeID      *uuid.UUID     `json:"assignee_id,omitempty"`
+	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
+	CompletedBy     *uuid.UUID     `json:"completed_by,omitempty"`
+	ExtensionCount  int            `json:"extension_count"`
+	ExtensionHistory []map[string]any `json:"extension_history,omitempty"`
+	ReminderConfig  map[string]any `json:"reminder_config,omitempty"`
+	LastReminderAt  *time.Time     `json:"last_reminder_at,omitempty"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+}
+
+// LifecycleEvent represents a historical event.
 type LifecycleEvent struct {
-	ID          string            `json:"id"`
-	EventType   string            `json:"event_type"`
-	EventDate   time.Time         `json:"event_date"`
-	Description string            `json:"description"`
-	Metadata    map[string]string `json:"metadata"`
-	TriggeredBy string            `json:"triggered_by"`
-	CreatedAt   time.Time         `json:"created_at"`
+	ID                uuid.UUID      `json:"id"`
+	PatentID          uuid.UUID      `json:"patent_id"`
+	EventType         EventType      `json:"event_type"`
+	EventDate         time.Time      `json:"event_date"`
+	Title             string         `json:"title"`
+	Description       string         `json:"description,omitempty"`
+	ActorID           *uuid.UUID     `json:"actor_id,omitempty"`
+	ActorName         string         `json:"actor_name,omitempty"`
+	RelatedDeadlineID *uuid.UUID     `json:"related_deadline_id,omitempty"`
+	RelatedAnnuityID  *uuid.UUID     `json:"related_annuity_id,omitempty"`
+	BeforeState       map[string]any `json:"before_state,omitempty"`
+	AfterState        map[string]any `json:"after_state,omitempty"`
+	Attachments       []map[string]string `json:"attachments,omitempty"`
+	Source            string         `json:"source"`
+	Metadata          map[string]any `json:"metadata,omitempty"`
+	CreatedAt         time.Time      `json:"created_at"`
 }
 
-// PhaseTransition represents a transition between lifecycle phases.
-type PhaseTransition struct {
-	FromPhase      LifecyclePhase `json:"from_phase"`
-	ToPhase        LifecyclePhase `json:"to_phase"`
-	TransitionDate time.Time      `json:"transition_date"`
-	Reason         string         `json:"reason"`
-	TriggeredBy    string         `json:"triggered_by"`
+// CostRecord represents a financial transaction.
+type CostRecord struct {
+	ID               uuid.UUID      `json:"id"`
+	PatentID         uuid.UUID      `json:"patent_id"`
+	CostType         string         `json:"cost_type"`
+	Amount           int64          `json:"amount"`
+	Currency         string         `json:"currency"`
+	AmountUSD        *int64         `json:"amount_usd,omitempty"`
+	ExchangeRate     *float64       `json:"exchange_rate,omitempty"`
+	IncurredDate     time.Time      `json:"incurred_date"`
+	Description      string         `json:"description,omitempty"`
+	InvoiceReference string         `json:"invoice_reference,omitempty"`
+	RelatedAnnuityID *uuid.UUID     `json:"related_annuity_id,omitempty"`
+	RelatedEventID   *uuid.UUID     `json:"related_event_id,omitempty"`
+	Metadata         map[string]any `json:"metadata,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
 }
 
-// LifecycleRecord is the aggregate root for patent lifecycle.
-type LifecycleRecord struct {
-	ID                 string            `json:"id"`
-	PatentID           string            `json:"patent_id"`
-	CurrentPhase       LifecyclePhase    `json:"current_phase"`
-	PhaseHistory       []PhaseTransition `json:"phase_history"`
-	Events             []*LifecycleEvent `json:"events"`
-	FilingDate         time.Time         `json:"filing_date"`
-	GrantDate          *time.Time        `json:"grant_date,omitempty"`
-	ExpirationDate     *time.Time        `json:"expiration_date,omitempty"`
-	AbandonmentDate    *time.Time        `json:"abandonment_date,omitempty"`
-	JurisdictionCode   string            `json:"jurisdiction_code"`
-	RemainingLifeYears float64           `json:"remaining_life_years"`
-	TotalLifeYears     float64           `json:"total_life_years"`
-	CreatedAt          time.Time         `json:"created_at"`
-	UpdatedAt          time.Time         `json:"updated_at"`
+// CostSummary aggregates costs by type.
+type CostSummary struct {
+	TotalCosts map[string]int64 `json:"total_costs"`
 }
 
-var validTransitions = map[LifecyclePhase][]LifecyclePhase{
-	PhaseApplication: {PhaseExamination, PhaseAbandoned},
-	PhaseExamination: {PhaseGranted, PhaseAbandoned},
-	PhaseGranted:     {PhaseMaintenance, PhaseRevoked, PhaseAbandoned},
-	PhaseMaintenance: {PhaseExpired, PhaseLapsed, PhaseAbandoned},
+// PortfolioCostSummary aggregates costs by portfolio.
+type PortfolioCostSummary struct {
+	TotalCosts map[string]int64 `json:"total_costs"`
 }
 
-// NewLifecycleRecord creates a new LifecycleRecord.
-func NewLifecycleRecord(patentID, jurisdictionCode string, filingDate time.Time) (*LifecycleRecord, error) {
-	if patentID == "" {
-		return nil, errors.InvalidParam("patent ID cannot be empty")
-	}
-	if jurisdictionCode == "" {
-		return nil, errors.InvalidParam("jurisdiction code cannot be empty")
-	}
-	if filingDate.IsZero() {
-		return nil, errors.InvalidParam("filing date cannot be zero")
-	}
-
-	totalLifeYears := 20.0
-	// Simplified: utility models might have different terms, but for now default to 20
-	expirationDate := filingDate.AddDate(int(totalLifeYears), 0, 0)
-
-	lr := &LifecycleRecord{
-		ID:               uuid.New().String(),
-		PatentID:         patentID,
-		CurrentPhase:     PhaseApplication,
-		FilingDate:       filingDate,
-		ExpirationDate:   &expirationDate,
-		JurisdictionCode: jurisdictionCode,
-		TotalLifeYears:   totalLifeYears,
-		CreatedAt:        time.Now().UTC(),
-		UpdatedAt:        time.Now().UTC(),
-	}
-
-	lr.AddEvent("filed", "Patent application filed", "system", nil)
-
-	return lr, nil
+// DashboardStats contains lifecycle metrics.
+type DashboardStats struct {
+	UpcomingAnnuities int64 `json:"upcoming_annuities"`
+	OverdueAnnuities  int64 `json:"overdue_annuities"`
+	ActiveDeadlines   int64 `json:"active_deadlines"`
+	RecentEvents      int64 `json:"recent_events"`
+	TotalCostYTD      int64 `json:"total_cost_ytd"`
 }
 
-// TransitionTo changes the lifecycle phase.
-func (lr *LifecycleRecord) TransitionTo(phase LifecyclePhase, reason, triggeredBy string) error {
-	allowed, ok := validTransitions[lr.CurrentPhase]
-	if !ok {
-		return errors.InvalidState(fmt.Sprintf("cannot transition from terminal phase %s", lr.CurrentPhase))
-	}
-
-	isValid := false
-	for _, p := range allowed {
-		if p == phase {
-			isValid = true
-			break
-		}
-	}
-
-	if !isValid {
-		return errors.InvalidState(fmt.Sprintf("invalid transition from %s to %s", lr.CurrentPhase, phase))
-	}
-
-	transition := PhaseTransition{
-		FromPhase:      lr.CurrentPhase,
-		ToPhase:        phase,
-		TransitionDate: time.Now().UTC(),
-		Reason:         reason,
-		TriggeredBy:    triggeredBy,
-	}
-
-	lr.PhaseHistory = append(lr.PhaseHistory, transition)
-	lr.CurrentPhase = phase
-	lr.UpdatedAt = time.Now().UTC()
-
-	lr.AddEvent(string(phase), fmt.Sprintf("Phase transitioned to %s", phase), triggeredBy, map[string]string{"reason": reason})
-
-	return nil
-}
-
-// AddEvent adds a new event to the record.
-func (lr *LifecycleRecord) AddEvent(eventType, description, triggeredBy string, metadata map[string]string) *LifecycleEvent {
-	event := &LifecycleEvent{
-		ID:          uuid.New().String(),
-		EventType:   eventType,
-		EventDate:   time.Now().UTC(),
-		Description: description,
-		Metadata:    metadata,
-		TriggeredBy: triggeredBy,
-		CreatedAt:   time.Now().UTC(),
-	}
-	lr.Events = append(lr.Events, event)
-	return event
-}
-
-// CalculateRemainingLife computes the remaining life in years.
-func (lr *LifecycleRecord) CalculateRemainingLife(asOf time.Time) float64 {
-	if !lr.IsActive() {
-		return 0
-	}
-	if lr.ExpirationDate == nil || asOf.After(*lr.ExpirationDate) {
-		return 0
-	}
-	return lr.ExpirationDate.Sub(asOf).Hours() / 24 / 365.25
-}
-
-// IsActive checks if the patent is in an active phase.
-func (lr *LifecycleRecord) IsActive() bool {
-	switch lr.CurrentPhase {
-	case PhaseApplication, PhaseExamination, PhaseGranted, PhaseMaintenance:
-		return true
-	}
-	return false
-}
-
-// MarkGranted marks the patent as granted.
-func (lr *LifecycleRecord) MarkGranted(grantDate time.Time) error {
-	if lr.CurrentPhase != PhaseExamination {
-		return errors.InvalidState("can only mark as granted from Examination phase")
-	}
-	lr.GrantDate = &grantDate
-	return lr.TransitionTo(PhaseGranted, "Patent granted", "system")
-}
-
-// MarkAbandoned marks the patent as abandoned.
-func (lr *LifecycleRecord) MarkAbandoned(reason string) error {
-	if !lr.IsActive() {
-		return errors.InvalidState("can only abandon active patent")
-	}
+//DaysUntilDue calculates days remaining until due date
+func (d *Deadline) DaysUntilDue() int {
 	now := time.Now().UTC()
-	lr.AbandonmentDate = &now
-	return lr.TransitionTo(PhaseAbandoned, reason, "system")
-}
-
-// Validate checks the integrity of the lifecycle record.
-func (lr *LifecycleRecord) Validate() error {
-	if lr.ID == "" {
-		return errors.InvalidParam("ID cannot be empty")
-	}
-	if lr.PatentID == "" {
-		return errors.InvalidParam("PatentID cannot be empty")
-	}
-	if lr.JurisdictionCode == "" {
-		return errors.InvalidParam("JurisdictionCode cannot be empty")
-	}
-	if lr.FilingDate.IsZero() {
-		return errors.InvalidParam("FilingDate cannot be zero")
-	}
-	// Check phase history consistency
-	if len(lr.PhaseHistory) > 0 {
-		if lr.PhaseHistory[len(lr.PhaseHistory)-1].ToPhase != lr.CurrentPhase {
-			return errors.InvalidState("current phase inconsistent with history")
-		}
-	}
-	return nil
+	duration := d.DueDate.Sub(now)
+	return int(duration.Hours() / 24)
 }
 
 //Personal.AI order the ending

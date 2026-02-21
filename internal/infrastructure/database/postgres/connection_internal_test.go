@@ -1,91 +1,87 @@
 package postgres
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
-	"github.com/turtacn/KeyIP-Intelligence/internal/config"
+	"github.com/stretchr/testify/require"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 )
 
-func TestBuildConnString(t *testing.T) {
-	t.Parallel()
+func TestConnection_NewConnection(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
+	require.NoError(t, err)
+	defer db.Close()
 
-	cases := []struct {
-		name   string
-		cfg    config.DatabaseConfig
-		expect string
-	}{
-		{
-			name: "standard config",
-			cfg: config.DatabaseConfig{
-				Postgres: config.PostgresConfig{
-					Host:     "localhost",
-					Port:     5432,
-					User:     "user",
-					Password: "pass",
-					DBName:   "db",
-					SSLMode:  "disable",
-				},
-			},
-			expect: "postgres://user:pass@localhost:5432/db?sslmode=disable",
-		},
-		{
-			name: "production config",
-			cfg: config.DatabaseConfig{
-				Postgres: config.PostgresConfig{
-					Host:     "db.prod.internal",
-					Port:     5432,
-					User:     "admin",
-					Password: "complex!password",
-					DBName:   "keyip",
-					SSLMode:  "verify-full",
-				},
-			},
-			expect: "postgres://admin:complex!password@db.prod.internal:5432/keyip?sslmode=verify-full",
-		},
+	// Mock sqlOpen
+	origOpen := sqlOpen
+	defer func() { sqlOpen = origOpen }()
+	sqlOpen = func(driverName, dataSourceName string) (*sql.DB, error) {
+		return db, nil
 	}
 
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			result := buildConnString(tc.cfg)
-			assert.Equal(t, tc.expect, result)
-		})
+	mock.ExpectPing()
+
+	logger := logging.NewNopLogger()
+	cfg := PostgresConfig{
+		Host: "localhost",
+		Port: 5432,
 	}
+
+	conn, err := NewConnection(cfg, logger)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestConfigurePool(t *testing.T) {
-	t.Parallel()
-
-	t.Run("applies custom settings", func(t *testing.T) {
-		cfg := config.DatabaseConfig{
-			Postgres: config.PostgresConfig{
-				MaxOpenConns:    50,
-				MaxIdleConns:    10,
-				ConnMaxLifetime: 2 * time.Hour,
-				ConnMaxIdleTime: 45 * time.Minute,
-			},
-		}
-		poolCfg := &pgxpool.Config{}
-		configurePool(poolCfg, cfg)
-
-		assert.Equal(t, int32(50), poolCfg.MaxConns)
-		assert.Equal(t, int32(10), poolCfg.MinConns)
-		assert.Equal(t, 2*time.Hour, poolCfg.MaxConnLifetime)
-		assert.Equal(t, 45*time.Minute, poolCfg.MaxConnIdleTime)
-	})
-
-	t.Run("handles zero values", func(t *testing.T) {
-		cfg := config.DatabaseConfig{}
-		poolCfg := &pgxpool.Config{
-			MaxConns: 25, // default
-		}
-		configurePool(poolCfg, cfg)
-		assert.Equal(t, int32(25), poolCfg.MaxConns)
-	})
+func TestBuildDSN(t *testing.T) {
+	cfg := PostgresConfig{
+		Host:     "localhost",
+		Port:     5432,
+		Database: "testdb",
+		Username: "user",
+		Password: "password",
+	}
+	dsn := buildDSN(cfg)
+	// dsn format is URL: postgres://user:password@localhost:5432/testdb...
+	assert.Contains(t, dsn, "postgres://user:password@localhost:5432/testdb")
+	assert.Contains(t, dsn, "sslmode=disable")
 }
 
-// //Personal.AI order the ending
+// Check pool configuration logic
+func TestConnection_PoolConfig(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
+	require.NoError(t, err)
+	defer db.Close()
+
+	origOpen := sqlOpen
+	defer func() { sqlOpen = origOpen }()
+	sqlOpen = func(driverName, dataSourceName string) (*sql.DB, error) {
+		return db, nil
+	}
+
+	mock.ExpectPing()
+
+	cfg := PostgresConfig{
+		MaxOpenConns:    10,
+		MaxIdleConns:    5,
+		ConnMaxLifetime: 1 * time.Hour,
+		ConnMaxIdleTime: 10 * time.Minute,
+	}
+
+	conn, err := NewConnection(cfg, logging.NewNopLogger())
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+
+	// We can't easily assert db settings on *sql.DB without reflection or stats,
+	// but we can ensure no panic and logic runs.
+	stats := conn.Stats()
+	assert.Equal(t, 10, stats.MaxOpenConnections)
+	// MaxIdle is not directly exposed in stats struct in older Go versions, but MaxOpen is.
+}
+
+//Personal.AI order the ending

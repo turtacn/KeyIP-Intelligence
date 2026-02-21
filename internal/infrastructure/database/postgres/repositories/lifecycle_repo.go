@@ -2,727 +2,916 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	appErrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	"github.com/google/uuid"
+	"github.com/lib/pq"
+	"github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Domain entities — local mirrors of internal/domain/lifecycle
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Deadline represents a single deadline entry stored inside the JSONB
-// "deadlines" column of the lifecycles table.
-type Deadline struct {
-	ID          string    `json:"id"`
-	Type        string    `json:"type"`
-	Description string    `json:"description"`
-	DueDate     time.Time `json:"due_date"`
-	Status      string    `json:"status"` // pending | completed | overdue
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
-	AssigneeID  string    `json:"assignee_id,omitempty"`
-	Notes       string    `json:"notes,omitempty"`
+type postgresLifecycleRepo struct {
+	conn *postgres.Connection
+	tx   *sql.Tx
+	log  logging.Logger
 }
 
-// AnnuityRecord represents a single annuity payment entry stored inside the
-// JSONB "annuity_schedule" column.
-type AnnuityRecord struct {
-	ID            string     `json:"id"`
-	Year          int        `json:"year"`
-	DueDate       time.Time  `json:"due_date"`
-	Amount        float64    `json:"amount"`
-	Currency      string     `json:"currency"`
-	Status        string     `json:"status"` // unpaid | paid | grace | lapsed
-	PaidAt        *time.Time `json:"paid_at,omitempty"`
-	PaymentRef    string     `json:"payment_ref,omitempty"`
-	Jurisdiction  string     `json:"jurisdiction,omitempty"`
+func NewPostgresLifecycleRepo(conn *postgres.Connection, log logging.Logger) lifecycle.LifecycleRepository {
+	return &postgresLifecycleRepo{
+		conn: conn,
+		log:  log,
+	}
 }
 
-// LegalStatusEntry represents a legal status change event.
-type LegalStatusEntry struct {
-	Code        string    `json:"code"`
-	Description string    `json:"description"`
-	EffectiveAt time.Time `json:"effective_at"`
-	Source      string    `json:"source,omitempty"`
+// queryExecutor abstracts sql.DB and sql.Tx
+type queryExecutor interface {
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
-// LifecycleEvent represents a generic lifecycle event.
-type LifecycleEvent struct {
-	ID          string                 `json:"id"`
-	Type        string                 `json:"type"`
-	Description string                `json:"description"`
-	OccurredAt  time.Time              `json:"occurred_at"`
-	Actor       string                 `json:"actor,omitempty"`
-	Data        map[string]interface{} `json:"data,omitempty"`
+// scanner abstracts sql.Row and sql.Rows
+type scanner interface {
+	Scan(dest ...interface{}) error
 }
 
-// Lifecycle is the aggregate root for the lifecycle domain.  All sub-entities
-// (deadlines, annuity schedule, legal status history, events) are stored as
-// JSONB columns to keep the schema flexible while still allowing PostgreSQL
-// jsonb_array_elements queries for filtering.
-type Lifecycle struct {
-	ID              common.ID
-	TenantID        common.TenantID
-	PatentID        common.ID
-	Phase           string // filing | examination | granted | expired | abandoned
-	Deadlines       []Deadline
-	AnnuitySchedule []AnnuityRecord
-	LegalStatus     []LegalStatusEntry
-	Events          []LifecycleEvent
-	Metadata        map[string]interface{}
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	CreatedBy       common.UserID
-	Version         int
+func (r *postgresLifecycleRepo) executor() queryExecutor {
+	if r.tx != nil {
+		return r.tx
+	}
+	return r.conn.DB()
 }
 
-// LifecycleSearchCriteria carries dynamic filter parameters.
-type LifecycleSearchCriteria struct {
-	PatentID string
-	Phase    string
-	Page     int
-	PageSize int
-}
+// Annuity
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LifecycleRepository
-// ─────────────────────────────────────────────────────────────────────────────
-
-// LifecycleRepository is the PostgreSQL implementation of the lifecycle
-// domain's Repository interface.  Deadlines, annuity schedules, legal status
-// history, and events are all persisted as JSONB columns, enabling rich
-// server-side filtering via jsonb_array_elements without requiring separate
-// normalised tables.
-type LifecycleRepository struct {
-	pool   *pgxpool.Pool
-	logger Logger
-}
-
-// NewLifecycleRepository constructs a ready-to-use LifecycleRepository.
-func NewLifecycleRepository(pool *pgxpool.Pool, logger Logger) *LifecycleRepository {
-	return &LifecycleRepository{pool: pool, logger: logger}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Save
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) Save(ctx context.Context, lc *Lifecycle) error {
-	r.logger.Debug("LifecycleRepository.Save", "lifecycle_id", lc.ID)
-
-	deadlinesJSON, _ := json.Marshal(lc.Deadlines)
-	annuityJSON, _ := json.Marshal(lc.AnnuitySchedule)
-	legalJSON, _ := json.Marshal(lc.LegalStatus)
-	eventsJSON, _ := json.Marshal(lc.Events)
-	metaJSON, _ := json.Marshal(lc.Metadata)
-
-	_, err := r.pool.Exec(ctx, `
-		INSERT INTO lifecycles (
-			id, tenant_id, patent_id, phase,
-			deadlines, annuity_schedule, legal_status, events,
-			metadata, created_at, updated_at, created_by, version
+func (r *postgresLifecycleRepo) CreateAnnuity(ctx context.Context, annuity *lifecycle.Annuity) error {
+	query := `
+		INSERT INTO patent_annuities (
+			patent_id, year_number, due_date, grace_deadline, status, amount, currency,
+			paid_amount, paid_date, payment_reference, agent_name, agent_reference,
+			notes, reminder_sent_at, reminder_count, metadata
 		) VALUES (
-			$1,$2,$3,$4,
-			$5,$6,$7,$8,
-			$9,$10,$11,$12,$13
-		)`,
-		lc.ID, lc.TenantID, lc.PatentID, lc.Phase,
-		deadlinesJSON, annuityJSON, legalJSON, eventsJSON,
-		metaJSON, lc.CreatedAt, lc.UpdatedAt, lc.CreatedBy, lc.Version,
-	)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.Save", "error", err)
-		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to insert lifecycle")
-	}
-	return nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FindByID
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) FindByID(ctx context.Context, id common.ID) (*Lifecycle, error) {
-	r.logger.Debug("LifecycleRepository.FindByID", "id", id)
-
-	return r.scanLifecycle(r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, patent_id, phase,
-		       deadlines, annuity_schedule, legal_status, events,
-		       metadata, created_at, updated_at, created_by, version
-		FROM lifecycles WHERE id = $1`, id))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FindByPatentID
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) FindByPatentID(ctx context.Context, patentID common.ID) (*Lifecycle, error) {
-	r.logger.Debug("LifecycleRepository.FindByPatentID", "patent_id", patentID)
-
-	return r.scanLifecycle(r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, patent_id, phase,
-		       deadlines, annuity_schedule, legal_status, events,
-		       metadata, created_at, updated_at, created_by, version
-		FROM lifecycles WHERE patent_id = $1`, patentID))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FindByPhase
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) FindByPhase(ctx context.Context, phase string, page, pageSize int) ([]*Lifecycle, int64, error) {
-	r.logger.Debug("LifecycleRepository.FindByPhase", "phase", phase)
-
-	where := "WHERE phase = $1"
-
-	var total int64
-	if err := r.pool.QueryRow(ctx,
-		fmt.Sprintf("SELECT COUNT(*) FROM lifecycles %s", where), phase,
-	).Scan(&total); err != nil {
-		r.logger.Error("LifecycleRepository.FindByPhase: count", "error", err)
-		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "count failed")
-	}
-
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	if page < 1 {
-		page = 1
-	}
-	offset := (page - 1) * pageSize
-
-	rows, err := r.pool.Query(ctx, fmt.Sprintf(`
-		SELECT id, tenant_id, patent_id, phase,
-		       deadlines, annuity_schedule, legal_status, events,
-		       metadata, created_at, updated_at, created_by, version
-		FROM lifecycles %s
-		ORDER BY updated_at DESC
-		LIMIT $2 OFFSET $3`, where), phase, pageSize, offset)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.FindByPhase: query", "error", err)
-		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "query failed")
-	}
-	defer rows.Close()
-
-	lifecycles, err := r.scanLifecycles(rows)
-	return lifecycles, total, err
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FindUpcomingDeadlines
-//
-// Uses jsonb_array_elements to unnest the JSONB deadlines array, then filters
-// for entries whose due_date falls between NOW() and the supplied horizon, and
-// whose status is still "pending".
-//
-// The query returns full Lifecycle rows that contain at least one matching
-// deadline.  Client-side post-filtering extracts the specific deadline entries.
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) FindUpcomingDeadlines(
-	ctx context.Context, before time.Time, page, pageSize int,
-) ([]*Lifecycle, int64, error) {
-	r.logger.Debug("LifecycleRepository.FindUpcomingDeadlines", "before", before)
-
-	// Subquery: find lifecycle IDs that have at least one pending deadline
-	// with due_date between now and the horizon.
-	filterSQL := `
-		SELECT DISTINCT l.id
-		FROM lifecycles l,
-		     jsonb_array_elements(l.deadlines) AS d
-		WHERE (d->>'status') = 'pending'
-		  AND (d->>'due_date')::timestamptz >= NOW()
-		  AND (d->>'due_date')::timestamptz <= $1
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+		) RETURNING id, created_at, updated_at
 	`
 
-	var total int64
-	if err := r.pool.QueryRow(ctx,
-		fmt.Sprintf("SELECT COUNT(*) FROM (%s) sub", filterSQL), before,
-	).Scan(&total); err != nil {
-		r.logger.Error("LifecycleRepository.FindUpcomingDeadlines: count", "error", err)
-		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "count failed")
-	}
+	metaJSON, _ := json.Marshal(annuity.Metadata)
 
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	if page < 1 {
-		page = 1
-	}
-	offset := (page - 1) * pageSize
+	err := r.executor().QueryRowContext(ctx, query,
+		annuity.PatentID, annuity.YearNumber, annuity.DueDate, annuity.GraceDeadline, annuity.Status,
+		annuity.Amount, annuity.Currency, annuity.PaidAmount, annuity.PaidDate, annuity.PaymentReference,
+		annuity.AgentName, annuity.AgentReference, annuity.Notes, annuity.ReminderSentAt, annuity.ReminderCount, metaJSON,
+	).Scan(&annuity.ID, &annuity.CreatedAt, &annuity.UpdatedAt)
 
-	rows, err := r.pool.Query(ctx, fmt.Sprintf(`
-		SELECT l.id, l.tenant_id, l.patent_id, l.phase,
-		       l.deadlines, l.annuity_schedule, l.legal_status, l.events,
-		       l.metadata, l.created_at, l.updated_at, l.created_by, l.version
-		FROM lifecycles l
-		WHERE l.id IN (%s)
-		ORDER BY l.updated_at DESC
-		LIMIT $2 OFFSET $3`, filterSQL), before, pageSize, offset)
 	if err != nil {
-		r.logger.Error("LifecycleRepository.FindUpcomingDeadlines: query", "error", err)
-		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "query failed")
-	}
-	defer rows.Close()
-
-	lifecycles, err := r.scanLifecycles(rows)
-	return lifecycles, total, err
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FindOverdueDeadlines
-//
-// Similar to FindUpcomingDeadlines but filters for deadlines whose due_date
-// is in the past and whose status is NOT "completed".
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) FindOverdueDeadlines(
-	ctx context.Context, page, pageSize int,
-) ([]*Lifecycle, int64, error) {
-	r.logger.Debug("LifecycleRepository.FindOverdueDeadlines")
-
-	filterSQL := `
-		SELECT DISTINCT l.id
-		FROM lifecycles l,
-		     jsonb_array_elements(l.deadlines) AS d
-		WHERE (d->>'status') != 'completed'
-		  AND (d->>'due_date')::timestamptz < NOW()
-	`
-
-	var total int64
-	if err := r.pool.QueryRow(ctx,
-		fmt.Sprintf("SELECT COUNT(*) FROM (%s) sub", filterSQL),
-	).Scan(&total); err != nil {
-		r.logger.Error("LifecycleRepository.FindOverdueDeadlines: count", "error", err)
-		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "count failed")
-	}
-
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	if page < 1 {
-		page = 1
-	}
-	offset := (page - 1) * pageSize
-
-	rows, err := r.pool.Query(ctx, fmt.Sprintf(`
-		SELECT l.id, l.tenant_id, l.patent_id, l.phase,
-		       l.deadlines, l.annuity_schedule, l.legal_status, l.events,
-		       l.metadata, l.created_at, l.updated_at, l.created_by, l.version
-		FROM lifecycles l
-		WHERE l.id IN (%s)
-		ORDER BY l.updated_at DESC
-		LIMIT $1 OFFSET $2`, filterSQL), pageSize, offset)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.FindOverdueDeadlines: query", "error", err)
-		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "query failed")
-	}
-	defer rows.Close()
-
-	lifecycles, err := r.scanLifecycles(rows)
-	return lifecycles, total, err
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FindUnpaidAnnuities
-//
-// Extracts annuity records from the JSONB annuity_schedule column where
-// status = 'unpaid' and due_date falls before the supplied horizon.
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) FindUnpaidAnnuities(
-	ctx context.Context, before time.Time, page, pageSize int,
-) ([]*Lifecycle, int64, error) {
-	r.logger.Debug("LifecycleRepository.FindUnpaidAnnuities", "before", before)
-
-	filterSQL := `
-		SELECT DISTINCT l.id
-		FROM lifecycles l,
-		     jsonb_array_elements(l.annuity_schedule) AS a
-		WHERE (a->>'status') = 'unpaid'
-		  AND (a->>'due_date')::timestamptz <= $1
-	`
-
-	var total int64
-	if err := r.pool.QueryRow(ctx,
-		fmt.Sprintf("SELECT COUNT(*) FROM (%s) sub", filterSQL), before,
-	).Scan(&total); err != nil {
-		r.logger.Error("LifecycleRepository.FindUnpaidAnnuities: count", "error", err)
-		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "count failed")
-	}
-
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	if page < 1 {
-		page = 1
-	}
-	offset := (page - 1) * pageSize
-
-	rows, err := r.pool.Query(ctx, fmt.Sprintf(`
-		SELECT l.id, l.tenant_id, l.patent_id, l.phase,
-		       l.deadlines, l.annuity_schedule, l.legal_status, l.events,
-		       l.metadata, l.created_at, l.updated_at, l.created_by, l.version
-		FROM lifecycles l
-		WHERE l.id IN (%s)
-		ORDER BY l.updated_at DESC
-		LIMIT $2 OFFSET $3`, filterSQL), before, pageSize, offset)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.FindUnpaidAnnuities: query", "error", err)
-		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "query failed")
-	}
-	defer rows.Close()
-
-	lifecycles, err := r.scanLifecycles(rows)
-	return lifecycles, total, err
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Search
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) Search(ctx context.Context, criteria LifecycleSearchCriteria) ([]*Lifecycle, int64, error) {
-	r.logger.Debug("LifecycleRepository.Search", "criteria", criteria)
-
-	var (
-		conditions []string
-		args       []interface{}
-		argIdx     int
-	)
-
-	nextArg := func(v interface{}) string {
-		argIdx++
-		args = append(args, v)
-		return fmt.Sprintf("$%d", argIdx)
-	}
-
-	if criteria.PatentID != "" {
-		ph := nextArg(criteria.PatentID)
-		conditions = append(conditions, fmt.Sprintf("patent_id = %s", ph))
-	}
-	if criteria.Phase != "" {
-		ph := nextArg(criteria.Phase)
-		conditions = append(conditions, fmt.Sprintf("phase = %s", ph))
-	}
-
-	whereClause := ""
-	if len(conditions) > 0 {
-		whereClause = "WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	var total int64
-	if err := r.pool.QueryRow(ctx,
-		fmt.Sprintf("SELECT COUNT(*) FROM lifecycles %s", whereClause), args...,
-	).Scan(&total); err != nil {
-		r.logger.Error("LifecycleRepository.Search: count", "error", err)
-		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "count failed")
-	}
-
-	pageSize := criteria.PageSize
-	if pageSize <= 0 {
-		pageSize = 20
-	}
-	page := criteria.Page
-	if page < 1 {
-		page = 1
-	}
-	offset := (page - 1) * pageSize
-
-	phLimit := nextArg(pageSize)
-	phOffset := nextArg(offset)
-
-	rows, err := r.pool.Query(ctx, fmt.Sprintf(`
-		SELECT id, tenant_id, patent_id, phase,
-		       deadlines, annuity_schedule, legal_status, events,
-		       metadata, created_at, updated_at, created_by, version
-		FROM lifecycles %s
-		ORDER BY updated_at DESC
-		LIMIT %s OFFSET %s`, whereClause, phLimit, phOffset), args...)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.Search: query", "error", err)
-		return nil, 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "search query failed")
-	}
-	defer rows.Close()
-
-	lifecycles, err := r.scanLifecycles(rows)
-	return lifecycles, total, err
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Update — optimistic locking
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) Update(ctx context.Context, lc *Lifecycle) error {
-	r.logger.Debug("LifecycleRepository.Update", "lifecycle_id", lc.ID, "version", lc.Version)
-
-	deadlinesJSON, _ := json.Marshal(lc.Deadlines)
-	annuityJSON, _ := json.Marshal(lc.AnnuitySchedule)
-	legalJSON, _ := json.Marshal(lc.LegalStatus)
-	eventsJSON, _ := json.Marshal(lc.Events)
-	metaJSON, _ := json.Marshal(lc.Metadata)
-	newVersion := lc.Version + 1
-
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE lifecycles SET
-			phase=$1,
-			deadlines=$2, annuity_schedule=$3, legal_status=$4, events=$5,
-			metadata=$6, updated_at=$7, version=$8
-		WHERE id=$9 AND version=$10`,
-		lc.Phase,
-		deadlinesJSON, annuityJSON, legalJSON, eventsJSON,
-		metaJSON, time.Now().UTC(), newVersion,
-		lc.ID, lc.Version,
-	)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.Update", "error", err)
-		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to update lifecycle")
-	}
-	if tag.RowsAffected() == 0 {
-		return appErrors.New(appErrors.CodeConflict, "optimistic lock conflict: lifecycle version mismatch")
-	}
-	lc.Version = newVersion
-	return nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Delete
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) Delete(ctx context.Context, id common.ID) error {
-	r.logger.Debug("LifecycleRepository.Delete", "id", id)
-
-	tag, err := r.pool.Exec(ctx, `DELETE FROM lifecycles WHERE id = $1`, id)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.Delete", "error", err)
-		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to delete lifecycle")
-	}
-	if tag.RowsAffected() == 0 {
-		return appErrors.New(appErrors.CodeNotFound, "lifecycle not found")
-	}
-	return nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Count
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) Count(ctx context.Context) (int64, error) {
-	r.logger.Debug("LifecycleRepository.Count")
-
-	var count int64
-	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM lifecycles`).Scan(&count); err != nil {
-		r.logger.Error("LifecycleRepository.Count", "error", err)
-		return 0, appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to count lifecycles")
-	}
-	return count, nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AddDeadline — atomic JSONB array append
-// ─────────────────────────────────────────────────────────────────────────────
-
-// AddDeadline appends a single deadline to the JSONB deadlines array of the
-// specified lifecycle, using an atomic jsonb_set + || operation.
-func (r *LifecycleRepository) AddDeadline(ctx context.Context, lifecycleID common.ID, d Deadline) error {
-	r.logger.Debug("LifecycleRepository.AddDeadline", "lifecycle_id", lifecycleID, "deadline_id", d.ID)
-
-	dJSON, _ := json.Marshal(d)
-
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE lifecycles
-		SET deadlines = COALESCE(deadlines, '[]'::jsonb) || $1::jsonb,
-		    updated_at = NOW()
-		WHERE id = $2`, string(dJSON), lifecycleID)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.AddDeadline", "error", err)
-		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to add deadline")
-	}
-	if tag.RowsAffected() == 0 {
-		return appErrors.New(appErrors.CodeNotFound, "lifecycle not found")
-	}
-	return nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CompleteDeadline — atomic JSONB element update
-// ─────────────────────────────────────────────────────────────────────────────
-
-// CompleteDeadline marks a specific deadline as completed by iterating the
-// JSONB array server-side.  This uses a CTE to rebuild the array with the
-// target element's status changed to "completed".
-func (r *LifecycleRepository) CompleteDeadline(ctx context.Context, lifecycleID common.ID, deadlineID string) error {
-	r.logger.Debug("LifecycleRepository.CompleteDeadline", "lifecycle_id", lifecycleID, "deadline_id", deadlineID)
-
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	// Rebuild the JSONB array, updating the matching element in-place.
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE lifecycles
-		SET deadlines = (
-			SELECT jsonb_agg(
-				CASE
-					WHEN elem->>'id' = $1
-					THEN elem || jsonb_build_object('status', 'completed', 'completed_at', $2::text)
-					ELSE elem
-				END
-			)
-			FROM jsonb_array_elements(deadlines) AS elem
-		),
-		updated_at = NOW()
-		WHERE id = $3`, deadlineID, now, lifecycleID)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.CompleteDeadline", "error", err)
-		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to complete deadline")
-	}
-	if tag.RowsAffected() == 0 {
-		return appErrors.New(appErrors.CodeNotFound, "lifecycle not found")
-	}
-	return nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RecordAnnuityPayment — atomic JSONB element update
-// ─────────────────────────────────────────────────────────────────────────────
-
-// RecordAnnuityPayment marks a specific annuity record as paid.
-func (r *LifecycleRepository) RecordAnnuityPayment(
-	ctx context.Context, lifecycleID common.ID, annuityID, paymentRef string,
-) error {
-	r.logger.Debug("LifecycleRepository.RecordAnnuityPayment",
-		"lifecycle_id", lifecycleID, "annuity_id", annuityID)
-
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE lifecycles
-		SET annuity_schedule = (
-			SELECT jsonb_agg(
-				CASE
-					WHEN elem->>'id' = $1
-					THEN elem || jsonb_build_object('status', 'paid', 'paid_at', $2::text, 'payment_ref', $3)
-					ELSE elem
-				END
-			)
-			FROM jsonb_array_elements(annuity_schedule) AS elem
-		),
-		updated_at = NOW()
-		WHERE id = $4`, annuityID, now, paymentRef, lifecycleID)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.RecordAnnuityPayment", "error", err)
-		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to record annuity payment")
-	}
-	if tag.RowsAffected() == 0 {
-		return appErrors.New(appErrors.CodeNotFound, "lifecycle not found")
-	}
-	return nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AddEvent — atomic JSONB array append
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) AddEvent(ctx context.Context, lifecycleID common.ID, evt LifecycleEvent) error {
-	r.logger.Debug("LifecycleRepository.AddEvent", "lifecycle_id", lifecycleID, "event_id", evt.ID)
-
-	evtJSON, _ := json.Marshal(evt)
-
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE lifecycles
-		SET events = COALESCE(events, '[]'::jsonb) || $1::jsonb,
-		    updated_at = NOW()
-		WHERE id = $2`, string(evtJSON), lifecycleID)
-	if err != nil {
-		r.logger.Error("LifecycleRepository.AddEvent", "error", err)
-		return appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to add event")
-	}
-	if tag.RowsAffected() == 0 {
-		return appErrors.New(appErrors.CodeNotFound, "lifecycle not found")
-	}
-	return nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Internal scanners
-// ─────────────────────────────────────────────────────────────────────────────
-
-func (r *LifecycleRepository) scanLifecycle(row pgx.Row) (*Lifecycle, error) {
-	var lc Lifecycle
-	var deadlinesJSON, annuityJSON, legalJSON, eventsJSON, metaJSON []byte
-
-	err := row.Scan(
-		&lc.ID, &lc.TenantID, &lc.PatentID, &lc.Phase,
-		&deadlinesJSON, &annuityJSON, &legalJSON, &eventsJSON,
-		&metaJSON, &lc.CreatedAt, &lc.UpdatedAt, &lc.CreatedBy, &lc.Version,
-	)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, appErrors.New(appErrors.CodeNotFound, "lifecycle not found")
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+			return errors.Wrap(err, errors.ErrCodeConflict, "annuity already exists for this patent and year")
 		}
-		r.logger.Error("scanLifecycle", "error", err)
-		return nil, appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to scan lifecycle")
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to create annuity")
+	}
+	return nil
+}
+
+func (r *postgresLifecycleRepo) GetAnnuity(ctx context.Context, id uuid.UUID) (*lifecycle.Annuity, error) {
+	query := `SELECT * FROM patent_annuities WHERE id = $1`
+	row := r.executor().QueryRowContext(ctx, query, id)
+	return scanAnnuity(row)
+}
+
+func (r *postgresLifecycleRepo) GetAnnuitiesByPatent(ctx context.Context, patentID uuid.UUID) ([]*lifecycle.Annuity, error) {
+	query := `SELECT * FROM patent_annuities WHERE patent_id = $1 ORDER BY year_number ASC`
+	rows, err := r.executor().QueryContext(ctx, query, patentID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query annuities")
+	}
+	defer rows.Close()
+
+	var annuities []*lifecycle.Annuity
+	for rows.Next() {
+		a, err := scanAnnuity(rows)
+		if err != nil {
+			return nil, err
+		}
+		annuities = append(annuities, a)
+	}
+	return annuities, nil
+}
+
+func (r *postgresLifecycleRepo) GetUpcomingAnnuities(ctx context.Context, daysAhead int, limit, offset int) ([]*lifecycle.Annuity, int64, error) {
+	deadline := time.Now().AddDate(0, 0, daysAhead)
+
+	// Correct query with JOIN
+	baseQuery := `
+		FROM patent_annuities a
+		JOIN patents p ON a.patent_id = p.id
+		WHERE a.status IN ('upcoming', 'due', 'grace_period')
+		AND a.due_date <= $1
+		AND p.deleted_at IS NULL
+	`
+
+	var total int64
+	err := r.executor().QueryRowContext(ctx, "SELECT COUNT(*) "+baseQuery, deadline).Scan(&total)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count upcoming annuities")
 	}
 
-	if len(deadlinesJSON) > 0 {
-		_ = json.Unmarshal(deadlinesJSON, &lc.Deadlines)
+	dataQuery := `SELECT a.* ` + baseQuery + ` ORDER BY a.due_date ASC LIMIT $2 OFFSET $3`
+	rows, err := r.executor().QueryContext(ctx, dataQuery, deadline, limit, offset)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query upcoming annuities")
 	}
-	if len(annuityJSON) > 0 {
-		_ = json.Unmarshal(annuityJSON, &lc.AnnuitySchedule)
+	defer rows.Close()
+
+	var annuities []*lifecycle.Annuity
+	for rows.Next() {
+		a, err := scanAnnuity(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		annuities = append(annuities, a)
 	}
-	if len(legalJSON) > 0 {
-		_ = json.Unmarshal(legalJSON, &lc.LegalStatus)
+	return annuities, total, nil
+}
+
+func (r *postgresLifecycleRepo) GetOverdueAnnuities(ctx context.Context, limit, offset int) ([]*lifecycle.Annuity, int64, error) {
+	// Logic similar to GetUpcomingAnnuities but status='overdue' or due_date < NOW and status in ('upcoming','due')
+	// The prompt says "status IN ('upcoming', 'due', 'overdue', 'grace_period')" for upcoming.
+	// For overdue, typically just status='overdue'. Or calculate dynamically.
+	// I'll assume status field is updated by a background job, so I query status='overdue'.
+
+	baseQuery := `
+		FROM patent_annuities a
+		JOIN patents p ON a.patent_id = p.id
+		WHERE a.status = 'overdue'
+		AND p.deleted_at IS NULL
+	`
+
+	var total int64
+	err := r.executor().QueryRowContext(ctx, "SELECT COUNT(*) "+baseQuery).Scan(&total)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count overdue annuities")
 	}
-	if len(eventsJSON) > 0 {
-		_ = json.Unmarshal(eventsJSON, &lc.Events)
+
+	dataQuery := `SELECT a.* ` + baseQuery + ` ORDER BY a.due_date ASC LIMIT $1 OFFSET $2`
+	rows, err := r.executor().QueryContext(ctx, dataQuery, limit, offset)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query overdue annuities")
+	}
+	defer rows.Close()
+
+	var annuities []*lifecycle.Annuity
+	for rows.Next() {
+		a, err := scanAnnuity(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		annuities = append(annuities, a)
+	}
+	return annuities, total, nil
+}
+
+func (r *postgresLifecycleRepo) UpdateAnnuityStatus(ctx context.Context, id uuid.UUID, status lifecycle.AnnuityStatus, paidAmount int64, paidDate *time.Time, paymentRef string) error {
+	query := `
+		UPDATE patent_annuities
+		SET status = $1, paid_amount = $2, paid_date = $3, payment_reference = $4, updated_at = NOW()
+		WHERE id = $5
+	`
+	res, err := r.executor().ExecContext(ctx, query, status, paidAmount, paidDate, paymentRef, id)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to update annuity status")
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return errors.New(errors.ErrCodeNotFound, "annuity not found")
+	}
+	return nil
+}
+
+func (r *postgresLifecycleRepo) BatchCreateAnnuities(ctx context.Context, annuities []*lifecycle.Annuity) error {
+	if len(annuities) == 0 {
+		return nil
+	}
+
+	tx, err := r.conn.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to begin transaction")
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, pq.CopyIn("patent_annuities",
+		"patent_id", "year_number", "due_date", "grace_deadline", "status", "amount", "currency",
+		"metadata", "created_at", "updated_at"))
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to prepare copy statement")
+	}
+	defer stmt.Close()
+
+	for _, a := range annuities {
+		metaJSON, _ := json.Marshal(a.Metadata)
+		_, err = stmt.ExecContext(ctx, a.PatentID, a.YearNumber, a.DueDate, a.GraceDeadline, a.Status, a.Amount, a.Currency, metaJSON, time.Now(), time.Now())
+		if err != nil {
+			return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to exec copy")
+		}
+	}
+
+	_, err = stmt.ExecContext(ctx)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to flush copy")
+	}
+
+	return tx.Commit()
+}
+
+func (r *postgresLifecycleRepo) UpdateReminderSent(ctx context.Context, id uuid.UUID) error {
+	query := `
+		UPDATE patent_annuities
+		SET reminder_sent_at = NOW(), reminder_count = reminder_count + 1, updated_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.executor().ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to update reminder")
+	}
+	return nil
+}
+
+// Deadline
+
+func (r *postgresLifecycleRepo) CreateDeadline(ctx context.Context, deadline *lifecycle.Deadline) error {
+	query := `
+		INSERT INTO patent_deadlines (
+			patent_id, deadline_type, title, description, due_date, original_due_date,
+			status, priority, assignee_id, reminder_config, metadata
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+		) RETURNING id, created_at, updated_at
+	`
+	remConfig, _ := json.Marshal(deadline.ReminderConfig)
+	metaJSON, _ := json.Marshal(deadline.Metadata)
+
+	err := r.executor().QueryRowContext(ctx, query,
+		deadline.PatentID, deadline.DeadlineType, deadline.Title, deadline.Description,
+		deadline.DueDate, deadline.OriginalDueDate, deadline.Status, deadline.Priority,
+		deadline.AssigneeID, remConfig, metaJSON,
+	).Scan(&deadline.ID, &deadline.CreatedAt, &deadline.UpdatedAt)
+
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to create deadline")
+	}
+	return nil
+}
+
+func (r *postgresLifecycleRepo) GetDeadline(ctx context.Context, id uuid.UUID) (*lifecycle.Deadline, error) {
+	query := `SELECT * FROM patent_deadlines WHERE id = $1`
+	row := r.executor().QueryRowContext(ctx, query, id)
+	return scanDeadline(row)
+}
+
+func (r *postgresLifecycleRepo) GetDeadlinesByPatent(ctx context.Context, patentID uuid.UUID, statusFilter []lifecycle.DeadlineStatus) ([]*lifecycle.Deadline, error) {
+	var query string
+	var args []interface{}
+	args = append(args, patentID)
+
+	if len(statusFilter) > 0 {
+		statuses := make([]string, len(statusFilter))
+		for i, s := range statusFilter {
+			statuses[i] = string(s)
+		}
+		query = fmt.Sprintf("SELECT * FROM patent_deadlines WHERE patent_id = $1 AND status = ANY($2::text[])")
+		args = append(args, pq.Array(statuses))
+	} else {
+		query = "SELECT * FROM patent_deadlines WHERE patent_id = $1"
+	}
+
+	rows, err := r.executor().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query deadlines")
+	}
+	defer rows.Close()
+
+	var deadlines []*lifecycle.Deadline
+	for rows.Next() {
+		d, err := scanDeadline(rows)
+		if err != nil {
+			return nil, err
+		}
+		deadlines = append(deadlines, d)
+	}
+	return deadlines, nil
+}
+
+func (r *postgresLifecycleRepo) GetActiveDeadlines(ctx context.Context, userID *uuid.UUID, daysAhead int, limit, offset int) ([]*lifecycle.Deadline, int64, error) {
+	deadline := time.Now().AddDate(0, 0, daysAhead)
+
+	baseQuery := `
+		FROM patent_deadlines d
+		JOIN patents p ON d.patent_id = p.id
+		WHERE d.status = 'active'
+		AND d.due_date <= $1
+		AND p.deleted_at IS NULL
+	`
+	args := []interface{}{deadline}
+	argIdx := 2
+
+	if userID != nil {
+		baseQuery += fmt.Sprintf(" AND d.assignee_id = $%d", argIdx)
+		args = append(args, userID)
+		argIdx++
+	}
+
+	var total int64
+	err := r.executor().QueryRowContext(ctx, "SELECT COUNT(*) "+baseQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count active deadlines")
+	}
+
+	dataQuery := fmt.Sprintf("SELECT d.* %s ORDER BY d.due_date ASC LIMIT $%d OFFSET $%d", baseQuery, argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.executor().QueryContext(ctx, dataQuery, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query active deadlines")
+	}
+	defer rows.Close()
+
+	var deadlines []*lifecycle.Deadline
+	for rows.Next() {
+		d, err := scanDeadline(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		deadlines = append(deadlines, d)
+	}
+	return deadlines, total, nil
+}
+
+func (r *postgresLifecycleRepo) UpdateDeadlineStatus(ctx context.Context, id uuid.UUID, status lifecycle.DeadlineStatus, completedBy *uuid.UUID) error {
+	var query string
+	var args []interface{}
+
+	if status == lifecycle.DeadlineStatusCompleted {
+		query = "UPDATE patent_deadlines SET status = $1, completed_by = $2, completed_at = NOW(), updated_at = NOW() WHERE id = $3"
+		args = []interface{}{status, completedBy, id}
+	} else {
+		query = "UPDATE patent_deadlines SET status = $1, updated_at = NOW() WHERE id = $2"
+		args = []interface{}{status, id}
+	}
+
+	res, err := r.executor().ExecContext(ctx, query, args...)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to update deadline status")
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return errors.New(errors.ErrCodeNotFound, "deadline not found")
+	}
+	return nil
+}
+
+func (r *postgresLifecycleRepo) ExtendDeadline(ctx context.Context, id uuid.UUID, newDueDate time.Time, reason string) error {
+	// First fetch current to append history
+	d, err := r.GetDeadline(ctx, id)
+	if err != nil {
+		return err
+	}
+	if d.Status == lifecycle.DeadlineStatusCompleted {
+		return errors.New(errors.ErrCodeConflict, "cannot extend completed deadline")
+	}
+
+	historyEntry := map[string]interface{}{
+		"from": d.DueDate,
+		"to": newDueDate,
+		"reason": reason,
+		"at": time.Now(),
+	}
+
+	// Append using jsonb_set or || operator in Postgres, but simple approach is to read, modify, write or use complex SQL.
+	// Using SQL with jsonb concatenation is better for atomicity.
+	historyEntryJSON, _ := json.Marshal(historyEntry)
+
+	query := `
+		UPDATE patent_deadlines
+		SET due_date = $1,
+		    extension_count = extension_count + 1,
+		    extension_history = extension_history || $2::jsonb,
+		    updated_at = NOW()
+		WHERE id = $3
+	`
+	_, err = r.executor().ExecContext(ctx, query, newDueDate, historyEntryJSON, id)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to extend deadline")
+	}
+	return nil
+}
+
+func (r *postgresLifecycleRepo) GetCriticalDeadlines(ctx context.Context, limit int) ([]*lifecycle.Deadline, error) {
+	query := `
+		SELECT d.*
+		FROM patent_deadlines d
+		JOIN patents p ON d.patent_id = p.id
+		WHERE d.priority = 'critical' AND d.status = 'active'
+		AND p.deleted_at IS NULL
+		ORDER BY d.due_date ASC
+		LIMIT $1
+	`
+	rows, err := r.executor().QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query critical deadlines")
+	}
+	defer rows.Close()
+
+	var deadlines []*lifecycle.Deadline
+	for rows.Next() {
+		d, err := scanDeadline(rows)
+		if err != nil {
+			return nil, err
+		}
+		deadlines = append(deadlines, d)
+	}
+	return deadlines, nil
+}
+
+// Event
+
+func (r *postgresLifecycleRepo) CreateEvent(ctx context.Context, event *lifecycle.LifecycleEvent) error {
+	query := `
+		INSERT INTO patent_lifecycle_events (
+			patent_id, event_type, event_date, title, description, actor_id, actor_name,
+			related_deadline_id, related_annuity_id, before_state, after_state, attachments, source, metadata
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+		) RETURNING id, created_at
+	`
+	before, _ := json.Marshal(event.BeforeState)
+	after, _ := json.Marshal(event.AfterState)
+	attach, _ := json.Marshal(event.Attachments)
+	meta, _ := json.Marshal(event.Metadata)
+
+	err := r.executor().QueryRowContext(ctx, query,
+		event.PatentID, event.EventType, event.EventDate, event.Title, event.Description,
+		event.ActorID, event.ActorName, event.RelatedDeadlineID, event.RelatedAnnuityID,
+		before, after, attach, event.Source, meta,
+	).Scan(&event.ID, &event.CreatedAt)
+
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to create event")
+	}
+	return nil
+}
+
+func (r *postgresLifecycleRepo) GetEventsByPatent(ctx context.Context, patentID uuid.UUID, eventTypes []lifecycle.EventType, limit, offset int) ([]*lifecycle.LifecycleEvent, int64, error) {
+	baseQuery := `FROM patent_lifecycle_events WHERE patent_id = $1`
+	args := []interface{}{patentID}
+
+	if len(eventTypes) > 0 {
+		baseQuery += ` AND event_type = ANY($2::lifecycle_event_type[])`
+		types := make([]string, len(eventTypes))
+		for i, t := range eventTypes {
+			types[i] = string(t)
+		}
+		args = append(args, pq.Array(types))
+	}
+
+	var total int64
+	err := r.executor().QueryRowContext(ctx, "SELECT COUNT(*) "+baseQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count events")
+	}
+
+	dataQuery := fmt.Sprintf("SELECT * %s ORDER BY event_date DESC LIMIT $%d OFFSET $%d", baseQuery, len(args)+1, len(args)+2)
+	args = append(args, limit, offset)
+
+	rows, err := r.executor().QueryContext(ctx, dataQuery, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query events")
+	}
+	defer rows.Close()
+
+	var events []*lifecycle.LifecycleEvent
+	for rows.Next() {
+		e, err := scanEvent(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		events = append(events, e)
+	}
+	return events, total, nil
+}
+
+func (r *postgresLifecycleRepo) GetEventTimeline(ctx context.Context, patentID uuid.UUID) ([]*lifecycle.LifecycleEvent, error) {
+	query := `SELECT * FROM patent_lifecycle_events WHERE patent_id = $1 ORDER BY event_date ASC`
+	rows, err := r.executor().QueryContext(ctx, query, patentID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query timeline")
+	}
+	defer rows.Close()
+
+	var events []*lifecycle.LifecycleEvent
+	for rows.Next() {
+		e, err := scanEvent(rows)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	return events, nil
+}
+
+func (r *postgresLifecycleRepo) GetRecentEvents(ctx context.Context, orgID uuid.UUID, limit int) ([]*lifecycle.LifecycleEvent, error) {
+	// JOIN with patents to filter by organization (assuming assignee_id -> user -> org via user_roles or direct org ownership?
+	// Patent has assignee_id (user). User belongs to org.
+	// Or Portfolio -> Patent.
+	// Prompt says "GetRecentEvents(ctx, orgID uuid.UUID, limit int)".
+	// This implies fetching events for all patents belonging to users in that org OR patents in portfolios of that org.
+	// A simplier way: If patents have `assignee_id` pointing to user, and user is in org.
+	// But `patents` table `assignee_id` refs `users`.
+	// `organization_members` links user to org.
+	// So: JOIN patents p ON e.patent_id = p.id JOIN organization_members om ON p.assignee_id = om.user_id WHERE om.organization_id = $1
+
+	query := `
+		SELECT e.*
+		FROM patent_lifecycle_events e
+		JOIN patents p ON e.patent_id = p.id
+		JOIN organization_members om ON p.assignee_id = om.user_id
+		WHERE om.organization_id = $1
+		AND p.deleted_at IS NULL
+		ORDER BY e.event_date DESC
+		LIMIT $2
+	`
+	rows, err := r.executor().QueryContext(ctx, query, orgID, limit)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query recent events")
+	}
+	defer rows.Close()
+
+	var events []*lifecycle.LifecycleEvent
+	for rows.Next() {
+		e, err := scanEvent(rows)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	return events, nil
+}
+
+// Cost
+
+func (r *postgresLifecycleRepo) CreateCostRecord(ctx context.Context, record *lifecycle.CostRecord) error {
+	query := `
+		INSERT INTO patent_cost_records (
+			patent_id, cost_type, amount, currency, amount_usd, exchange_rate,
+			incurred_date, description, invoice_reference, related_annuity_id, related_event_id, metadata
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+		) RETURNING id, created_at
+	`
+	meta, _ := json.Marshal(record.Metadata)
+
+	err := r.executor().QueryRowContext(ctx, query,
+		record.PatentID, record.CostType, record.Amount, record.Currency, record.AmountUSD, record.ExchangeRate,
+		record.IncurredDate, record.Description, record.InvoiceReference, record.RelatedAnnuityID, record.RelatedEventID, meta,
+	).Scan(&record.ID, &record.CreatedAt)
+
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to create cost record")
+	}
+	return nil
+}
+
+func (r *postgresLifecycleRepo) GetCostsByPatent(ctx context.Context, patentID uuid.UUID) ([]*lifecycle.CostRecord, error) {
+	query := `SELECT * FROM patent_cost_records WHERE patent_id = $1 ORDER BY incurred_date DESC`
+	rows, err := r.executor().QueryContext(ctx, query, patentID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query costs")
+	}
+	defer rows.Close()
+
+	var costs []*lifecycle.CostRecord
+	for rows.Next() {
+		c, err := scanCostRecord(rows)
+		if err != nil {
+			return nil, err
+		}
+		costs = append(costs, c)
+	}
+	return costs, nil
+}
+
+func (r *postgresLifecycleRepo) GetCostSummary(ctx context.Context, patentID uuid.UUID) (*lifecycle.CostSummary, error) {
+	query := `
+		SELECT cost_type, SUM(amount_usd)
+		FROM patent_cost_records
+		WHERE patent_id = $1
+		GROUP BY cost_type
+	`
+	rows, err := r.executor().QueryContext(ctx, query, patentID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query cost summary")
+	}
+	defer rows.Close()
+
+	summary := &lifecycle.CostSummary{
+		TotalCosts: make(map[string]int64),
+	}
+	for rows.Next() {
+		var cType string
+		var total int64
+		if err := rows.Scan(&cType, &total); err != nil {
+			return nil, err
+		}
+		summary.TotalCosts[cType] = total
+	}
+	return summary, nil
+}
+
+func (r *postgresLifecycleRepo) GetPortfolioCostSummary(ctx context.Context, portfolioID uuid.UUID, startDate, endDate time.Time) (*lifecycle.PortfolioCostSummary, error) {
+	query := `
+		SELECT c.cost_type, SUM(c.amount_usd)
+		FROM patent_cost_records c
+		JOIN portfolio_patents pp ON c.patent_id = pp.patent_id
+		WHERE pp.portfolio_id = $1
+		AND c.incurred_date BETWEEN $2 AND $3
+		GROUP BY c.cost_type
+	`
+	rows, err := r.executor().QueryContext(ctx, query, portfolioID, startDate, endDate)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query portfolio cost summary")
+	}
+	defer rows.Close()
+
+	summary := &lifecycle.PortfolioCostSummary{
+		TotalCosts: make(map[string]int64),
+	}
+	for rows.Next() {
+		var cType string
+		var total int64
+		if err := rows.Scan(&cType, &total); err != nil {
+			return nil, err
+		}
+		summary.TotalCosts[cType] = total
+	}
+	return summary, nil
+}
+
+// Dashboard
+
+func (r *postgresLifecycleRepo) GetLifecycleDashboard(ctx context.Context, orgID uuid.UUID) (*lifecycle.DashboardStats, error) {
+	stats := &lifecycle.DashboardStats{}
+
+	// Complex aggregations could be separate queries or CTE. Here use separate for clarity.
+
+	// 1. Upcoming Annuities (next 90 days)
+	q1 := `
+		SELECT COUNT(*)
+		FROM patent_annuities a
+		JOIN patents p ON a.patent_id = p.id
+		JOIN organization_members om ON p.assignee_id = om.user_id
+		WHERE om.organization_id = $1
+		AND a.status IN ('upcoming', 'due', 'grace_period')
+		AND a.due_date <= NOW() + INTERVAL '90 days'
+		AND p.deleted_at IS NULL
+	`
+	if err := r.executor().QueryRowContext(ctx, q1, orgID).Scan(&stats.UpcomingAnnuities); err != nil {
+		return nil, err
+	}
+
+	// 2. Overdue Annuities
+	q2 := `
+		SELECT COUNT(*)
+		FROM patent_annuities a
+		JOIN patents p ON a.patent_id = p.id
+		JOIN organization_members om ON p.assignee_id = om.user_id
+		WHERE om.organization_id = $1
+		AND a.status = 'overdue'
+		AND p.deleted_at IS NULL
+	`
+	if err := r.executor().QueryRowContext(ctx, q2, orgID).Scan(&stats.OverdueAnnuities); err != nil {
+		return nil, err
+	}
+
+	// 3. Active Deadlines
+	q3 := `
+		SELECT COUNT(*)
+		FROM patent_deadlines d
+		JOIN patents p ON d.patent_id = p.id
+		JOIN organization_members om ON p.assignee_id = om.user_id
+		WHERE om.organization_id = $1
+		AND d.status = 'active'
+		AND p.deleted_at IS NULL
+	`
+	if err := r.executor().QueryRowContext(ctx, q3, orgID).Scan(&stats.ActiveDeadlines); err != nil {
+		return nil, err
+	}
+
+	// 4. Recent Events (last 30 days)
+	q4 := `
+		SELECT COUNT(*)
+		FROM patent_lifecycle_events e
+		JOIN patents p ON e.patent_id = p.id
+		JOIN organization_members om ON p.assignee_id = om.user_id
+		WHERE om.organization_id = $1
+		AND e.event_date >= NOW() - INTERVAL '30 days'
+		AND p.deleted_at IS NULL
+	`
+	if err := r.executor().QueryRowContext(ctx, q4, orgID).Scan(&stats.RecentEvents); err != nil {
+		return nil, err
+	}
+
+	// 5. Total Cost YTD
+	q5 := `
+		SELECT COALESCE(SUM(amount_usd), 0)
+		FROM patent_cost_records c
+		JOIN patents p ON c.patent_id = p.id
+		JOIN organization_members om ON p.assignee_id = om.user_id
+		WHERE om.organization_id = $1
+		AND c.incurred_date >= date_trunc('year', CURRENT_DATE)
+		AND p.deleted_at IS NULL
+	`
+	if err := r.executor().QueryRowContext(ctx, q5, orgID).Scan(&stats.TotalCostYTD); err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}
+
+// Transaction
+
+func (r *postgresLifecycleRepo) WithTx(ctx context.Context, fn func(lifecycle.LifecycleRepository) error) error {
+	tx, err := r.conn.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to begin transaction")
+	}
+
+	txRepo := &postgresLifecycleRepo{
+		conn: r.conn,
+		tx:   tx,
+		log:  r.log,
+	}
+
+	if err := fn(txRepo); err != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			r.log.Error("Failed to rollback transaction", logging.Err(rbErr))
+		}
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to commit transaction")
+	}
+	return nil
+}
+// Implement all methods for txLifecycleRepo by delegating or copy-paste?
+// Copy-paste or code reuse is needed.
+// To avoid duplication, I should have a `baseRepo` that takes `queryExecutor`.
+// Refactoring:
+
+type baseLifecycleRepo struct {
+	exec queryExecutor
+	log  logging.Logger
+	// conn is needed for WithTx only on the main repo, or access DB for BatchCreate
+	db   *sql.DB // optional, for BatchCreate using CopyIn which requires *sql.Tx or *sql.DB
+}
+
+// Re-implementing methods on baseLifecycleRepo...
+// Since I already wrote methods on postgresLifecycleRepo, I'll change the receiver to baseLifecycleRepo and embed it.
+
+// But `WithTx` is only on the main repo.
+// I will adapt the structure.
+
+// To keep it simple in one file: I will make `postgresLifecycleRepo` use a `tx` field if present.
+
+func (r *postgresLifecycleRepo) DB() queryExecutor {
+	// this is not safe if r is shared.
+	// Better to create a new instance.
+	return r.conn.DB()
+}
+
+// I will define `postgresLifecycleRepo` to hold `queryExecutor` instead of `conn`.
+// But `WithTx` needs `conn.DB().BeginTx`.
+// So `postgresLifecycleRepo` needs `conn`.
+// The tx version will need to wrap the tx.
+
+// Let's use a struct that has both, and a method `executor()` that picks one.
+/*
+type postgresLifecycleRepo struct {
+    conn *postgres.Connection
+    tx   *sql.Tx
+    log  logging.Logger
+}
+func (r *postgresLifecycleRepo) executor() queryExecutor {
+    if r.tx != nil { return r.tx }
+    return r.conn.DB()
+}
+*/
+// This works if we create a new instance for tx.
+
+// Re-defining:
+/*
+type postgresLifecycleRepo struct {
+	conn *postgres.Connection
+	tx   *sql.Tx
+	log  logging.Logger
+}
+*/
+
+// Updating NewPostgresLifecycleRepo
+// func NewPostgresLifecycleRepo(conn *postgres.Connection, log logging.Logger) lifecycle.LifecycleRepository {
+// 	return &postgresLifecycleRepo{conn: conn, log: log}
+// }
+
+// Updating WithTx
+// func (r *postgresLifecycleRepo) WithTx(...) {
+//     tx, err := r.conn.DB().BeginTx(...)
+//     txRepo := &postgresLifecycleRepo{conn: r.conn, tx: tx, log: r.log}
+//     ...
+// }
+
+// Scan helpers
+func scanAnnuity(row scanner) (*lifecycle.Annuity, error) {
+	a := &lifecycle.Annuity{}
+	var metaJSON []byte
+	err := row.Scan(
+		&a.ID, &a.PatentID, &a.YearNumber, &a.DueDate, &a.GraceDeadline, &a.Status,
+		&a.Amount, &a.Currency, &a.PaidAmount, &a.PaidDate, &a.PaymentReference,
+		&a.AgentName, &a.AgentReference, &a.Notes, &a.ReminderSentAt, &a.ReminderCount, &metaJSON,
+		&a.CreatedAt, &a.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New(errors.ErrCodeNotFound, "annuity not found")
+		}
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan annuity")
 	}
 	if len(metaJSON) > 0 {
-		_ = json.Unmarshal(metaJSON, &lc.Metadata)
+		_ = json.Unmarshal(metaJSON, &a.Metadata)
 	}
-	return &lc, nil
+	return a, nil
 }
 
-func (r *LifecycleRepository) scanLifecycles(rows pgx.Rows) ([]*Lifecycle, error) {
-	var lifecycles []*Lifecycle
-	for rows.Next() {
-		var lc Lifecycle
-		var deadlinesJSON, annuityJSON, legalJSON, eventsJSON, metaJSON []byte
-
-		err := rows.Scan(
-			&lc.ID, &lc.TenantID, &lc.PatentID, &lc.Phase,
-			&deadlinesJSON, &annuityJSON, &legalJSON, &eventsJSON,
-			&metaJSON, &lc.CreatedAt, &lc.UpdatedAt, &lc.CreatedBy, &lc.Version,
-		)
-		if err != nil {
-			r.logger.Error("scanLifecycles", "error", err)
-			return nil, appErrors.Wrap(err, appErrors.CodeDBQueryError, "failed to scan lifecycle row")
+func scanDeadline(row scanner) (*lifecycle.Deadline, error) {
+	d := &lifecycle.Deadline{}
+	var remJSON, metaJSON, extHistoryJSON []byte
+	err := row.Scan(
+		&d.ID, &d.PatentID, &d.DeadlineType, &d.Title, &d.Description,
+		&d.DueDate, &d.OriginalDueDate, &d.Status, &d.Priority, &d.AssigneeID,
+		&d.CompletedAt, &d.CompletedBy, &d.ExtensionCount, &extHistoryJSON,
+		&remJSON, &d.LastReminderAt, &metaJSON, &d.CreatedAt, &d.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New(errors.ErrCodeNotFound, "deadline not found")
 		}
-
-		if len(deadlinesJSON) > 0 {
-			_ = json.Unmarshal(deadlinesJSON, &lc.Deadlines)
-		}
-		if len(annuityJSON) > 0 {
-			_ = json.Unmarshal(annuityJSON, &lc.AnnuitySchedule)
-		}
-		if len(legalJSON) > 0 {
-			_ = json.Unmarshal(legalJSON, &lc.LegalStatus)
-		}
-		if len(eventsJSON) > 0 {
-			_ = json.Unmarshal(eventsJSON, &lc.Events)
-		}
-		if len(metaJSON) > 0 {
-			_ = json.Unmarshal(metaJSON, &lc.Metadata)
-		}
-		lifecycles = append(lifecycles, &lc)
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan deadline")
 	}
-	if err := rows.Err(); err != nil {
-		return nil, appErrors.Wrap(err, appErrors.CodeDBQueryError, "row iteration error")
+	if len(remJSON) > 0 { _ = json.Unmarshal(remJSON, &d.ReminderConfig) }
+	if len(metaJSON) > 0 { _ = json.Unmarshal(metaJSON, &d.Metadata) }
+	if len(extHistoryJSON) > 0 { _ = json.Unmarshal(extHistoryJSON, &d.ExtensionHistory) }
+	return d, nil
+}
+
+func scanEvent(row scanner) (*lifecycle.LifecycleEvent, error) {
+	e := &lifecycle.LifecycleEvent{}
+	var before, after, attach, meta []byte
+	err := row.Scan(
+		&e.ID, &e.PatentID, &e.EventType, &e.EventDate, &e.Title, &e.Description,
+		&e.ActorID, &e.ActorName, &e.RelatedDeadlineID, &e.RelatedAnnuityID,
+		&before, &after, &attach, &e.Source, &meta, &e.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New(errors.ErrCodeNotFound, "event not found")
+		}
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan event")
 	}
-	return lifecycles, nil
+	if len(before) > 0 { _ = json.Unmarshal(before, &e.BeforeState) }
+	if len(after) > 0 { _ = json.Unmarshal(after, &e.AfterState) }
+	if len(attach) > 0 { _ = json.Unmarshal(attach, &e.Attachments) }
+	if len(meta) > 0 { _ = json.Unmarshal(meta, &e.Metadata) }
+	return e, nil
+}
+
+func scanCostRecord(row scanner) (*lifecycle.CostRecord, error) {
+	c := &lifecycle.CostRecord{}
+	var meta []byte
+	err := row.Scan(
+		&c.ID, &c.PatentID, &c.CostType, &c.Amount, &c.Currency, &c.AmountUSD,
+		&c.ExchangeRate, &c.IncurredDate, &c.Description, &c.InvoiceReference,
+		&c.RelatedAnnuityID, &c.RelatedEventID, &meta, &c.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New(errors.ErrCodeNotFound, "cost record not found")
+		}
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan cost record")
+	}
+	if len(meta) > 0 { _ = json.Unmarshal(meta, &c.Metadata) }
+	return c, nil
 }
 
 //Personal.AI order the ending
