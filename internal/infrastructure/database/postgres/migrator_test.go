@@ -210,12 +210,14 @@ func TestRunMigrations_CreatesExpectedTables(t *testing.T) {
 
 	// Connect to database and verify tables exist.
 	cfg := config.DatabaseConfig{
-		Host:     "localhost",
-		Port:     5432,
-		User:     "test",
-		Password: "test",
-		DBName:   "test_keyip",
-		SSLMode:  "disable",
+		Postgres: config.PostgresConfig{
+			Host:     "localhost",
+			Port:     5432,
+			User:     "test",
+			Password: "test",
+			DBName:   "test_keyip",
+			SSLMode:  "disable",
+		},
 	}
 
 	logger := logging.NewNopLogger()
@@ -249,3 +251,4 @@ func TestRunMigrations_CreatesExpectedTables(t *testing.T) {
 	}
 }
 
+//Personal.AI order the ending

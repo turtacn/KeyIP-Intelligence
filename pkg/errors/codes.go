@@ -149,6 +149,9 @@ const (
 	// are not specifically connection issues.
 	CodeDatabaseError ErrorCode = 70006
 
+	// CodeDBQueryError is returned when a database query execution fails.
+	CodeDBQueryError ErrorCode = 70007
+
 	// CodeCacheError is returned when a Redis operation (GET, SET, DEL, EVAL, etc.)
 	// fails due to connection loss, timeout, or an unexpected response.
 	CodeCacheError ErrorCode = 70002
@@ -243,6 +246,8 @@ func (c ErrorCode) String() string {
 		return "DB_CONNECTION_ERROR"
 	case CodeDatabaseError:
 		return "DATABASE_ERROR"
+	case CodeDBQueryError:
+		return "DB_QUERY_ERROR"
 	case CodeCacheError:
 		return "CACHE_ERROR"
 	case CodeSearchError:
@@ -328,3 +333,4 @@ func (c ErrorCode) HTTPStatus() int {
 	}
 }
 
+//Personal.AI order the ending

@@ -1,182 +1,75 @@
-package config_test
+package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/config"
 )
 
-// validConfig returns a Config that passes Validate() with all required fields set.
-func validConfig() *config.Config {
-	cfg := &config.Config{}
-	config.ApplyDefaults(cfg)
-	// Fill required fields that have no default.
-	cfg.Database.User = "keyip"
-	cfg.Database.Password = "secret"
+func newValidConfig() *Config {
+	cfg := NewDefaultConfig()
+	cfg.Server.HTTP.Host = "localhost"
+	cfg.Server.HTTP.Port = 8080
+	cfg.Server.GRPC.Port = 9090
+	cfg.Database.Postgres.Host = "localhost"
+	cfg.Database.Postgres.Port = 5432
+	cfg.Database.Postgres.User = "user"
+	cfg.Database.Postgres.Password = "pass"
+	cfg.Database.Postgres.DBName = "db"
+	cfg.Database.Neo4j.URI = "bolt://localhost:7687"
+	cfg.Database.Neo4j.User = "neo4j"
+	cfg.Database.Neo4j.Password = "pass"
+	cfg.Cache.Redis.Addr = "localhost:6379"
+	cfg.Search.OpenSearch.Addresses = []string{"http://localhost:9200"}
+	cfg.Search.Milvus.Address = "localhost"
+	cfg.Search.Milvus.Port = 19530
+	cfg.Messaging.Kafka.Brokers = []string{"localhost:9092"}
+	cfg.Messaging.Kafka.ConsumerGroup = "group"
+	cfg.Storage.MinIO.Endpoint = "localhost:9000"
+	cfg.Storage.MinIO.AccessKey = "access"
+	cfg.Storage.MinIO.SecretKey = "secret"
+	cfg.Storage.MinIO.BucketName = "bucket"
+	cfg.Auth.Keycloak.BaseURL = "http://localhost:8180"
+	cfg.Auth.Keycloak.Realm = "realm"
+	cfg.Auth.Keycloak.ClientID = "client"
+	cfg.Auth.Keycloak.ClientSecret = "secret"
+	cfg.Auth.JWT.Secret = "secret"
+	cfg.Auth.JWT.Issuer = "issuer"
+	cfg.Auth.JWT.Expiry = 24 * time.Hour
+	cfg.Intelligence.ModelsDir = "./models"
+	cfg.Intelligence.MolPatentGNN.ModelPath = "gnn.pt"
+	cfg.Intelligence.MolPatentGNN.Device = "cpu"
+	cfg.Intelligence.ClaimBERT.ModelPath = "bert.pt"
+	cfg.Intelligence.ClaimBERT.Device = "cpu"
+	cfg.Intelligence.StrategyGPT.Endpoint = "http://localhost:8080"
+	cfg.Intelligence.StrategyGPT.APIKey = "key"
+	cfg.Intelligence.StrategyGPT.ModelName = "gpt"
+	cfg.Intelligence.ChemExtractor.OCREndpoint = "http://localhost:8000"
+	cfg.Intelligence.ChemExtractor.NERModelPath = "ner.bin"
+	cfg.Intelligence.InfringeNet.ModelPath = "infringe.pt"
+	cfg.Intelligence.InfringeNet.Threshold = 0.8
 	return cfg
 }
 
-func TestConfig_Validate_ValidConfig(t *testing.T) {
-	t.Parallel()
-	assert.NoError(t, validConfig().Validate())
+func TestConfig_Validate(t *testing.T) {
+	t.Run("ValidConfig", func(t *testing.T) {
+		cfg := newValidConfig()
+		assert.NoError(t, cfg.Validate())
+	})
+
+	t.Run("MissingPostgresHost", func(t *testing.T) {
+		cfg := newValidConfig()
+		cfg.Database.Postgres.Host = ""
+		assert.Error(t, cfg.Validate())
+	})
 }
 
-func TestConfig_Validate_MissingDatabaseHost(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Database.Host = ""
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "database.host")
+func TestConfig_PostgresDSN(t *testing.T) {
+	cfg := newValidConfig()
+	cfg.Database.Postgres.Host = "myhost"
+	dsn := cfg.PostgresDSN()
+	assert.Contains(t, dsn, "host=myhost")
 }
 
-func TestConfig_Validate_MissingDatabaseUser(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Database.User = ""
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "database.user")
-}
-
-func TestConfig_Validate_MissingDatabaseName(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Database.DBName = ""
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "database.db_name")
-}
-
-func TestConfig_Validate_InvalidServerPort(t *testing.T) {
-	t.Parallel()
-	cases := []int{0, -1, 65536, 100000}
-	for _, p := range cases {
-		p := p
-		t.Run("", func(t *testing.T) {
-			t.Parallel()
-			cfg := validConfig()
-			cfg.Server.Port = p
-			err := cfg.Validate()
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "server.port")
-		})
-	}
-}
-
-func TestConfig_Validate_InvalidServerMode(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Server.Mode = "production" // not an accepted value
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "server.mode")
-}
-
-func TestConfig_Validate_InvalidDatabasePort(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Database.Port = 0
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "database.port")
-}
-
-func TestConfig_Validate_DatabaseMaxConnsLessThanOne(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Database.MaxConns = 0
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "database.max_conns")
-}
-
-func TestConfig_Validate_MissingRedisAddr(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Redis.Addr = ""
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "redis.addr")
-}
-
-func TestConfig_Validate_EmptyKafkaBrokers(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Kafka.Brokers = nil
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "kafka.brokers")
-}
-
-func TestConfig_Validate_MissingKafkaGroupID(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Kafka.GroupID = ""
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "kafka.group_id")
-}
-
-func TestConfig_Validate_MissingMilvusAddr(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Milvus.Addr = ""
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "milvus.addr")
-}
-
-func TestConfig_Validate_WorkerConcurrencyLessThanOne(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Worker.Concurrency = 0
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "worker.concurrency")
-}
-
-func TestConfig_Validate_InvalidLogLevel(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Log.Level = "verbose"
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "log.level")
-}
-
-func TestConfig_Validate_InvalidLogFormat(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Log.Format = "xml"
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "log.format")
-}
-
-func TestConfig_Validate_MissingTritonAddr(t *testing.T) {
-	t.Parallel()
-	cfg := validConfig()
-	cfg.Intelligence.TritonAddr = ""
-	err := cfg.Validate()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "intelligence.triton_addr")
-}
-
-func TestConfig_SubStructs_ZeroValues(t *testing.T) {
-	t.Parallel()
-
-	cfg := config.Config{}
-	assert.Equal(t, 0, cfg.Server.Port)
-	assert.Equal(t, "", cfg.Server.Mode)
-	assert.Equal(t, "", cfg.Database.Host)
-	assert.Equal(t, 0, cfg.Database.Port)
-	assert.Equal(t, "", cfg.Redis.Addr)
-	assert.Nil(t, cfg.Kafka.Brokers)
-	assert.Equal(t, "", cfg.Milvus.Addr)
-	assert.Equal(t, "", cfg.Log.Level)
-	assert.Equal(t, 0, cfg.Worker.Concurrency)
-}
-
+// //Personal.AI order the ending

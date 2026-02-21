@@ -14,7 +14,6 @@ import (
 
 	appErrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	patentTypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────

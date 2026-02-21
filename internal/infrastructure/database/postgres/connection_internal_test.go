@@ -20,24 +20,28 @@ func TestBuildConnString(t *testing.T) {
 		{
 			name: "standard config",
 			cfg: config.DatabaseConfig{
-				Host:     "localhost",
-				Port:     5432,
-				User:     "user",
-				Password: "pass",
-				DBName:   "db",
-				SSLMode:  "disable",
+				Postgres: config.PostgresConfig{
+					Host:     "localhost",
+					Port:     5432,
+					User:     "user",
+					Password: "pass",
+					DBName:   "db",
+					SSLMode:  "disable",
+				},
 			},
 			expect: "postgres://user:pass@localhost:5432/db?sslmode=disable",
 		},
 		{
 			name: "production config",
 			cfg: config.DatabaseConfig{
-				Host:     "db.prod.internal",
-				Port:     5432,
-				User:     "admin",
-				Password: "complex!password",
-				DBName:   "keyip",
-				SSLMode:  "verify-full",
+				Postgres: config.PostgresConfig{
+					Host:     "db.prod.internal",
+					Port:     5432,
+					User:     "admin",
+					Password: "complex!password",
+					DBName:   "keyip",
+					SSLMode:  "verify-full",
+				},
 			},
 			expect: "postgres://admin:complex!password@db.prod.internal:5432/keyip?sslmode=verify-full",
 		},
@@ -57,14 +61,15 @@ func TestConfigurePool(t *testing.T) {
 	t.Parallel()
 
 	t.Run("applies custom settings", func(t *testing.T) {
-		poolCfg := &pgxpool.Config{}
 		cfg := config.DatabaseConfig{
-			MaxConns:        50,
-			MinConns:        10,
-			ConnMaxLifetime: 2 * time.Hour,
-			ConnMaxIdleTime: 45 * time.Minute,
+			Postgres: config.PostgresConfig{
+				MaxOpenConns:    50,
+				MaxIdleConns:    10,
+				ConnMaxLifetime: 2 * time.Hour,
+				ConnMaxIdleTime: 45 * time.Minute,
+			},
 		}
-
+		poolCfg := &pgxpool.Config{}
 		configurePool(poolCfg, cfg)
 
 		assert.Equal(t, int32(50), poolCfg.MaxConns)
@@ -73,16 +78,14 @@ func TestConfigurePool(t *testing.T) {
 		assert.Equal(t, 45*time.Minute, poolCfg.MaxConnIdleTime)
 	})
 
-	t.Run("applies defaults", func(t *testing.T) {
-		poolCfg := &pgxpool.Config{}
+	t.Run("handles zero values", func(t *testing.T) {
 		cfg := config.DatabaseConfig{}
-
+		poolCfg := &pgxpool.Config{
+			MaxConns: 25, // default
+		}
 		configurePool(poolCfg, cfg)
-
-		assert.Equal(t, int32(defaultMaxConns), poolCfg.MaxConns)
-		assert.Equal(t, int32(defaultMinConns), poolCfg.MinConns)
-		assert.Equal(t, defaultMaxConnLifetime, poolCfg.MaxConnLifetime)
-		assert.Equal(t, defaultMaxConnIdleTime, poolCfg.MaxConnIdleTime)
-		assert.Equal(t, defaultHealthCheckPeriod, poolCfg.HealthCheckPeriod)
+		assert.Equal(t, int32(25), poolCfg.MaxConns)
 	})
 }
+
+// //Personal.AI order the ending

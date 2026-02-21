@@ -77,9 +77,9 @@ func NewConnectionPool(cfg config.DatabaseConfig, logger logging.Logger) (*pgxpo
 		logger.Info("attempting database connection",
 			logging.Int("attempt", attempt),
 			logging.Int("max_attempts", maxRetries),
-			logging.String("host", cfg.Host),
-			logging.Int("port", cfg.Port),
-			logging.String("database", cfg.DBName),
+			logging.String("host", cfg.Postgres.Host),
+			logging.Int("port", cfg.Postgres.Port),
+			logging.String("database", cfg.Postgres.DBName),
 		)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -94,9 +94,9 @@ func NewConnectionPool(cfg config.DatabaseConfig, logger logging.Logger) (*pgxpo
 
 			if err == nil {
 				logger.Info("database connection established",
-					logging.String("host", cfg.Host),
-					logging.Int("port", cfg.Port),
-					logging.String("database", cfg.DBName),
+					logging.String("host", cfg.Postgres.Host),
+					logging.Int("port", cfg.Postgres.Port),
+					logging.String("database", cfg.Postgres.DBName),
 					logging.Int("max_conns", int(poolConfig.MaxConns)),
 				)
 				return pool, nil
@@ -183,12 +183,12 @@ func HealthCheck(ctx context.Context, pool *pgxpool.Pool) error {
 func buildConnString(cfg config.DatabaseConfig) string {
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		cfg.User,
-		cfg.Password,
-		cfg.Host,
-		cfg.Port,
-		cfg.DBName,
-		cfg.SSLMode,
+		cfg.Postgres.User,
+		cfg.Postgres.Password,
+		cfg.Postgres.Host,
+		cfg.Postgres.Port,
+		cfg.Postgres.DBName,
+		cfg.Postgres.SSLMode,
 	)
 }
 
@@ -201,29 +201,29 @@ func buildConnString(cfg config.DatabaseConfig) string {
 // are zero.
 func configurePool(poolConfig *pgxpool.Config, cfg config.DatabaseConfig) {
 	// MaxConns: maximum number of connections in the pool.
-	if cfg.MaxConns > 0 {
-		poolConfig.MaxConns = int32(cfg.MaxConns)
+	if cfg.Postgres.MaxOpenConns > 0 {
+		poolConfig.MaxConns = int32(cfg.Postgres.MaxOpenConns)
 	} else {
 		poolConfig.MaxConns = defaultMaxConns
 	}
 
 	// MinConns: minimum number of idle connections to maintain.
-	if cfg.MinConns > 0 {
-		poolConfig.MinConns = int32(cfg.MinConns)
+	if cfg.Postgres.MaxIdleConns > 0 {
+		poolConfig.MinConns = int32(cfg.Postgres.MaxIdleConns)
 	} else {
 		poolConfig.MinConns = defaultMinConns
 	}
 
 	// MaxConnLifetime: maximum duration a connection can be reused.
-	if cfg.ConnMaxLifetime > 0 {
-		poolConfig.MaxConnLifetime = cfg.ConnMaxLifetime
+	if cfg.Postgres.ConnMaxLifetime > 0 {
+		poolConfig.MaxConnLifetime = cfg.Postgres.ConnMaxLifetime
 	} else {
 		poolConfig.MaxConnLifetime = defaultMaxConnLifetime
 	}
 
 	// MaxConnIdleTime: maximum duration a connection can remain idle.
-	if cfg.ConnMaxIdleTime > 0 {
-		poolConfig.MaxConnIdleTime = cfg.ConnMaxIdleTime
+	if cfg.Postgres.ConnMaxIdleTime > 0 {
+		poolConfig.MaxConnIdleTime = cfg.Postgres.ConnMaxIdleTime
 	} else {
 		poolConfig.MaxConnIdleTime = defaultMaxConnIdleTime
 	}
@@ -314,3 +314,4 @@ func WithTransaction(ctx context.Context, pool *pgxpool.Pool, fn func(tx pgx.Tx,
 	return err
 }
 
+//Personal.AI order the ending

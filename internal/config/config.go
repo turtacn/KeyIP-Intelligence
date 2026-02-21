@@ -1,56 +1,82 @@
-// Package config defines all configuration structures for the KeyIP-Intelligence
-// platform.  No I/O or parsing logic lives here — only plain data types and
-// validation.
+// Package config defines the global configuration structure and validation rules.
 package config
 
 import (
 	"fmt"
+	"sync"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-configuration structs
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ServerConfig holds HTTP server tunables.
-type ServerConfig struct {
-	Port            int           `mapstructure:"port"`
-	Mode            string        `mapstructure:"mode"` // "debug" | "release" | "test"
-	ReadTimeout     time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout    time.Duration `mapstructure:"write_timeout"`
-	MaxBodySize     int64         `mapstructure:"max_body_size"`
-	ShutdownTimeout time.Duration `mapstructure:"shutdown_timeout"`
+// Config is the root configuration structure.
+type Config struct {
+	Server       ServerConfig       `mapstructure:"server"`
+	Database     DatabaseConfig     `mapstructure:"database"`
+	Cache        CacheConfig        `mapstructure:"cache"`
+	Search       SearchConfig       `mapstructure:"search"`
+	Messaging    MessagingConfig    `mapstructure:"messaging"`
+	Storage      StorageConfig      `mapstructure:"storage"`
+	Auth         AuthConfig         `mapstructure:"auth"`
+	Intelligence IntelligenceConfig `mapstructure:"intelligence"`
+	Monitoring   MonitoringConfig   `mapstructure:"monitoring"`
+	Notification NotificationConfig `mapstructure:"notification"`
 }
 
-// DatabaseConfig holds PostgreSQL connection parameters.
+// ServerConfig holds server-related settings.
+type ServerConfig struct {
+	HTTP HTTPConfig `mapstructure:"http"`
+	GRPC GRPCConfig `mapstructure:"grpc"`
+}
+
+type HTTPConfig struct {
+	Host           string        `mapstructure:"host" validate:"required"`
+	Port           int           `mapstructure:"port" validate:"required,min=1,max=65535"`
+	ReadTimeout    time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout   time.Duration `mapstructure:"write_timeout"`
+	MaxHeaderBytes int           `mapstructure:"max_header_bytes"`
+}
+
+type GRPCConfig struct {
+	Port           int `mapstructure:"port" validate:"required,min=1,max=65535"`
+	MaxRecvMsgSize int `mapstructure:"max_recv_msg_size"`
+	MaxSendMsgSize int `mapstructure:"max_send_msg_size"`
+}
+
+// DatabaseConfig holds database connection parameters.
 type DatabaseConfig struct {
-	Host            string        `mapstructure:"host"`
-	Port            int           `mapstructure:"port"`
-	User            string        `mapstructure:"user"`
-	Password        string        `mapstructure:"password"`
-	DBName          string        `mapstructure:"db_name"`
-	SSLMode         string        `mapstructure:"ssl_mode"`
-	MaxConns        int           `mapstructure:"max_conns"`
-	MinConns        int           `mapstructure:"min_conns"`
+	Postgres PostgresConfig `mapstructure:"postgres"`
+	Neo4j    Neo4jConfig    `mapstructure:"neo4j"`
+}
+
+type PostgresConfig struct {
+	Host            string        `mapstructure:"host" validate:"required"`
+	Port            int           `mapstructure:"port" validate:"required,min=1,max=65535"`
+	User            string        `mapstructure:"user" validate:"required"`
+	Password        string        `mapstructure:"password" validate:"required"`
+	DBName          string        `mapstructure:"dbname" validate:"required"`
+	SSLMode         string        `mapstructure:"sslmode"`
+	MaxOpenConns    int           `mapstructure:"max_open_conns"`
 	MaxIdleConns    int           `mapstructure:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
 	ConnMaxIdleTime time.Duration `mapstructure:"conn_max_idle_time"`
-	MigrationPath   string        `mapstructure:"migration_path"`
 }
 
-// Neo4jConfig holds Neo4j / knowledge-graph connection parameters.
 type Neo4jConfig struct {
-	URI                   string        `mapstructure:"uri"`
-	User                  string        `mapstructure:"user"`
-	Password              string        `mapstructure:"password"`
-	MaxConnectionPoolSize int           `mapstructure:"max_connection_pool_size"`
-	ConnectionTimeout     time.Duration `mapstructure:"connection_timeout"`
-	Database              string        `mapstructure:"database"`
+	URI                          string        `mapstructure:"uri" validate:"required"`
+	User                         string        `mapstructure:"user" validate:"required"`
+	Password                     string        `mapstructure:"password" validate:"required"`
+	MaxConnectionPoolSize        int           `mapstructure:"max_connection_pool_size"`
+	ConnectionAcquisitionTimeout time.Duration `mapstructure:"connection_acquisition_timeout"`
 }
 
-// RedisConfig holds Redis connection parameters.
+// CacheConfig holds cache-related settings.
+type CacheConfig struct {
+	Redis RedisConfig `mapstructure:"redis"`
+}
+
 type RedisConfig struct {
-	Addr         string        `mapstructure:"addr"`
+	Addr         string        `mapstructure:"addr" validate:"required"`
 	Password     string        `mapstructure:"password"`
 	DB           int           `mapstructure:"db"`
 	PoolSize     int           `mapstructure:"pool_size"`
@@ -58,207 +84,271 @@ type RedisConfig struct {
 	DialTimeout  time.Duration `mapstructure:"dial_timeout"`
 	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
 	WriteTimeout time.Duration `mapstructure:"write_timeout"`
-	DefaultTTL   time.Duration `mapstructure:"default_ttl"`
-	KeyPrefix    string        `mapstructure:"key_prefix"`
 }
 
-// KafkaConfig holds Apache Kafka producer/consumer parameters.
-type KafkaConfig struct {
-	Brokers           []string `mapstructure:"brokers"`
-	GroupID           string   `mapstructure:"group_id"`
-	AutoOffsetReset   string   `mapstructure:"auto_offset_reset"` // "earliest" | "latest"
-	TimeoutMS         int      `mapstructure:"timeout_ms"`
-	ProducerRetries   int      `mapstructure:"producer_retries"`
-	BatchSize         int      `mapstructure:"batch_size"`
-	AutoCreateTopics  bool     `mapstructure:"auto_create_topics"`
-	ReplicationFactor int      `mapstructure:"replication_factor"`
-	NumPartitions     int      `mapstructure:"num_partitions"`
+// SearchConfig holds search engine settings.
+type SearchConfig struct {
+	OpenSearch OpenSearchConfig `mapstructure:"opensearch"`
+	Milvus     MilvusConfig     `mapstructure:"milvus"`
 }
 
-// OpenSearchConfig holds OpenSearch cluster connection parameters.
 type OpenSearchConfig struct {
-	Addresses          []string `mapstructure:"addresses"`
-	User               string   `mapstructure:"user"`
-	Password           string   `mapstructure:"password"`
-	InsecureSkipVerify bool     `mapstructure:"insecure_skip_verify"`
-	BulkBatchSize      int      `mapstructure:"bulk_batch_size"`
-	ScrollSize         int      `mapstructure:"scroll_size"`
-	IndexPrefix        string   `mapstructure:"index_prefix"`
+	Addresses             []string `mapstructure:"addresses" validate:"required,min=1"`
+	Username              string   `mapstructure:"username"`
+	Password              string   `mapstructure:"password"`
+	MaxRetries            int      `mapstructure:"max_retries"`
+	RetryOnStatus         []int    `mapstructure:"retry_on_status"`
+	CompressRequestBody   bool     `mapstructure:"compress_request_body"`
 }
 
-// MilvusConfig holds Milvus vector-store connection parameters.
 type MilvusConfig struct {
-	Addr               string `mapstructure:"addr"`
-	DBName             string `mapstructure:"db_name"`
-	EmbeddingDim       int    `mapstructure:"embedding_dim"`
-	IndexType          string `mapstructure:"index_type"`
-	HNSWM              int    `mapstructure:"hnsw_m"`
-	HNSWEfConstruction int    `mapstructure:"hnsw_ef_construction"`
-	DefaultTopK        int    `mapstructure:"default_top_k"`
-	CollectionPrefix   string `mapstructure:"collection_prefix"`
+	Address        string        `mapstructure:"address" validate:"required"`
+	Port           int           `mapstructure:"port" validate:"required,min=1,max=65535"`
+	Username       string        `mapstructure:"username"`
+	Password       string        `mapstructure:"password"`
+	ConnectTimeout time.Duration `mapstructure:"connect_timeout"`
+	ReadTimeout    time.Duration `mapstructure:"read_timeout"`
 }
 
-// MinIOConfig holds MinIO / S3-compatible object-storage parameters.
-type MinIOConfig struct {
-	Endpoint      string        `mapstructure:"endpoint"`
-	AccessKey     string        `mapstructure:"access_key"`
-	SecretKey     string        `mapstructure:"secret_key"`
-	Bucket        string        `mapstructure:"bucket"`
-	UseSSL        bool          `mapstructure:"use_ssl"`
-	PresignExpiry time.Duration `mapstructure:"presign_expiry"`
+// MessagingConfig holds messaging settings.
+type MessagingConfig struct {
+	Kafka KafkaConfig `mapstructure:"kafka"`
 }
 
-// KeycloakConfig holds Keycloak OIDC / OAuth2 parameters.
-type KeycloakConfig struct {
-	BaseURL      string        `mapstructure:"base_url"`
-	Realm        string        `mapstructure:"realm"`
-	ClientID     string        `mapstructure:"client_id"`
-	ClientSecret string        `mapstructure:"client_secret"`
-	JWKSCacheTTL time.Duration `mapstructure:"jwks_cache_ttl"`
-	Audience     string        `mapstructure:"audience"`
-}
-
-// WorkerConfig holds background-worker execution parameters.
-type WorkerConfig struct {
-	Mode              string        `mapstructure:"mode"` // "local" | "distributed"
-	Concurrency       int           `mapstructure:"concurrency"`
-	QueueDepth        int           `mapstructure:"queue_depth"`
+type KafkaConfig struct {
+	Brokers          []string      `mapstructure:"brokers" validate:"required,min=1"`
+	ConsumerGroup    string        `mapstructure:"consumer_group" validate:"required"`
+	AutoOffsetReset  string        `mapstructure:"auto_offset_reset"`
+	MaxBytes         int           `mapstructure:"max_bytes"`
+	SessionTimeout   time.Duration `mapstructure:"session_timeout"`
 	HeartbeatInterval time.Duration `mapstructure:"heartbeat_interval"`
-	MaxRetries        int           `mapstructure:"max_retries"`
-	RetryBackoffMS    time.Duration `mapstructure:"retry_backoff_ms"`
+	RebalanceTimeout time.Duration `mapstructure:"rebalance_timeout"`
 }
 
-// LogConfig holds structured-logging parameters.
-type LogConfig struct {
-	Level            string `mapstructure:"level"`  // "debug" | "info" | "warn" | "error"
-	Format           string `mapstructure:"format"` // "json" | "text"
-	Output           string `mapstructure:"output"`
-	EnableCaller     bool   `mapstructure:"enable_caller"`
-	EnableStacktrace bool   `mapstructure:"enable_stacktrace"`
-	SamplingRate     int    `mapstructure:"sampling_rate"`
+// StorageConfig holds object storage settings.
+type StorageConfig struct {
+	MinIO MinIOConfig `mapstructure:"minio"`
 }
 
-// IntelligenceConfig holds AI model and inference parameters.
+type MinIOConfig struct {
+	Endpoint   string `mapstructure:"endpoint" validate:"required"`
+	AccessKey  string `mapstructure:"access_key" validate:"required"`
+	SecretKey  string `mapstructure:"secret_key" validate:"required"`
+	UseSSL     bool   `mapstructure:"use_ssl"`
+	BucketName string `mapstructure:"bucket_name" validate:"required"`
+	Region     string `mapstructure:"region"`
+	PartSize   int64  `mapstructure:"part_size"`
+}
+
+// AuthConfig holds authentication settings.
+type AuthConfig struct {
+	Keycloak KeycloakConfig `mapstructure:"keycloak"`
+	JWT      JWTConfig      `mapstructure:"jwt"`
+}
+
+type KeycloakConfig struct {
+	BaseURL          string `mapstructure:"base_url" validate:"required,url"`
+	Realm            string `mapstructure:"realm" validate:"required"`
+	ClientID         string `mapstructure:"client_id" validate:"required"`
+	ClientSecret     string `mapstructure:"client_secret" validate:"required"`
+	AdminUser        string `mapstructure:"admin_user"`
+	AdminPassword    string `mapstructure:"admin_password"`
+	TokenEndpoint    string `mapstructure:"token_endpoint"`
+	UserInfoEndpoint string `mapstructure:"userinfo_endpoint"`
+}
+
+type JWTConfig struct {
+	Secret         string        `mapstructure:"secret" validate:"required"`
+	Issuer         string        `mapstructure:"issuer" validate:"required"`
+	Expiry         time.Duration `mapstructure:"expiry" validate:"required"`
+	RefreshExpiry  time.Duration `mapstructure:"refresh_expiry"`
+	SigningMethod  string        `mapstructure:"signing_method"`
+}
+
+// IntelligenceConfig holds AI engine settings.
 type IntelligenceConfig struct {
-	TritonAddr         string        `mapstructure:"triton_addr"`
-	ModelTimeout       time.Duration `mapstructure:"model_timeout"`
-	MaxBatchSize       int           `mapstructure:"max_batch_size"`
-	MolPatentGNNModel  string        `mapstructure:"molpatent_gnn_model"`
-	ClaimBERTModel     string        `mapstructure:"claim_bert_model"`
-	InfringeNetModel   string        `mapstructure:"infringe_net_model"`
-	StrategyGPTBaseURL string        `mapstructure:"strategy_gpt_base_url"`
-	StrategyGPTAPIKey  string        `mapstructure:"strategy_gpt_api_key"`
-	StrategyGPTModel   string        `mapstructure:"strategy_gpt_model"`
-	RagTopK            int           `mapstructure:"rag_top_k"`
+	ModelsDir     string             `mapstructure:"models_dir" validate:"required"`
+	MolPatentGNN  MolPatentGNNConfig `mapstructure:"molpatent_gnn"`
+	ClaimBERT     ClaimBERTConfig    `mapstructure:"claim_bert"`
+	StrategyGPT   StrategyGPTConfig  `mapstructure:"strategy_gpt"`
+	ChemExtractor ChemExtractorConfig `mapstructure:"chem_extractor"`
+	InfringeNet   InfringeNetConfig  `mapstructure:"infringe_net"`
 }
 
-// MultitenancyConfig holds multi-tenancy isolation parameters.
-type MultitenancyConfig struct {
-	EnableRLS    bool   `mapstructure:"enable_rls"`
-	TenantHeader string `mapstructure:"tenant_header"`
+type MolPatentGNNConfig struct {
+	ModelPath string        `mapstructure:"model_path" validate:"required"`
+	BatchSize int           `mapstructure:"batch_size"`
+	Timeout   time.Duration `mapstructure:"timeout"`
+	Device    string        `mapstructure:"device" validate:"oneof=cpu cuda"`
+	NumWorkers int          `mapstructure:"num_workers"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Root Config
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Config is the root configuration structure for the entire platform.
-// Every infrastructure component and application service reads its settings
-// from the relevant sub-struct.
-type Config struct {
-	Server       ServerConfig       `mapstructure:"server"`
-	Database     DatabaseConfig     `mapstructure:"database"`
-	Neo4j        Neo4jConfig        `mapstructure:"neo4j"`
-	Redis        RedisConfig        `mapstructure:"redis"`
-	Kafka        KafkaConfig        `mapstructure:"kafka"`
-	OpenSearch   OpenSearchConfig   `mapstructure:"opensearch"`
-	Milvus       MilvusConfig       `mapstructure:"milvus"`
-	MinIO        MinIOConfig        `mapstructure:"minio"`
-	Keycloak     KeycloakConfig     `mapstructure:"keycloak"`
-	Worker       WorkerConfig       `mapstructure:"worker"`
-	Log          LogConfig          `mapstructure:"log"`
-	Intelligence IntelligenceConfig `mapstructure:"intelligence"`
-	Multitenancy MultitenancyConfig `mapstructure:"multitenancy"`
+type ClaimBERTConfig struct {
+	ModelPath    string        `mapstructure:"model_path" validate:"required"`
+	MaxSeqLength int           `mapstructure:"max_seq_length"`
+	Timeout      time.Duration `mapstructure:"timeout"`
+	Device       string        `mapstructure:"device" validate:"oneof=cpu cuda"`
+	VocabPath    string        `mapstructure:"vocab_path"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Validation
-// ─────────────────────────────────────────────────────────────────────────────
+type StrategyGPTConfig struct {
+	Endpoint    string        `mapstructure:"endpoint" validate:"required,url"`
+	APIKey      string        `mapstructure:"api_key" validate:"required"`
+	ModelName   string        `mapstructure:"model_name" validate:"required"`
+	MaxTokens   int           `mapstructure:"max_tokens"`
+	Temperature float64       `mapstructure:"temperature"`
+	TopP        float64       `mapstructure:"top_p"`
+	Timeout     time.Duration `mapstructure:"timeout"`
+	RetryCount  int           `mapstructure:"retry_count"`
+	RetryDelay  time.Duration `mapstructure:"retry_delay"`
+}
 
-// Validate performs semantic validation of the fully-populated Config.
-// It returns the first error encountered; callers should treat any error as
-// fatal and refuse to start the application.
+type ChemExtractorConfig struct {
+	OCREndpoint         string        `mapstructure:"ocr_endpoint" validate:"required,url"`
+	NERModelPath        string        `mapstructure:"ner_model_path" validate:"required"`
+	ImagePreprocessing  bool          `mapstructure:"image_preprocessing"`
+	SupportedFormats    []string      `mapstructure:"supported_formats"`
+	Timeout             time.Duration `mapstructure:"timeout"`
+}
+
+type InfringeNetConfig struct {
+	ModelPath        string        `mapstructure:"model_path" validate:"required"`
+	Threshold        float64       `mapstructure:"threshold" validate:"min=0,max=1"`
+	BatchSize        int           `mapstructure:"batch_size"`
+	Timeout          time.Duration `mapstructure:"timeout"`
+	SimilarityMetric string        `mapstructure:"similarity_metric"`
+}
+
+// MonitoringConfig holds monitoring and logging settings.
+type MonitoringConfig struct {
+	Prometheus PrometheusConfig `mapstructure:"prometheus"`
+	Logging    LoggingConfig    `mapstructure:"logging"`
+	Tracing    TracingConfig    `mapstructure:"tracing"`
+}
+
+type PrometheusConfig struct {
+	Enabled   bool   `mapstructure:"enabled"`
+	Port      int    `mapstructure:"port" validate:"required_if=Enabled true"`
+	Path      string `mapstructure:"path"`
+	Namespace string `mapstructure:"namespace"`
+}
+
+type LoggingConfig struct {
+	Level      string `mapstructure:"level" validate:"oneof=debug info warn error"`
+	Format     string `mapstructure:"format" validate:"oneof=json text"`
+	Output     string `mapstructure:"output" validate:"oneof=stdout file"`
+	FilePath   string `mapstructure:"file_path"`
+	MaxSize    int    `mapstructure:"max_size"`
+	MaxBackups int    `mapstructure:"max_backups"`
+	MaxAge     int    `mapstructure:"max_age"`
+	Compress   bool   `mapstructure:"compress"`
+}
+
+type TracingConfig struct {
+	Enabled     bool    `mapstructure:"enabled"`
+	Endpoint    string  `mapstructure:"endpoint"`
+	SampleRate  float64 `mapstructure:"sample_rate"`
+	ServiceName string  `mapstructure:"service_name"`
+	Environment string  `mapstructure:"environment"`
+}
+
+// NotificationConfig holds notification settings.
+type NotificationConfig struct {
+	Email      EmailConfig      `mapstructure:"email"`
+	WeChatWork WeChatWorkConfig `mapstructure:"wechat_work"`
+}
+
+type EmailConfig struct {
+	SMTPHost string        `mapstructure:"smtp_host"`
+	SMTPPort int           `mapstructure:"smtp_port"`
+	Username string        `mapstructure:"username"`
+	Password string        `mapstructure:"password"`
+	From     string        `mapstructure:"from"`
+	UseTLS   bool          `mapstructure:"use_tls"`
+	Timeout  time.Duration `mapstructure:"timeout"`
+}
+
+type WeChatWorkConfig struct {
+	CorpID         string `mapstructure:"corp_id"`
+	AgentID        string `mapstructure:"agent_id"`
+	Secret         string `mapstructure:"secret"`
+	Token          string `mapstructure:"token"`
+	EncodingAESKey string `mapstructure:"encoding_aes_key"`
+}
+
+// Versioning information injected at build time.
+var (
+	Version   = "dev"
+	CommitSHA = "unknown"
+	BuildTime = "unknown"
+	GoVersion = "unknown"
+)
+
+// Global configuration access.
+var (
+	globalConfig *Config
+	configOnce   sync.Once
+	configMu     sync.RWMutex
+	validate     = validator.New()
+)
+
+// Get returns the global configuration instance.
+func Get() *Config {
+	configOnce.Do(func() {
+		configMu.Lock()
+		defer configMu.Unlock()
+		if globalConfig == nil {
+			globalConfig = NewDefaultConfig()
+		}
+	})
+
+	configMu.RLock()
+	defer configMu.RUnlock()
+	return globalConfig
+}
+
+// Set sets the global configuration instance.
+func Set(cfg *Config) {
+	configMu.Lock()
+	defer configMu.Unlock()
+	globalConfig = cfg
+}
+
+// Validate performs validation on the configuration.
 func (c *Config) Validate() error {
-	// Server
-	if c.Server.Port < 1 || c.Server.Port > 65535 {
-		return fmt.Errorf("config: server.port %d is out of range [1, 65535]", c.Server.Port)
-	}
-	switch c.Server.Mode {
-	case "debug", "release", "test":
-	default:
-		return fmt.Errorf("config: server.mode %q is invalid; expected debug|release|test", c.Server.Mode)
-	}
-
-	// Database
-	if c.Database.Host == "" {
-		return fmt.Errorf("config: database.host is required")
-	}
-	if c.Database.Port < 1 || c.Database.Port > 65535 {
-		return fmt.Errorf("config: database.port %d is out of range [1, 65535]", c.Database.Port)
-	}
-	if c.Database.User == "" {
-		return fmt.Errorf("config: database.user is required")
-	}
-	if c.Database.DBName == "" {
-		return fmt.Errorf("config: database.db_name is required")
-	}
-	if c.Database.MaxConns < 1 {
-		return fmt.Errorf("config: database.max_conns must be ≥ 1, got %d", c.Database.MaxConns)
-	}
-
-	// Redis
-	if c.Redis.Addr == "" {
-		return fmt.Errorf("config: redis.addr is required")
-	}
-	if c.Redis.DB < 0 {
-		return fmt.Errorf("config: redis.db must be ≥ 0, got %d", c.Redis.DB)
-	}
-
-	// Kafka
-	if len(c.Kafka.Brokers) == 0 {
-		return fmt.Errorf("config: kafka.brokers must contain at least one broker address")
-	}
-	if c.Kafka.GroupID == "" {
-		return fmt.Errorf("config: kafka.group_id is required")
-	}
-
-	// Intelligence
-	if c.Intelligence.TritonAddr == "" {
-		return fmt.Errorf("config: intelligence.triton_addr is required")
-	}
-
-	// Milvus
-	if c.Milvus.Addr == "" {
-		return fmt.Errorf("config: milvus.addr is required")
-	}
-
-	// Worker
-	if c.Worker.Concurrency < 1 {
-		return fmt.Errorf("config: worker.concurrency must be ≥ 1, got %d", c.Worker.Concurrency)
-	}
-
-	// Log
-	switch c.Log.Level {
-	case "debug", "info", "warn", "error":
-	default:
-		return fmt.Errorf("config: log.level %q is invalid; expected debug|info|warn|error", c.Log.Level)
-	}
-	switch c.Log.Format {
-	case "json", "text":
-	default:
-		return fmt.Errorf("config: log.format %q is invalid; expected json|text", c.Log.Format)
-	}
-
-	return nil
+	return validate.Struct(c)
 }
 
+// PostgresDSN returns the PostgreSQL connection string.
+func (c *Config) PostgresDSN() string {
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		c.Database.Postgres.Host,
+		c.Database.Postgres.Port,
+		c.Database.Postgres.User,
+		c.Database.Postgres.Password,
+		c.Database.Postgres.DBName,
+		c.Database.Postgres.SSLMode,
+	)
+}
+
+// Neo4jURI returns the Neo4j connection URI.
+func (c *Config) Neo4jURI() string {
+	return c.Database.Neo4j.URI
+}
+
+// RedisAddr returns the Redis address.
+func (c *Config) RedisAddr() string {
+	return c.Cache.Redis.Addr
+}
+
+// KafkaBrokers returns the Kafka brokers list.
+func (c *Config) KafkaBrokers() []string {
+	return c.Messaging.Kafka.Brokers
+}
+
+// IsProduction returns true if the environment is production (log level info/warn/error).
+func (c *Config) IsProduction() bool {
+	return c.Monitoring.Logging.Level != "debug"
+}
+
+// //Personal.AI order the ending
