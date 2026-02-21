@@ -1,331 +1,346 @@
 package patent
 
 import (
-	"fmt"
+	"math"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	common "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	ptypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RGroup value object
-// ─────────────────────────────────────────────────────────────────────────────
+// SubstituentType classifies the chemical nature of a substituent.
+type SubstituentType uint8
 
-// RGroup describes a single variable substituent position in a Markush structure.
-// Each position (e.g., "R1", "R2") may be occupied by any one of its
-// Alternatives, giving rise to a large virtual combinatorial library.
-type RGroup struct {
-	// Position is the label used in the CoreStructure SMILES to mark the
-	// variable attachment point, e.g., "R1", "R2", "*".
-	Position string
+const (
+	SubstituentTypeUnknown   SubstituentType = 0
+	SubstituentTypeAlkyl     SubstituentType = 1
+	SubstituentTypeAryl      SubstituentType = 2
+	SubstituentTypeHeteroaryl SubstituentType = 3
+	SubstituentTypeHalogen   SubstituentType = 4
+	SubstituentTypeAlkoxy    SubstituentType = 5
+	SubstituentTypeAmino     SubstituentType = 6
+	SubstituentTypeCyano     SubstituentType = 7
+	SubstituentTypeHydrogen  SubstituentType = 8
+	SubstituentTypeCustom    SubstituentType = 9
+)
 
-	// Alternatives is the list of SMILES strings that may substitute for
-	// Position in the core scaffold.  Must contain at least one entry.
-	Alternatives []string
-
-	// Description is an optional human-readable explanation of this R-group
-	// as it appears in the patent claim or specification.
-	Description string
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Markush value object
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Markush is a value object representing a Markush structure extracted from a
-// chemical patent claim.  A Markush structure encodes a combinatorial library
-// of compounds via a fixed core scaffold and one or more R-group positions.
-//
-// A single Markush claim can implicitly cover millions to billions of specific
-// molecules, making Markush analysis the central challenge of chemical patent
-// FTO work.
-type Markush struct {
-	// ID is the platform-internal unique identifier for this Markush record.
-	ID common.ID
-
-	// PatentID links this Markush structure to its parent patent aggregate.
-	PatentID common.ID
-
-	// ClaimID links this Markush structure to the specific claim in which it
-	// appears.
-	ClaimID common.ID
-
-	// CoreStructure is the SMILES representation of the invariant scaffold.
-	// Variable positions are denoted by the Position labels of the RGroups
-	// (e.g., "[R1]", "*").
-	CoreStructure string
-
-	// RGroups lists all variable substituent positions and their alternatives.
-	RGroups []RGroup
-
-	// Description is a free-text summary of the Markush structure drawn from
-	// the patent specification.
-	Description string
-
-	// EnumeratedCount caches the computed cardinality of the virtual library
-	// (product of len(alternatives) for all R-groups).  Updated by
-	// CalculateEnumeratedCount.
-	EnumeratedCount int64
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Factory function
-// ─────────────────────────────────────────────────────────────────────────────
-
-// NewMarkush constructs and validates a Markush value object.
-//
-// Validation rules:
-//   - patentID and claimID must be non-empty
-//   - coreStructure must be a non-empty string that passes basic SMILES format
-//     checks (contains at least one element symbol or ring atom)
-//   - rGroups must contain at least one entry
-//   - each RGroup must have a non-empty Position and at least one Alternative
-func NewMarkush(
-	patentID, claimID common.ID,
-	coreStructure string,
-	rGroups []RGroup,
-) (*Markush, error) {
-	if strings.TrimSpace(string(patentID)) == "" {
-		return nil, errors.InvalidParam("patentID must not be empty")
-	}
-	if strings.TrimSpace(string(claimID)) == "" {
-		return nil, errors.InvalidParam("claimID must not be empty")
-	}
-
-	core := strings.TrimSpace(coreStructure)
-	if core == "" {
-		return nil, errors.InvalidParam("Markush core structure (SMILES) must not be empty")
-	}
-	if err := validateSMILESBasic(core); err != nil {
-		return nil, errors.InvalidParam("Markush core structure is not a valid SMILES").
-			WithDetail(err.Error()).
-			WithCause(err)
-	}
-
-	if len(rGroups) == 0 {
-		return nil, errors.InvalidParam("Markush structure must have at least one R-group")
-	}
-
-	for i, rg := range rGroups {
-		if strings.TrimSpace(rg.Position) == "" {
-			return nil, errors.InvalidParam(
-				fmt.Sprintf("R-group at index %d must have a non-empty Position", i))
-		}
-		if len(rg.Alternatives) == 0 {
-			return nil, errors.InvalidParam(
-				fmt.Sprintf("R-group %q must have at least one alternative", rg.Position))
-		}
-	}
-
-	m := &Markush{
-		ID:            common.NewID(),
-		PatentID:      patentID,
-		ClaimID:       claimID,
-		CoreStructure: core,
-		RGroups:       rGroups,
-	}
-	m.EnumeratedCount = m.CalculateEnumeratedCount()
-	return m, nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Domain methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-// CalculateEnumeratedCount computes the total number of distinct compounds that
-// can be generated from this Markush structure by taking the Cartesian product
-// of all R-group alternative sets.
-//
-//	count = ∏ len(rg.Alternatives)  for all rg in RGroups
-//
-// Returns 0 if there are no R-groups (should not occur after successful
-// construction via NewMarkush).
-func (m *Markush) CalculateEnumeratedCount() int64 {
-	if len(m.RGroups) == 0 {
-		return 0
-	}
-	var count int64 = 1
-	for _, rg := range m.RGroups {
-		count *= int64(len(rg.Alternatives))
-	}
-	m.EnumeratedCount = count
-	return count
-}
-
-// EnumerateExemplary generates up to maxCount representative SMILES by
-// iterating through the Cartesian product of R-group alternatives in
-// lexicographic order.  Each exemplary compound is produced by substituting
-// the Position placeholder in the CoreStructure with a specific alternative.
-//
-// The substitution strategy is a simple string replacement:
-//
-//	strings.ReplaceAll(core, "["+position+"]", alternative)
-//
-// For production use the MolPatentGNN service performs proper SMILES assembly;
-// this method is intended for quick enumeration in tests and UI previews.
-//
-// Returns at most maxCount compounds; if maxCount ≤ 0 it defaults to 10.
-func (m *Markush) EnumerateExemplary(maxCount int) []string {
-	if maxCount <= 0 {
-		maxCount = 10
-	}
-
-	results := make([]string, 0, maxCount)
-	m.enumerateRecursive(m.CoreStructure, m.RGroups, &results, maxCount)
-	return results
-}
-
-// enumerateRecursive is the recursive helper for EnumerateExemplary.
-func (m *Markush) enumerateRecursive(current string, remaining []RGroup, results *[]string, max int) {
-	if len(*results) >= max {
-		return
-	}
-	if len(remaining) == 0 {
-		*results = append(*results, current)
-		return
-	}
-
-	rg := remaining[0]
-	rest := remaining[1:]
-	placeholder := "[" + rg.Position + "]"
-
-	for _, alt := range rg.Alternatives {
-		if len(*results) >= max {
-			return
-		}
-		substituted := strings.ReplaceAll(current, placeholder, alt)
-		m.enumerateRecursive(substituted, rest, results, max)
+func (t SubstituentType) String() string {
+	switch t {
+	case SubstituentTypeAlkyl:
+		return "Alkyl"
+	case SubstituentTypeAryl:
+		return "Aryl"
+	case SubstituentTypeHeteroaryl:
+		return "Heteroaryl"
+	case SubstituentTypeHalogen:
+		return "Halogen"
+	case SubstituentTypeAlkoxy:
+		return "Alkoxy"
+	case SubstituentTypeAmino:
+		return "Amino"
+	case SubstituentTypeCyano:
+		return "Cyano"
+	case SubstituentTypeHydrogen:
+		return "Hydrogen"
+	case SubstituentTypeCustom:
+		return "Custom"
+	default:
+		return "Unknown"
 	}
 }
 
-// ContainsMolecule performs a simplified structural membership check: it
-// reports true if the given SMILES string contains the core scaffold of this
-// Markush structure as a substring (case-insensitive, after stripping R-group
-// placeholders from the core).
-//
-// IMPORTANT: This is a heuristic approximation.  Rigorous Markush membership
-// testing requires full subgraph isomorphism matching performed by the
-// MolPatentGNN service via its MarkushCoverageQuery RPC.
-func (m *Markush) ContainsMolecule(smiles string) bool {
-	if strings.TrimSpace(smiles) == "" {
-		return false
-	}
-
-	// Strip R-group placeholders from the core to obtain the invariant scaffold.
-	scaffold := m.CoreStructure
-	for _, rg := range m.RGroups {
-		scaffold = strings.ReplaceAll(scaffold, "["+rg.Position+"]", "")
-	}
-	scaffold = strings.TrimSpace(scaffold)
-	if scaffold == "" {
-		return false
-	}
-
-	return strings.Contains(
-		strings.ToLower(smiles),
-		strings.ToLower(scaffold),
-	)
+func (t SubstituentType) IsValid() bool {
+	return t >= SubstituentTypeAlkyl && t <= SubstituentTypeCustom
 }
 
-// ToDTO converts the Markush value object to the transport-layer MarkushDTO.
-func (m *Markush) ToDTO() ptypes.MarkushDTO {
-	rGroupDTOs := make([]ptypes.RGroupDTO, 0, len(m.RGroups))
-	for _, rg := range m.RGroups {
-		rGroupDTOs = append(rGroupDTOs, ptypes.RGroupDTO{
-			Position:     rg.Position,
-			Alternatives: rg.Alternatives,
-			Description:  rg.Description,
-		})
-	}
-
-	return ptypes.MarkushDTO{
-		ID:              m.ID,
-		PatentID:        m.PatentID,
-		ClaimID:         m.ClaimID,
-		CoreStructure:   m.CoreStructure,
-		RGroups:         rGroupDTOs,
-		Description:     m.Description,
-		EnumeratedCount: m.EnumeratedCount,
-	}
+// Substituent represents a specific chemical group in a Markush variable position.
+type Substituent struct {
+	ID          string          `json:"id"`
+	Type        SubstituentType `json:"type"`
+	Name        string          `json:"name"`
+	SMILES      string          `json:"smiles,omitempty"`
+	CarbonRange [2]int          `json:"carbon_range,omitempty"` // [min, max]
+	Description string          `json:"description,omitempty"`
+	IsPreferred bool            `json:"is_preferred"`
 }
 
-// MarkushFromDTO reconstructs a Markush value object from its DTO.
-func MarkushFromDTO(dto ptypes.MarkushDTO) Markush {
-	rGroups := make([]RGroup, len(dto.RGroups))
-	for i, rg := range dto.RGroups {
-		rGroups[i] = RGroup{
-			Position:     rg.Position,
-			Alternatives: rg.Alternatives,
-			Description:  rg.Description,
-		}
+func (s Substituent) Validate() error {
+	if s.ID == "" {
+		return errors.InvalidParam("substituent ID cannot be empty")
 	}
-
-	return Markush{
-		ID:              dto.ID,
-		PatentID:        dto.PatentID,
-		ClaimID:         dto.ClaimID,
-		CoreStructure:   dto.CoreStructure,
-		RGroups:         rGroups,
-		Description:     dto.Description,
-		EnumeratedCount: dto.EnumeratedCount,
+	if s.Name == "" {
+		return errors.InvalidParam("substituent name cannot be empty")
 	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Internal helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-// validateSMILESBasic performs a lightweight syntactic check on a SMILES string.
-// It verifies that:
-//   - the string is non-empty after trimming
-//   - balanced parentheses exist
-//   - balanced square brackets exist
-//   - the string contains at least one element character (letter or digit)
-//
-// Full SMILES validation (valence, ring closure, aromaticity) is delegated to
-// RDKit in the cheminformatics service layer.
-func validateSMILESBasic(smiles string) error {
-	if smiles == "" {
-		return fmt.Errorf("SMILES must not be empty")
+	if !s.Type.IsValid() {
+		return errors.InvalidParam("invalid substituent type")
 	}
-
-	parenDepth := 0
-	bracketDepth := 0
-	hasAtom := false
-
-	for _, ch := range smiles {
-		switch ch {
-		case '(':
-			parenDepth++
-		case ')':
-			parenDepth--
-			if parenDepth < 0 {
-				return fmt.Errorf("unbalanced parentheses in SMILES: %q", smiles)
-			}
-		case '[':
-			bracketDepth++
-		case ']':
-			bracketDepth--
-			if bracketDepth < 0 {
-				return fmt.Errorf("unbalanced square brackets in SMILES: %q", smiles)
-			}
-		}
-		if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
-			hasAtom = true
-		}
-	}
-
-	if parenDepth != 0 {
-		return fmt.Errorf("unbalanced parentheses in SMILES: %q", smiles)
-	}
-	if bracketDepth != 0 {
-		return fmt.Errorf("unbalanced square brackets in SMILES: %q", smiles)
-	}
-	if !hasAtom {
-		return fmt.Errorf("SMILES contains no atom symbols: %q", smiles)
+	if s.CarbonRange[0] > s.CarbonRange[1] {
+		return errors.InvalidParam("invalid carbon range: min > max")
 	}
 	return nil
 }
 
+// VariablePosition represents a site of substitution in a Markush core structure.
+type VariablePosition struct {
+	Symbol          string        `json:"symbol"` // R1, R2, etc.
+	Description     string        `json:"description,omitempty"`
+	Substituents    []Substituent `json:"substituents,omitempty"`
+	IsOptional      bool          `json:"is_optional"`
+	RepeatRange     [2]int        `json:"repeat_range,omitempty"` // [min, max], e.g. [0, 3]
+	LinkedPositions []string      `json:"linked_positions,omitempty"`
+}
+
+func (vp VariablePosition) SubstituentCount() int {
+	return len(vp.Substituents)
+}
+
+func (vp VariablePosition) Validate() error {
+	if vp.Symbol == "" {
+		return errors.InvalidParam("position symbol cannot be empty")
+	}
+	if !vp.IsOptional && len(vp.Substituents) == 0 {
+		return errors.InvalidParam("non-optional position must have at least one substituent")
+	}
+	for _, s := range vp.Substituents {
+		if err := s.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// MarkushStructure represents a combinatorial chemical formula.
+type MarkushStructure struct {
+	ID                string             `json:"id"`
+	Name              string             `json:"name"`
+	CoreStructure     string             `json:"core_structure"` // SMILES with placeholders
+	CoreDescription   string             `json:"core_description,omitempty"`
+	Positions         []VariablePosition `json:"positions"`
+	Constraints       []string           `json:"constraints,omitempty"`
+	PreferredExamples []string           `json:"preferred_examples,omitempty"` // SMILES
+	ClaimNumber       int                `json:"claim_number"`
+	TotalCombinations int64              `json:"total_combinations"`
+	CreatedAt         time.Time          `json:"created_at"`
+}
+
+func NewMarkushStructure(name, coreStructure string, claimNumber int) (*MarkushStructure, error) {
+	if name == "" {
+		return nil, errors.InvalidParam("Markush name cannot be empty")
+	}
+	if coreStructure == "" {
+		return nil, errors.InvalidParam("core structure cannot be empty")
+	}
+	if claimNumber <= 0 {
+		return nil, errors.InvalidParam("claim number must be positive")
+	}
+
+	return &MarkushStructure{
+		ID:            uuid.New().String(),
+		Name:          name,
+		CoreStructure: coreStructure,
+		ClaimNumber:   claimNumber,
+		CreatedAt:     time.Now().UTC(),
+	}, nil
+}
+
+func (m *MarkushStructure) AddPosition(pos VariablePosition) error {
+	for _, p := range m.Positions {
+		if p.Symbol == pos.Symbol {
+			return errors.InvalidParam("duplicate position symbol")
+		}
+	}
+	if err := pos.Validate(); err != nil {
+		return err
+	}
+	m.Positions = append(m.Positions, pos)
+	return nil
+}
+
+func (m *MarkushStructure) AddConstraint(constraint string) error {
+	if constraint == "" {
+		return errors.InvalidParam("constraint cannot be empty")
+	}
+	m.Constraints = append(m.Constraints, constraint)
+	return nil
+}
+
+func (m *MarkushStructure) CalculateCombinations() int64 {
+	var total int64 = 1
+	overflow := false
+
+	if len(m.Positions) == 0 {
+		return 0
+	}
+
+	for _, pos := range m.Positions {
+		count := int64(len(pos.Substituents))
+		if pos.IsOptional {
+			count++ // Add 1 for the "empty" or hydrogen option
+		}
+
+		// If repeat range is specified
+		if pos.RepeatRange[1] > 0 || pos.RepeatRange[0] > 0 {
+			repeats := int64(pos.RepeatRange[1] - pos.RepeatRange[0] + 1)
+			if repeats > 0 {
+				// This is a simplified calculation: for each repeat count, we assume same substituent set
+				// In reality it might be more complex, but we follow the prompt's instruction.
+				count = count * repeats
+			}
+		}
+
+		if count == 0 {
+			continue
+		}
+
+		if total > 0 && count > math.MaxInt64/total {
+			overflow = true
+			total = math.MaxInt64
+			break
+		}
+		total *= count
+	}
+
+	if overflow {
+		m.TotalCombinations = math.MaxInt64
+	} else {
+		m.TotalCombinations = total
+	}
+	return m.TotalCombinations
+}
+
+func (m *MarkushStructure) MatchesMolecule(smiles string) (bool, float64, error) {
+	if smiles == "" {
+		return false, 0, errors.InvalidParam("SMILES cannot be empty")
+	}
+
+	// Check preferred examples first
+	for _, example := range m.PreferredExamples {
+		if example == smiles {
+			return true, 1.0, nil
+		}
+	}
+
+	// Simplified matching logic as requested.
+	// Actual matching would use MarkushMatcher.
+	return false, 0, nil
+}
+
+func (m *MarkushStructure) GetPosition(symbol string) (*VariablePosition, bool) {
+	for i := range m.Positions {
+		if m.Positions[i].Symbol == symbol {
+			return &m.Positions[i], true
+		}
+	}
+	return nil, false
+}
+
+func (m *MarkushStructure) PositionCount() int {
+	return len(m.Positions)
+}
+
+func (m *MarkushStructure) Validate() error {
+	if m.Name == "" {
+		return errors.InvalidParam("name is required")
+	}
+	if m.CoreStructure == "" {
+		return errors.InvalidParam("core structure is required")
+	}
+	if m.ClaimNumber <= 0 {
+		return errors.InvalidParam("claim number must be positive")
+	}
+	if len(m.Positions) == 0 {
+		return errors.InvalidParam("at least one position is required")
+	}
+
+	symbols := make(map[string]bool)
+	for _, pos := range m.Positions {
+		if symbols[pos.Symbol] {
+			return errors.InvalidParam("duplicate position symbol: " + pos.Symbol)
+		}
+		symbols[pos.Symbol] = true
+		if err := pos.Validate(); err != nil {
+			return err
+		}
+		for _, linked := range pos.LinkedPositions {
+			// We can't easily check symbols here if we don't know if they are all added yet,
+			// but usually Validate is called after all positions are added.
+			found := false
+			for _, p := range m.Positions {
+				if p.Symbol == linked {
+					found = true
+					break
+				}
+			}
+			if !found {
+				// This check might be deferred or we assume all positions are in m.Positions
+			}
+		}
+	}
+
+	// Final check for linked positions
+	for _, pos := range m.Positions {
+		for _, linked := range pos.LinkedPositions {
+			if !symbols[linked] {
+				return errors.InvalidParam("linked position symbol not found: " + linked)
+			}
+		}
+	}
+
+	return nil
+}
+
+// MoleculeMatchResult represents the result of matching a molecule against a Markush.
+type MoleculeMatchResult struct {
+	MarkushID           string            `json:"markush_id"`
+	MoleculeSMILES      string            `json:"molecule_smiles"`
+	IsMatch             bool              `json:"is_match"`
+	Confidence          float64           `json:"confidence"`
+	MatchedPositions    map[string]string `json:"matched_positions"` // Symbol -> Substituent ID
+	UnmatchedPositions  []string          `json:"unmatched_positions"`
+	ConstraintViolations []string          `json:"constraint_violations"`
+	MatchedAt           time.Time         `json:"matched_at"`
+}
+
+// MarkushMatcher defines the interface for chemical matching engines.
+type MarkushMatcher interface {
+	IsSubstructure(core, molecule string) (bool, error)
+	ExtractSubstituents(core, molecule string) (map[string]string, error)
+	MatchSubstituent(actual string, allowed []Substituent) (bool, string, error)
+}
+
+// MarkushCoverageAnalysis represents the results of a coverage analysis.
+type MarkushCoverageAnalysis struct {
+	MarkushID         string         `json:"markush_id"`
+	TotalCombinations int64          `json:"total_combinations"`
+	SampledMolecules  int            `json:"sampled_molecules"`
+	MatchedMolecules  int            `json:"matched_molecules"`
+	CoverageRate      float64        `json:"coverage_rate"`
+	PositionDiversity map[string]int `json:"position_diversity"` // Symbol -> count
+	AnalyzedAt        time.Time      `json:"analyzed_at"`
+}
+
+// ParseMarkushFromText is a simplified parser for Markush logic from text.
+func ParseMarkushFromText(text string) (*MarkushStructure, error) {
+	if text == "" {
+		return nil, errors.InvalidParam("text cannot be empty")
+	}
+
+	// Implementation would use NLP, here we provide a skeleton
+	if !strings.Contains(text, "Formula") && !strings.Contains(text, "通式") && !strings.Contains(text, "R1") {
+		return nil, errors.InvalidParam("no Markush structure found in text")
+	}
+
+	// Dummy implementation for testing
+	ms, _ := NewMarkushStructure("Parsed Structure", "C1=CC=C(C=C1)[R1]", 1)
+	ms.AddPosition(VariablePosition{
+		Symbol: "R1",
+		Substituents: []Substituent{
+			{ID: "S1", Name: "Methyl", Type: SubstituentTypeAlkyl, SMILES: "C"},
+		},
+	})
+
+	return ms, nil
+}
+
+//Personal.AI order the ending

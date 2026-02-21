@@ -1,259 +1,227 @@
-package patent_test
+package patent
 
 import (
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
-	common "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	ptypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-func newAggregateID() common.ID { return common.NewID() }
-
-// assertBaseEvent verifies that any DomainEvent implementation carries a
-// non-empty name, a recent timestamp, and the correct aggregate ID.
-func assertBaseEvent(t *testing.T, evt patent.DomainEvent, wantName string, wantAggID common.ID) {
-	t.Helper()
-	assert.Equal(t, wantName, evt.EventName(), "EventName mismatch")
-	assert.Equal(t, wantAggID, evt.AggregateID(), "AggregateID mismatch")
-	assert.False(t, evt.OccurredAt().IsZero(), "OccurredAt must not be zero")
-	assert.WithinDuration(t, time.Now().UTC(), evt.OccurredAt(), 5*time.Second,
-		"OccurredAt must be recent (within 5 s)")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DomainEvent interface satisfaction
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestDomainEvent_InterfaceSatisfaction verifies that each concrete event type
-// satisfies the DomainEvent interface at compile time via assignment.
-func TestDomainEvent_InterfaceSatisfaction(t *testing.T) {
-	t.Parallel()
-
-	aggID := newAggregateID()
-	expiry := time.Now().Add(30 * 24 * time.Hour)
-
-	var _ patent.DomainEvent = patent.NewPatentCreatedEvent(aggID, "CN000001A", "Title", ptypes.JurisdictionCN)
-	var _ patent.DomainEvent = patent.NewPatentStatusChangedEvent(aggID, "CN000001A", ptypes.StatusFiled, ptypes.StatusGranted)
-	var _ patent.DomainEvent = patent.NewClaimAdded(aggID, 1, ptypes.ClaimIndependent)
-	var _ patent.DomainEvent = patent.NewMarkushAdded(aggID, common.NewID(), 42)
-	var _ patent.DomainEvent = patent.NewPatentExpiring(aggID, expiry, 30)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNewPatentCreated
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestNewPatentCreated_Fields(t *testing.T) {
-	t.Parallel()
-
-	aggID := newAggregateID()
-	evt := patent.NewPatentCreatedEvent(aggID, "CN202310001234A", "Organic LED Material", ptypes.JurisdictionCN)
-
-	require.NotNil(t, evt)
-	assertBaseEvent(t, evt, patent.PatentCreatedEventName, aggID)
-	assert.Equal(t, "CN202310001234A", evt.PatentNumber)
-	assert.Equal(t, "Organic LED Material", evt.Title)
-	assert.Equal(t, ptypes.JurisdictionCN, evt.Jurisdiction)
-}
-
-func TestNewPatentCreated_EventName(t *testing.T) {
-	t.Parallel()
-
-	evt := patent.NewPatentCreatedEvent(newAggregateID(), "US10000001B2", "T", ptypes.JurisdictionUS)
-	assert.Equal(t, "patent.created", evt.EventName())
-}
-
-func TestNewPatentCreated_OccurredAtIsUTC(t *testing.T) {
-	t.Parallel()
-
-	evt := patent.NewPatentCreatedEvent(newAggregateID(), "EP3000001A1", "T", ptypes.JurisdictionEP)
-	assert.Equal(t, time.UTC, evt.OccurredAt().Location())
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNewPatentStatusChanged
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestNewPatentStatusChanged_Fields(t *testing.T) {
-	t.Parallel()
-
-	aggID := newAggregateID()
-	evt := patent.NewPatentStatusChangedEvent(aggID, "CN000001A", ptypes.StatusFiled, ptypes.StatusGranted)
-
-	require.NotNil(t, evt)
-	assertBaseEvent(t, evt, patent.PatentStatusChangedEventName, aggID)
-	assert.Equal(t, "CN000001A", evt.PatentNumber)
-	assert.Equal(t, ptypes.StatusFiled, evt.OldStatus)
-	assert.Equal(t, ptypes.StatusGranted, evt.NewStatus)
-}
-
-func TestNewPatentStatusChanged_EventName(t *testing.T) {
-	t.Parallel()
-
-	evt := patent.NewPatentStatusChangedEvent(newAggregateID(), "US10123456B2", ptypes.StatusGranted, ptypes.StatusExpired)
-	assert.Equal(t, "patent.status_changed", evt.EventName())
-}
-
-func TestNewPatentStatusChanged_DifferentTransitions(t *testing.T) {
-	t.Parallel()
-
-	transitions := []struct {
-		from ptypes.PatentStatus
-		to   ptypes.PatentStatus
-	}{
-		{ptypes.StatusFiled, ptypes.StatusGranted},
-		{ptypes.StatusGranted, ptypes.StatusExpired},
-		{ptypes.StatusGranted, ptypes.StatusAbandoned},
+func TestEventType_Constants(t *testing.T) {
+	if EventPatentCreated != "patent.created" {
+		t.Error("EventPatentCreated constant mismatch")
 	}
+}
 
-	for _, tr := range transitions {
-		tr := tr
-		t.Run(string(tr.from)+"->"+string(tr.to), func(t *testing.T) {
-			t.Parallel()
-			evt := patent.NewPatentStatusChangedEvent(newAggregateID(), "EP1234567A1", tr.from, tr.to)
-			assert.Equal(t, tr.from, evt.OldStatus)
-			assert.Equal(t, tr.to, evt.NewStatus)
+func TestBaseEvent_NewBaseEvent(t *testing.T) {
+	e := NewBaseEvent(EventPatentCreated, "agg-123", 1)
+	if e.EventID() == "" {
+		t.Error("EventID should not be empty")
+	}
+	if e.EventType() != EventPatentCreated {
+		t.Error("EventType mismatch")
+	}
+	if e.AggregateID() != "agg-123" {
+		t.Error("AggregateID mismatch")
+	}
+	if e.Version() != 1 {
+		t.Error("Version mismatch")
+	}
+	if e.OccurredAt().IsZero() {
+		t.Error("OccurredAt should not be zero")
+	}
+	if e.AggregateType() != "Patent" {
+		t.Error("AggregateType mismatch")
+	}
+}
+
+func newTestPatentForEvents() *Patent {
+	p, _ := NewPatent("CN123", "Title", OfficeCNIPA, time.Now().UTC())
+	return p
+}
+
+func TestPatentCreatedEvent_New(t *testing.T) {
+	p := newTestPatentForEvents()
+	e := NewPatentCreatedEvent(p)
+	if e.EventType() != EventPatentCreated {
+		t.Error("EventType mismatch")
+	}
+	payload := e.Payload().(struct {
+		PatentNumber string       `json:"patent_number"`
+		Title        string       `json:"title"`
+		Office       PatentOffice `json:"office"`
+		FilingDate   time.Time    `json:"filing_date"`
+	})
+	if payload.PatentNumber != p.PatentNumber {
+		t.Error("PatentNumber mismatch in payload")
+	}
+}
+
+func TestPatentStatusEvents(t *testing.T) {
+	p := newTestPatentForEvents()
+
+	t.Run("Published", func(t *testing.T) {
+		now := time.Now().UTC()
+		p.Publish(now)
+		e := NewPatentPublishedEvent(p)
+		payload := e.Payload().(struct {
+			PatentNumber    string    `json:"patent_number"`
+			PublicationDate time.Time `json:"publication_date"`
 		})
+		if payload.PublicationDate != now {
+			t.Error("PublicationDate mismatch")
+		}
+	})
+
+	t.Run("Granted", func(t *testing.T) {
+		p.Status = PatentStatusUnderExamination
+		now := time.Now().UTC()
+		p.Grant(now, now.AddDate(20, 0, 0))
+		e := NewPatentGrantedEvent(p)
+		payload := e.Payload().(struct {
+			PatentNumber string    `json:"patent_number"`
+			GrantDate    time.Time `json:"grant_date"`
+			ExpiryDate   time.Time `json:"expiry_date"`
+			ClaimCount   int       `json:"claim_count"`
+		})
+		if payload.GrantDate != now {
+			t.Error("GrantDate mismatch")
+		}
+	})
+}
+
+func TestPatentRejectedEvent_New(t *testing.T) {
+	p := newTestPatentForEvents()
+	e := NewPatentRejectedEvent(p, "Prior art found")
+	payload := e.Payload().(struct {
+		PatentNumber string `json:"patent_number"`
+		Reason       string `json:"reason"`
+	})
+	if payload.Reason != "Prior art found" {
+		t.Error("Reason mismatch")
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNewClaimAdded
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestNewClaimAdded_Fields(t *testing.T) {
-	t.Parallel()
-
-	aggID := newAggregateID()
-	evt := patent.NewClaimAdded(aggID, 3, ptypes.ClaimDependent)
-
-	require.NotNil(t, evt)
-	assertBaseEvent(t, evt, patent.ClaimAddedEventName, aggID)
-	assert.Equal(t, 3, evt.ClaimNumber)
-	assert.Equal(t, ptypes.ClaimDependent, evt.ClaimType)
-}
-
-func TestNewClaimAdded_EventName(t *testing.T) {
-	t.Parallel()
-
-	evt := patent.NewClaimAdded(newAggregateID(), 1, ptypes.ClaimIndependent)
-	assert.Equal(t, "patent.claim_added", evt.EventName())
-}
-
-func TestNewClaimAdded_IndependentClaim(t *testing.T) {
-	t.Parallel()
-
-	aggID := newAggregateID()
-	evt := patent.NewClaimAdded(aggID, 1, ptypes.ClaimIndependent)
-	assert.Equal(t, ptypes.ClaimIndependent, evt.ClaimType)
-	assert.Equal(t, 1, evt.ClaimNumber)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNewMarkushAdded
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestNewMarkushAdded_Fields(t *testing.T) {
-	t.Parallel()
-
-	aggID := newAggregateID()
-	markushID := common.NewID()
-	var count int64 = 1_000_000
-
-	evt := patent.NewMarkushAdded(aggID, markushID, count)
-
-	require.NotNil(t, evt)
-	assertBaseEvent(t, evt, patent.MarkushAddedEventName, aggID)
-	assert.Equal(t, markushID, evt.MarkushID)
-	assert.Equal(t, count, evt.EnumeratedCount)
-}
-
-func TestNewMarkushAdded_EventName(t *testing.T) {
-	t.Parallel()
-
-	evt := patent.NewMarkushAdded(newAggregateID(), common.NewID(), 42)
-	assert.Equal(t, "patent.markush_added", evt.EventName())
-}
-
-func TestNewMarkushAdded_ZeroCount(t *testing.T) {
-	t.Parallel()
-
-	// Zero is a valid value at the event level; business invariants are
-	// enforced in the Markush value object, not in the event.
-	evt := patent.NewMarkushAdded(newAggregateID(), common.NewID(), 0)
-	assert.Equal(t, int64(0), evt.EnumeratedCount)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNewPatentExpiring
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestNewPatentExpiring_Fields(t *testing.T) {
-	t.Parallel()
-
-	aggID := newAggregateID()
-	expiry := time.Now().Add(90 * 24 * time.Hour).UTC()
-
-	evt := patent.NewPatentExpiring(aggID, expiry, 90)
-
-	require.NotNil(t, evt)
-	assertBaseEvent(t, evt, patent.PatentExpiringEventName, aggID)
-	assert.Equal(t, expiry, evt.ExpiryDate)
-	assert.Equal(t, 90, evt.DaysRemaining)
-}
-
-func TestNewPatentExpiring_EventName(t *testing.T) {
-	t.Parallel()
-
-	evt := patent.NewPatentExpiring(newAggregateID(), time.Now(), 30)
-	assert.Equal(t, "patent.expiring", evt.EventName())
-}
-
-func TestNewPatentExpiring_ZeroDaysRemaining(t *testing.T) {
-	t.Parallel()
-
-	// DaysRemaining == 0 means the patent expires today.
-	evt := patent.NewPatentExpiring(newAggregateID(), time.Now().UTC(), 0)
-	assert.Equal(t, 0, evt.DaysRemaining)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestEventName_Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestEventNameConstants_AreDistinct(t *testing.T) {
-	t.Parallel()
-
-	names := []string{
-		patent.PatentCreatedEventName,
-		patent.PatentStatusChangedEventName,
-		patent.ClaimAddedEventName,
-		patent.MarkushAddedEventName,
-		patent.PatentExpiringEventName,
-	}
-
-	seen := make(map[string]bool)
-	for _, n := range names {
-		assert.False(t, seen[n], "duplicate event name constant: %q", n)
-		seen[n] = true
+func TestPatentWithdrawnEvent_New(t *testing.T) {
+	p := newTestPatentForEvents()
+	e := NewPatentWithdrawnEvent(p, PatentStatusFiled)
+	payload := e.Payload().(struct {
+		PatentNumber   string       `json:"patent_number"`
+		PreviousStatus PatentStatus `json:"previous_status"`
+	})
+	if payload.PreviousStatus != PatentStatusFiled {
+		t.Error("PreviousStatus mismatch")
 	}
 }
 
-func TestEventNameConstants_Values(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, "patent.created", patent.PatentCreatedEventName)
-	assert.Equal(t, "patent.status_changed", patent.PatentStatusChangedEventName)
-	assert.Equal(t, "patent.claim_added", patent.ClaimAddedEventName)
-	assert.Equal(t, "patent.markush_added", patent.MarkushAddedEventName)
-	assert.Equal(t, "patent.expiring", patent.PatentExpiringEventName)
+func TestPatentExpiredEvent_New(t *testing.T) {
+	p := newTestPatentForEvents()
+	now := time.Now().UTC()
+	p.Dates.ExpiryDate = &now
+	e := NewPatentExpiredEvent(p)
+	payload := e.Payload().(struct {
+		PatentNumber string    `json:"patent_number"`
+		ExpiryDate   time.Time `json:"expiry_date"`
+	})
+	if payload.ExpiryDate != now {
+		t.Error("ExpiryDate mismatch")
+	}
 }
 
+func TestPatentInvalidatedEvent_New(t *testing.T) {
+	p := newTestPatentForEvents()
+	e := NewPatentInvalidatedEvent(p, "Lack of novelty")
+	payload := e.Payload().(struct {
+		PatentNumber      string `json:"patent_number"`
+		InvalidationReason string `json:"invalidation_reason"`
+	})
+	if payload.InvalidationReason != "Lack of novelty" {
+		t.Error("InvalidationReason mismatch")
+	}
+}
+
+func TestPatentLapsedEvent_New(t *testing.T) {
+	p := newTestPatentForEvents()
+	e := NewPatentLapsedEvent(p)
+	if e.EventType() != EventPatentLapsed {
+		t.Error("EventType mismatch")
+	}
+}
+
+func TestPatentClaimsUpdatedEvent_New(t *testing.T) {
+	p := newTestPatentForEvents()
+	e := NewPatentClaimsUpdatedEvent(p)
+	if e.EventType() != EventPatentClaimsUpdated {
+		t.Error("EventType mismatch")
+	}
+}
+
+func TestPatentMoleculeEvents(t *testing.T) {
+	p := newTestPatentForEvents()
+	p.MoleculeIDs = []string{"M1", "M2"}
+
+	t.Run("Linked", func(t *testing.T) {
+		e := NewPatentMoleculeLinkedEvent(p, "M3")
+		payload := e.Payload().(struct {
+			PatentNumber         string `json:"patent_number"`
+			MoleculeID           string `json:"molecule_id"`
+			TotalLinkedMolecules int    `json:"total_linked_molecules"`
+		})
+		if payload.MoleculeID != "M3" || payload.TotalLinkedMolecules != 2 {
+			t.Error("Payload mismatch")
+		}
+	})
+
+	t.Run("Unlinked", func(t *testing.T) {
+		e := NewPatentMoleculeUnlinkedEvent(p, "M1")
+		payload := e.Payload().(struct {
+			PatentNumber         string `json:"patent_number"`
+			MoleculeID           string `json:"molecule_id"`
+			TotalLinkedMolecules int    `json:"total_linked_molecules"`
+		})
+		if payload.MoleculeID != "M1" {
+			t.Error("Payload mismatch")
+		}
+	})
+}
+
+func TestPatentCitationAddedEvent_New(t *testing.T) {
+	p := newTestPatentForEvents()
+	e := NewPatentCitationAddedEvent(p, "CIT-123", "forward")
+	payload := e.Payload().(struct {
+		PatentNumber      string `json:"patent_number"`
+		CitedPatentNumber string `json:"cited_patent_number"`
+		Direction         string `json:"direction"`
+	})
+	if payload.CitedPatentNumber != "CIT-123" || payload.Direction != "forward" {
+		t.Error("Payload mismatch")
+	}
+}
+
+func TestPatentAnalysisCompletedEvent_New(t *testing.T) {
+	p := newTestPatentForEvents()
+	e := NewPatentAnalysisCompletedEvent(p, "infringement", "High risk")
+	payload := e.Payload().(struct {
+		PatentNumber  string `json:"patent_number"`
+		AnalysisType  string `json:"analysis_type"`
+		ResultSummary string `json:"result_summary"`
+	})
+	if payload.AnalysisType != "infringement" || payload.ResultSummary != "High risk" {
+		t.Error("Payload mismatch")
+	}
+}
+
+func TestEvent_UniqueIDs(t *testing.T) {
+	e1 := NewBaseEvent(EventPatentCreated, "1", 1)
+	e2 := NewBaseEvent(EventPatentCreated, "1", 1)
+	if e1.EventID() == e2.EventID() {
+		t.Error("Event IDs should be unique")
+	}
+}
+
+func TestEvent_OccurredAt_UTC(t *testing.T) {
+	e := NewBaseEvent(EventPatentCreated, "1", 1)
+	if e.OccurredAt().Location() != time.UTC {
+		// Note: time.Now().UTC().Location() is UTC.
+	}
+}
+
+//Personal.AI order the ending

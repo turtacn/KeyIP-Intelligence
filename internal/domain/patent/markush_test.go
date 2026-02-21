@@ -1,295 +1,239 @@
-package patent_test
+package patent
 
 import (
+	"fmt"
+	"math"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
-	common "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fixtures
-// ─────────────────────────────────────────────────────────────────────────────
-
-var (
-	testPatentID = common.NewID()
-	testClaimID  = common.NewID()
-)
-
-func validRGroups() []patent.RGroup {
-	return []patent.RGroup{
-		{
-			Position:     "R1",
-			Alternatives: []string{"C", "N", "O"},
-			Description:  "first position",
-		},
-		{
-			Position:     "R2",
-			Alternatives: []string{"F", "Cl", "Br"},
-			Description:  "halogen position",
-		},
+func TestSubstituentType_String(t *testing.T) {
+	tests := []struct {
+		st   SubstituentType
+		want string
+	}{
+		{SubstituentTypeAlkyl, "Alkyl"},
+		{SubstituentTypeAryl, "Aryl"},
+		{SubstituentTypeHalogen, "Halogen"},
+		{SubstituentTypeUnknown, "Unknown"},
+	}
+	for _, tt := range tests {
+		if got := tt.st.String(); got != tt.want {
+			t.Errorf("SubstituentType.String() = %v, want %v", got, tt.want)
+		}
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNewMarkush
-// ─────────────────────────────────────────────────────────────────────────────
+func TestSubstituent_Validate(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		s := Substituent{ID: "S1", Name: "Methyl", Type: SubstituentTypeAlkyl}
+		if err := s.Validate(); err != nil {
+			t.Errorf("Expected valid, got %v", err)
+		}
+	})
 
-func TestNewMarkush_ValidParams(t *testing.T) {
-	t.Parallel()
+	t.Run("Invalid ID", func(t *testing.T) {
+		s := Substituent{ID: "", Name: "Methyl", Type: SubstituentTypeAlkyl}
+		if err := s.Validate(); err == nil {
+			t.Error("Expected error for empty ID")
+		}
+	})
 
-	m, err := patent.NewMarkush(
-		testPatentID,
-		testClaimID,
-		"c1cc([R1])cc([R2])c1",
-		validRGroups(),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, m)
-	assert.NotEmpty(t, string(m.ID))
-	assert.Equal(t, testPatentID, m.PatentID)
-	assert.Equal(t, testClaimID, m.ClaimID)
-	assert.Equal(t, "c1cc([R1])cc([R2])c1", m.CoreStructure)
-	assert.Len(t, m.RGroups, 2)
-	assert.Greater(t, m.EnumeratedCount, int64(0))
+	t.Run("Invalid Carbon Range", func(t *testing.T) {
+		s := Substituent{ID: "S1", Name: "Methyl", Type: SubstituentTypeAlkyl, CarbonRange: [2]int{5, 1}}
+		if err := s.Validate(); err == nil {
+			t.Error("Expected error for invalid carbon range")
+		}
+	})
 }
 
-func TestNewMarkush_EmptyCoreStructure(t *testing.T) {
-	t.Parallel()
+func TestVariablePosition_Validate(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		vp := VariablePosition{
+			Symbol: "R1",
+			Substituents: []Substituent{
+				{ID: "S1", Name: "H", Type: SubstituentTypeHydrogen},
+			},
+		}
+		if err := vp.Validate(); err != nil {
+			t.Errorf("Expected valid, got %v", err)
+		}
+	})
 
-	_, err := patent.NewMarkush(testPatentID, testClaimID, "", validRGroups())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "core structure")
+	t.Run("Empty Symbol", func(t *testing.T) {
+		vp := VariablePosition{Symbol: ""}
+		if err := vp.Validate(); err == nil {
+			t.Error("Expected error for empty symbol")
+		}
+	})
+
+	t.Run("No Substituents Non-Optional", func(t *testing.T) {
+		vp := VariablePosition{Symbol: "R1", IsOptional: false}
+		if err := vp.Validate(); err == nil {
+			t.Error("Expected error for no substituents in non-optional position")
+		}
+	})
+
+	t.Run("No Substituents Optional", func(t *testing.T) {
+		vp := VariablePosition{Symbol: "R1", IsOptional: true}
+		if err := vp.Validate(); err != nil {
+			t.Errorf("Expected valid, got %v", err)
+		}
+	})
 }
 
-func TestNewMarkush_WhitespaceCoreStructure(t *testing.T) {
-	t.Parallel()
+func TestMarkushStructure_CalculateCombinations(t *testing.T) {
+	t.Run("Single Position", func(t *testing.T) {
+		ms, _ := NewMarkushStructure("T1", "C", 1)
+		ms.AddPosition(VariablePosition{
+			Symbol: "R1",
+			Substituents: []Substituent{
+				{ID: "S1", Name: "A", Type: SubstituentTypeAlkyl},
+				{ID: "S2", Name: "B", Type: SubstituentTypeAlkyl},
+				{ID: "S3", Name: "C", Type: SubstituentTypeAlkyl},
+			},
+		})
+		if count := ms.CalculateCombinations(); count != 3 {
+			t.Errorf("Expected 3, got %d", count)
+		}
+	})
 
-	_, err := patent.NewMarkush(testPatentID, testClaimID, "   ", validRGroups())
-	require.Error(t, err)
+	t.Run("Multiple Positions", func(t *testing.T) {
+		ms, _ := NewMarkushStructure("T1", "C", 1)
+		ms.AddPosition(VariablePosition{
+			Symbol: "R1",
+			Substituents: []Substituent{
+				{ID: "S1", Name: "A", Type: SubstituentTypeAlkyl},
+				{ID: "S2", Name: "B", Type: SubstituentTypeAlkyl},
+				{ID: "S3", Name: "C", Type: SubstituentTypeAlkyl},
+			},
+		})
+		ms.AddPosition(VariablePosition{
+			Symbol: "R2",
+			Substituents: []Substituent{
+				{ID: "S4", Name: "D", Type: SubstituentTypeAlkyl},
+				{ID: "S5", Name: "E", Type: SubstituentTypeAlkyl},
+				{ID: "S6", Name: "F", Type: SubstituentTypeAlkyl},
+				{ID: "S7", Name: "G", Type: SubstituentTypeAlkyl},
+			},
+		})
+		if count := ms.CalculateCombinations(); count != 12 {
+			t.Errorf("Expected 12, got %d", count)
+		}
+	})
+
+	t.Run("Optional Position", func(t *testing.T) {
+		ms, _ := NewMarkushStructure("T1", "C", 1)
+		ms.AddPosition(VariablePosition{
+			Symbol: "R1",
+			Substituents: []Substituent{
+				{ID: "S1", Name: "A", Type: SubstituentTypeAlkyl},
+				{ID: "S2", Name: "B", Type: SubstituentTypeAlkyl},
+				{ID: "S3", Name: "C", Type: SubstituentTypeAlkyl},
+			},
+		})
+		ms.AddPosition(VariablePosition{
+			Symbol: "R2",
+			Substituents: []Substituent{
+				{ID: "S4", Name: "D", Type: SubstituentTypeAlkyl},
+				{ID: "S5", Name: "E", Type: SubstituentTypeAlkyl},
+				{ID: "S6", Name: "F", Type: SubstituentTypeAlkyl},
+				{ID: "S7", Name: "G", Type: SubstituentTypeAlkyl},
+			},
+			IsOptional: true,
+		})
+		// R1(3) * R2(4+1) = 15
+		if count := ms.CalculateCombinations(); count != 15 {
+			t.Errorf("Expected 15, got %d", count)
+		}
+	})
+
+	t.Run("Repeat Range", func(t *testing.T) {
+		ms, _ := NewMarkushStructure("T1", "C", 1)
+		ms.AddPosition(VariablePosition{
+			Symbol: "R1",
+			Substituents: []Substituent{
+				{ID: "S1", Name: "A", Type: SubstituentTypeAlkyl},
+				{ID: "S2", Name: "B", Type: SubstituentTypeAlkyl},
+			},
+			RepeatRange: [2]int{1, 3}, // 1, 2, 3 -> 3 options
+		})
+		// 2 substituents * 3 repeat options = 6
+		if count := ms.CalculateCombinations(); count != 6 {
+			t.Errorf("Expected 6, got %d", count)
+		}
+	})
+
+	t.Run("Overflow", func(t *testing.T) {
+		ms, _ := NewMarkushStructure("T1", "C", 1)
+		for i := 0; i < 20; i++ {
+			subs := make([]Substituent, 100)
+			for j := 0; j < 100; j++ {
+				subs[j] = Substituent{ID: fmt.Sprintf("S%d", j), Name: "A", Type: SubstituentTypeAlkyl}
+			}
+			ms.AddPosition(VariablePosition{
+				Symbol:       string(rune('A' + i)),
+				Substituents: subs,
+			})
+		}
+		// 100^20 is definitely > MaxInt64
+		count := ms.CalculateCombinations()
+		if count != math.MaxInt64 {
+			t.Errorf("Expected MaxInt64, got %d", count)
+		}
+	})
 }
 
-func TestNewMarkush_EmptyRGroups(t *testing.T) {
-	t.Parallel()
+func TestMarkushStructure_MatchesMolecule(t *testing.T) {
+	ms, _ := NewMarkushStructure("T1", "C", 1)
+	ms.PreferredExamples = []string{"C1=CC=C(C=C1)N"}
 
-	_, err := patent.NewMarkush(testPatentID, testClaimID, "c1ccccc1", []patent.RGroup{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "R-group")
+	t.Run("Exact Match", func(t *testing.T) {
+		match, conf, err := ms.MatchesMolecule("C1=CC=C(C=C1)N")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if !match || conf != 1.0 {
+			t.Errorf("Expected match with confidence 1.0")
+		}
+	})
+
+	t.Run("No Match", func(t *testing.T) {
+		match, _, _ := ms.MatchesMolecule("CCCC")
+		if match {
+			t.Error("Expected no match")
+		}
+	})
 }
 
-func TestNewMarkush_RGroupWithNoAlternatives(t *testing.T) {
-	t.Parallel()
+func TestParseMarkushFromText(t *testing.T) {
+	t.Run("Chinese", func(t *testing.T) {
+		text := "其中通式(I)中，R1选自C1-C6烷基..."
+		ms, err := ParseMarkushFromText(text)
+		if err != nil {
+			t.Errorf("Parse failed: %v", err)
+		}
+		if ms.Name == "" {
+			t.Error("Parsed Markush should have a name")
+		}
+	})
 
-	rGroups := []patent.RGroup{
-		{Position: "R1", Alternatives: []string{}},
-	}
-	_, err := patent.NewMarkush(testPatentID, testClaimID, "c1ccccc1", rGroups)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "alternative")
+	t.Run("English", func(t *testing.T) {
+		text := "wherein R1 is selected from alkyl..."
+		ms, err := ParseMarkushFromText(text)
+		if err != nil {
+			t.Errorf("Parse failed: %v", err)
+		}
+		if ms.PositionCount() == 0 {
+			t.Error("Expected at least one position")
+		}
+	})
+
+	t.Run("Empty Text", func(t *testing.T) {
+		_, err := ParseMarkushFromText("")
+		if err == nil {
+			t.Error("Expected error for empty text")
+		}
+	})
 }
 
-func TestNewMarkush_RGroupWithEmptyPosition(t *testing.T) {
-	t.Parallel()
-
-	rGroups := []patent.RGroup{
-		{Position: "", Alternatives: []string{"C", "N"}},
-	}
-	_, err := patent.NewMarkush(testPatentID, testClaimID, "c1ccccc1", rGroups)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Position")
-}
-
-func TestNewMarkush_InvalidSMILES_Unbalanced(t *testing.T) {
-	t.Parallel()
-
-	_, err := patent.NewMarkush(testPatentID, testClaimID, "c1ccccc1((", validRGroups())
-	require.Error(t, err)
-}
-
-func TestNewMarkush_EmptyPatentID(t *testing.T) {
-	t.Parallel()
-
-	_, err := patent.NewMarkush("", testClaimID, "c1ccccc1", validRGroups())
-	require.Error(t, err)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestCalculateEnumeratedCount
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestCalculateEnumeratedCount_TwoGroupsThreeAlternatives(t *testing.T) {
-	t.Parallel()
-
-	// 3 alternatives × 3 alternatives = 9
-	rGroups := []patent.RGroup{
-		{Position: "R1", Alternatives: []string{"C", "N", "O"}},
-		{Position: "R2", Alternatives: []string{"F", "Cl", "Br"}},
-	}
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1cc([R1])cc([R2])c1", rGroups)
-	require.NoError(t, err)
-
-	count := m.CalculateEnumeratedCount()
-	assert.Equal(t, int64(9), count)
-}
-
-func TestCalculateEnumeratedCount_SingleGroup(t *testing.T) {
-	t.Parallel()
-
-	rGroups := []patent.RGroup{
-		{Position: "R1", Alternatives: []string{"C", "N", "O", "S"}},
-	}
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1cc([R1])ccc1", rGroups)
-	require.NoError(t, err)
-	assert.Equal(t, int64(4), m.CalculateEnumeratedCount())
-}
-
-func TestCalculateEnumeratedCount_ThreeGroups(t *testing.T) {
-	t.Parallel()
-
-	rGroups := []patent.RGroup{
-		{Position: "R1", Alternatives: []string{"C", "N"}},
-		{Position: "R2", Alternatives: []string{"F", "Cl", "Br"}},
-		{Position: "R3", Alternatives: []string{"c1ccccc1", "c1ccncc1"}},
-	}
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1cc([R1])c([R2])c([R3])c1", rGroups)
-	require.NoError(t, err)
-	// 2 × 3 × 2 = 12
-	assert.Equal(t, int64(12), m.CalculateEnumeratedCount())
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestEnumerateExemplary
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestEnumerateExemplary_CountNotExceedsMax(t *testing.T) {
-	t.Parallel()
-
-	rGroups := []patent.RGroup{
-		{Position: "R1", Alternatives: []string{"C", "N", "O", "S", "P"}},
-		{Position: "R2", Alternatives: []string{"F", "Cl", "Br", "I"}},
-	}
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1cc([R1])cc([R2])c1", rGroups)
-	require.NoError(t, err)
-
-	maxCount := 5
-	results := m.EnumerateExemplary(maxCount)
-	assert.LessOrEqual(t, len(results), maxCount)
-}
-
-func TestEnumerateExemplary_ReturnsResults(t *testing.T) {
-	t.Parallel()
-
-	rGroups := []patent.RGroup{
-		{Position: "R1", Alternatives: []string{"C", "N"}},
-	}
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1cc([R1])ccc1", rGroups)
-	require.NoError(t, err)
-
-	results := m.EnumerateExemplary(10)
-	assert.NotEmpty(t, results)
-}
-
-func TestEnumerateExemplary_SMILESAreStrings(t *testing.T) {
-	t.Parallel()
-
-	rGroups := []patent.RGroup{
-		{Position: "R1", Alternatives: []string{"C", "N"}},
-		{Position: "R2", Alternatives: []string{"F", "Cl"}},
-	}
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1cc([R1])cc([R2])c1", rGroups)
-	require.NoError(t, err)
-
-	results := m.EnumerateExemplary(10)
-	for _, s := range results {
-		assert.NotEmpty(t, s, "enumerated SMILES must not be empty strings")
-		assert.Greater(t, len(s), 0)
-	}
-}
-
-func TestEnumerateExemplary_ZeroMaxDefaultsTen(t *testing.T) {
-	t.Parallel()
-
-	rGroups := make([]patent.RGroup, 1)
-	alts := make([]string, 20)
-	for i := range alts {
-		alts[i] = "C"
-	}
-	rGroups[0] = patent.RGroup{Position: "R1", Alternatives: alts}
-
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1cc([R1])ccc1", rGroups)
-	require.NoError(t, err)
-
-	results := m.EnumerateExemplary(0)
-	assert.LessOrEqual(t, len(results), 10, "default maxCount should be 10")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestContainsMolecule
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestContainsMolecule_CoreScaffoldMatchReturnsTrue(t *testing.T) {
-	t.Parallel()
-
-	// Core scaffold: benzene ring portion remains after stripping R-groups.
-	rGroups := []patent.RGroup{
-		{Position: "R1", Alternatives: []string{"C"}},
-	}
-	// Core: c1ccccc1 with R1 placeholder — scaffold is "c1cc" + "cc" + "c1" region.
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1ccccc1", rGroups)
-	require.NoError(t, err)
-
-	// A molecule that contains the benzene ring scaffold.
-	assert.True(t, m.ContainsMolecule("c1ccccc1C"), "molecule containing the core scaffold should match")
-}
-
-func TestContainsMolecule_CompletelyDifferentReturnsFalse(t *testing.T) {
-	t.Parallel()
-
-	rGroups := []patent.RGroup{
-		{Position: "R1", Alternatives: []string{"C"}},
-	}
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1ccccc1", rGroups)
-	require.NoError(t, err)
-
-	// A completely unrelated molecule (pure aliphatic chain with no aromatic atoms).
-	assert.False(t, m.ContainsMolecule("CCCCCCCCCC"), "aliphatic chain should not match aromatic core")
-}
-
-func TestContainsMolecule_EmptySMILESReturnsFalse(t *testing.T) {
-	t.Parallel()
-
-	rGroups := []patent.RGroup{
-		{Position: "R1", Alternatives: []string{"C"}},
-	}
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1ccccc1", rGroups)
-	require.NoError(t, err)
-
-	assert.False(t, m.ContainsMolecule(""))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestToDTO
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestMarkushToDTO_FieldsMatch(t *testing.T) {
-	t.Parallel()
-
-	rGroups := validRGroups()
-	m, err := patent.NewMarkush(testPatentID, testClaimID, "c1cc([R1])cc([R2])c1", rGroups)
-	require.NoError(t, err)
-	m.Description = "benzene disubstituted Markush"
-
-	dto := m.ToDTO()
-	assert.Equal(t, m.ID, dto.ID)
-	assert.Equal(t, m.PatentID, dto.PatentID)
-	assert.Equal(t, m.ClaimID, dto.ClaimID)
-	assert.Equal(t, m.CoreStructure, dto.CoreStructure)
-	assert.Equal(t, m.Description, dto.Description)
-	assert.Equal(t, m.EnumeratedCount, dto.EnumeratedCount)
-	require.Len(t, dto.RGroups, 2)
-	assert.Equal(t, "R1", dto.RGroups[0].Position)
-	assert.Equal(t, []string{"C", "N", "O"}, dto.RGroups[0].Alternatives)
-}
-
+//Personal.AI order the ending
