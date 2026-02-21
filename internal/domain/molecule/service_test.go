@@ -1,252 +1,237 @@
-// Package molecule_test provides unit tests for the molecule domain service.
-package molecule_test
+package molecule
 
 import (
 	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	mtypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Mock Repository
-// ─────────────────────────────────────────────────────────────────────────────
+// Mock Implementations
 
-type mockRepository struct {
-	mock.Mock
+type mockMoleculeRepository struct {
+	SaveFunc               func(ctx context.Context, m *Molecule) error
+	UpdateFunc             func(ctx context.Context, m *Molecule) error
+	DeleteFunc             func(ctx context.Context, id string) error
+	FindByIDFunc           func(ctx context.Context, id string) (*Molecule, error)
+	FindByInChIKeyFunc     func(ctx context.Context, inchiKey string) (*Molecule, error)
+	ExistsByInChIKeyFunc   func(ctx context.Context, inchiKey string) (bool, error)
+	SearchFunc             func(ctx context.Context, q *MoleculeQuery) (*MoleculeSearchResult, error)
+	BatchSaveFunc          func(ctx context.Context, molecules []*Molecule) (int, error)
+	SaveCallCount          int
+	UpdateCallCount        int
+	BatchSaveCallCount     int
+	ExistsByInChIKeyCount int
 }
 
-func (m *mockRepository) Save(ctx context.Context, mol *molecule.Molecule) error {
-	args := m.Called(ctx, mol)
-	return args.Error(0)
-}
-
-func (m *mockRepository) FindByID(ctx context.Context, id common.ID) (*molecule.Molecule, error) {
-	args := m.Called(ctx, id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockMoleculeRepository) Save(ctx context.Context, mol *Molecule) error {
+	m.SaveCallCount++
+	if m.SaveFunc != nil {
+		return m.SaveFunc(ctx, mol)
 	}
-	return args.Get(0).(*molecule.Molecule), args.Error(1)
-}
-
-func (m *mockRepository) FindBySMILES(ctx context.Context, smiles string) (*molecule.Molecule, error) {
-	args := m.Called(ctx, smiles)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*molecule.Molecule), args.Error(1)
-}
-
-func (m *mockRepository) FindByInChIKey(ctx context.Context, inchiKey string) (*molecule.Molecule, error) {
-	args := m.Called(ctx, inchiKey)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*molecule.Molecule), args.Error(1)
-}
-
-func (m *mockRepository) Search(ctx context.Context, req mtypes.MoleculeSearchRequest) (*mtypes.MoleculeSearchResponse, error) {
-	args := m.Called(ctx, req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*mtypes.MoleculeSearchResponse), args.Error(1)
-}
-
-func (m *mockRepository) FindSimilar(ctx context.Context, fp *molecule.Fingerprint, fpType mtypes.FingerprintType, threshold float64, maxResults int) ([]*molecule.Molecule, error) {
-	args := m.Called(ctx, fp, fpType, threshold, maxResults)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*molecule.Molecule), args.Error(1)
-}
-
-func (m *mockRepository) SubstructureSearch(ctx context.Context, smarts string, maxResults int) ([]*molecule.Molecule, error) {
-	args := m.Called(ctx, smarts, maxResults)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*molecule.Molecule), args.Error(1)
-}
-
-func (m *mockRepository) Update(ctx context.Context, mol *molecule.Molecule) error {
-	args := m.Called(ctx, mol)
-	return args.Error(0)
-}
-
-func (m *mockRepository) Delete(ctx context.Context, id common.ID) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
-}
-
-func (m *mockRepository) FindByPatentID(ctx context.Context, patentID common.ID) ([]*molecule.Molecule, error) {
-	args := m.Called(ctx, patentID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*molecule.Molecule), args.Error(1)
-}
-
-func (m *mockRepository) BatchSave(ctx context.Context, mols []*molecule.Molecule) error {
-	args := m.Called(ctx, mols)
-	return args.Error(0)
-}
-
-func (m *mockRepository) Count(ctx context.Context) (int64, error) {
-	args := m.Called(ctx)
-	return args.Get(0).(int64), args.Error(1)
-}
-
-// Mock logger
-type mockLogger struct{}
-
-func (mockLogger) Debug(msg string, fields ...logging.Field) {}
-func (mockLogger) Info(msg string, fields ...logging.Field)  {}
-func (mockLogger) Warn(msg string, fields ...logging.Field)  {}
-func (mockLogger) Error(msg string, fields ...logging.Field) {}
-func (mockLogger) Fatal(msg string, fields ...logging.Field) {}
-func (l mockLogger) With(fields ...logging.Field) logging.Logger {
-	return l
-}
-func (l mockLogger) WithContext(ctx context.Context) logging.Logger {
-	return l
-}
-func (l mockLogger) WithError(err error) logging.Logger {
-	return l
-}
-func (l mockLogger) Named(name string) logging.Logger {
-	return l
-}
-func (l mockLogger) Sync() error {
 	return nil
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestCreateMolecule_NewMolecule(t *testing.T) {
-	t.Parallel()
-
-	mockRepo := new(mockRepository)
-	svc := molecule.NewService(mockRepo, mockLogger{})
-	ctx := context.Background()
-
-	smiles := "c1ccccc1"
-
-	// Mock: molecule does not exist
-	mockRepo.On("FindBySMILES", ctx, smiles).Return(nil, errors.NotFound("not found"))
-
-	// Mock: save succeeds
-	mockRepo.On("Save", ctx, mock.AnythingOfType("*molecule.Molecule")).Return(nil)
-
-	mol, err := svc.CreateMolecule(ctx, smiles, mtypes.TypeSmallMolecule)
-	require.NoError(t, err)
-	require.NotNil(t, mol)
-
-	assert.Equal(t, smiles, mol.SMILES)
-	mockRepo.AssertExpectations(t)
+func (m *mockMoleculeRepository) Update(ctx context.Context, mol *Molecule) error {
+	m.UpdateCallCount++
+	if m.UpdateFunc != nil {
+		return m.UpdateFunc(ctx, mol)
+	}
+	return nil
+}
+func (m *mockMoleculeRepository) Delete(ctx context.Context, id string) error {
+	if m.DeleteFunc != nil {
+		return m.DeleteFunc(ctx, id)
+	}
+	return nil
+}
+func (m *mockMoleculeRepository) BatchSave(ctx context.Context, molecules []*Molecule) (int, error) {
+	m.BatchSaveCallCount++
+	if m.BatchSaveFunc != nil {
+		return m.BatchSaveFunc(ctx, molecules)
+	}
+	return len(molecules), nil
+}
+func (m *mockMoleculeRepository) FindByID(ctx context.Context, id string) (*Molecule, error) {
+	if m.FindByIDFunc != nil {
+		return m.FindByIDFunc(ctx, id)
+	}
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindByInChIKey(ctx context.Context, inchiKey string) (*Molecule, error) {
+	if m.FindByInChIKeyFunc != nil {
+		return m.FindByInChIKeyFunc(ctx, inchiKey)
+	}
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindBySMILES(ctx context.Context, smiles string) ([]*Molecule, error) { return nil, nil }
+func (m *mockMoleculeRepository) FindByIDs(ctx context.Context, ids []string) ([]*Molecule, error) { return nil, nil }
+func (m *mockMoleculeRepository) Exists(ctx context.Context, id string) (bool, error)         { return false, nil }
+func (m *mockMoleculeRepository) ExistsByInChIKey(ctx context.Context, inchiKey string) (bool, error) {
+	m.ExistsByInChIKeyCount++
+	if m.ExistsByInChIKeyFunc != nil {
+		return m.ExistsByInChIKeyFunc(ctx, inchiKey)
+	}
+	return false, nil
+}
+func (m *mockMoleculeRepository) Search(ctx context.Context, q *MoleculeQuery) (*MoleculeSearchResult, error) {
+	if m.SearchFunc != nil {
+		return m.SearchFunc(ctx, q)
+	}
+	return nil, nil
+}
+func (m *mockMoleculeRepository) Count(ctx context.Context, q *MoleculeQuery) (int64, error) { return 0, nil }
+func (m *mockMoleculeRepository) FindBySource(ctx context.Context, s MoleculeSource, o, l int) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindByStatus(ctx context.Context, s MoleculeStatus, o, l int) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindByTags(ctx context.Context, t []string, o, l int) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindByMolecularWeightRange(ctx context.Context, min, max float64, o, l int) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindWithFingerprint(ctx context.Context, t FingerprintType, o, l int) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindWithoutFingerprint(ctx context.Context, t FingerprintType, o, l int) ([]*Molecule, error) {
+	return nil, nil
 }
 
-func TestCreateMolecule_DuplicateReturnsExisting(t *testing.T) {
-	t.Parallel()
-
-	mockRepo := new(mockRepository)
-	svc := molecule.NewService(mockRepo, mockLogger{})
-	ctx := context.Background()
-
-	smiles := "c1ccccc1"
-
-	existingMol, err := molecule.NewMolecule(smiles, mtypes.TypeSmallMolecule)
-	require.NoError(t, err)
-
-	// Mock: molecule already exists
-	mockRepo.On("FindBySMILES", ctx, smiles).Return(existingMol, nil)
-
-	mol, err := svc.CreateMolecule(ctx, smiles, mtypes.TypeSmallMolecule)
-	require.NoError(t, err)
-	assert.Equal(t, existingMol.ID, mol.ID)
-
-	// Save should NOT be called
-	mockRepo.AssertNotCalled(t, "Save")
+type mockFingerprintCalculator struct {
+	CalculateFunc      func(ctx context.Context, smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) (*Fingerprint, error)
+	StandardizeFunc    func(ctx context.Context, smiles string) (*StructureIdentifiers, error)
+	BatchCalculateFunc func(ctx context.Context, smilesSlice []string, fpType FingerprintType, opts *FingerprintCalcOptions) ([]*Fingerprint, error)
 }
 
-func TestFindSimilarMolecules(t *testing.T) {
-	t.Parallel()
+func (m *mockFingerprintCalculator) Standardize(ctx context.Context, smiles string) (*StructureIdentifiers, error) {
+	if m.StandardizeFunc != nil {
+		return m.StandardizeFunc(ctx, smiles)
+	}
+	return &StructureIdentifiers{
+		CanonicalSMILES: smiles,
+		InChIKey:        "AAAAAAAAAAAAAA-BBBBBBBBBB-C",
+		Formula:         "C6H6",
+		Weight:          78.11,
+		InChI:           "InChI=1S/C6H6/h1-6H",
+	}, nil
+}
+func (m *mockFingerprintCalculator) Calculate(ctx context.Context, smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) (*Fingerprint, error) {
+	if m.CalculateFunc != nil {
+		return m.CalculateFunc(ctx, smiles, fpType, opts)
+	}
+	return nil, nil
+}
+func (m *mockFingerprintCalculator) BatchCalculate(ctx context.Context, smilesSlice []string, fpType FingerprintType, opts *FingerprintCalcOptions) ([]*Fingerprint, error) {
+	if m.BatchCalculateFunc != nil {
+		return m.BatchCalculateFunc(ctx, smilesSlice, fpType, opts)
+	}
+	res := make([]*Fingerprint, len(smilesSlice))
+	for i := range smilesSlice {
+		res[i], _ = NewBitFingerprint(fpType, make([]byte, 256), 2048, 2)
+	}
+	return res, nil
+}
+func (m *mockFingerprintCalculator) SupportedTypes() []FingerprintType { return nil }
 
-	mockRepo := new(mockRepository)
-	svc := molecule.NewService(mockRepo, mockLogger{})
+type mockSimilarityEngine struct {
+	SearchSimilarFunc     func(ctx context.Context, target *Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error)
+	ComputeSimilarityFunc func(fp1, fp2 *Fingerprint, metric SimilarityMetric) (float64, error)
+}
+
+func (m *mockSimilarityEngine) SearchSimilar(ctx context.Context, target *Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error) {
+	if m.SearchSimilarFunc != nil {
+		return m.SearchSimilarFunc(ctx, target, metric, threshold, limit)
+	}
+	return nil, nil
+}
+func (m *mockSimilarityEngine) ComputeSimilarity(fp1, fp2 *Fingerprint, metric SimilarityMetric) (float64, error) {
+	if m.ComputeSimilarityFunc != nil {
+		return m.ComputeSimilarityFunc(fp1, fp2, metric)
+	}
+	return 0, nil
+}
+func (m *mockSimilarityEngine) BatchComputeSimilarity(target *Fingerprint, candidates []*Fingerprint, metric SimilarityMetric) ([]float64, error) {
+	return nil, nil
+}
+func (m *mockSimilarityEngine) RankBySimilarity(ctx context.Context, target *Fingerprint, candidateIDs []string, metric SimilarityMetric) ([]*SimilarityResult, error) {
+	return nil, nil
+}
+
+func setupService(t *testing.T) (*MoleculeService, *mockMoleculeRepository, *mockFingerprintCalculator, *mockSimilarityEngine) {
+	repo := &mockMoleculeRepository{}
+	fpCalc := &mockFingerprintCalculator{}
+	simEngine := &mockSimilarityEngine{}
+	logger := logging.NewNopLogger()
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
+	return svc, repo, fpCalc, simEngine
+}
+
+func TestMoleculeService_RegisterMolecule(t *testing.T) {
+	svc, repo, fpCalc, _ := setupService(t)
 	ctx := context.Background()
 
-	smiles := "c1ccccc1"
+	t.Run("success_new_molecule", func(t *testing.T) {
+		repo.ExistsByInChIKeyFunc = func(ctx context.Context, inchiKey string) (bool, error) { return false, nil }
+		fpCalc.CalculateFunc = func(ctx context.Context, smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) (*Fingerprint, error) {
+			return NewBitFingerprint(fpType, make([]byte, 256), 2048, 2)
+		}
 
-	similarMol, err := molecule.NewMolecule("Cc1ccccc1", mtypes.TypeSmallMolecule)
-	require.NoError(t, err)
+		mol, err := svc.RegisterMolecule(ctx, "c1ccccc1", SourcePatent, "REF123")
+		assert.NoError(t, err)
+		assert.NotNil(t, mol)
+		assert.True(t, mol.IsActive())
+		assert.Equal(t, 1, repo.SaveCallCount)
+	})
 
-	mockRepo.On("FindSimilar", ctx, mock.AnythingOfType("*molecule.Fingerprint"),
-		mtypes.FPMorgan, 0.8, 10).Return([]*molecule.Molecule{similarMol}, nil)
+	t.Run("idempotent_existing_molecule", func(t *testing.T) {
+		repo.SaveCallCount = 0
+		repo.ExistsByInChIKeyFunc = func(ctx context.Context, inchiKey string) (bool, error) { return true, nil }
+		repo.FindByInChIKeyFunc = func(ctx context.Context, inchiKey string) (*Molecule, error) {
+			return NewMolecule("c1ccccc1", SourcePatent, "REF123")
+		}
 
-	results, err := svc.FindSimilarMolecules(ctx, smiles, 0.8, mtypes.FPMorgan, 10)
-	require.NoError(t, err)
+		_, err := svc.RegisterMolecule(ctx, "c1ccccc1", SourcePatent, "REF123")
+		assert.NoError(t, err)
+		assert.Equal(t, 0, repo.SaveCallCount)
+	})
+}
+
+func TestMoleculeService_BatchRegisterMolecules(t *testing.T) {
+	svc, repo, _, _ := setupService(t)
+	ctx := context.Background()
+
+	reqs := []MoleculeRegistrationRequest{
+		{SMILES: "C", Source: SourceManual},
+		{SMILES: "CC", Source: SourceManual},
+		{SMILES: "INVALID!!!", Source: SourceManual},
+	}
+
+	result, err := svc.BatchRegisterMolecules(ctx, reqs)
+	assert.NoError(t, err)
+	assert.Len(t, result.Succeeded, 2)
+	assert.Len(t, result.Failed, 1)
+	assert.Equal(t, 3, result.TotalProcessed)
+	assert.Equal(t, 1, repo.BatchSaveCallCount)
+}
+
+func TestMoleculeService_FindSimilarMolecules(t *testing.T) {
+	svc, _, fpCalc, simEngine := setupService(t)
+	ctx := context.Background()
+
+	fpCalc.CalculateFunc = func(ctx context.Context, smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) (*Fingerprint, error) {
+		return NewBitFingerprint(fpType, make([]byte, 256), 2048, 2)
+	}
+	simEngine.SearchSimilarFunc = func(ctx context.Context, target *Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error) {
+		return []*SimilarityResult{{MoleculeID: "mol1", Score: 0.9}}, nil
+	}
+
+	results, err := svc.FindSimilarMolecules(ctx, "c1ccccc1", FingerprintMorgan, 0.8, 10)
+	assert.NoError(t, err)
 	assert.Len(t, results, 1)
-	assert.Equal(t, similarMol.ID, results[0].ID)
-
-	mockRepo.AssertExpectations(t)
+	assert.Equal(t, "mol1", results[0].MoleculeID)
 }
 
-func TestBatchImportMolecules_SuccessCount(t *testing.T) {
-	t.Parallel()
-
-	mockRepo := new(mockRepository)
-	svc := molecule.NewService(mockRepo, mockLogger{})
-	ctx := context.Background()
-
-	smilesLines := []string{"c1ccccc1", "CCO", "invalid!!!"}
-
-	// Mock: none exist
-	mockRepo.On("FindBySMILES", ctx, "c1ccccc1").Return(nil, errors.NotFound("not found"))
-	mockRepo.On("FindBySMILES", ctx, "CCO").Return(nil, errors.NotFound("not found"))
-	mockRepo.On("FindBySMILES", ctx, "invalid!!!").Return(nil, errors.NotFound("not found"))
-
-	// Mock: batch save succeeds
-	mockRepo.On("BatchSave", ctx, mock.AnythingOfType("[]*molecule.Molecule")).Return(nil)
-
-	count, err := svc.BatchImportMolecules(ctx, smilesLines, mtypes.TypeSmallMolecule)
-	require.NoError(t, err)
-
-	// Should import 2 valid molecules, skip 1 invalid
-	assert.Equal(t, 2, count)
-
-	mockRepo.AssertExpectations(t)
-}
-
-func TestBatchImportMolecules_SkipsInvalid(t *testing.T) {
-	t.Parallel()
-
-	mockRepo := new(mockRepository)
-	svc := molecule.NewService(mockRepo, mockLogger{})
-	ctx := context.Background()
-
-	// All invalid SMILES
-	smilesLines := []string{"!!!", "$$$", "^^^"}
-
-	// Mock: none exist
-	mockRepo.On("FindBySMILES", ctx, "!!!").Return(nil, errors.NotFound("not found"))
-	mockRepo.On("FindBySMILES", ctx, "$$$").Return(nil, errors.NotFound("not found"))
-	mockRepo.On("FindBySMILES", ctx, "^^^").Return(nil, errors.NotFound("not found"))
-
-	count, err := svc.BatchImportMolecules(ctx, smilesLines, mtypes.TypeSmallMolecule)
-	require.Error(t, err)
-	assert.Equal(t, 0, count)
-	assert.Contains(t, err.Error(), "no valid molecules")
-
-	mockRepo.AssertNotCalled(t, "BatchSave")
-}
-
+//Personal.AI order the ending

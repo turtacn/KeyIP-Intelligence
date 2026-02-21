@@ -1,211 +1,357 @@
-// Package molecule provides molecular similarity computation algorithms for
-// chemical structure comparison in the KeyIP-Intelligence platform.
 package molecule
 
 import (
+	"context"
 	"fmt"
 	"math"
-	"math/bits"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tanimoto Similarity
-// ─────────────────────────────────────────────────────────────────────────────
+// SimilarityMetric defines the algorithm used for molecular similarity measurement.
+type SimilarityMetric string
 
-// TanimotoSimilarity computes the Tanimoto coefficient (Jaccard index) between
-// two molecular fingerprints.  This is the most commonly used similarity metric
-// in cheminformatics.
-//
-// Formula: |A ∩ B| / |A ∪ B| = |A ∩ B| / (|A| + |B| - |A ∩ B|)
-//
-// Returns a value in [0.0, 1.0] where:
-//   - 1.0 indicates identical fingerprints
-//   - 0.0 indicates no common bits set
-//   - ≥ 0.85 is typically considered "highly similar" in patent analysis
-//
-// Both fingerprints must have the same length and type.
-func TanimotoSimilarity(fp1, fp2 *Fingerprint) (float64, error) {
-	if err := validateFingerprints(fp1, fp2); err != nil {
-		return 0, err
+const (
+	MetricTanimoto  SimilarityMetric = "tanimoto"
+	MetricDice      SimilarityMetric = "dice"
+	MetricCosine    SimilarityMetric = "cosine"
+	MetricEuclidean SimilarityMetric = "euclidean"
+	MetricManhattan SimilarityMetric = "manhattan"
+	MetricSoergel   SimilarityMetric = "soergel"
+)
+
+// IsValid checks if the similarity metric is valid.
+func (m SimilarityMetric) IsValid() bool {
+	switch m {
+	case MetricTanimoto, MetricDice, MetricCosine, MetricEuclidean, MetricManhattan, MetricSoergel:
+		return true
+	default:
+		return false
 	}
-
-	// Handle edge case: both fingerprints are all-zeros
-	if fp1.NumOnBits == 0 && fp2.NumOnBits == 0 {
-		return 1.0, nil // Consider two empty sets as identical
-	}
-
-	// Calculate intersection (AND operation)
-	intersection := andCount(fp1.Bits, fp2.Bits)
-
-	// Calculate union using inclusion-exclusion principle
-	union := fp1.NumOnBits + fp2.NumOnBits - intersection
-
-	if union == 0 {
-		return 0.0, nil
-	}
-
-	return float64(intersection) / float64(union), nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Cosine Similarity
-// ─────────────────────────────────────────────────────────────────────────────
-
-// CosineSimilarity computes the cosine of the angle between two fingerprint
-// vectors.  This treats fingerprints as binary vectors in high-dimensional space.
-//
-// Formula: (A · B) / (||A|| × ||B||)
-//
-// For binary vectors: (A · B) = |A ∩ B|
-// ||A|| = sqrt(|A|), ||B|| = sqrt(|B|)
-//
-// Returns a value in [0.0, 1.0].
-func CosineSimilarity(fp1, fp2 *Fingerprint) (float64, error) {
-	if err := validateFingerprints(fp1, fp2); err != nil {
-		return 0, err
-	}
-
-	if fp1.NumOnBits == 0 || fp2.NumOnBits == 0 {
-		return 0.0, nil
-	}
-
-	intersection := andCount(fp1.Bits, fp2.Bits)
-
-	// Cosine = dot_product / (norm1 * norm2)
-	// For binary vectors: dot_product = intersection count
-	// norm = sqrt(number of 1s)
-	norm1 := math.Sqrt(float64(fp1.NumOnBits))
-	norm2 := math.Sqrt(float64(fp2.NumOnBits))
-
-	return float64(intersection) / (norm1 * norm2), nil
+// String returns the string representation of the similarity metric.
+func (m SimilarityMetric) String() string {
+	return string(m)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Dice Similarity
-// ─────────────────────────────────────────────────────────────────────────────
-
-// DiceSimilarity computes the Dice coefficient (Sørensen–Dice index) between
-// two fingerprints.  This metric gives more weight to the intersection than
-// Tanimoto.
-//
-// Formula: 2 × |A ∩ B| / (|A| + |B|)
-//
-// Returns a value in [0.0, 1.0].  Dice similarity is always ≥ Tanimoto similarity
-// for the same fingerprint pair.
-func DiceSimilarity(fp1, fp2 *Fingerprint) (float64, error) {
-	if err := validateFingerprints(fp1, fp2); err != nil {
-		return 0, err
+// ParseSimilarityMetric parses a string into a SimilarityMetric.
+func ParseSimilarityMetric(s string) (SimilarityMetric, error) {
+	m := SimilarityMetric(s)
+	if m.IsValid() {
+		return m, nil
 	}
-
-	if fp1.NumOnBits == 0 && fp2.NumOnBits == 0 {
-		return 1.0, nil
-	}
-
-	denominator := fp1.NumOnBits + fp2.NumOnBits
-	if denominator == 0 {
-		return 0.0, nil
-	}
-
-	intersection := andCount(fp1.Bits, fp2.Bits)
-
-	return 2.0 * float64(intersection) / float64(denominator), nil
+	return "", errors.New(errors.ErrCodeValidation, "unsupported similarity metric: "+s)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tversky Similarity
-// ─────────────────────────────────────────────────────────────────────────────
+// SimilarityCalculator defines the interface for calculating similarity between fingerprints.
+type SimilarityCalculator interface {
+	Calculate(fp1, fp2 *Fingerprint) (float64, error)
+	Metric() SimilarityMetric
+	SupportsEncoding(encoding FingerprintEncoding) bool
+}
 
-// TverskySimilarity computes the asymmetric Tversky index, which generalizes
-// both Tanimoto and Dice coefficients.
-//
-// Formula: |A ∩ B| / (|A ∩ B| + α|A - B| + β|B - A|)
-//
-// Where:
-//   - α, β ∈ [0, 1] are weighting parameters
-//   - α = β = 0.5 gives Tanimoto similarity
-//   - α = β = 1.0 gives Dice similarity
-//   - α > β emphasizes features in A
-//   - α < β emphasizes features in B
-//
-// This is useful for asymmetric similarity queries where one molecule (e.g., a
-// patent claim) is considered more important than the other (e.g., a prior art).
-func TverskySimilarity(fp1, fp2 *Fingerprint, alpha, beta float64) (float64, error) {
-	if err := validateFingerprints(fp1, fp2); err != nil {
-		return 0, err
+// TanimotoCalculator implements Tanimoto similarity (Jaccard index).
+type TanimotoCalculator struct{}
+
+// Calculate computes Tanimoto similarity.
+func (c *TanimotoCalculator) Calculate(fp1, fp2 *Fingerprint) (float64, error) {
+	if fp1.Type != fp2.Type || fp1.NumBits != fp2.NumBits {
+		return 0, errors.New(errors.ErrCodeValidation, "fingerprints must have same type and dimension")
 	}
 
-	if alpha < 0 || beta < 0 {
-		return 0, errors.InvalidParam("alpha and beta must be non-negative").
-			WithDetail(fmt.Sprintf("alpha=%f, beta=%f", alpha, beta))
-	}
-
-	intersection := andCount(fp1.Bits, fp2.Bits)
-
-	// |A - B| = |A| - |A ∩ B|
-	aMinusB := fp1.NumOnBits - intersection
-	// |B - A| = |B| - |A ∩ B|
-	bMinusA := fp2.NumOnBits - intersection
-
-	denominator := float64(intersection) + alpha*float64(aMinusB) + beta*float64(bMinusA)
-
-	if denominator == 0 {
-		if fp1.NumOnBits == 0 && fp2.NumOnBits == 0 {
-			return 1.0, nil
+	if fp1.IsBitVector() && fp2.IsBitVector() {
+		intersection := 0
+		union := 0
+		for i := range fp1.Bits {
+			b1 := fp1.Bits[i]
+			b2 := fp2.Bits[i]
+			intersection += PopCountByte(b1 & b2)
+			union += PopCountByte(b1 | b2)
 		}
+		if union == 0 {
+			return 0.0, nil
+		}
+		return float64(intersection) / float64(union), nil
+	}
+
+	if fp1.IsDenseVector() && fp2.IsDenseVector() {
+		var sumMin, sumMax float32
+		for i := range fp1.Vector {
+			v1 := fp1.Vector[i]
+			v2 := fp2.Vector[i]
+			if v1 < v2 {
+				sumMin += v1
+				sumMax += v2
+			} else {
+				sumMin += v2
+				sumMax += v1
+			}
+		}
+		if sumMax == 0 {
+			return 0.0, nil
+		}
+		return float64(sumMin / sumMax), nil
+	}
+
+	return 0, errors.New(errors.ErrCodeValidation, "unsupported encoding for Tanimoto")
+}
+
+// Metric returns MetricTanimoto.
+func (c *TanimotoCalculator) Metric() SimilarityMetric { return MetricTanimoto }
+
+// SupportsEncoding returns true for BitVector and DenseVector.
+func (c *TanimotoCalculator) SupportsEncoding(e FingerprintEncoding) bool {
+	return e == EncodingBitVector || e == EncodingDenseVector
+}
+
+// DiceCalculator implements Dice similarity.
+type DiceCalculator struct{}
+
+// Calculate computes Dice similarity.
+func (c *DiceCalculator) Calculate(fp1, fp2 *Fingerprint) (float64, error) {
+	if fp1.Type != fp2.Type || fp1.NumBits != fp2.NumBits {
+		return 0, errors.New(errors.ErrCodeValidation, "fingerprints must have same type and dimension")
+	}
+
+	if fp1.IsBitVector() && fp2.IsBitVector() {
+		intersection := 0
+		for i := range fp1.Bits {
+			intersection += PopCountByte(fp1.Bits[i] & fp2.Bits[i])
+		}
+		denominator := fp1.BitCount() + fp2.BitCount()
+		if denominator == 0 {
+			return 0.0, nil
+		}
+		return 2.0 * float64(intersection) / float64(denominator), nil
+	}
+
+	return 0, errors.New(errors.ErrCodeValidation, "Dice similarity only supports bit vectors")
+}
+
+// Metric returns MetricDice.
+func (c *DiceCalculator) Metric() SimilarityMetric { return MetricDice }
+
+// SupportsEncoding returns true for BitVector.
+func (c *DiceCalculator) SupportsEncoding(e FingerprintEncoding) bool {
+	return e == EncodingBitVector
+}
+
+// CosineCalculator implements Cosine similarity.
+type CosineCalculator struct{}
+
+// Calculate computes Cosine similarity.
+func (c *CosineCalculator) Calculate(fp1, fp2 *Fingerprint) (float64, error) {
+	if fp1.NumBits != fp2.NumBits {
+		return 0, errors.New(errors.ErrCodeValidation, "fingerprints must have same dimension")
+	}
+
+	v1 := fp1.ToFloat32Slice()
+	v2 := fp2.ToFloat32Slice()
+
+	var dotProduct, norm1, norm2 float64
+	for i := range v1 {
+		f1 := float64(v1[i])
+		f2 := float64(v2[i])
+		dotProduct += f1 * f2
+		norm1 += f1 * f1
+		norm2 += f2 * f2
+	}
+
+	if norm1 == 0 || norm2 == 0 {
 		return 0.0, nil
 	}
 
-	return float64(intersection) / denominator, nil
+	cosine := dotProduct / (math.Sqrt(norm1) * math.Sqrt(norm2))
+	// Normalize to [0, 1]
+	return (cosine + 1) / 2, nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper Functions
-// ─────────────────────────────────────────────────────────────────────────────
+// Metric returns MetricCosine.
+func (c *CosineCalculator) Metric() SimilarityMetric { return MetricCosine }
 
-// validateFingerprints checks that two fingerprints are compatible for similarity
-// comparison (same length and type).
-func validateFingerprints(fp1, fp2 *Fingerprint) error {
-	if fp1 == nil || fp2 == nil {
-		return errors.InvalidParam("fingerprints cannot be nil")
+// SupportsEncoding returns true for BitVector and DenseVector.
+func (c *CosineCalculator) SupportsEncoding(e FingerprintEncoding) bool {
+	return e == EncodingBitVector || e == EncodingDenseVector
+}
+
+// EuclideanCalculator implements Euclidean distance based similarity.
+type EuclideanCalculator struct{}
+
+// Calculate computes Euclidean similarity.
+func (c *EuclideanCalculator) Calculate(fp1, fp2 *Fingerprint) (float64, error) {
+	if fp1.NumBits != fp2.NumBits {
+		return 0, errors.New(errors.ErrCodeValidation, "fingerprints must have same dimension")
+	}
+	if !fp1.IsDenseVector() || !fp2.IsDenseVector() {
+		return 0, errors.New(errors.ErrCodeValidation, "Euclidean similarity only supports dense vectors")
 	}
 
-	if fp1.Length != fp2.Length {
-		return errors.InvalidParam("fingerprints must have same length").
-			WithDetail(fmt.Sprintf("fp1=%d, fp2=%d", fp1.Length, fp2.Length))
+	var distSq float64
+	for i := range fp1.Vector {
+		diff := float64(fp1.Vector[i] - fp2.Vector[i])
+		distSq += diff * diff
 	}
+	distance := math.Sqrt(distSq)
+	return 1.0 / (1.0 + distance), nil
+}
 
-	if fp1.Type != fp2.Type {
-		return errors.InvalidParam("fingerprints must have same type").
-			WithDetail(fmt.Sprintf("fp1=%s, fp2=%s", fp1.Type, fp2.Type))
+// Metric returns MetricEuclidean.
+func (c *EuclideanCalculator) Metric() SimilarityMetric { return MetricEuclidean }
+
+// SupportsEncoding returns true for DenseVector.
+func (c *EuclideanCalculator) SupportsEncoding(e FingerprintEncoding) bool {
+	return e == EncodingDenseVector
+}
+
+// NewSimilarityCalculator factory function.
+func NewSimilarityCalculator(metric SimilarityMetric) (SimilarityCalculator, error) {
+	switch metric {
+	case MetricTanimoto:
+		return &TanimotoCalculator{}, nil
+	case MetricDice:
+		return &DiceCalculator{}, nil
+	case MetricCosine:
+		return &CosineCalculator{}, nil
+	case MetricEuclidean:
+		return &EuclideanCalculator{}, nil
+	default:
+		return nil, errors.New(errors.ErrCodeValidation, "unsupported similarity metric: "+string(metric))
 	}
+}
 
+// SimilarityEngine defines high-level operations for molecular similarity search.
+type SimilarityEngine interface {
+	SearchSimilar(ctx context.Context, target *Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error)
+	ComputeSimilarity(fp1, fp2 *Fingerprint, metric SimilarityMetric) (float64, error)
+	BatchComputeSimilarity(target *Fingerprint, candidates []*Fingerprint, metric SimilarityMetric) ([]float64, error)
+	RankBySimilarity(ctx context.Context, target *Fingerprint, candidateIDs []string, metric SimilarityMetric) ([]*SimilarityResult, error)
+}
+
+// SimilarityResult represents a single match in a similarity search.
+type SimilarityResult struct {
+	MoleculeID      string          `json:"molecule_id"`
+	SMILES          string          `json:"smiles"`
+	Score           float64         `json:"score"`
+	Metric          SimilarityMetric `json:"metric"`
+	FingerprintType FingerprintType `json:"fingerprint_type"`
+	Rank            int             `json:"rank"`
+}
+
+func (r *SimilarityResult) String() string {
+	return fmt.Sprintf("SimilarityResult{id=%s, score=%.4f, metric=%s}", r.MoleculeID, r.Score, r.Metric)
+}
+
+// SimilaritySearchOptions defines configuration for similarity search.
+type SimilaritySearchOptions struct {
+	Metric                  SimilarityMetric
+	FingerprintType         FingerprintType
+	Threshold               float64
+	Limit                   int
+	UseVectorDB             bool
+	FusionStrategy          FingerprintFusionStrategy
+	FusionFingerprintTypes  []FingerprintType
+	FusionWeights           map[FingerprintType]float64
+}
+
+// DefaultSimilaritySearchOptions returns default search options.
+func DefaultSimilaritySearchOptions() *SimilaritySearchOptions {
+	return &SimilaritySearchOptions{
+		Metric:          MetricTanimoto,
+		FingerprintType: FingerprintMorgan,
+		Threshold:       0.7,
+		Limit:           100,
+		UseVectorDB:     true,
+	}
+}
+
+// Validate checks if the search options are valid.
+func (o *SimilaritySearchOptions) Validate() error {
+	if !o.Metric.IsValid() {
+		return errors.New(errors.ErrCodeValidation, "invalid similarity metric")
+	}
+	if !o.FingerprintType.IsValid() {
+		return errors.New(errors.ErrCodeValidation, "invalid fingerprint type")
+	}
+	if o.Threshold < 0 || o.Threshold > 1 {
+		return errors.New(errors.ErrCodeValidation, "threshold must be between 0 and 1")
+	}
+	if o.Limit <= 0 {
+		return errors.New(errors.ErrCodeValidation, "limit must be positive")
+	}
 	return nil
 }
 
-// popcount counts the number of set bits in a byte slice using the built-in
-// bits.OnesCount8 function for efficiency.
-func popcount(data []byte) int {
-	count := 0
-	for _, b := range data {
-		count += bits.OnesCount8(uint8(b))
-	}
-	return count
+// DefaultSimilarityEngine implements SimilarityEngine.
+type DefaultSimilarityEngine struct {
+	calculators map[SimilarityMetric]SimilarityCalculator
 }
 
-// andCount computes the number of bits set in the bitwise AND of two byte slices.
-// This represents the size of the intersection of two binary sets.
-func andCount(a, b []byte) int {
-	minLen := len(a)
-	if len(b) < minLen {
-		minLen = len(b)
-	}
-
-	count := 0
-	for i := 0; i < minLen; i++ {
-		count += bits.OnesCount8(uint8(a[i] & b[i]))
-	}
-	return count
+// NewDefaultSimilarityEngine constructs a new DefaultSimilarityEngine.
+func NewDefaultSimilarityEngine() *DefaultSimilarityEngine {
+	calcs := make(map[SimilarityMetric]SimilarityCalculator)
+	calcs[MetricTanimoto] = &TanimotoCalculator{}
+	calcs[MetricDice] = &DiceCalculator{}
+	calcs[MetricCosine] = &CosineCalculator{}
+	calcs[MetricEuclidean] = &EuclideanCalculator{}
+	return &DefaultSimilarityEngine{calculators: calcs}
 }
 
+// ComputeSimilarity computes similarity between two fingerprints.
+func (e *DefaultSimilarityEngine) ComputeSimilarity(fp1, fp2 *Fingerprint, metric SimilarityMetric) (float64, error) {
+	calc, ok := e.calculators[metric]
+	if !ok {
+		return 0, errors.New(errors.ErrCodeValidation, "unsupported similarity metric")
+	}
+	return calc.Calculate(fp1, fp2)
+}
+
+// BatchComputeSimilarity computes similarity between target and multiple candidates.
+func (e *DefaultSimilarityEngine) BatchComputeSimilarity(target *Fingerprint, candidates []*Fingerprint, metric SimilarityMetric) ([]float64, error) {
+	res := make([]float64, len(candidates))
+	for i, c := range candidates {
+		score, err := e.ComputeSimilarity(target, c, metric)
+		if err != nil {
+			return nil, err
+		}
+		res[i] = score
+	}
+	return res, nil
+}
+
+// SearchSimilar is not implemented in the default engine (requires vector DB).
+func (e *DefaultSimilarityEngine) SearchSimilar(ctx context.Context, target *Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error) {
+	return nil, errors.New(errors.ErrCodeNotImplemented, "SearchSimilar requires vector database implementation")
+}
+
+// RankBySimilarity is not implemented in the default engine.
+func (e *DefaultSimilarityEngine) RankBySimilarity(ctx context.Context, target *Fingerprint, candidateIDs []string, metric SimilarityMetric) ([]*SimilarityResult, error) {
+	return nil, errors.New(errors.ErrCodeNotImplemented, "RankBySimilarity requires vector database implementation")
+}
+
+// Similarity Threshold Constants
+const (
+	ThresholdIdentical           = 0.99
+	ThresholdHighSimilarity      = 0.85
+	ThresholdModerateSimilarity  = 0.70
+	ThresholdLowSimilarity       = 0.50
+)
+
+// ClassifySimilarity returns a classification label for a given similarity score.
+func ClassifySimilarity(score float64) string {
+	if score >= ThresholdIdentical {
+		return "identical"
+	}
+	if score >= ThresholdHighSimilarity {
+		return "high"
+	}
+	if score >= ThresholdModerateSimilarity {
+		return "moderate"
+	}
+	if score >= ThresholdLowSimilarity {
+		return "low"
+	}
+	return "dissimilar"
+}
+
+//Personal.AI order the ending

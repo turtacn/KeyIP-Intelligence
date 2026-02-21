@@ -1,244 +1,351 @@
-// Package molecule provides the domain service layer for molecular operations.
 package molecule
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	mtypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
-// Service coordinates molecule-related business logic and repository operations.
-// It enforces domain rules, orchestrates complex workflows, and provides a
-// high-level API for application services.
-type Service struct {
-	repo   Repository
-	logger logging.Logger
+// MoleculeService coordinates molecule-related business operations.
+type MoleculeService struct {
+	repo             MoleculeRepository
+	fpCalculator     FingerprintCalculator
+	similarityEngine SimilarityEngine
+	logger           logging.Logger
 }
 
-// NewService constructs a new molecule domain service.
-func NewService(repo Repository, logger logging.Logger) *Service {
-	return &Service{
-		repo:   repo,
-		logger: logger,
+// NewMoleculeService constructs a new MoleculeService.
+func NewMoleculeService(repo MoleculeRepository, fpCalc FingerprintCalculator, simEngine SimilarityEngine, logger logging.Logger) (*MoleculeService, error) {
+	if repo == nil || fpCalc == nil || simEngine == nil || logger == nil {
+		return nil, errors.New(errors.ErrCodeValidation, "all dependencies must be provided")
 	}
+	return &MoleculeService{
+		repo:             repo,
+		fpCalculator:     fpCalc,
+		similarityEngine: simEngine,
+		logger:           logger,
+	}, nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Core CRUD Operations
-// ─────────────────────────────────────────────────────────────────────────────
-
-// CreateMolecule creates a new molecule from a SMILES string, performing
-// deduplication via SMILES lookup.  If the molecule already exists, returns
-// the existing entity rather than creating a duplicate.
-func (s *Service) CreateMolecule(ctx context.Context, smiles string, molType mtypes.MoleculeType) (*Molecule, error) {
-	// Check if molecule already exists (deduplication)
-	existing, err := s.repo.FindBySMILES(ctx, smiles)
-	if err == nil {
-		s.logger.Info("molecule already exists", logging.String("smiles", smiles), logging.String("id", string(existing.ID)))
-		return existing, nil
-	}
-	if !errors.IsNotFound(err) {
-		return nil, errors.Wrap(err, errors.CodeDatabaseError, "failed to check for existing molecule")
-	}
-
-	// Create new molecule
-	mol, err := NewMolecule(smiles, molType)
+// RegisterMolecule handles the complete registration process for a new molecule.
+func (s *MoleculeService) RegisterMolecule(ctx context.Context, smiles string, source MoleculeSource, sourceRef string) (*Molecule, error) {
+	// 1. Basic validation and entity creation
+	mol, err := NewMolecule(smiles, source, sourceRef)
 	if err != nil {
 		return nil, err
 	}
 
-	// Calculate default fingerprint (Morgan)
-	if err := mol.CalculateFingerprint(mtypes.FPMorgan); err != nil {
-		s.logger.Warn("failed to calculate Morgan fingerprint", logging.Err(err))
-		// Non-fatal: continue without fingerprint
+	// 2. Structural identifiers using RDKit standardization
+	ids, err := s.fpCalculator.Standardize(ctx, smiles)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeMoleculeParsingFailed, "failed to standardize molecule")
 	}
 
-	// Calculate basic properties
-	if err := mol.CalculateProperties(); err != nil {
-		s.logger.Warn("failed to calculate molecular properties", logging.Err(err))
-		// Non-fatal: continue without properties
+	// 3. Duplicate check via InChIKey
+	exists, err := s.repo.ExistsByInChIKey(ctx, ids.InChIKey)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return s.repo.FindByInChIKey(ctx, ids.InChIKey)
 	}
 
-	// Persist
+	if err := mol.SetStructureIdentifiers(ids.CanonicalSMILES, ids.InChI, ids.InChIKey, ids.Formula, ids.Weight); err != nil {
+		return nil, err
+	}
+
+	// 4. Calculate mandatory fingerprints (Morgan and MACCS)
+	opts := DefaultFingerprintCalcOptions()
+
+	morgan, err := s.fpCalculator.Calculate(ctx, ids.CanonicalSMILES, FingerprintMorgan, opts)
+	if err != nil {
+		s.logger.Warn("failed to calculate Morgan fingerprint", logging.String("smiles", smiles), logging.Error(err))
+	} else {
+		_ = mol.AddFingerprint(morgan)
+	}
+
+	maccs, err := s.fpCalculator.Calculate(ctx, ids.CanonicalSMILES, FingerprintMACCS, opts)
+	if err != nil {
+		s.logger.Warn("failed to calculate MACCS fingerprint", logging.String("smiles", smiles), logging.Error(err))
+	} else {
+		_ = mol.AddFingerprint(maccs)
+	}
+
+	// 5. Activate and save
+	if err := mol.Activate(); err != nil {
+		return nil, err
+	}
+
 	if err := s.repo.Save(ctx, mol); err != nil {
-		return nil, errors.Wrap(err, errors.CodeDatabaseError, "failed to save molecule")
-	}
-
-	s.logger.Info("created new molecule",
-		logging.String("id", string(mol.ID)),
-		logging.String("smiles", smiles),
-		logging.String("type", string(molType)))
-
-	return mol, nil
-}
-
-// GetMolecule retrieves a molecule by its ID.
-func (s *Service) GetMolecule(ctx context.Context, id common.ID) (*Molecule, error) {
-	mol, err := s.repo.FindByID(ctx, id)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.CodeNotFound, "molecule not found")
-	}
-	return mol, nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Search Operations
-// ─────────────────────────────────────────────────────────────────────────────
-
-// SearchMolecules performs a paginated search with filtering.
-func (s *Service) SearchMolecules(ctx context.Context, req mtypes.MoleculeSearchRequest) (*mtypes.MoleculeSearchResponse, error) {
-	// Validate pagination parameters
-	if err := req.Validate(); err != nil {
 		return nil, err
 	}
 
-	resp, err := s.repo.Search(ctx, req)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.CodeDatabaseError, "search failed")
-	}
-
-	s.logger.Debug("molecule search executed",
-		logging.Int("results", len(resp.Items)),
-		logging.Int64("total", resp.Total))
-
-	return resp, nil
+	return mol, nil
 }
 
-// FindSimilarMolecules finds molecules similar to the given SMILES string
-// using fingerprint-based similarity search.
-func (s *Service) FindSimilarMolecules(ctx context.Context, smiles string, threshold float64, fpType mtypes.FingerprintType, maxResults int) ([]*Molecule, error) {
-	// Create query molecule
-	queryMol, err := NewMolecule(smiles, mtypes.TypeSmallMolecule)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.CodeMoleculeInvalidSMILES, "invalid query SMILES")
-	}
-
-	// Calculate fingerprint
-	if err := queryMol.CalculateFingerprint(fpType); err != nil {
-		return nil, errors.Wrap(err, errors.CodeMoleculeInvalidSMILES, "failed to calculate query fingerprint")
-	}
-
-	fp := queryMol.Fingerprints[fpType]
-	if fp == nil {
-		return nil, errors.New(errors.CodeMoleculeInvalidSMILES, "fingerprint not available")
-	}
-
-	// Perform similarity search
-	results, err := s.repo.FindSimilar(ctx, fp, fpType, threshold, maxResults)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.CodeDatabaseError, "similarity search failed")
-	}
-
-	s.logger.Info("similarity search completed",
-		logging.String("query_smiles", smiles),
-		logging.Float64("threshold", threshold),
-		logging.Int("results", len(results)))
-
-	return results, nil
+// MoleculeRegistrationRequest defines parameters for registering a molecule.
+type MoleculeRegistrationRequest struct {
+	SMILES     string
+	Source     MoleculeSource
+	SourceRef  string
+	Tags       []string
+	Properties []*MolecularProperty
 }
 
-// SubstructureSearch finds molecules containing the specified substructure.
-func (s *Service) SubstructureSearch(ctx context.Context, smarts string, maxResults int) ([]*Molecule, error) {
-	if smarts == "" {
-		return nil, errors.InvalidParam("SMARTS pattern cannot be empty")
-	}
-
-	results, err := s.repo.SubstructureSearch(ctx, smarts, maxResults)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.CodeDatabaseError, "substructure search failed")
-	}
-
-	s.logger.Info("substructure search completed",
-		logging.String("smarts", smarts),
-		logging.Int("results", len(results)))
-
-	return results, nil
+// BatchRegistrationResult contains results of a batch registration operation.
+type BatchRegistrationResult struct {
+	Succeeded      []*Molecule
+	Failed         []BatchRegistrationError
+	DuplicateCount int
+	TotalProcessed int
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Batch Operations
-// ─────────────────────────────────────────────────────────────────────────────
+// BatchRegistrationError describes an error for a specific item in a batch.
+type BatchRegistrationError struct {
+	Index  int
+	SMILES string
+	Error  error
+}
 
-// BatchImportMolecules imports multiple molecules from SMILES strings, skipping
-// invalid entries and duplicates.  Returns the count of successfully imported
-// molecules.
-func (s *Service) BatchImportMolecules(ctx context.Context, smilesLines []string, molType mtypes.MoleculeType) (int, error) {
-	if len(smilesLines) == 0 {
-		return 0, errors.InvalidParam("no SMILES strings provided")
+// BatchRegisterMolecules handles multiple molecule registrations with optimization.
+func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests []MoleculeRegistrationRequest) (*BatchRegistrationResult, error) {
+	result := &BatchRegistrationResult{
+		TotalProcessed: len(requests),
 	}
 
-	validMols := make([]*Molecule, 0, len(smilesLines))
-	skipped := 0
+	var candidates []*Molecule
+	var smilesToProcess []string
 
-	for i, smiles := range smilesLines {
-		// Check for duplicates via SMILES lookup
-		_, err := s.repo.FindBySMILES(ctx, smiles)
-		if err == nil {
-			s.logger.Debug("skipping duplicate molecule",
-				logging.Int("line", i),
-				logging.String("smiles", smiles))
-			skipped++
-			continue
-		}
-
-		// Create molecule
-		mol, err := NewMolecule(smiles, molType)
+	for i, req := range requests {
+		mol, err := NewMolecule(req.SMILES, req.Source, req.SourceRef)
 		if err != nil {
-			s.logger.Warn("skipping invalid SMILES",
-				logging.Int("line", i),
-				logging.String("smiles", smiles),
-				logging.Err(err))
-			skipped++
+			result.Failed = append(result.Failed, BatchRegistrationError{Index: i, SMILES: req.SMILES, Error: err})
 			continue
 		}
 
-		// Calculate fingerprint and properties (non-blocking errors)
-		_ = mol.CalculateFingerprint(mtypes.FPMorgan)
-		_ = mol.CalculateProperties()
+		ids, err := s.fpCalculator.Standardize(ctx, req.SMILES)
+		if err != nil {
+			result.Failed = append(result.Failed, BatchRegistrationError{Index: i, SMILES: req.SMILES, Error: err})
+			continue
+		}
 
-		validMols = append(validMols, mol)
+		exists, err := s.repo.ExistsByInChIKey(ctx, ids.InChIKey)
+		if err == nil && exists {
+			existing, _ := s.repo.FindByInChIKey(ctx, ids.InChIKey)
+			if existing != nil {
+				result.Succeeded = append(result.Succeeded, existing)
+				result.DuplicateCount++
+				continue
+			}
+		}
+
+		_ = mol.SetStructureIdentifiers(ids.CanonicalSMILES, ids.InChI, ids.InChIKey, ids.Formula, ids.Weight)
+		// Add properties and tags from request
+		for _, tag := range req.Tags { _ = mol.AddTag(tag) }
+		for _, prop := range req.Properties { _ = mol.AddProperty(prop) }
+
+		candidates = append(candidates, mol)
+		smilesToProcess = append(smilesToProcess, ids.CanonicalSMILES)
 	}
 
-	if len(validMols) == 0 {
-		return 0, fmt.Errorf("no valid molecules to import")
+	if len(candidates) > 0 {
+		opts := DefaultFingerprintCalcOptions()
+		// Batch calculate Morgan
+		morgans, _ := s.fpCalculator.BatchCalculate(ctx, smilesToProcess, FingerprintMorgan, opts)
+		// Batch calculate MACCS
+		maccss, _ := s.fpCalculator.BatchCalculate(ctx, smilesToProcess, FingerprintMACCS, opts)
+
+		toSave := make([]*Molecule, 0, len(candidates))
+		for j, mol := range candidates {
+			if j < len(morgans) && morgans[j] != nil { _ = mol.AddFingerprint(morgans[j]) }
+			if j < len(maccss) && maccss[j] != nil { _ = mol.AddFingerprint(maccss[j]) }
+
+			if err := mol.Activate(); err == nil {
+				toSave = append(toSave, mol)
+			}
+		}
+
+		if len(toSave) > 0 {
+			_, err := s.repo.BatchSave(ctx, toSave)
+			if err != nil {
+				s.logger.Error("batch save failed", logging.Error(err))
+			}
+			result.Succeeded = append(result.Succeeded, toSave...)
+		}
 	}
 
-	// Batch save
-	if err := s.repo.BatchSave(ctx, validMols); err != nil {
-		return 0, errors.Wrap(err, errors.CodeDatabaseError, "batch save failed")
-	}
-
-	s.logger.Info("batch import completed",
-		logging.Int("total", len(smilesLines)),
-		logging.Int("imported", len(validMols)),
-		logging.Int("skipped", skipped))
-
-	return len(validMols), nil
+	return result, nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Patent Association
-// ─────────────────────────────────────────────────────────────────────────────
-
-// GetMoleculesByPatent retrieves all molecules extracted from a specific patent.
-func (s *Service) GetMoleculesByPatent(ctx context.Context, patentID common.ID) ([]*Molecule, error) {
-	if patentID == "" {
-		return nil, errors.InvalidParam("patent ID cannot be empty")
+// GetMolecule retrieves a molecule by ID.
+func (s *MoleculeService) GetMolecule(ctx context.Context, id string) (*Molecule, error) {
+	if id == "" {
+		return nil, errors.New(errors.ErrCodeValidation, "id cannot be empty")
 	}
+	return s.repo.FindByID(ctx, id)
+}
 
-	mols, err := s.repo.FindByPatentID(ctx, patentID)
+// GetMoleculeByInChIKey retrieves a molecule by InChIKey.
+func (s *MoleculeService) GetMoleculeByInChIKey(ctx context.Context, inchiKey string) (*Molecule, error) {
+	if !inchiKeyRegex.MatchString(inchiKey) {
+		return nil, errors.New(errors.ErrCodeValidation, "invalid inchiKey format")
+	}
+	return s.repo.FindByInChIKey(ctx, inchiKey)
+}
+
+// SearchMolecules searches for molecules.
+func (s *MoleculeService) SearchMolecules(ctx context.Context, query *MoleculeQuery) (*MoleculeSearchResult, error) {
+	if query == nil {
+		return nil, errors.New(errors.ErrCodeValidation, "query cannot be nil")
+	}
+	if err := query.Validate(); err != nil {
+		return nil, err
+	}
+	return s.repo.Search(ctx, query)
+}
+
+// CalculateFingerprints computes specified fingerprints for a molecule.
+func (s *MoleculeService) CalculateFingerprints(ctx context.Context, moleculeID string, fpTypes []FingerprintType) error {
+	mol, err := s.repo.FindByID(ctx, moleculeID)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.CodeDatabaseError, "failed to retrieve molecules by patent")
+		return err
 	}
 
-	s.logger.Debug("retrieved molecules by patent",
-		logging.String("patent_id", string(patentID)),
-		logging.Int("count", len(mols)))
+	opts := DefaultFingerprintCalcOptions()
+	updated := false
+	for _, ft := range fpTypes {
+		if mol.HasFingerprint(ft) {
+			continue
+		}
+		fp, err := s.fpCalculator.Calculate(ctx, mol.SMILES(), ft, opts)
+		if err != nil {
+			s.logger.Error("failed to calculate fingerprint", logging.String("molecule_id", moleculeID), logging.String("type", string(ft)), logging.Error(err))
+			continue
+		}
+		_ = mol.AddFingerprint(fp)
+		updated = true
+	}
 
-	return mols, nil
+	if updated {
+		return s.repo.Update(ctx, mol)
+	}
+	return nil
 }
 
+// FindSimilarMolecules searches for molecules similar to a target SMILES.
+func (s *MoleculeService) FindSimilarMolecules(ctx context.Context, targetSMILES string, fpType FingerprintType, threshold float64, limit int) ([]*SimilarityResult, error) {
+	if targetSMILES == "" {
+		return nil, errors.New(errors.ErrCodeValidation, "targetSMILES cannot be empty")
+	}
+	if threshold < 0 || threshold > 1 {
+		return nil, errors.New(errors.ErrCodeValidation, "threshold must be between 0 and 1")
+	}
+
+	opts := DefaultFingerprintCalcOptions()
+	fp, err := s.fpCalculator.Calculate(ctx, targetSMILES, fpType, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	metric := MetricTanimoto
+	if fp.IsDenseVector() {
+		metric = MetricCosine
+	}
+
+	return s.similarityEngine.SearchSimilar(ctx, fp, metric, threshold, limit)
+}
+
+// MoleculeComparisonResult contains results of comparing two molecules.
+type MoleculeComparisonResult struct {
+	Molecule1SMILES         string
+	Molecule2SMILES         string
+	Scores                  map[FingerprintType]float64
+	FusedScore              float64
+	IsStructurallyIdentical bool
+}
+
+// CompareMolecules calculates similarity scores between two SMILES strings.
+func (s *MoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2 string, fpTypes []FingerprintType) (*MoleculeComparisonResult, error) {
+	if smiles1 == "" || smiles2 == "" {
+		return nil, errors.New(errors.ErrCodeValidation, "SMILES strings cannot be empty")
+	}
+	if len(fpTypes) == 0 {
+		return nil, errors.New(errors.ErrCodeValidation, "at least one fingerprint type required")
+	}
+
+	ids1, err1 := s.fpCalculator.Standardize(ctx, smiles1)
+	ids2, err2 := s.fpCalculator.Standardize(ctx, smiles2)
+
+	opts := DefaultFingerprintCalcOptions()
+	scores := make(map[FingerprintType]float64)
+
+	for _, ft := range fpTypes {
+		fp1, err := s.fpCalculator.Calculate(ctx, smiles1, ft, opts)
+		if err != nil { return nil, err }
+		fp2, err := s.fpCalculator.Calculate(ctx, smiles2, ft, opts)
+		if err != nil { return nil, err }
+
+		metric := MetricTanimoto
+		if ft == FingerprintGNN {
+			metric = MetricCosine
+		}
+		score, err := s.similarityEngine.ComputeSimilarity(fp1, fp2, metric)
+		if err != nil { return nil, err }
+		scores[ft] = score
+	}
+
+	fusion := &WeightedAverageFusion{}
+	fused, _ := fusion.Fuse(scores, nil)
+
+	identical := false
+	if err1 == nil && err2 == nil {
+		identical = ids1.InChIKey == ids2.InChIKey
+	}
+
+	return &MoleculeComparisonResult{
+		Molecule1SMILES:         smiles1,
+		Molecule2SMILES:         smiles2,
+		Scores:                  scores,
+		FusedScore:              fused,
+		IsStructurallyIdentical: identical,
+	}, nil
+}
+
+// ArchiveMolecule transitions a molecule to Archived status.
+func (s *MoleculeService) ArchiveMolecule(ctx context.Context, id string) error {
+	mol, err := s.repo.FindByID(ctx, id)
+	if err != nil { return err }
+	if err := mol.Archive(); err != nil { return err }
+	return s.repo.Update(ctx, mol)
+}
+
+// DeleteMolecule transitions a molecule to Deleted status.
+func (s *MoleculeService) DeleteMolecule(ctx context.Context, id string) error {
+	mol, err := s.repo.FindByID(ctx, id)
+	if err != nil { return err }
+	if err := mol.MarkDeleted(); err != nil { return err }
+	return s.repo.Update(ctx, mol)
+}
+
+// AddMoleculeProperties adds properties to an existing molecule.
+func (s *MoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID string, properties []*MolecularProperty) error {
+	mol, err := s.repo.FindByID(ctx, moleculeID)
+	if err != nil { return err }
+	for _, p := range properties {
+		if err := mol.AddProperty(p); err != nil { return err }
+	}
+	return s.repo.Update(ctx, mol)
+}
+
+// TagMolecule adds tags to an existing molecule.
+func (s *MoleculeService) TagMolecule(ctx context.Context, moleculeID string, tags []string) error {
+	mol, err := s.repo.FindByID(ctx, moleculeID)
+	if err != nil { return err }
+	for _, t := range tags {
+		if err := mol.AddTag(t); err != nil { return err }
+	}
+	return s.repo.Update(ctx, mol)
+}
+
+//Personal.AI order the ending
