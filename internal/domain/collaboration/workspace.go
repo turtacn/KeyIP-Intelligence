@@ -1,351 +1,319 @@
-// Package collaboration implements the collaboration bounded context for the
-// KeyIP-Intelligence platform, enabling multi-user workspaces with fine-grained
-// access control over shared patents, portfolios, and reports.
 package collaboration
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MemberRole — enumeration of workspace membership roles
-// ─────────────────────────────────────────────────────────────────────────────
-
-// MemberRole defines the privilege level a user has within a workspace.
-// Roles form a strict hierarchy: Owner > Admin > Editor > Viewer.
-type MemberRole string
+// WorkspaceStatus defines the status of a workspace.
+type WorkspaceStatus string
 
 const (
-	// RoleOwner has full control: can delete workspace, manage all members,
-	// and perform all resource operations.
-	RoleOwner MemberRole = "owner"
-
-	// RoleAdmin can manage members (invite, remove, change roles except Owner),
-	// share/unshare resources, and perform all resource operations.
-	RoleAdmin MemberRole = "admin"
-
-	// RoleEditor can read and modify shared resources but cannot manage
-	// workspace membership or sharing settings.
-	RoleEditor MemberRole = "editor"
-
-	// RoleViewer has read-only access to all shared resources in the workspace.
-	RoleViewer MemberRole = "viewer"
+	WorkspaceStatusActive    WorkspaceStatus = "active"
+	WorkspaceStatusSuspended WorkspaceStatus = "suspended"
+	WorkspaceStatusArchived  WorkspaceStatus = "archived"
+	WorkspaceStatusDeleted   WorkspaceStatus = "deleted"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Value objects
-// ─────────────────────────────────────────────────────────────────────────────
+// WorkspacePlan defines the subscription plan of a workspace.
+type WorkspacePlan string
 
-// Member represents a user's membership in a workspace.
-// It is a value object embedded in the Workspace aggregate.
-type Member struct {
-	// UserID uniquely identifies the user across the platform.
-	UserID common.UserID `json:"user_id"`
+const (
+	PlanFree       WorkspacePlan = "free"
+	PlanPro        WorkspacePlan = "pro"
+	PlanEnterprise WorkspacePlan = "enterprise"
+)
 
-	// Role defines the user's privilege level within this workspace.
-	Role MemberRole `json:"role"`
-
-	// JoinedAt records when the user became a member (accepted invitation).
-	JoinedAt time.Time `json:"joined_at"`
-
-	// InvitedBy records which user sent the invitation that led to this membership.
-	InvitedBy common.UserID `json:"invited_by"`
+// WorkspaceSettings defines the settings of a workspace.
+type WorkspaceSettings struct {
+	DefaultCurrency          string   `json:"default_currency"`
+	DefaultJurisdiction      string   `json:"default_jurisdiction"`
+	AnnuityReminderDays      []int    `json:"annuity_reminder_days"`
+	DeadlineReminderDays     []int    `json:"deadline_reminder_days"`
+	EnableEmailNotifications bool     `json:"enable_email_notifications"`
+	EnableInAppNotifications bool     `json:"enable_in_app_notifications"`
+	MaxPortfolios            int      `json:"max_portfolios"`
+	MaxMembers               int      `json:"max_members"`
+	AIFeaturesEnabled        bool     `json:"ai_features_enabled"`
+	Language                 string   `json:"language"`
+	Timezone                 string   `json:"timezone"`
 }
 
-// SharedResource represents a patent, portfolio, or report that has been
-// shared with all members of a workspace.
-type SharedResource struct {
-	// ResourceID is the platform-wide unique identifier of the shared entity.
-	ResourceID common.ID `json:"resource_id"`
-
-	// ResourceType classifies the entity: "patent", "portfolio", "report".
-	ResourceType string `json:"resource_type"`
-
-	// SharedBy records the user who added this resource to the workspace.
-	SharedBy common.UserID `json:"shared_by"`
-
-	// SharedAt is the UTC timestamp when the resource was shared.
-	SharedAt time.Time `json:"shared_at"`
-
-	// AccessLevel defines the maximum permission any workspace member has:
-	// "read" or "write".  Individual member roles may further restrict this.
-	AccessLevel string `json:"access_level"`
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Workspace — aggregate root
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Workspace is the aggregate root for the collaboration bounded context.
-// It groups users and shared resources together under a common namespace with
-// role-based access control.
+// Workspace is the aggregate root for a collaboration unit.
 type Workspace struct {
-	common.BaseEntity
-
-	// Name is the human-readable workspace identifier shown in the UI.
-	Name string `json:"name"`
-
-	// Description explains the purpose of this workspace (optional).
-	Description string `json:"description"`
-
-	// OwnerID identifies the user who created the workspace and holds ultimate
-	// control.  The owner cannot be removed and has all permissions.
-	OwnerID common.UserID `json:"owner_id"`
-
-	// Members lists all users with access to this workspace, including the owner.
-	Members []Member `json:"members"`
-
-	// SharedResources lists all patents, portfolios, and reports accessible to
-	// workspace members.
-	SharedResources []SharedResource `json:"shared_resources"`
-
-	// Status tracks the workspace lifecycle (active, archived, deleted).
-	Status common.Status `json:"status"`
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Slug         string            `json:"slug"`
+	Description  string            `json:"description"`
+	OwnerID      string            `json:"owner_id"`
+	Status       WorkspaceStatus   `json:"status"`
+	Plan         WorkspacePlan     `json:"plan"`
+	Settings     WorkspaceSettings `json:"settings"`
+	PortfolioIDs []string          `json:"portfolio_ids"`
+	MemberCount  int               `json:"member_count"`
+	LogoURL      string            `json:"logo_url"`
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Factory function
-// ─────────────────────────────────────────────────────────────────────────────
+// DefaultWorkspaceSettings returns default settings for a free plan.
+func DefaultWorkspaceSettings() WorkspaceSettings {
+	return WorkspaceSettings{
+		DefaultCurrency:          "USD",
+		DefaultJurisdiction:      "US",
+		AnnuityReminderDays:      []int{7, 30, 60},
+		DeadlineReminderDays:     []int{7, 14, 30},
+		EnableEmailNotifications: true,
+		EnableInAppNotifications: true,
+		MaxPortfolios:            5,
+		MaxMembers:               3,
+		AIFeaturesEnabled:        false,
+		Language:                 "en",
+		Timezone:                 "UTC",
+	}
+}
 
-// NewWorkspace constructs a new workspace with the given owner.
-// The owner is automatically added as a member with RoleOwner.
-// Returns an error if name is empty.
-func NewWorkspace(name, description string, ownerID common.UserID) (*Workspace, error) {
-	if name == "" {
-		return nil, errors.InvalidParam("workspace name must not be empty")
+// PlanLimits returns settings for a specific plan.
+func PlanLimits(plan WorkspacePlan) WorkspaceSettings {
+	settings := DefaultWorkspaceSettings()
+	switch plan {
+	case PlanFree:
+		settings.MaxPortfolios = 5
+		settings.MaxMembers = 3
+		settings.AIFeaturesEnabled = false
+	case PlanPro:
+		settings.MaxPortfolios = 50
+		settings.MaxMembers = 20
+		settings.AIFeaturesEnabled = true
+	case PlanEnterprise:
+		settings.MaxPortfolios = -1
+		settings.MaxMembers = -1
+		settings.AIFeaturesEnabled = true
+	}
+	return settings
+}
+
+// NewWorkspace creates a new workspace.
+func NewWorkspace(name, ownerID string) (*Workspace, error) {
+	if name == "" || len(name) > 100 {
+		return nil, errors.InvalidParam("name must be between 1 and 100 characters")
 	}
 	if ownerID == "" {
-		return nil, errors.InvalidParam("owner ID must not be empty")
+		return nil, errors.InvalidParam("ownerID is required")
 	}
 
 	now := time.Now().UTC()
-	ws := &Workspace{
-		BaseEntity: common.BaseEntity{
-			ID:        common.NewID(),
-			CreatedAt: now,
-			UpdatedAt: now,
-			Version:   1,
-		},
+	return &Workspace{
+		ID:          uuid.New().String(),
 		Name:        name,
-		Description: description,
 		OwnerID:     ownerID,
-		Status:      common.StatusActive,
-		Members: []Member{
-			{
-				UserID:    ownerID,
-				Role:      RoleOwner,
-				JoinedAt:  now,
-				InvitedBy: ownerID, // owner invites themselves
-			},
-		},
-		SharedResources: []SharedResource{},
-	}
-
-	return ws, nil
+		Status:      WorkspaceStatusActive,
+		Plan:        PlanFree,
+		Settings:    DefaultWorkspaceSettings(),
+		MemberCount: 1,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}, nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Member management
-// ─────────────────────────────────────────────────────────────────────────────
-
-// AddMember adds a new member to the workspace.
-// Returns an error if the user is already a member.
-func (w *Workspace) AddMember(userID common.UserID, role MemberRole, invitedBy common.UserID) error {
-	if userID == "" {
-		return errors.InvalidParam("user ID must not be empty")
+// UpdateName updates the workspace name.
+func (w *Workspace) UpdateName(name string) error {
+	if name == "" || len(name) > 100 {
+		return errors.InvalidParam("name must be between 1 and 100 characters")
 	}
-
-	// Check for duplicate membership.
-	for _, m := range w.Members {
-		if m.UserID == userID {
-			return errors.Conflict(fmt.Sprintf("user %s is already a member", userID))
-		}
-	}
-
-	w.Members = append(w.Members, Member{
-		UserID:    userID,
-		Role:      role,
-		JoinedAt:  time.Now().UTC(),
-		InvitedBy: invitedBy,
-	})
+	w.Name = name
 	w.UpdatedAt = time.Now().UTC()
-	w.Version++
-
 	return nil
 }
 
-// RemoveMember removes a member from the workspace.
-// The owner cannot be removed; attempting to do so returns an error.
-func (w *Workspace) RemoveMember(userID common.UserID) error {
-	if userID == w.OwnerID {
-		return errors.Forbidden("cannot remove workspace owner")
+// UpdateDescription updates the workspace description.
+func (w *Workspace) UpdateDescription(description string) error {
+	if len(description) > 500 {
+		return errors.InvalidParam("description must be at most 500 characters")
 	}
-
-	idx := -1
-	for i, m := range w.Members {
-		if m.UserID == userID {
-			idx = i
-			break
-		}
-	}
-
-	if idx == -1 {
-		return errors.NotFound(fmt.Sprintf("user %s is not a member", userID))
-	}
-
-	// Remove by replacing with last element and truncating.
-	w.Members[idx] = w.Members[len(w.Members)-1]
-	w.Members = w.Members[:len(w.Members)-1]
-
+	w.Description = description
 	w.UpdatedAt = time.Now().UTC()
-	w.Version++
-
 	return nil
 }
 
-// ChangeMemberRole updates a member's role.
-// The owner's role cannot be changed.
-func (w *Workspace) ChangeMemberRole(userID common.UserID, newRole MemberRole) error {
-	if userID == w.OwnerID {
-		return errors.Forbidden("cannot change owner role")
-	}
+// UpdateSettings updates the workspace settings.
+func (w *Workspace) UpdateSettings(settings WorkspaceSettings) error {
+	// Preserve plan-controlled limits
+	settings.MaxPortfolios = w.Settings.MaxPortfolios
+	settings.MaxMembers = w.Settings.MaxMembers
+	settings.AIFeaturesEnabled = w.Settings.AIFeaturesEnabled
 
-	found := false
-	for i := range w.Members {
-		if w.Members[i].UserID == userID {
-			w.Members[i].Role = newRole
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return errors.NotFound(fmt.Sprintf("user %s is not a member", userID))
-	}
-
+	w.Settings = settings
 	w.UpdatedAt = time.Now().UTC()
-	w.Version++
-
 	return nil
 }
 
-// IsMember returns true if the given user is a member of this workspace.
-func (w *Workspace) IsMember(userID common.UserID) bool {
-	for _, m := range w.Members {
-		if m.UserID == userID {
-			return true
-		}
-	}
-	return false
-}
-
-// GetMemberRole returns the role of a member.
-// Returns an error if the user is not a member.
-func (w *Workspace) GetMemberRole(userID common.UserID) (MemberRole, error) {
-	for _, m := range w.Members {
-		if m.UserID == userID {
-			return m.Role, nil
-		}
-	}
-	return "", errors.NotFound(fmt.Sprintf("user %s is not a member", userID))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Resource sharing
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ShareResource adds a resource to the workspace's shared collection.
-// Returns an error if the resource is already shared.
-func (w *Workspace) ShareResource(resource SharedResource) error {
-	if resource.ResourceID == "" {
-		return errors.InvalidParam("resource ID must not be empty")
-	}
-	if resource.ResourceType == "" {
-		return errors.InvalidParam("resource type must not be empty")
-	}
-	if resource.AccessLevel != "read" && resource.AccessLevel != "write" {
-		return errors.InvalidParam("access level must be 'read' or 'write'")
+// UpgradePlan upgrades the workspace plan.
+func (w *Workspace) UpgradePlan(plan WorkspacePlan) error {
+	planRank := map[WorkspacePlan]int{
+		PlanFree:       0,
+		PlanPro:        1,
+		PlanEnterprise: 2,
 	}
 
-	// Check for duplicate.
-	for _, r := range w.SharedResources {
-		if r.ResourceID == resource.ResourceID {
-			return errors.Conflict(fmt.Sprintf("resource %s is already shared", resource.ResourceID))
-		}
+	currentRank, ok1 := planRank[w.Plan]
+	newRank, ok2 := planRank[plan]
+
+	if !ok2 {
+		return errors.InvalidParam("invalid plan")
+	}
+	if !ok1 || newRank <= currentRank {
+		return errors.InvalidParam("can only upgrade to a higher plan")
 	}
 
-	resource.SharedAt = time.Now().UTC()
-	w.SharedResources = append(w.SharedResources, resource)
+	w.Plan = plan
+	limits := PlanLimits(plan)
+	w.Settings.MaxPortfolios = limits.MaxPortfolios
+	w.Settings.MaxMembers = limits.MaxMembers
+	w.Settings.AIFeaturesEnabled = limits.AIFeaturesEnabled
 	w.UpdatedAt = time.Now().UTC()
-	w.Version++
-
 	return nil
 }
 
-// UnshareResource removes a resource from the workspace's shared collection.
-func (w *Workspace) UnshareResource(resourceID common.ID) error {
-	idx := -1
-	for i, r := range w.SharedResources {
-		if r.ResourceID == resourceID {
-			idx = i
-			break
+// AddPortfolio adds a portfolio to the workspace.
+func (w *Workspace) AddPortfolio(portfolioID string) error {
+	if portfolioID == "" {
+		return errors.InvalidParam("portfolioID is required")
+	}
+	for _, id := range w.PortfolioIDs {
+		if id == portfolioID {
+			return errors.Conflict("portfolio already added to workspace")
 		}
 	}
-
-	if idx == -1 {
-		return errors.NotFound(fmt.Sprintf("resource %s is not shared in this workspace", resourceID))
+	if w.Settings.MaxPortfolios != -1 && len(w.PortfolioIDs) >= w.Settings.MaxPortfolios {
+		return errors.Forbidden("maximum number of portfolios reached for current plan")
 	}
-
-	w.SharedResources[idx] = w.SharedResources[len(w.SharedResources)-1]
-	w.SharedResources = w.SharedResources[:len(w.SharedResources)-1]
-
+	w.PortfolioIDs = append(w.PortfolioIDs, portfolioID)
 	w.UpdatedAt = time.Now().UTC()
-	w.Version++
-
 	return nil
 }
 
-// HasAccess checks if a user has the required access level to a resource.
-// Returns true if:
-// 1. The user is a member of the workspace
-// 2. The resource is shared in this workspace
-// 3. The user's role grants sufficient permissions
-// 4. The resource's access level permits the required operation
-func (w *Workspace) HasAccess(userID common.UserID, resourceID common.ID, requiredLevel string) bool {
-	// Check membership.
-	role, err := w.GetMemberRole(userID)
-	if err != nil {
-		return false
-	}
-
-	// Find the resource.
-	var resource *SharedResource
-	for i := range w.SharedResources {
-		if w.SharedResources[i].ResourceID == resourceID {
-			resource = &w.SharedResources[i]
-			break
+// RemovePortfolio removes a portfolio from the workspace.
+func (w *Workspace) RemovePortfolio(portfolioID string) error {
+	for i, id := range w.PortfolioIDs {
+		if id == portfolioID {
+			w.PortfolioIDs = append(w.PortfolioIDs[:i], w.PortfolioIDs[i+1:]...)
+			w.UpdatedAt = time.Now().UTC()
+			return nil
 		}
 	}
-	if resource == nil {
-		return false
-	}
+	return errors.NotFound("portfolio not found in workspace")
+}
 
-	// Owner and Admin always have full access.
-	if role == RoleOwner || role == RoleAdmin {
+// IncrementMemberCount increments the member count.
+func (w *Workspace) IncrementMemberCount() {
+	w.MemberCount++
+	w.UpdatedAt = time.Now().UTC()
+}
+
+// DecrementMemberCount decrements the member count.
+func (w *Workspace) DecrementMemberCount() {
+	if w.MemberCount > 1 {
+		w.MemberCount--
+		w.UpdatedAt = time.Now().UTC()
+	}
+}
+
+// CanAddMember checks if a member can be added to the workspace.
+func (w *Workspace) CanAddMember() bool {
+	if w.Settings.MaxMembers == -1 {
 		return true
 	}
-
-	// For Editor and Viewer, check the resource's access level.
-	if requiredLevel == "write" {
-		// Write requires both role Editor+ and resource access_level "write".
-		return role == RoleEditor && resource.AccessLevel == "write"
-	}
-
-	// Read access: Editor and Viewer both have read on any shared resource.
-	return role == RoleEditor || role == RoleViewer
+	return w.MemberCount < w.Settings.MaxMembers
 }
 
+// CanAddPortfolio checks if a portfolio can be added to the workspace.
+func (w *Workspace) CanAddPortfolio() bool {
+	if w.Settings.MaxPortfolios == -1 {
+		return true
+	}
+	return len(w.PortfolioIDs) < w.Settings.MaxPortfolios
+}
+
+// Suspend suspends the workspace.
+func (w *Workspace) Suspend(reason string) error {
+	if w.Status != WorkspaceStatusActive {
+		return errors.InvalidState("only active workspaces can be suspended")
+	}
+	w.Status = WorkspaceStatusSuspended
+	w.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// Reactivate reactivates the workspace.
+func (w *Workspace) Reactivate() error {
+	if w.Status != WorkspaceStatusSuspended {
+		return errors.InvalidState("only suspended workspaces can be reactivated")
+	}
+	w.Status = WorkspaceStatusActive
+	w.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// Archive archives the workspace.
+func (w *Workspace) Archive() error {
+	if w.Status != WorkspaceStatusActive && w.Status != WorkspaceStatusSuspended {
+		return errors.InvalidState("only active or suspended workspaces can be archived")
+	}
+	w.Status = WorkspaceStatusArchived
+	w.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// MarkDeleted marks the workspace as deleted.
+func (w *Workspace) MarkDeleted() error {
+	w.Status = WorkspaceStatusDeleted
+	w.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// IsActive checks if the workspace is active.
+func (w *Workspace) IsActive() bool {
+	return w.Status == WorkspaceStatusActive
+}
+
+// TransferOwnership transfers the workspace ownership.
+func (w *Workspace) TransferOwnership(newOwnerID string) error {
+	if newOwnerID == "" {
+		return errors.InvalidParam("newOwnerID is required")
+	}
+	if newOwnerID == w.OwnerID {
+		return errors.InvalidParam("cannot transfer ownership to current owner")
+	}
+	w.OwnerID = newOwnerID
+	w.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// Validate validates the workspace.
+func (w *Workspace) Validate() error {
+	if w.ID == "" || w.Name == "" || w.Slug == "" || w.OwnerID == "" {
+		return errors.InvalidParam("ID, Name, Slug, and OwnerID are required")
+	}
+	if w.MemberCount < 1 {
+		return errors.InvalidParam("MemberCount must be at least 1")
+	}
+	validStatus := map[WorkspaceStatus]bool{
+		WorkspaceStatusActive: true, WorkspaceStatusSuspended: true,
+		WorkspaceStatusArchived: true, WorkspaceStatusDeleted: true,
+	}
+	if !validStatus[w.Status] {
+		return errors.InvalidParam("invalid status")
+	}
+	validPlan := map[WorkspacePlan]bool{
+		PlanFree: true, PlanPro: true, PlanEnterprise: true,
+	}
+	if !validPlan[w.Plan] {
+		return errors.InvalidParam("invalid plan")
+	}
+	return nil
+}
+
+//Personal.AI order the ending

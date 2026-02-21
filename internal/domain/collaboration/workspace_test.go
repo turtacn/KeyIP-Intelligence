@@ -1,291 +1,216 @@
-// Package collaboration_test provides unit tests for the Workspace aggregate root.
-package collaboration_test
+package collaboration
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/collaboration"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNewWorkspace
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestNewWorkspace_ValidParams(t *testing.T) {
-	t.Parallel()
-
-	ownerID := common.UserID("user-123")
-	ws, err := collaboration.NewWorkspace("My Workspace", "Description", ownerID)
-
-	require.NoError(t, err)
-	require.NotNil(t, ws)
-	assert.Equal(t, "My Workspace", ws.Name)
-	assert.Equal(t, "Description", ws.Description)
-	assert.Equal(t, ownerID, ws.OwnerID)
-	assert.Equal(t, common.StatusActive, ws.Status)
-	assert.NotEmpty(t, ws.ID)
+func TestNewWorkspace_Success(t *testing.T) {
+	w, err := NewWorkspace("My Workspace", "owner1")
+	assert.NoError(t, err)
+	assert.NotNil(t, w)
+	assert.NotEmpty(t, w.ID)
+	assert.Equal(t, "My Workspace", w.Name)
+	assert.Equal(t, "owner1", w.OwnerID)
+	assert.Equal(t, WorkspaceStatusActive, w.Status)
+	assert.Equal(t, PlanFree, w.Plan)
+	assert.Equal(t, 1, w.MemberCount)
 }
 
-func TestNewWorkspace_OwnerAutomaticallyAddedAsMember(t *testing.T) {
-	t.Parallel()
-
-	ownerID := common.UserID("user-owner")
-	ws, err := collaboration.NewWorkspace("Test", "", ownerID)
-
-	require.NoError(t, err)
-	require.Len(t, ws.Members, 1, "owner should be auto-added")
-	assert.Equal(t, ownerID, ws.Members[0].UserID)
-	assert.Equal(t, collaboration.RoleOwner, ws.Members[0].Role)
-	assert.Equal(t, ownerID, ws.Members[0].InvitedBy)
+func TestNewWorkspace_EmptyName(t *testing.T) {
+	_, err := NewWorkspace("", "owner1")
+	assert.Error(t, err)
 }
 
-func TestNewWorkspace_EmptyNameReturnsError(t *testing.T) {
-	t.Parallel()
-
-	_, err := collaboration.NewWorkspace("", "desc", "user-123")
-	require.Error(t, err)
-	assert.True(t, errors.IsCode(err, errors.CodeInvalidParam))
+func TestNewWorkspace_NameTooLong(t *testing.T) {
+	name := ""
+	for i := 0; i < 101; i++ {
+		name += "a"
+	}
+	_, err := NewWorkspace(name, "owner1")
+	assert.Error(t, err)
 }
 
-func TestNewWorkspace_EmptyOwnerIDReturnsError(t *testing.T) {
-	t.Parallel()
-
-	_, err := collaboration.NewWorkspace("name", "desc", "")
-	require.Error(t, err)
-	assert.True(t, errors.IsCode(err, errors.CodeInvalidParam))
+func TestNewWorkspace_EmptyOwnerID(t *testing.T) {
+	_, err := NewWorkspace("My Workspace", "")
+	assert.Error(t, err)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestAddMember
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestAddMember_Success(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	newUser := common.UserID("user-new")
-
-	err := ws.AddMember(newUser, collaboration.RoleEditor, "owner")
-	require.NoError(t, err)
-
-	assert.Len(t, ws.Members, 2)
-	assert.Equal(t, newUser, ws.Members[1].UserID)
-	assert.Equal(t, collaboration.RoleEditor, ws.Members[1].Role)
+func TestNewWorkspace_DefaultSettings(t *testing.T) {
+	w, _ := NewWorkspace("My Workspace", "owner1")
+	assert.Equal(t, "USD", w.Settings.DefaultCurrency)
+	assert.Equal(t, "US", w.Settings.DefaultJurisdiction)
+	assert.Equal(t, []int{7, 30, 60}, w.Settings.AnnuityReminderDays)
+	assert.Equal(t, 5, w.Settings.MaxPortfolios)
+	assert.Equal(t, 3, w.Settings.MaxMembers)
 }
 
-func TestAddMember_DuplicateReturnsError(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	userID := common.UserID("user-dup")
-
-	err := ws.AddMember(userID, collaboration.RoleViewer, "owner")
-	require.NoError(t, err)
-
-	err = ws.AddMember(userID, collaboration.RoleEditor, "owner")
-	require.Error(t, err)
-	assert.True(t, errors.IsCode(err, errors.CodeConflict))
+func TestDefaultWorkspaceSettings(t *testing.T) {
+	s := DefaultWorkspaceSettings()
+	assert.Equal(t, "USD", s.DefaultCurrency)
+	assert.Equal(t, 5, s.MaxPortfolios)
 }
 
-func TestAddMember_EmptyUserIDReturnsError(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	err := ws.AddMember("", collaboration.RoleViewer, "owner")
-	require.Error(t, err)
-	assert.True(t, errors.IsCode(err, errors.CodeInvalidParam))
+func TestPlanLimits_Free(t *testing.T) {
+	s := PlanLimits(PlanFree)
+	assert.Equal(t, 5, s.MaxPortfolios)
+	assert.Equal(t, 3, s.MaxMembers)
+	assert.False(t, s.AIFeaturesEnabled)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestRemoveMember
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestRemoveMember_Success(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	userID := common.UserID("user-remove")
-	_ = ws.AddMember(userID, collaboration.RoleViewer, "owner")
-
-	err := ws.RemoveMember(userID)
-	require.NoError(t, err)
-	assert.Len(t, ws.Members, 1, "only owner should remain")
+func TestPlanLimits_Pro(t *testing.T) {
+	s := PlanLimits(PlanPro)
+	assert.Equal(t, 50, s.MaxPortfolios)
+	assert.Equal(t, 20, s.MaxMembers)
+	assert.True(t, s.AIFeaturesEnabled)
 }
 
-func TestRemoveMember_CannotRemoveOwner(t *testing.T) {
-	t.Parallel()
-
-	ownerID := common.UserID("owner")
-	ws, _ := collaboration.NewWorkspace("ws", "", ownerID)
-
-	err := ws.RemoveMember(ownerID)
-	require.Error(t, err)
-	assert.True(t, errors.IsCode(err, errors.CodeForbidden))
+func TestPlanLimits_Enterprise(t *testing.T) {
+	s := PlanLimits(PlanEnterprise)
+	assert.Equal(t, -1, s.MaxPortfolios)
+	assert.Equal(t, -1, s.MaxMembers)
+	assert.True(t, s.AIFeaturesEnabled)
 }
 
-func TestRemoveMember_NonExistentUserReturnsError(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	err := ws.RemoveMember("nonexistent")
-	require.Error(t, err)
-	assert.True(t, errors.IsCode(err, errors.CodeNotFound))
+func TestWorkspace_UpdateName_Success(t *testing.T) {
+	w, _ := NewWorkspace("Old Name", "owner1")
+	err := w.UpdateName("New Name")
+	assert.NoError(t, err)
+	assert.Equal(t, "New Name", w.Name)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestChangeMemberRole
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestChangeMemberRole_Success(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	userID := common.UserID("user-change")
-	_ = ws.AddMember(userID, collaboration.RoleViewer, "owner")
-
-	err := ws.ChangeMemberRole(userID, collaboration.RoleEditor)
-	require.NoError(t, err)
-
-	role, _ := ws.GetMemberRole(userID)
-	assert.Equal(t, collaboration.RoleEditor, role)
+func TestWorkspace_UpdateName_Empty(t *testing.T) {
+	w, _ := NewWorkspace("Old Name", "owner1")
+	err := w.UpdateName("")
+	assert.Error(t, err)
 }
 
-func TestChangeMemberRole_CannotChangeOwnerRole(t *testing.T) {
-	t.Parallel()
-
-	ownerID := common.UserID("owner")
-	ws, _ := collaboration.NewWorkspace("ws", "", ownerID)
-
-	err := ws.ChangeMemberRole(ownerID, collaboration.RoleAdmin)
-	require.Error(t, err)
-	assert.True(t, errors.IsCode(err, errors.CodeForbidden))
+func TestWorkspace_UpdateDescription_Success(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	err := w.UpdateDescription("A new description")
+	assert.NoError(t, err)
+	assert.Equal(t, "A new description", w.Description)
 }
 
-func TestChangeMemberRole_NonMemberReturnsError(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	err := ws.ChangeMemberRole("nonexistent", collaboration.RoleAdmin)
-	require.Error(t, err)
-	assert.True(t, errors.IsCode(err, errors.CodeNotFound))
+func TestWorkspace_UpdateSettings_Success(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	newSettings := DefaultWorkspaceSettings()
+	newSettings.DefaultCurrency = "EUR"
+	newSettings.MaxPortfolios = 100 // Should be ignored
+	err := w.UpdateSettings(newSettings)
+	assert.NoError(t, err)
+	assert.Equal(t, "EUR", w.Settings.DefaultCurrency)
+	assert.Equal(t, 5, w.Settings.MaxPortfolios) // Still 5 because of plan
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestHasAccess
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestHasAccess_MemberWithSufficientPermissions(t *testing.T) {
-	t.Parallel()
-
-	ownerID := common.UserID("owner")
-	ws, _ := collaboration.NewWorkspace("ws", "", ownerID)
-
-	resourceID := common.ID("res-1")
-	_ = ws.ShareResource(collaboration.SharedResource{
-		ResourceID:   resourceID,
-		ResourceType: "patent",
-		SharedBy:     ownerID,
-		AccessLevel:  "write",
-	})
-
-	// Owner has access to everything.
-	assert.True(t, ws.HasAccess(ownerID, resourceID, "write"))
-	assert.True(t, ws.HasAccess(ownerID, resourceID, "read"))
+func TestWorkspace_UpgradePlan_FreeToPro(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	err := w.UpgradePlan(PlanPro)
+	assert.NoError(t, err)
+	assert.Equal(t, PlanPro, w.Plan)
+	assert.Equal(t, 50, w.Settings.MaxPortfolios)
+	assert.Equal(t, 20, w.Settings.MaxMembers)
 }
 
-func TestHasAccess_NonMemberReturnsFalse(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	resourceID := common.ID("res-1")
-	_ = ws.ShareResource(collaboration.SharedResource{
-		ResourceID:   resourceID,
-		ResourceType: "patent",
-		SharedBy:     "owner",
-		AccessLevel:  "read",
-	})
-
-	nonMember := common.UserID("nonmember")
-	assert.False(t, ws.HasAccess(nonMember, resourceID, "read"))
+func TestWorkspace_UpgradePlan_Downgrade(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	w.UpgradePlan(PlanPro)
+	err := w.UpgradePlan(PlanFree)
+	assert.Error(t, err)
 }
 
-func TestHasAccess_ViewerCannotWrite(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	viewerID := common.UserID("viewer")
-	_ = ws.AddMember(viewerID, collaboration.RoleViewer, "owner")
-
-	resourceID := common.ID("res-1")
-	_ = ws.ShareResource(collaboration.SharedResource{
-		ResourceID:   resourceID,
-		ResourceType: "patent",
-		SharedBy:     "owner",
-		AccessLevel:  "write",
-	})
-
-	assert.True(t, ws.HasAccess(viewerID, resourceID, "read"))
-	assert.False(t, ws.HasAccess(viewerID, resourceID, "write"))
+func TestWorkspace_AddPortfolio_Success(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	err := w.AddPortfolio("port1")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(w.PortfolioIDs))
 }
 
-func TestHasAccess_EditorCanWriteIfResourcePermits(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	editorID := common.UserID("editor")
-	_ = ws.AddMember(editorID, collaboration.RoleEditor, "owner")
-
-	resourceID := common.ID("res-1")
-	_ = ws.ShareResource(collaboration.SharedResource{
-		ResourceID:   resourceID,
-		ResourceType: "patent",
-		SharedBy:     "owner",
-		AccessLevel:  "write",
-	})
-
-	assert.True(t, ws.HasAccess(editorID, resourceID, "write"))
-	assert.True(t, ws.HasAccess(editorID, resourceID, "read"))
+func TestWorkspace_AddPortfolio_Duplicate(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	w.AddPortfolio("port1")
+	err := w.AddPortfolio("port1")
+	assert.Error(t, err)
 }
 
-func TestHasAccess_EditorCannotWriteIfResourceReadOnly(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	editorID := common.UserID("editor")
-	_ = ws.AddMember(editorID, collaboration.RoleEditor, "owner")
-
-	resourceID := common.ID("res-1")
-	_ = ws.ShareResource(collaboration.SharedResource{
-		ResourceID:   resourceID,
-		ResourceType: "patent",
-		SharedBy:     "owner",
-		AccessLevel:  "read", // read-only
-	})
-
-	assert.True(t, ws.HasAccess(editorID, resourceID, "read"))
-	assert.False(t, ws.HasAccess(editorID, resourceID, "write"))
+func TestWorkspace_AddPortfolio_ExceedsLimit(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	w.Settings.MaxPortfolios = 1
+	w.AddPortfolio("port1")
+	err := w.AddPortfolio("port2")
+	assert.Error(t, err)
 }
 
-func TestHasAccess_AdminHasFullAccess(t *testing.T) {
-	t.Parallel()
-
-	ws, _ := collaboration.NewWorkspace("ws", "", "owner")
-	adminID := common.UserID("admin")
-	_ = ws.AddMember(adminID, collaboration.RoleAdmin, "owner")
-
-	resourceID := common.ID("res-1")
-	_ = ws.ShareResource(collaboration.SharedResource{
-		ResourceID:   resourceID,
-		ResourceType: "patent",
-		SharedBy:     "owner",
-		AccessLevel:  "read",
-	})
-
-	// Admin bypasses resource access level restrictions.
-	assert.True(t, ws.HasAccess(adminID, resourceID, "write"))
-	assert.True(t, ws.HasAccess(adminID, resourceID, "read"))
+func TestWorkspace_AddPortfolio_UnlimitedPlan(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	w.UpgradePlan(PlanPro)
+	w.UpgradePlan(PlanEnterprise)
+	for i := 0; i < 10; i++ {
+		err := w.AddPortfolio(string(rune(i)))
+		assert.NoError(t, err)
+	}
 }
 
+func TestWorkspace_RemovePortfolio_Success(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	w.AddPortfolio("port1")
+	err := w.RemovePortfolio("port1")
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(w.PortfolioIDs))
+}
+
+func TestWorkspace_RemovePortfolio_NotFound(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	err := w.RemovePortfolio("port1")
+	assert.Error(t, err)
+}
+
+func TestWorkspace_IncrementMemberCount(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	w.IncrementMemberCount()
+	assert.Equal(t, 2, w.MemberCount)
+}
+
+func TestWorkspace_DecrementMemberCount_MinimumOne(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	w.DecrementMemberCount()
+	assert.Equal(t, 1, w.MemberCount)
+}
+
+func TestWorkspace_CanAddMember_AtLimit(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	w.Settings.MaxMembers = 1
+	assert.False(t, w.CanAddMember())
+}
+
+func TestWorkspace_Suspend_Success(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	err := w.Suspend("reason")
+	assert.NoError(t, err)
+	assert.Equal(t, WorkspaceStatusSuspended, w.Status)
+}
+
+func TestWorkspace_Archive_FromSuspended(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	w.Suspend("reason")
+	err := w.Archive()
+	assert.NoError(t, err)
+	assert.Equal(t, WorkspaceStatusArchived, w.Status)
+}
+
+func TestWorkspace_TransferOwnership_Success(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	err := w.TransferOwnership("owner2")
+	assert.NoError(t, err)
+	assert.Equal(t, "owner2", w.OwnerID)
+}
+
+func TestWorkspace_Validate_Success(t *testing.T) {
+	w, _ := NewWorkspace("Name", "owner1")
+	w.Slug = "name"
+	err := w.Validate()
+	assert.NoError(t, err)
+}
+
+//Personal.AI order the ending

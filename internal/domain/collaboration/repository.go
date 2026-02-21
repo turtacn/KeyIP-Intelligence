@@ -1,40 +1,93 @@
-// Package collaboration defines the repository interface for workspace persistence.
 package collaboration
 
 import (
 	"context"
-
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// Repository defines the persistence contract for the Workspace aggregate.
-// Implementations must handle multi-tenancy isolation and optimistic locking.
-type Repository interface {
-	// SaveWorkspace persists a new workspace to the data store.
-	// Returns an error if a workspace with the same ID already exists.
-	SaveWorkspace(ctx context.Context, ws *Workspace) error
-
-	// FindWorkspaceByID retrieves a workspace by its unique identifier.
-	// Returns errors.CodeNotFound if no such workspace exists.
-	FindWorkspaceByID(ctx context.Context, id common.ID) (*Workspace, error)
-
-	// FindWorkspacesByUser returns all workspaces where the given user is a member,
-	// paginated according to the PageRequest.
-	FindWorkspacesByUser(ctx context.Context, userID common.UserID, page common.PageRequest) (*common.PageResponse[*Workspace], error)
-
-	// UpdateWorkspace persists changes to an existing workspace.
-	// Must enforce optimistic locking via the Version field: if the persisted
-	// Version differs from ws.Version, return errors.CodeConflict.
-	UpdateWorkspace(ctx context.Context, ws *Workspace) error
-
-	// DeleteWorkspace removes a workspace from the data store.
-	// Implementations may choose soft-delete (set Status = StatusDeleted) or
-	// hard-delete depending on audit requirements.
-	DeleteWorkspace(ctx context.Context, id common.ID) error
-
-	// FindWorkspacesByResource returns all workspaces that have shared the
-	// given resource (patent, portfolio, or report).
-	// Used by the application layer to determine which users can access a resource.
-	FindWorkspacesByResource(ctx context.Context, resourceID common.ID) ([]*Workspace, error)
+// WorkspaceRepository defines the persistence interface for workspaces.
+type WorkspaceRepository interface {
+	Save(ctx context.Context, workspace *Workspace) error
+	FindByID(ctx context.Context, id string) (*Workspace, error)
+	FindByOwnerID(ctx context.Context, ownerID string) ([]*Workspace, error)
+	FindByMemberID(ctx context.Context, userID string) ([]*Workspace, error)
+	FindBySlug(ctx context.Context, slug string) (*Workspace, error)
+	Delete(ctx context.Context, id string) error
+	Count(ctx context.Context, ownerID string) (int64, error)
 }
 
+// MemberRepository defines the persistence interface for member permissions.
+type MemberRepository interface {
+	Save(ctx context.Context, member *MemberPermission) error
+	FindByID(ctx context.Context, id string) (*MemberPermission, error)
+	FindByWorkspaceID(ctx context.Context, workspaceID string) ([]*MemberPermission, error)
+	FindByUserID(ctx context.Context, userID string) ([]*MemberPermission, error)
+	FindByWorkspaceAndUser(ctx context.Context, workspaceID, userID string) (*MemberPermission, error)
+	FindByRole(ctx context.Context, workspaceID string, role Role) ([]*MemberPermission, error)
+	Delete(ctx context.Context, id string) error
+	CountByWorkspace(ctx context.Context, workspaceID string) (int64, error)
+	CountByRole(ctx context.Context, workspaceID string) (map[Role]int64, error)
+}
+
+// CollaborationQueryOptions defines filtering and pagination for collaboration queries.
+type CollaborationQueryOptions struct {
+	Offset       int
+	Limit        int
+	ActiveOnly   bool
+	AcceptedOnly bool
+	RoleFilter   Role
+}
+
+// CollaborationQueryOption defines a functional option for collaboration queries.
+type CollaborationQueryOption func(*CollaborationQueryOptions)
+
+// WithCollabPagination sets pagination options.
+func WithCollabPagination(offset, limit int) CollaborationQueryOption {
+	return func(o *CollaborationQueryOptions) {
+		o.Offset = offset
+		o.Limit = limit
+	}
+}
+
+// WithActiveOnly filters for active members only.
+func WithActiveOnly() CollaborationQueryOption {
+	return func(o *CollaborationQueryOptions) {
+		o.ActiveOnly = true
+	}
+}
+
+// WithAcceptedOnly filters for accepted members only.
+func WithAcceptedOnly() CollaborationQueryOption {
+	return func(o *CollaborationQueryOptions) {
+		o.AcceptedOnly = true
+	}
+}
+
+// WithRoleFilter filters by role.
+func WithRoleFilter(role Role) CollaborationQueryOption {
+	return func(o *CollaborationQueryOptions) {
+		o.RoleFilter = role
+	}
+}
+
+// ApplyCollabOptions applies the given options and returns the final configuration.
+func ApplyCollabOptions(opts ...CollaborationQueryOption) CollaborationQueryOptions {
+	options := CollaborationQueryOptions{
+		Offset: 0,
+		Limit:  20,
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	if options.Limit > 100 {
+		options.Limit = 100
+	}
+	if options.Limit <= 0 {
+		options.Limit = 20
+	}
+	if options.Offset < 0 {
+		options.Offset = 0
+	}
+	return options
+}
+
+//Personal.AI order the ending

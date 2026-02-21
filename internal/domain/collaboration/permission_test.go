@@ -1,220 +1,384 @@
-// Package collaboration_test provides unit tests for the permission model.
-package collaboration_test
+package collaboration
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/collaboration"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestHasPermission
-// ─────────────────────────────────────────────────────────────────────────────
+func TestNewPermissionPolicy(t *testing.T) {
+	p := NewPermissionPolicy()
+	roles := p.ListRoles()
+	assert.Equal(t, 7, len(roles))
+}
 
-func TestHasPermission_OwnerHasAllPermissions(t *testing.T) {
-	t.Parallel()
+func TestHasPermission_Owner_AllAllowed(t *testing.T) {
+	p := NewPermissionPolicy()
+	resources := []ResourceType{ResourcePatent, ResourcePortfolio, ResourceWorkspace, ResourceSettings}
+	actions := []Action{ActionCreate, ActionRead, ActionUpdate, ActionDelete, ActionManageMembers, ActionManageSettings}
 
-	cases := []struct {
-		action   string
-		resource string
-	}{
-		{"read", "patent"},
-		{"write", "patent"},
-		{"delete", "patent"},
-		{"read", "portfolio"},
-		{"write", "portfolio"},
-		{"generate", "report"},
-		{"manage", "workspace"},
-		{"invite", "member"},
-		{"remove", "member"},
-	}
-
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.action+"_"+tc.resource, func(t *testing.T) {
-			t.Parallel()
-			assert.True(t, collaboration.HasPermission(collaboration.RoleOwner, tc.action, tc.resource))
-		})
+	for _, res := range resources {
+		for _, act := range actions {
+			assert.True(t, p.HasPermission(RoleOwner, res, act), "Owner should have permission for %s:%s", res, act)
+		}
 	}
 }
 
-func TestHasPermission_AdminCannotDelete(t *testing.T) {
-	t.Parallel()
-
-	assert.False(t, collaboration.HasPermission(collaboration.RoleAdmin, "delete", "patent"),
-		"Admin should not have delete permission")
+func TestHasPermission_Admin_ManageSettings_Denied(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.False(t, p.HasPermission(RoleAdmin, ResourceSettings, ActionManageSettings))
 }
 
-func TestHasPermission_AdminHasOtherPermissions(t *testing.T) {
-	t.Parallel()
+func TestHasPermission_Admin_ManageMembers_Allowed(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.True(t, p.HasPermission(RoleAdmin, ResourceWorkspace, ActionManageMembers))
+}
 
-	cases := []struct {
-		action   string
-		resource string
-	}{
-		{"read", "patent"},
-		{"write", "patent"},
-		{"manage", "workspace"},
-		{"invite", "member"},
-		{"remove", "member"},
+func TestHasPermission_Manager_Patent_CRUD(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.True(t, p.HasPermission(RoleManager, ResourcePatent, ActionCreate))
+	assert.True(t, p.HasPermission(RoleManager, ResourcePatent, ActionRead))
+	assert.True(t, p.HasPermission(RoleManager, ResourcePatent, ActionUpdate))
+	assert.True(t, p.HasPermission(RoleManager, ResourcePatent, ActionDelete))
+}
+
+func TestHasPermission_Manager_ManageMembers_Denied(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.False(t, p.HasPermission(RoleManager, ResourceWorkspace, ActionManageMembers))
+}
+
+func TestHasPermission_Attorney_Patent_CRUD(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.True(t, p.HasPermission(RoleAttorney, ResourcePatent, ActionCreate))
+	assert.True(t, p.HasPermission(RoleAttorney, ResourcePatent, ActionRead))
+	assert.True(t, p.HasPermission(RoleAttorney, ResourcePatent, ActionUpdate))
+	assert.True(t, p.HasPermission(RoleAttorney, ResourcePatent, ActionDelete))
+}
+
+func TestHasPermission_Attorney_DeletePortfolio_Denied(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.False(t, p.HasPermission(RoleAttorney, ResourcePortfolio, ActionDelete))
+}
+
+func TestHasPermission_Analyst_Read_Allowed(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.True(t, p.HasPermission(RoleAnalyst, ResourcePatent, ActionRead))
+	assert.True(t, p.HasPermission(RoleAnalyst, ResourcePortfolio, ActionRead))
+}
+
+func TestHasPermission_Analyst_Create_Denied(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.False(t, p.HasPermission(RoleAnalyst, ResourcePatent, ActionCreate))
+}
+
+func TestHasPermission_Analyst_Analyze_Allowed(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.True(t, p.HasPermission(RoleAnalyst, ResourcePatent, ActionAnalyze))
+}
+
+func TestHasPermission_Analyst_Export_Allowed(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.True(t, p.HasPermission(RoleAnalyst, ResourcePatent, ActionExport))
+}
+
+func TestHasPermission_Viewer_Read_Allowed(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.True(t, p.HasPermission(RoleViewer, ResourcePatent, ActionRead))
+}
+
+func TestHasPermission_Viewer_Update_Denied(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.False(t, p.HasPermission(RoleViewer, ResourcePatent, ActionUpdate))
+}
+
+func TestHasPermission_Inventor_Patent_Read_Allowed(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.True(t, p.HasPermission(RoleInventor, ResourcePatent, ActionRead))
+}
+
+func TestHasPermission_Inventor_Patent_Create_Allowed(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.True(t, p.HasPermission(RoleInventor, ResourcePatent, ActionCreate))
+}
+
+func TestHasPermission_Inventor_Portfolio_Denied(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.False(t, p.HasPermission(RoleInventor, ResourcePortfolio, ActionRead))
+}
+
+func TestHasPermission_InvalidRole(t *testing.T) {
+	p := NewPermissionPolicy()
+	assert.False(t, p.HasPermission("invalid", ResourcePatent, ActionRead))
+}
+
+func TestGetRolePermissions_Owner(t *testing.T) {
+	p := NewPermissionPolicy()
+	rp, err := p.GetRolePermissions(RoleOwner)
+	assert.NoError(t, err)
+	assert.NotNil(t, rp)
+	assert.Equal(t, RoleOwner, rp.Role)
+	assert.True(t, len(rp.Permissions) > 0)
+}
+
+func TestGetRolePermissions_InvalidRole(t *testing.T) {
+	p := NewPermissionPolicy()
+	_, err := p.GetRolePermissions("invalid")
+	assert.Error(t, err)
+}
+
+func TestCheckAccess_Allowed(t *testing.T) {
+	p := NewPermissionPolicy()
+	now := time.Now()
+	member := &MemberPermission{
+		Role:       RoleManager,
+		IsActive:   true,
+		AcceptedAt: &now,
 	}
+	allowed, reason := p.CheckAccess(member, ResourcePatent, ActionRead)
+	assert.True(t, allowed)
+	assert.Empty(t, reason)
+}
 
-	for _, tc := range cases {
-		tc := tc
-		t.Run(tc.action+"_"+tc.resource, func(t *testing.T) {
-			t.Parallel()
-			assert.True(t, collaboration.HasPermission(collaboration.RoleAdmin, tc.action, tc.resource))
-		})
+func TestCheckAccess_Denied_NoPermission(t *testing.T) {
+	p := NewPermissionPolicy()
+	now := time.Now()
+	member := &MemberPermission{
+		Role:       RoleViewer,
+		IsActive:   true,
+		AcceptedAt: &now,
 	}
+	allowed, reason := p.CheckAccess(member, ResourcePatent, ActionDelete)
+	assert.False(t, allowed)
+	assert.Contains(t, reason, "insufficient permission")
 }
 
-func TestHasPermission_EditorCanReadAndWrite(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, collaboration.HasPermission(collaboration.RoleEditor, "read", "patent"))
-	assert.True(t, collaboration.HasPermission(collaboration.RoleEditor, "write", "patent"))
-	assert.True(t, collaboration.HasPermission(collaboration.RoleEditor, "read", "portfolio"))
-	assert.True(t, collaboration.HasPermission(collaboration.RoleEditor, "write", "portfolio"))
+func TestCheckAccess_Denied_Inactive(t *testing.T) {
+	p := NewPermissionPolicy()
+	now := time.Now()
+	member := &MemberPermission{
+		Role:       RoleOwner,
+		IsActive:   false,
+		AcceptedAt: &now,
+	}
+	allowed, reason := p.CheckAccess(member, ResourcePatent, ActionRead)
+	assert.False(t, allowed)
+	assert.Contains(t, reason, "inactive")
 }
 
-func TestHasPermission_EditorCannotDelete(t *testing.T) {
-	t.Parallel()
-
-	assert.False(t, collaboration.HasPermission(collaboration.RoleEditor, "delete", "patent"))
+func TestCheckAccess_Denied_NotAccepted(t *testing.T) {
+	p := NewPermissionPolicy()
+	member := &MemberPermission{
+		Role:       RoleOwner,
+		IsActive:   true,
+		AcceptedAt: nil,
+	}
+	allowed, reason := p.CheckAccess(member, ResourcePatent, ActionRead)
+	assert.False(t, allowed)
+	assert.Contains(t, reason, "pending invitation")
 }
 
-func TestHasPermission_EditorCannotManageWorkspace(t *testing.T) {
-	t.Parallel()
-
-	assert.False(t, collaboration.HasPermission(collaboration.RoleEditor, "manage", "workspace"))
-	assert.False(t, collaboration.HasPermission(collaboration.RoleEditor, "invite", "member"))
-}
-
-func TestHasPermission_ViewerCanOnlyRead(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, collaboration.HasPermission(collaboration.RoleViewer, "read", "patent"))
-	assert.True(t, collaboration.HasPermission(collaboration.RoleViewer, "read", "portfolio"))
-}
-
-func TestHasPermission_ViewerCannotWrite(t *testing.T) {
-	t.Parallel()
-
-	assert.False(t, collaboration.HasPermission(collaboration.RoleViewer, "write", "patent"))
-	assert.False(t, collaboration.HasPermission(collaboration.RoleViewer, "write", "portfolio"))
-	assert.False(t, collaboration.HasPermission(collaboration.RoleViewer, "delete", "patent"))
-	assert.False(t, collaboration.HasPermission(collaboration.RoleViewer, "generate", "report"))
-}
-
-func TestHasPermission_UnknownRoleReturnsFalse(t *testing.T) {
-	t.Parallel()
-
-	unknownRole := collaboration.MemberRole("unknown")
-	assert.False(t, collaboration.HasPermission(unknownRole, "read", "patent"))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestPermissionSet_Contains
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestPermissionSet_Contains_True(t *testing.T) {
-	t.Parallel()
-
-	ps := collaboration.PermissionSet{
-		Permissions: []collaboration.Permission{
-			{Action: "read", Resource: "patent"},
-			{Action: "write", Resource: "patent"},
+func TestCheckAccess_CustomPermission_Override(t *testing.T) {
+	p := NewPermissionPolicy()
+	now := time.Now()
+	member := &MemberPermission{
+		Role:       RoleViewer,
+		IsActive:   true,
+		AcceptedAt: &now,
+		CustomPermissions: []*Permission{
+			{Resource: ResourcePatent, Action: ActionUpdate, Allowed: true},
 		},
 	}
-
-	assert.True(t, ps.Contains("read", "patent"))
-	assert.True(t, ps.Contains("write", "patent"))
+	allowed, reason := p.CheckAccess(member, ResourcePatent, ActionUpdate)
+	assert.True(t, allowed)
+	assert.Empty(t, reason)
 }
 
-func TestPermissionSet_Contains_False(t *testing.T) {
-	t.Parallel()
-
-	ps := collaboration.PermissionSet{
-		Permissions: []collaboration.Permission{
-			{Action: "read", Resource: "patent"},
+func TestCheckAccess_CustomPermission_Deny(t *testing.T) {
+	p := NewPermissionPolicy()
+	now := time.Now()
+	member := &MemberPermission{
+		Role:       RoleOwner,
+		IsActive:   true,
+		AcceptedAt: &now,
+		CustomPermissions: []*Permission{
+			{Resource: ResourcePatent, Action: ActionDelete, Allowed: false},
 		},
 	}
-
-	assert.False(t, ps.Contains("write", "patent"))
-	assert.False(t, ps.Contains("read", "portfolio"))
+	allowed, reason := p.CheckAccess(member, ResourcePatent, ActionDelete)
+	assert.False(t, allowed)
+	assert.Contains(t, reason, "insufficient permission")
 }
 
-func TestPermissionSet_Contains_EmptySet(t *testing.T) {
-	t.Parallel()
-
-	ps := collaboration.PermissionSet{}
-	assert.False(t, ps.Contains("read", "patent"))
+func TestGetEffectivePermissions_RoleOnly(t *testing.T) {
+	p := NewPermissionPolicy()
+	member := &MemberPermission{Role: RoleViewer}
+	perms := p.GetEffectivePermissions(member)
+	assert.True(t, len(perms) > 0)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestPermissionSet_Merge
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestPermissionSet_Merge_CombinesBothSets(t *testing.T) {
-	t.Parallel()
-
-	ps1 := collaboration.PermissionSet{
-		Permissions: []collaboration.Permission{
-			{Action: "read", Resource: "patent"},
+func TestGetEffectivePermissions_WithCustomOverride(t *testing.T) {
+	p := NewPermissionPolicy()
+	member := &MemberPermission{
+		Role: RoleViewer,
+		CustomPermissions: []*Permission{
+			{Resource: ResourcePatent, Action: ActionRead, Allowed: false},
 		},
 	}
-	ps2 := collaboration.PermissionSet{
-		Permissions: []collaboration.Permission{
-			{Action: "write", Resource: "patent"},
+	perms := p.GetEffectivePermissions(member)
+	found := false
+	for _, perm := range perms {
+		if perm.Resource == ResourcePatent && perm.Action == ActionRead {
+			assert.False(t, perm.Allowed)
+			found = true
+		}
+	}
+	assert.True(t, found)
+}
+
+func TestGetEffectivePermissions_CustomAddition(t *testing.T) {
+	p := NewPermissionPolicy()
+	member := &MemberPermission{
+		Role: RoleViewer,
+		CustomPermissions: []*Permission{
+			{Resource: ResourceSettings, Action: ActionUpdate, Allowed: true},
 		},
 	}
-
-	merged := ps1.Merge(ps2)
-
-	assert.Len(t, merged.Permissions, 2)
-	assert.True(t, merged.Contains("read", "patent"))
-	assert.True(t, merged.Contains("write", "patent"))
-}
-
-func TestPermissionSet_Merge_OriginalUnchanged(t *testing.T) {
-	t.Parallel()
-
-	ps1 := collaboration.PermissionSet{
-		Permissions: []collaboration.Permission{
-			{Action: "read", Resource: "patent"},
-		},
+	perms := p.GetEffectivePermissions(member)
+	found := false
+	for _, perm := range perms {
+		if perm.Resource == ResourceSettings && perm.Action == ActionUpdate {
+			assert.True(t, perm.Allowed)
+			found = true
+		}
 	}
-	ps2 := collaboration.PermissionSet{
-		Permissions: []collaboration.Permission{
-			{Action: "write", Resource: "patent"},
-		},
-	}
-
-	_ = ps1.Merge(ps2)
-
-	assert.Len(t, ps1.Permissions, 1, "original should be unchanged")
-	assert.Len(t, ps2.Permissions, 1, "other should be unchanged")
+	assert.True(t, found)
 }
 
-func TestPermissionSet_Merge_EmptySets(t *testing.T) {
-	t.Parallel()
-
-	ps1 := collaboration.PermissionSet{}
-	ps2 := collaboration.PermissionSet{}
-
-	merged := ps1.Merge(ps2)
-	assert.Len(t, merged.Permissions, 0)
+func TestIsRoleHigherOrEqual_OwnerVsAdmin(t *testing.T) {
+	assert.True(t, IsRoleHigherOrEqual(RoleOwner, RoleAdmin))
 }
 
-func TestPermissionSet_Merge_PreservesDuplicates(t *testing.T) {
-	t.Parallel()
-
-	perm := collaboration.Permission{Action: "read", Resource: "patent"}
-	ps1 := collaboration.PermissionSet{Permissions: []collaboration.Permission{perm}}
-	ps2 := collaboration.PermissionSet{Permissions: []collaboration.Permission{perm}}
-
-	merged := ps1.Merge(ps2)
-	assert.Len(t, merged.Permissions, 2, "Merge does not deduplicate")
+func TestIsRoleHigherOrEqual_AdminVsOwner(t *testing.T) {
+	assert.False(t, IsRoleHigherOrEqual(RoleAdmin, RoleOwner))
 }
 
+func TestIsRoleHigherOrEqual_SameRole(t *testing.T) {
+	assert.True(t, IsRoleHigherOrEqual(RoleManager, RoleManager))
+}
+
+func TestIsRoleHigherOrEqual_ViewerVsInventor(t *testing.T) {
+	assert.True(t, IsRoleHigherOrEqual(RoleViewer, RoleInventor))
+}
+
+func TestIsRoleHigherOrEqual_InventorVsViewer(t *testing.T) {
+	assert.False(t, IsRoleHigherOrEqual(RoleInventor, RoleViewer))
+}
+
+func TestValidateRoleTransition_Valid(t *testing.T) {
+	err := ValidateRoleTransition(RoleAdmin, RoleManager)
+	assert.NoError(t, err)
+}
+
+func TestValidateRoleTransition_EscalationBeyondSelf(t *testing.T) {
+	err := ValidateRoleTransition(RoleManager, RoleAdmin)
+	assert.Error(t, err)
+}
+
+func TestNewMemberPermission_Success(t *testing.T) {
+	mp, err := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	assert.NoError(t, err)
+	assert.NotNil(t, mp)
+	assert.Equal(t, "ws1", mp.WorkspaceID)
+	assert.Equal(t, RoleManager, mp.Role)
+	assert.True(t, mp.IsActive)
+	assert.Nil(t, mp.AcceptedAt)
+}
+
+func TestNewMemberPermission_EmptyWorkspaceID(t *testing.T) {
+	_, err := NewMemberPermission("", "user1", RoleManager, "owner1")
+	assert.Error(t, err)
+}
+
+func TestNewMemberPermission_InvalidRole(t *testing.T) {
+	_, err := NewMemberPermission("ws1", "user1", "invalid", "owner1")
+	assert.Error(t, err)
+}
+
+func TestMemberPermission_Accept_Success(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	err := mp.Accept()
+	assert.NoError(t, err)
+	assert.NotNil(t, mp.AcceptedAt)
+}
+
+func TestMemberPermission_Accept_AlreadyAccepted(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	mp.Accept()
+	err := mp.Accept()
+	assert.Error(t, err)
+}
+
+func TestMemberPermission_Deactivate_Success(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	err := mp.Deactivate()
+	assert.NoError(t, err)
+	assert.False(t, mp.IsActive)
+}
+
+func TestMemberPermission_ChangeRole_Success(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	err := mp.ChangeRole(RoleAttorney, RoleAdmin)
+	assert.NoError(t, err)
+	assert.Equal(t, RoleAttorney, mp.Role)
+}
+
+func TestMemberPermission_ChangeRole_InsufficientAuthority(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleAdmin, "owner1")
+	err := mp.ChangeRole(RoleManager, RoleManager)
+	assert.Error(t, err)
+}
+
+func TestMemberPermission_AddCustomPermission_Success(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	err := mp.AddCustomPermission(&Permission{Resource: ResourcePatent, Action: ActionDelete, Allowed: true})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(mp.CustomPermissions))
+}
+
+func TestMemberPermission_AddCustomPermission_Duplicate(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	perm := &Permission{Resource: ResourcePatent, Action: ActionDelete, Allowed: true}
+	mp.AddCustomPermission(perm)
+	err := mp.AddCustomPermission(perm)
+	assert.Error(t, err)
+}
+
+func TestMemberPermission_RemoveCustomPermission_Success(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	mp.AddCustomPermission(&Permission{Resource: ResourcePatent, Action: ActionDelete, Allowed: true})
+	err := mp.RemoveCustomPermission(ResourcePatent, ActionDelete)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(mp.CustomPermissions))
+}
+
+func TestMemberPermission_RemoveCustomPermission_NotFound(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	err := mp.RemoveCustomPermission(ResourcePatent, ActionDelete)
+	assert.Error(t, err)
+}
+
+func TestMemberPermission_Validate_Success(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	err := mp.Validate()
+	assert.NoError(t, err)
+}
+
+func TestMemberPermission_Validate_EmptyID(t *testing.T) {
+	mp, _ := NewMemberPermission("ws1", "user1", RoleManager, "owner1")
+	mp.ID = ""
+	err := mp.Validate()
+	assert.Error(t, err)
+}
+
+//Personal.AI order the ending

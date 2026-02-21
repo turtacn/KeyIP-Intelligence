@@ -1,338 +1,252 @@
-// Package collaboration_test provides unit tests for the collaboration domain service.
-package collaboration_test
+package collaboration
 
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/collaboration"
-	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/stretchr/testify/mock"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Mock repository
-// ─────────────────────────────────────────────────────────────────────────────
-
-type mockRepository struct {
-	workspaces map[common.ID]*collaboration.Workspace
+// Mock objects
+type mockWorkspaceRepository struct {
+	mock.Mock
 }
 
-func newMockRepository() *mockRepository {
-	return &mockRepository{
-		workspaces: make(map[common.ID]*collaboration.Workspace),
+func (m *mockWorkspaceRepository) Save(ctx context.Context, workspace *Workspace) error {
+	args := m.Called(ctx, workspace)
+	return args.Error(0)
+}
+
+func (m *mockWorkspaceRepository) FindByID(ctx context.Context, id string) (*Workspace, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
+	return args.Get(0).(*Workspace), args.Error(1)
 }
 
-func (r *mockRepository) SaveWorkspace(ctx context.Context, ws *collaboration.Workspace) error {
-	if _, exists := r.workspaces[ws.ID]; exists {
-		return errors.Conflict("workspace already exists")
+func (m *mockWorkspaceRepository) FindByOwnerID(ctx context.Context, ownerID string) ([]*Workspace, error) {
+	args := m.Called(ctx, ownerID)
+	return args.Get(0).([]*Workspace), args.Error(1)
+}
+
+func (m *mockWorkspaceRepository) FindByMemberID(ctx context.Context, userID string) ([]*Workspace, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).([]*Workspace), args.Error(1)
+}
+
+func (m *mockWorkspaceRepository) FindBySlug(ctx context.Context, slug string) (*Workspace, error) {
+	args := m.Called(ctx, slug)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	r.workspaces[ws.ID] = ws
-	return nil
+	return args.Get(0).(*Workspace), args.Error(1)
 }
 
-func (r *mockRepository) FindWorkspaceByID(ctx context.Context, id common.ID) (*collaboration.Workspace, error) {
-	ws, ok := r.workspaces[id]
-	if !ok {
-		return nil, errors.NotFound("workspace not found")
+func (m *mockWorkspaceRepository) Delete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *mockWorkspaceRepository) Count(ctx context.Context, ownerID string) (int64, error) {
+	args := m.Called(ctx, ownerID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+type mockMemberRepository struct {
+	mock.Mock
+}
+
+func (m *mockMemberRepository) Save(ctx context.Context, member *MemberPermission) error {
+	args := m.Called(ctx, member)
+	return args.Error(0)
+}
+
+func (m *mockMemberRepository) FindByID(ctx context.Context, id string) (*MemberPermission, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	return ws, nil
+	return args.Get(0).(*MemberPermission), args.Error(1)
 }
 
-func (r *mockRepository) FindWorkspacesByUser(ctx context.Context, userID common.UserID, page common.PageRequest) (*common.PageResponse[*collaboration.Workspace], error) {
-	var result []*collaboration.Workspace
-	for _, ws := range r.workspaces {
-		if ws.IsMember(userID) {
-			result = append(result, ws)
-		}
+func (m *mockMemberRepository) FindByWorkspaceID(ctx context.Context, workspaceID string) ([]*MemberPermission, error) {
+	args := m.Called(ctx, workspaceID)
+	return args.Get(0).([]*MemberPermission), args.Error(1)
+}
+
+func (m *mockMemberRepository) FindByUserID(ctx context.Context, userID string) ([]*MemberPermission, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).([]*MemberPermission), args.Error(1)
+}
+
+func (m *mockMemberRepository) FindByWorkspaceAndUser(ctx context.Context, workspaceID, userID string) (*MemberPermission, error) {
+	args := m.Called(ctx, workspaceID, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	return &common.PageResponse[*collaboration.Workspace]{
-	Items:    result,
-		Total:    int64(len(result)),
-			Page:     page.Page,
-			PageSize: page.PageSize,
-	}, nil
+	return args.Get(0).(*MemberPermission), args.Error(1)
 }
 
-func (r *mockRepository) UpdateWorkspace(ctx context.Context, ws *collaboration.Workspace) error {
-	if _, ok := r.workspaces[ws.ID]; !ok {
-		return errors.NotFound("workspace not found")
-	}
-	r.workspaces[ws.ID] = ws
-	return nil
+func (m *mockMemberRepository) FindByRole(ctx context.Context, workspaceID string, role Role) ([]*MemberPermission, error) {
+	args := m.Called(ctx, workspaceID, role)
+	return args.Get(0).([]*MemberPermission), args.Error(1)
 }
 
-func (r *mockRepository) DeleteWorkspace(ctx context.Context, id common.ID) error {
-	delete(r.workspaces, id)
-	return nil
+func (m *mockMemberRepository) Delete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
 }
 
-func (r *mockRepository) FindWorkspacesByResource(ctx context.Context, resourceID common.ID) ([]*collaboration.Workspace, error) {
-	var result []*collaboration.Workspace
-	for _, ws := range r.workspaces {
-		for _, res := range ws.SharedResources {
-			if res.ResourceID == resourceID {
-				result = append(result, ws)
-				break
-			}
-		}
-	}
-	return result, nil
+func (m *mockMemberRepository) CountByWorkspace(ctx context.Context, workspaceID string) (int64, error) {
+	args := m.Called(ctx, workspaceID)
+	return args.Get(0).(int64), args.Error(1)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Service tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-func setupService() (*collaboration.Service, *mockRepository) {
-	repo := newMockRepository()
-	logger := logging.NewNopLogger()
-	svc := collaboration.NewService(repo, logger)
-	return svc, repo
+func (m *mockMemberRepository) CountByRole(ctx context.Context, workspaceID string) (map[Role]int64, error) {
+	args := m.Called(ctx, workspaceID)
+	return args.Get(0).(map[Role]int64), args.Error(1)
 }
 
-func TestService_CreateWorkspace(t *testing.T) {
-	t.Parallel()
-
-	svc, _ := setupService()
-	ctx := context.Background()
-
-	ws, err := svc.CreateWorkspace(ctx, "Test Workspace", "Description", "user-1")
-	require.NoError(t, err)
-	require.NotNil(t, ws)
-	assert.Equal(t, "Test Workspace", ws.Name)
-	assert.Equal(t, common.UserID("user-1"), ws.OwnerID)
+type mockPermissionPolicy struct {
+	mock.Mock
 }
 
-func TestService_GetWorkspace(t *testing.T) {
-	t.Parallel()
-
-	svc, _ := setupService()
-	ctx := context.Background()
-
-	created, _ := svc.CreateWorkspace(ctx, "WS", "", "user-1")
-
-	retrieved, err := svc.GetWorkspace(ctx, created.ID)
-	require.NoError(t, err)
-	assert.Equal(t, created.ID, retrieved.ID)
+func (m *mockPermissionPolicy) HasPermission(role Role, resource ResourceType, action Action) bool {
+	args := m.Called(role, resource, action)
+	return args.Bool(0)
 }
 
-func TestService_InviteMember_WithPermission(t *testing.T) {
-	t.Parallel()
-
-	svc, _ := setupService()
-	ctx := context.Background()
-
-	ownerID := common.UserID("owner")
-	ws, _ := svc.CreateWorkspace(ctx, "WS", "", ownerID)
-
-	newUser := common.UserID("new-user")
-	err := svc.InviteMember(ctx, ws.ID, newUser, collaboration.RoleEditor, ownerID)
-	require.NoError(t, err)
-
-	updated, _ := svc.GetWorkspace(ctx, ws.ID)
-	assert.Len(t, updated.Members, 2)
+func (m *mockPermissionPolicy) GetRolePermissions(role Role) (*RolePermissions, error) {
+	args := m.Called(role)
+	return args.Get(0).(*RolePermissions), args.Error(1)
 }
 
-func TestService_InviteMember_WithoutPermission(t *testing.T) {
-	t.Parallel()
-
-	svc, _ := setupService()
-	ctx := context.Background()
-
-	ownerID := common.UserID("owner")
-	ws, _ := svc.CreateWorkspace(ctx, "WS", "", ownerID)
-
-	viewerID := common.UserID("viewer")
-	_ = svc.InviteMember(ctx, ws.ID, viewerID, collaboration.RoleViewer, ownerID)
-
-	// Viewer tries to invite another user (should fail).
-	err := svc.InviteMember(ctx, ws.ID, "user-3", collaboration.RoleEditor, viewerID)
-	require.Error(t, err)
-	assert.True(t, errors.IsCode(err, errors.CodeForbidden))
+func (m *mockPermissionPolicy) ListRoles() []*RolePermissions {
+	args := m.Called()
+	return args.Get(0).([]*RolePermissions)
 }
 
-func TestService_RemoveMember_Success(t *testing.T) {
-	t.Parallel()
-
-	svc, _ := setupService()
-	ctx := context.Background()
-
-	ownerID := common.UserID("owner")
-	ws, _ := svc.CreateWorkspace(ctx, "WS", "", ownerID)
-
-	memberID := common.UserID("member")
-	_ = svc.InviteMember(ctx, ws.ID, memberID, collaboration.RoleViewer, ownerID)
-
-	err := svc.RemoveMember(ctx, ws.ID, memberID, ownerID)
-	require.NoError(t, err)
-
-	updated, _ := svc.GetWorkspace(ctx, ws.ID)
-	assert.Len(t, updated.Members, 1, "only owner should remain")
+func (m *mockPermissionPolicy) CheckAccess(member *MemberPermission, resource ResourceType, action Action) (bool, string) {
+	args := m.Called(member, resource, action)
+	return args.Bool(0), args.String(1)
 }
 
-func TestService_ShareResource(t *testing.T) {
-	t.Parallel()
-
-	svc, _ := setupService()
-	ctx := context.Background()
-
-	ownerID := common.UserID("owner")
-	ws, _ := svc.CreateWorkspace(ctx, "WS", "", ownerID)
-
-	resource := collaboration.SharedResource{
-		ResourceID:   common.ID("res-1"),
-		ResourceType: "patent",
-		AccessLevel:  "read",
-	}
-
-	err := svc.ShareResource(ctx, ws.ID, resource, ownerID)
-	require.NoError(t, err)
-
-	updated, _ := svc.GetWorkspace(ctx, ws.ID)
-	require.Len(t, updated.SharedResources, 1)
-	assert.Equal(t, common.ID("res-1"), updated.SharedResources[0].ResourceID)
+func (m *mockPermissionPolicy) GetEffectivePermissions(member *MemberPermission) []*Permission {
+	args := m.Called(member)
+	return args.Get(0).([]*Permission)
 }
 
-func TestService_CheckAccess(t *testing.T) {
-	t.Parallel()
+// Tests
+func TestCreateWorkspace_Success(t *testing.T) {
+	wsRepo := new(mockWorkspaceRepository)
+	memRepo := new(mockMemberRepository)
+	policy := new(mockPermissionPolicy)
+	svc := NewCollaborationService(wsRepo, memRepo, policy)
 
-	svc, _ := setupService()
-	ctx := context.Background()
+	wsRepo.On("FindBySlug", mock.Anything, "my-workspace").Return(nil, nil)
+	wsRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
+	memRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
 
-	ownerID := common.UserID("owner")
-	ws, _ := svc.CreateWorkspace(ctx, "WS", "", ownerID)
-
-	resourceID := common.ID("res-1")
-	resource := collaboration.SharedResource{
-		ResourceID:   resourceID,
-		ResourceType: "patent",
-		AccessLevel:  "write",
-	}
-	_ = svc.ShareResource(ctx, ws.ID, resource, ownerID)
-
-	hasAccess, err := svc.CheckAccess(ctx, ws.ID, ownerID, resourceID, "write")
-	require.NoError(t, err)
-	assert.True(t, hasAccess)
+	ws, err := svc.CreateWorkspace(context.Background(), "My Workspace", "owner1")
+	assert.NoError(t, err)
+	assert.Equal(t, "My Workspace", ws.Name)
+	assert.Equal(t, "my-workspace", ws.Slug)
+	wsRepo.AssertExpectations(t)
+	memRepo.AssertExpectations(t)
 }
 
-func TestService_GetUserWorkspaces(t *testing.T) {
-	t.Parallel()
+func TestInviteMember_Success(t *testing.T) {
+	wsRepo := new(mockWorkspaceRepository)
+	memRepo := new(mockMemberRepository)
+	policy := new(mockPermissionPolicy)
+	svc := NewCollaborationService(wsRepo, memRepo, policy)
 
-	svc, _ := setupService()
-	ctx := context.Background()
+	inviter := &MemberPermission{Role: RoleAdmin, IsActive: true, AcceptedAt: new(time.Time)}
+	memRepo.On("FindByWorkspaceAndUser", mock.Anything, "ws1", "inviter1").Return(inviter, nil)
+	policy.On("CheckAccess", inviter, ResourceWorkspace, ActionManageMembers).Return(true, "")
+	memRepo.On("FindByWorkspaceAndUser", mock.Anything, "ws1", "invitee1").Return(nil, errors.NotFound("not found"))
+	memRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
 
-	userID := common.UserID("user-multi")
-	_, _ = svc.CreateWorkspace(ctx, "WS1", "", userID)
-	_, _ = svc.CreateWorkspace(ctx, "WS2", "", userID)
-
-	page := common.PageRequest{Page: 1, PageSize: 10}
-	resp, err := svc.GetUserWorkspaces(ctx, userID, page)
-	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(resp.Items), 2)
+	mp, err := svc.InviteMember(context.Background(), "ws1", "inviter1", "invitee1", RoleManager)
+	assert.NoError(t, err)
+	assert.Equal(t, RoleManager, mp.Role)
+	assert.Nil(t, mp.AcceptedAt)
 }
 
-func TestService_UpdateWorkspace(t *testing.T) {
-	t.Parallel()
+func TestAcceptInvitation_Success(t *testing.T) {
+	wsRepo := new(mockWorkspaceRepository)
+	memRepo := new(mockMemberRepository)
+	policy := new(mockPermissionPolicy)
+	svc := NewCollaborationService(wsRepo, memRepo, policy)
 
-	svc, _ := setupService()
-	ctx := context.Background()
+	mp := &MemberPermission{ID: "m1", WorkspaceID: "ws1", UserID: "user1"}
+	ws := &Workspace{ID: "ws1", MemberCount: 1}
+	memRepo.On("FindByID", mock.Anything, "m1").Return(mp, nil)
+	wsRepo.On("FindByID", mock.Anything, "ws1").Return(ws, nil)
+	wsRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
+	memRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
 
-	ownerID := common.UserID("owner")
-	ws, _ := svc.CreateWorkspace(ctx, "Old Name", "Old Desc", ownerID)
-
-	err := svc.UpdateWorkspace(ctx, ws.ID, "New Name", "New Desc", ownerID)
-	require.NoError(t, err)
-
-	updated, _ := svc.GetWorkspace(ctx, ws.ID)
-	assert.Equal(t, "New Name", updated.Name)
-	assert.Equal(t, "New Desc", updated.Description)
+	err := svc.AcceptInvitation(context.Background(), "m1", "user1")
+	assert.NoError(t, err)
+	assert.NotNil(t, mp.AcceptedAt)
+	assert.Equal(t, 2, ws.MemberCount)
 }
 
-func TestService_DeleteWorkspace(t *testing.T) {
-	t.Parallel()
+func TestRemoveMember_Success(t *testing.T) {
+	wsRepo := new(mockWorkspaceRepository)
+	memRepo := new(mockMemberRepository)
+	policy := new(mockPermissionPolicy)
+	svc := NewCollaborationService(wsRepo, memRepo, policy)
 
-	svc, _ := setupService()
-	ctx := context.Background()
+	remover := &MemberPermission{Role: RoleAdmin, IsActive: true, AcceptedAt: new(time.Time)}
+	target := &MemberPermission{Role: RoleManager, IsActive: true, AcceptedAt: new(time.Time)}
+	ws := &Workspace{ID: "ws1", MemberCount: 2}
 
-	ownerID := common.UserID("owner")
-	ws, _ := svc.CreateWorkspace(ctx, "WS", "", ownerID)
+	memRepo.On("FindByWorkspaceAndUser", mock.Anything, "ws1", "remover1").Return(remover, nil)
+	memRepo.On("FindByWorkspaceAndUser", mock.Anything, "ws1", "target1").Return(target, nil)
+	policy.On("CheckAccess", remover, ResourceWorkspace, ActionManageMembers).Return(true, "")
+	wsRepo.On("FindByID", mock.Anything, "ws1").Return(ws, nil)
+	wsRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
+	memRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
 
-	err := svc.DeleteWorkspace(ctx, ws.ID, ownerID)
-	require.NoError(t, err)
-
-	_, err = svc.GetWorkspace(ctx, ws.ID)
-	require.Error(t, err)
-	assert.True(t, errors.IsCode(err, errors.CodeNotFound))
+	err := svc.RemoveMember(context.Background(), "ws1", "remover1", "target1")
+	assert.NoError(t, err)
+	assert.False(t, target.IsActive)
+	assert.Equal(t, 1, ws.MemberCount)
 }
 
-func TestService_ChangeMemberRole(t *testing.T) {
-	t.Parallel()
+func TestTransferOwnership_Success(t *testing.T) {
+	wsRepo := new(mockWorkspaceRepository)
+	memRepo := new(mockMemberRepository)
+	policy := new(mockPermissionPolicy)
+	svc := NewCollaborationService(wsRepo, memRepo, policy)
 
-	svc, _ := setupService()
-	ctx := context.Background()
+	ws := &Workspace{ID: "ws1", OwnerID: "owner1"}
+	newOwner := &MemberPermission{UserID: "owner2", Role: RoleAdmin, IsActive: true}
+	oldOwner := &MemberPermission{UserID: "owner1", Role: RoleOwner, IsActive: true}
 
-	ownerID := common.UserID("owner")
-	ws, _ := svc.CreateWorkspace(ctx, "WS", "", ownerID)
+	wsRepo.On("FindByID", mock.Anything, "ws1").Return(ws, nil)
+	memRepo.On("FindByWorkspaceAndUser", mock.Anything, "ws1", "owner2").Return(newOwner, nil)
+	memRepo.On("FindByWorkspaceAndUser", mock.Anything, "ws1", "owner1").Return(oldOwner, nil)
+	wsRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
+	memRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
 
-	memberID := common.UserID("member")
-	_ = svc.InviteMember(ctx, ws.ID, memberID, collaboration.RoleViewer, ownerID)
-
-	err := svc.ChangeMemberRole(ctx, ws.ID, memberID, collaboration.RoleAdmin, ownerID)
-	require.NoError(t, err)
-
-	updated, _ := svc.GetWorkspace(ctx, ws.ID)
-	role, _ := updated.GetMemberRole(memberID)
-	assert.Equal(t, collaboration.RoleAdmin, role)
+	err := svc.TransferOwnership(context.Background(), "ws1", "owner1", "owner2")
+	assert.NoError(t, err)
+	assert.Equal(t, "owner2", ws.OwnerID)
+	assert.Equal(t, RoleOwner, newOwner.Role)
+	assert.Equal(t, RoleAdmin, oldOwner.Role)
 }
 
-func TestService_UnshareResource(t *testing.T) {
-	t.Parallel()
-
-	svc, _ := setupService()
-	ctx := context.Background()
-
-	ownerID := common.UserID("owner")
-	ws, _ := svc.CreateWorkspace(ctx, "WS", "", ownerID)
-
-	resource := collaboration.SharedResource{
-		ResourceID:   common.ID("res-1"),
-		ResourceType: "patent",
-		AccessLevel:  "read",
-	}
-	_ = svc.ShareResource(ctx, ws.ID, resource, ownerID)
-
-	err := svc.UnshareResource(ctx, ws.ID, common.ID("res-1"), ownerID)
-	require.NoError(t, err)
-
-	updated, _ := svc.GetWorkspace(ctx, ws.ID)
-	assert.Empty(t, updated.SharedResources)
+func TestGenerateSlug(t *testing.T) {
+	assert.Equal(t, "my-patent-portfolio", GenerateSlug("My Patent Portfolio"))
+	assert.Equal(t, "hello-world2025", GenerateSlug("Hello! World@2025"))
+	assert.Equal(t, "a-b-c", GenerateSlug("a--b---c"))
+	assert.Equal(t, "hello", GenerateSlug("-hello-"))
 }
 
-func TestService_GetWorkspacesByResource(t *testing.T) {
-	t.Parallel()
-
-	svc, _ := setupService()
-	ctx := context.Background()
-
-	ownerID := common.UserID("owner")
-	ws, _ := svc.CreateWorkspace(ctx, "WS", "", ownerID)
-
-	resourceID := common.ID("res-1")
-	resource := collaboration.SharedResource{
-		ResourceID:   resourceID,
-		ResourceType: "patent",
-		AccessLevel:  "read",
-	}
-	_ = svc.ShareResource(ctx, ws.ID, resource, ownerID)
-
-	workspaces, err := svc.GetWorkspacesByResource(ctx, resourceID)
-	require.NoError(t, err)
-	assert.Len(t, workspaces, 1)
-	assert.Equal(t, ws.ID, workspaces[0].ID)
-}
-
+//Personal.AI order the ending
