@@ -1,6 +1,3 @@
-// Package portfolio implements patent portfolio valuation algorithms and
-// aggregation logic for computing portfolio-level financial metrics from
-// individual patent factors.
 package portfolio
 
 import (
@@ -11,244 +8,348 @@ import (
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Valuator interface
-// ─────────────────────────────────────────────────────────────────────────────
+// ValuationDimension represents a specific aspect of patent value.
+type ValuationDimension string
 
-// Valuator computes the monetary value of a single patent given its
-// multi-dimensional factors.  Implementations may use different weighting
-// schemes, base values, or external market data sources.
-type Valuator interface {
-	// Valuate returns the estimated USD value of a patent or an error if
-	// computation fails.
-	Valuate(ctx context.Context, patentID common.ID, factors ValuationFactors) (float64, error)
+const (
+	DimensionTechnical  ValuationDimension = "Technical"
+	DimensionLegal      ValuationDimension = "Legal"
+	DimensionCommercial ValuationDimension = "Commercial"
+	DimensionStrategic  ValuationDimension = "Strategic"
+)
+
+// ValuationTier represents the quality category of a patent.
+type ValuationTier string
+
+const (
+	TierS ValuationTier = "S"
+	TierA ValuationTier = "A"
+	TierB ValuationTier = "B"
+	TierC ValuationTier = "C"
+	TierD ValuationTier = "D"
+)
+
+// DimensionScore holds the score and factors for a single dimension.
+type DimensionScore struct {
+	Dimension   ValuationDimension `json:"dimension"`
+	Score       float64            `json:"score"`
+	Factors     map[string]float64 `json:"factors"`
+	Explanation string             `json:"explanation"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MultiFactorValuator — weighted linear combination implementation
-// ─────────────────────────────────────────────────────────────────────────────
-
-// MultiFactorValuator computes patent value as a weighted sum of technical,
-// legal, and market scores, adjusted for remaining patent life.
-//
-// Formula:
-//
-//	DecayedBase = BaseValue × exp(-DecayRate × (20 - RemainingLife))
-//	Value = DecayedBase × (TechWeight×TechScore + LegalWeight×LegalScore + MarketWeight×MarketScore)
-//
-// Default weights sum to 1.0.  BaseValue defaults to USD 100,000.
-type MultiFactorValuator struct {
-	// BaseValue is the starting valuation in USD before applying scores and decay.
-	BaseValue float64
-
-	// TechnicalWeight is the multiplier for TechnicalScore (default 0.4).
-	TechnicalWeight float64
-
-	// LegalWeight is the multiplier for LegalScore (default 0.3).
-	LegalWeight float64
-
-	// MarketWeight is the multiplier for MarketScore (default 0.3).
-	MarketWeight float64
-
-	// DecayRate controls how rapidly value decreases as RemainingLife shrinks.
-	// Higher values cause steeper decay.  Default 0.05.
-	DecayRate float64
+func (ds *DimensionScore) Validate() error {
+	if ds.Score < 0 || ds.Score > 100 {
+		return errors.InvalidParam(fmt.Sprintf("%s score must be between 0 and 100", ds.Dimension))
+	}
+	return nil
 }
 
-// NewMultiFactorValuator constructs a MultiFactorValuator with sensible defaults.
-func NewMultiFactorValuator() *MultiFactorValuator {
-	return &MultiFactorValuator{
-		BaseValue:       100000.0,
-		TechnicalWeight: 0.4,
-		LegalWeight:     0.3,
-		MarketWeight:    0.3,
-		DecayRate:       0.05,
+// ValuationRecommendation provides actionable advice based on valuation.
+type ValuationRecommendation struct {
+	Type     string `json:"type"`     // maintain / strengthen / enforce / abandon
+	Priority string `json:"priority"` // critical / high / medium / low
+	Action   string `json:"action"`
+	Reason   string `json:"reason"`
+}
+
+// WeightConfig defines the weights for each valuation dimension.
+type WeightConfig struct {
+	TechnicalWeight float64 `json:"technical_weight"`
+	LegalWeight     float64 `json:"legal_weight"`
+	CommercialWeight float64 `json:"commercial_weight"`
+	StrategicWeight float64 `json:"strategic_weight"`
+}
+
+// DefaultWeightConfig returns the default weight distribution.
+func DefaultWeightConfig() *WeightConfig {
+	return &WeightConfig{
+		TechnicalWeight:  0.20,
+		LegalWeight:      0.25,
+		CommercialWeight: 0.30,
+		StrategicWeight:  0.25,
 	}
 }
 
-// Valuate implements the Valuator interface.
-func (v *MultiFactorValuator) Valuate(ctx context.Context, patentID common.ID, factors ValuationFactors) (float64, error) {
-	// Validate score ranges.
-	if factors.TechnicalScore < 0 || factors.TechnicalScore > 1 {
-		return 0, errors.InvalidParam(fmt.Sprintf("TechnicalScore must be in [0,1], got %.2f", factors.TechnicalScore))
-	}
-	if factors.LegalScore < 0 || factors.LegalScore > 1 {
-		return 0, errors.InvalidParam(fmt.Sprintf("LegalScore must be in [0,1], got %.2f", factors.LegalScore))
-	}
-	if factors.MarketScore < 0 || factors.MarketScore > 1 {
-		return 0, errors.InvalidParam(fmt.Sprintf("MarketScore must be in [0,1], got %.2f", factors.MarketScore))
-	}
-
-	// Apply time decay: patents nearing expiration lose value exponentially.
-	// Remaining life typically ranges 0–20 years.
-	yearsRemaining := math.Max(0, factors.RemainingLife)
-	decayFactor := math.Exp(-v.DecayRate * (20.0 - yearsRemaining))
-	decayedBase := v.BaseValue * decayFactor
-
-	// Weighted sum of normalised scores.
-	compositeScore := v.TechnicalWeight*factors.TechnicalScore +
-		v.LegalWeight*factors.LegalScore +
-		v.MarketWeight*factors.MarketScore
-
-	value := decayedBase * compositeScore
-
-	// Floor at zero (no negative valuations).
-	if value < 0 {
-		value = 0
-	}
-
-	return value, nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Portfolio-level valuation aggregation
-// ─────────────────────────────────────────────────────────────────────────────
-
-// CalculatePortfolioValuation computes a ValuationResult for a collection of
-// patents by applying the Valuator to each patent's factors, then aggregating
-// total, average, median, highest, and lowest values.
-//
-// Returns an error if:
-//   - patentFactors is empty
-//   - any individual Valuate call fails
-func CalculatePortfolioValuation(
-	ctx context.Context,
-	valuator Valuator,
-	patentFactors map[common.ID]ValuationFactors,
-) (*ValuationResult, error) {
-	if len(patentFactors) == 0 {
-		return nil, errors.InvalidParam("cannot valuate an empty portfolio")
-	}
-
-	breakdown := make([]PatentValuation, 0, len(patentFactors))
-	values := make([]float64, 0, len(patentFactors))
-
-	for patentID, factors := range patentFactors {
-		value, err := valuator.Valuate(ctx, patentID, factors)
-		if err != nil {
-			return nil, errors.Wrap(err, errors.CodeInternal,
-				fmt.Sprintf("failed to valuate patent %s", patentID))
+// Validate ensures weights are valid and sum to 1.0.
+func (wc *WeightConfig) Validate() error {
+	weights := []float64{wc.TechnicalWeight, wc.LegalWeight, wc.CommercialWeight, wc.StrategicWeight}
+	sum := 0.0
+	for _, w := range weights {
+		if w < 0 || w > 1 {
+			return errors.InvalidParam("weights must be between 0 and 1")
 		}
+		sum += w
+	}
+	if math.Abs(sum-1.0) > 0.001 {
+		return errors.InvalidParam(fmt.Sprintf("weights must sum to 1.0, got %f", sum))
+	}
+	return nil
+}
 
-		breakdown = append(breakdown, PatentValuation{
-			PatentID: patentID,
-			Value:    value,
-			Factors:  factors,
-		})
-		values = append(values, value)
+// PatentValuation holds the full valuation data for a single patent.
+type PatentValuation struct {
+	PatentID        string                                  `json:"patent_id"`
+	DimensionScores map[ValuationDimension]*DimensionScore `json:"dimension_scores"`
+	OverallScore    float64                                 `json:"overall_score"`
+	Tier            ValuationTier                            `json:"tier"`
+	WeightConfig    *WeightConfig                            `json:"weight_config"`
+	Recommendations []ValuationRecommendation                `json:"recommendations"`
+	EvaluatedAt     time.Time                                `json:"evaluated_at"`
+}
+
+// PortfolioValuation holds the aggregated valuation data for a portfolio.
+type PortfolioValuation struct {
+	PortfolioID       string                      `json:"portfolio_id"`
+	PatentValuations  map[string]*PatentValuation `json:"patent_valuations"`
+	AggregateScore    float64                     `json:"aggregate_score"`
+	TierDistribution  map[ValuationTier]int       `json:"tier_distribution"`
+	DimensionAverages map[ValuationDimension]float64 `json:"dimension_averages"`
+	TopPerformers     []string                    `json:"top_performers"`
+	UnderPerformers   []string                    `json:"under_performers"`
+	EvaluatedAt       time.Time                   `json:"evaluated_at"`
+}
+
+// DimensionEvaluator defines the interface for evaluating a single dimension.
+type DimensionEvaluator interface {
+	Evaluate(ctx context.Context, patentID string) (*DimensionScore, error)
+	Dimension() ValuationDimension
+}
+
+// ValuationEngine defines the core domain logic for valuation.
+type ValuationEngine interface {
+	EvaluatePatent(ctx context.Context, patentID string, config *WeightConfig) (*PatentValuation, error)
+	EvaluatePortfolio(ctx context.Context, portfolioID string, config *WeightConfig) (*PortfolioValuation, error)
+	ComparativeValuation(ctx context.Context, portfolioIDs []string, config *WeightConfig) (map[string]*PortfolioValuation, error)
+}
+
+type valuationEngineImpl struct {
+	repo       PortfolioRepository
+	evaluators map[ValuationDimension]DimensionEvaluator
+}
+
+// NewValuationEngine creates a new ValuationEngine.
+func NewValuationEngine(repo PortfolioRepository, evaluators ...DimensionEvaluator) ValuationEngine {
+	if len(evaluators) == 0 {
+		panic("at least one dimension evaluator must be provided")
+	}
+	evalMap := make(map[ValuationDimension]DimensionEvaluator)
+	for _, e := range evaluators {
+		evalMap[e.Dimension()] = e
+	}
+	return &valuationEngineImpl{
+		repo:       repo,
+		evaluators: evalMap,
+	}
+}
+
+func (e *valuationEngineImpl) EvaluatePatent(ctx context.Context, patentID string, config *WeightConfig) (*PatentValuation, error) {
+	if config == nil {
+		config = DefaultWeightConfig()
+	}
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
-	// Compute aggregate statistics.
-	total := sum(values)
-	average := total / float64(len(values))
-	median := computeMedian(values)
-	highest := max(values)
-	lowest := min(values)
+	scores := make(map[ValuationDimension]*DimensionScore)
+	overallScore := 0.0
 
-	return &ValuationResult{
-		TotalValue:    total,
-		AverageValue:  average,
-		MedianValue:   median,
-		HighestValue:  highest,
-		LowestValue:   lowest,
-		ValuationDate: time.Now().UTC(),
-		Method:        "MultiFactorV1",
-		Breakdown:     breakdown,
+	for dim, evaluator := range e.evaluators {
+		score, err := evaluator.Evaluate(ctx, patentID)
+		if err != nil {
+			return nil, err
+		}
+		scores[dim] = score
+
+		switch dim {
+		case DimensionTechnical:
+			overallScore += score.Score * config.TechnicalWeight
+		case DimensionLegal:
+			overallScore += score.Score * config.LegalWeight
+		case DimensionCommercial:
+			overallScore += score.Score * config.CommercialWeight
+		case DimensionStrategic:
+			overallScore += score.Score * config.StrategicWeight
+		}
+	}
+
+	return &PatentValuation{
+		PatentID:        patentID,
+		DimensionScores: scores,
+		OverallScore:    overallScore,
+		Tier:            DetermineValuationTier(overallScore),
+		WeightConfig:    config,
+		Recommendations: GenerateRecommendations(scores),
+		EvaluatedAt:     time.Now().UTC(),
 	}, nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Claim breadth calculation
-// ─────────────────────────────────────────────────────────────────────────────
-
-// CalculateClaimBreadth estimates the scope coverage of a patent's claims
-// based on the count and structure of independent and dependent claims.
-//
-// Formula (heuristic):
-//
-//	IndepRatio = independentClaimCount / claimCount
-//	ElementFactor = 1.0 / (1.0 + avgElementCount/10.0)
-//	Breadth = IndepRatio × ElementFactor
-//
-// Returns a score in [0.0, 1.0]:
-//   - Higher scores: many independent claims with few limiting elements (broad protection).
-//   - Lower scores: few independent claims or highly detailed elements (narrow protection).
-func CalculateClaimBreadth(claimCount, independentClaimCount int, avgElementCount float64) float64 {
-	if claimCount == 0 {
-		return 0.0
+func (e *valuationEngineImpl) EvaluatePortfolio(ctx context.Context, portfolioID string, config *WeightConfig) (*PortfolioValuation, error) {
+	p, err := e.repo.FindByID(ctx, portfolioID)
+	if err != nil {
+		return nil, err
 	}
 
-	indepRatio := float64(independentClaimCount) / float64(claimCount)
+	valuations := make(map[string]*PatentValuation)
+	tierDist := make(map[ValuationTier]int)
+	dimSums := make(map[ValuationDimension]float64)
+	totalScore := 0.0
 
-	// Penalise high element counts (more elements = narrower scope).
-	elementFactor := 1.0 / (1.0 + avgElementCount/10.0)
-
-	breadth := indepRatio * elementFactor
-
-	// Clamp to [0, 1].
-	if breadth < 0 {
-		breadth = 0
-	}
-	if breadth > 1 {
-		breadth = 1
-	}
-
-	return breadth
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper functions
-// ─────────────────────────────────────────────────────────────────────────────
-
-func sum(vals []float64) float64 {
-	s := 0.0
-	for _, v := range vals {
-		s += v
-	}
-	return s
-}
-
-func max(vals []float64) float64 {
-	if len(vals) == 0 {
-		return 0
-	}
-	m := vals[0]
-	for _, v := range vals[1:] {
-		if v > m {
-			m = v
+	for _, pid := range p.PatentIDs {
+		val, err := e.EvaluatePatent(ctx, pid, config)
+		if err != nil {
+			return nil, err
+		}
+		valuations[pid] = val
+		tierDist[val.Tier]++
+		totalScore += val.OverallScore
+		for dim, ds := range val.DimensionScores {
+			dimSums[dim] += ds.Score
 		}
 	}
-	return m
-}
 
-func min(vals []float64) float64 {
-	if len(vals) == 0 {
-		return 0
-	}
-	m := vals[0]
-	for _, v := range vals[1:] {
-		if v < m {
-			m = v
+	patentCount := float64(len(p.PatentIDs))
+	aggregateScore := 0.0
+	dimAverages := make(map[ValuationDimension]float64)
+	if patentCount > 0 {
+		aggregateScore = totalScore / patentCount
+		for dim, sum := range dimSums {
+			dimAverages[dim] = sum / patentCount
 		}
 	}
-	return m
+
+	// Sort for top/under performers
+	type pidScore struct {
+		id    string
+		score float64
+	}
+	sorted := make([]pidScore, 0, len(valuations))
+	for id, val := range valuations {
+		sorted = append(sorted, pidScore{id, val.OverallScore})
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].score > sorted[j].score
+	})
+
+	top := make([]string, 0)
+	for i := 0; i < len(sorted) && i < 10; i++ {
+		top = append(top, sorted[i].id)
+	}
+
+	under := make([]string, 0)
+	for i := len(sorted) - 1; i >= 0 && len(under) < 10; i-- {
+		under = append(under, sorted[i].id)
+	}
+
+	return &PortfolioValuation{
+		PortfolioID:       portfolioID,
+		PatentValuations:  valuations,
+		AggregateScore:    aggregateScore,
+		TierDistribution:  tierDist,
+		DimensionAverages: dimAverages,
+		TopPerformers:     top,
+		UnderPerformers:   under,
+		EvaluatedAt:       time.Now().UTC(),
+	}, nil
 }
 
-func computeMedian(vals []float64) float64 {
-	if len(vals) == 0 {
-		return 0
+func (e *valuationEngineImpl) ComparativeValuation(ctx context.Context, portfolioIDs []string, config *WeightConfig) (map[string]*PortfolioValuation, error) {
+	results := make(map[string]*PortfolioValuation)
+	for _, id := range portfolioIDs {
+		val, err := e.EvaluatePortfolio(ctx, id, config)
+		if err != nil {
+			return nil, err
+		}
+		results[id] = val
 	}
-	sorted := make([]float64, len(vals))
-	copy(sorted, vals)
-	sort.Float64s(sorted)
-
-	n := len(sorted)
-	if n%2 == 1 {
-		return sorted[n/2]
-	}
-	return (sorted[n/2-1] + sorted[n/2]) / 2.0
+	return results, nil
 }
 
+// DetermineValuationTier maps a score to a tier.
+func DetermineValuationTier(score float64) ValuationTier {
+	if score >= 90 {
+		return TierS
+	}
+	if score >= 75 {
+		return TierA
+	}
+	if score >= 60 {
+		return TierB
+	}
+	if score >= 40 {
+		return TierC
+	}
+	return TierD
+}
+
+// GenerateRecommendations generates advice based on dimension scores.
+func GenerateRecommendations(scores map[ValuationDimension]*DimensionScore) []ValuationRecommendation {
+	recs := make([]ValuationRecommendation, 0)
+
+	tech, okT := scores[DimensionTechnical]
+	legal, okL := scores[DimensionLegal]
+	comm, okC := scores[DimensionCommercial]
+	strat, okS := scores[DimensionStrategic]
+
+	if okT && tech.Score < 40 {
+		recs = append(recs, ValuationRecommendation{
+			Type:     "strengthen",
+			Priority: "high",
+			Action:   "Strengthen technical documentation and innovation depth.",
+			Reason:   "Technical score is below threshold.",
+		})
+	}
+
+	if okL && legal.Score < 30 {
+		recs = append(recs, ValuationRecommendation{
+			Type:     "enforce",
+			Priority: "critical",
+			Action:   "Review and enforce legal claims or file continuations.",
+			Reason:   "Legal strength is critically low.",
+		})
+	}
+
+	if okC && okS && comm.Score > 80 && strat.Score < 50 {
+		recs = append(recs, ValuationRecommendation{
+			Type:     "maintain",
+			Priority: "medium",
+			Action:   "Maintain commercial value while improving strategic alignment.",
+			Reason:   "High commercial value but weak strategic positioning.",
+		})
+	}
+
+	allHigh := true
+	allLow := true
+	for _, s := range scores {
+		if s.Score <= 75 {
+			allHigh = false
+		}
+		if s.Score >= 30 {
+			allLow = false
+		}
+	}
+
+	if len(scores) > 0 {
+		if allHigh {
+			recs = append(recs, ValuationRecommendation{
+				Type:     "maintain",
+				Priority: "low",
+				Action:   "Keep current maintenance strategy.",
+				Reason:   "Excellent scores across all dimensions.",
+			})
+		}
+		if allLow {
+			recs = append(recs, ValuationRecommendation{
+				Type:     "abandon",
+				Priority: "medium",
+				Action:   "Consider abandoning or licensing out this patent.",
+				Reason:   "Poor performance across all value dimensions.",
+			})
+		}
+	}
+
+	return recs
+}
+
+//Personal.AI order the ending

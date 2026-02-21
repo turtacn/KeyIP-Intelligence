@@ -1,214 +1,317 @@
-// Package portfolio provides the domain service layer for managing patent
-// portfolios, including creation, modification, and valuation orchestration.
 package portfolio
 
 import (
 	"context"
 	"fmt"
+	"math"
+	"time"
 
-	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// Service orchestrates portfolio domain operations by coordinating the
-// repository, valuator, and logging infrastructure.
-type Service struct {
-	repo     Repository
-	valuator Valuator
-	logger   logging.Logger
+// PortfolioComparison provides a comparison view of multiple portfolios.
+type PortfolioComparison struct {
+	PortfolioID        string            `json:"portfolio_id"`
+	Name               string            `json:"name"`
+	PatentCount        int               `json:"patent_count"`
+	TechDomainCoverage map[string]int    `json:"tech_domain_coverage"`
+	HealthScore        *HealthScore      `json:"health_score"`
 }
 
-// NewService constructs a new portfolio domain service.
-func NewService(repo Repository, valuator Valuator, logger logging.Logger) *Service {
-	return &Service{
-		repo:     repo,
-		valuator: valuator,
-		logger:   logger,
-	}
+// GapInfo describes a missing or weak technical area in a portfolio.
+type GapInfo struct {
+	TechDomain      string `json:"tech_domain"`
+	DomainName      string `json:"domain_name"`
+	CurrentCount    int    `json:"current_count"`
+	IndustryAverage int    `json:"industry_average"`
+	GapSeverity     string `json:"gap_severity"`
+	Recommendation  string `json:"recommendation"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Portfolio CRUD operations
-// ─────────────────────────────────────────────────────────────────────────────
+// OverlapResult describes the intersection of two portfolios.
+type OverlapResult struct {
+	Portfolio1ID        string   `json:"portfolio1_id"`
+	Portfolio2ID        string   `json:"portfolio2_id"`
+	OverlappingPatentIDs []string `json:"overlapping_patent_ids"`
+	OverlapRatio        float64  `json:"overlap_ratio"`
+	UniqueToPortfolio1  []string `json:"unique_to_portfolio1"`
+	UniqueToPortfolio2  []string `json:"unique_to_portfolio2"`
+}
 
-// CreatePortfolio constructs a new Portfolio aggregate and persists it.
-func (s *Service) CreatePortfolio(
-	ctx context.Context,
-	name, description string,
-	ownerID common.UserID,
-) (*Portfolio, error) {
-	p, err := NewPortfolio(name, description, ownerID)
+// PortfolioService defines the domain service for portfolio management.
+type PortfolioService interface {
+	CreatePortfolio(ctx context.Context, name, ownerID string, techDomains []string) (*Portfolio, error)
+	AddPatentsToPortfolio(ctx context.Context, portfolioID string, patentIDs []string) error
+	RemovePatentsFromPortfolio(ctx context.Context, portfolioID string, patentIDs []string) error
+	ActivatePortfolio(ctx context.Context, portfolioID string) error
+	ArchivePortfolio(ctx context.Context, portfolioID string) error
+	CalculateHealthScore(ctx context.Context, portfolioID string) (*HealthScore, error)
+	ComparePortfolios(ctx context.Context, portfolioIDs []string) ([]*PortfolioComparison, error)
+	IdentifyGaps(ctx context.Context, portfolioID string, targetDomains []string) ([]*GapInfo, error)
+	GetOverlapAnalysis(ctx context.Context, portfolioID1, portfolioID2 string) (*OverlapResult, error)
+}
+
+type portfolioServiceImpl struct {
+	repo PortfolioRepository
+}
+
+// NewPortfolioService creates a new PortfolioService.
+func NewPortfolioService(repo PortfolioRepository) PortfolioService {
+	return &portfolioServiceImpl{repo: repo}
+}
+
+func (s *portfolioServiceImpl) CreatePortfolio(ctx context.Context, name, ownerID string, techDomains []string) (*Portfolio, error) {
+	p, err := NewPortfolio(name, ownerID)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.CodeInvalidParam, "failed to create portfolio entity")
+		return nil, err
 	}
-
+	p.TechDomains = techDomains
+	if err := p.Validate(); err != nil {
+		return nil, err
+	}
 	if err := s.repo.Save(ctx, p); err != nil {
-		s.logger.Error("failed to save portfolio",
-			logging.Err(err),
-			logging.String("portfolio_id", string(p.ID)))
-		return nil, errors.Wrap(err, errors.CodeDBConnectionError, "failed to persist portfolio")
-	}
-
-	s.logger.Info("portfolio created",
-		logging.String("portfolio_id", string(p.ID)),
-		logging.String("owner_id", string(ownerID)))
-	return p, nil
-}
-
-// GetPortfolio retrieves a Portfolio by ID.
-func (s *Service) GetPortfolio(ctx context.Context, id common.ID) (*Portfolio, error) {
-	p, err := s.repo.FindByID(ctx, id)
-	if err != nil {
-		s.logger.Warn("portfolio not found", logging.String("portfolio_id", string(id)))
-		return nil, errors.Wrap(err, errors.CodePortfolioNotFound,
-			fmt.Sprintf("portfolio %s not found", id))
+		return nil, err
 	}
 	return p, nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Patent management operations
-// ─────────────────────────────────────────────────────────────────────────────
-
-// AddPatentToPortfolio appends a patent to a portfolio's member list.
-func (s *Service) AddPatentToPortfolio(
-	ctx context.Context,
-	portfolioID, patentID common.ID,
-) error {
-	p, err := s.GetPortfolio(ctx, portfolioID)
+func (s *portfolioServiceImpl) AddPatentsToPortfolio(ctx context.Context, portfolioID string, patentIDs []string) error {
+	p, err := s.repo.FindByID(ctx, portfolioID)
 	if err != nil {
 		return err
 	}
 
-	if err := p.AddPatent(patentID); err != nil {
-		s.logger.Warn("failed to add patent to portfolio",
-			logging.String("portfolio_id", string(portfolioID)),
-			logging.String("patent_id", string(patentID)),
-			logging.Err(err))
-		return err
+	var errs []string
+	for _, id := range patentIDs {
+		if err := p.AddPatent(id); err != nil {
+			errs = append(errs, err.Error())
+		}
 	}
 
-	if err := s.repo.Update(ctx, p); err != nil {
-		s.logger.Error("failed to update portfolio after adding patent",
-			logging.String("portfolio_id", string(portfolioID)),
-			logging.Err(err))
-		return errors.Wrap(err, errors.CodeDBConnectionError, "failed to update portfolio")
+	saveErr := s.repo.Save(ctx, p)
+	if saveErr != nil {
+		return saveErr
 	}
 
-	s.logger.Info("patent added to portfolio",
-		logging.String("portfolio_id", string(portfolioID)),
-		logging.String("patent_id", string(patentID)))
+	if len(errs) > 0 {
+		return errors.New(errors.ErrCodeConflict, fmt.Sprintf("failed to add some patents: %v", errs))
+	}
+
 	return nil
 }
 
-// RemovePatentFromPortfolio removes a patent from a portfolio's member list.
-func (s *Service) RemovePatentFromPortfolio(
-	ctx context.Context,
-	portfolioID, patentID common.ID,
-) error {
-	p, err := s.GetPortfolio(ctx, portfolioID)
+func (s *portfolioServiceImpl) RemovePatentsFromPortfolio(ctx context.Context, portfolioID string, patentIDs []string) error {
+	p, err := s.repo.FindByID(ctx, portfolioID)
 	if err != nil {
 		return err
 	}
 
-	if err := p.RemovePatent(patentID); err != nil {
-		s.logger.Warn("failed to remove patent from portfolio",
-			logging.String("portfolio_id", string(portfolioID)),
-			logging.String("patent_id", string(patentID)),
-			logging.Err(err))
-		return err
+	for _, id := range patentIDs {
+		if err := p.RemovePatent(id); err != nil {
+			return err
+		}
 	}
 
-	if err := s.repo.Update(ctx, p); err != nil {
-		s.logger.Error("failed to update portfolio after removing patent",
-			logging.String("portfolio_id", string(portfolioID)),
-			logging.Err(err))
-		return errors.Wrap(err, errors.CodeDBConnectionError, "failed to update portfolio")
-	}
-
-	s.logger.Info("patent removed from portfolio",
-		logging.String("portfolio_id", string(portfolioID)),
-		logging.String("patent_id", string(patentID)))
-	return nil
+	return s.repo.Save(ctx, p)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Valuation operations
-// ─────────────────────────────────────────────────────────────────────────────
+func (s *portfolioServiceImpl) ActivatePortfolio(ctx context.Context, portfolioID string) error {
+	p, err := s.repo.FindByID(ctx, portfolioID)
+	if err != nil {
+		return err
+	}
+	if err := p.Activate(); err != nil {
+		return err
+	}
+	return s.repo.Save(ctx, p)
+}
 
-// ValuatePortfolio computes a fresh valuation for the given portfolio using
-// the provided factors and updates the cached TotalValue field.
-func (s *Service) ValuatePortfolio(
-	ctx context.Context,
-	portfolioID common.ID,
-	factors map[common.ID]ValuationFactors,
-) (*ValuationResult, error) {
-	p, err := s.GetPortfolio(ctx, portfolioID)
+func (s *portfolioServiceImpl) ArchivePortfolio(ctx context.Context, portfolioID string) error {
+	p, err := s.repo.FindByID(ctx, portfolioID)
+	if err != nil {
+		return err
+	}
+	if err := p.Archive(); err != nil {
+		return err
+	}
+	return s.repo.Save(ctx, p)
+}
+
+func (s *portfolioServiceImpl) CalculateHealthScore(ctx context.Context, portfolioID string) (*HealthScore, error) {
+	p, err := s.repo.FindByID(ctx, portfolioID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Verify that factors are provided for all patents in the portfolio.
-	if len(factors) != p.Size() {
-		return nil, errors.InvalidParam(
-			fmt.Sprintf("factor count (%d) does not match portfolio size (%d)",
-				len(factors), p.Size()))
+	patentCount := float64(p.PatentCount())
+	coverageScore := math.Min(patentCount/10.0*100.0, 100.0)
+
+	// ConcentrationScore based on TechDomains distribution (Shannon entropy)
+	// Skeleton: if no domains, 0. If domains exist, assume equal distribution for skeleton
+	concentrationScore := 0.0
+	numDomains := len(p.TechDomains)
+	if numDomains > 0 && patentCount > 0 {
+		// H = -sum(pi * log2(pi)), pi = 1/numDomains
+		p_i := 1.0 / float64(numDomains)
+		entropy := -float64(numDomains) * (p_i * math.Log2(p_i))
+		maxEntropy := math.Log2(float64(numDomains))
+		if maxEntropy > 0 {
+			concentrationScore = (entropy / maxEntropy) * 100.0
+		} else {
+			concentrationScore = 0.0 // Only one domain, highly concentrated
+		}
 	}
 
-	result, err := CalculatePortfolioValuation(ctx, s.valuator, factors)
-	if err != nil {
-		s.logger.Error("failed to calculate portfolio valuation",
-			logging.String("portfolio_id", string(portfolioID)),
-			logging.Err(err))
-		return nil, errors.Wrap(err, errors.CodeInternal, "valuation computation failed")
+	score := HealthScore{
+		CoverageScore:      coverageScore,
+		ConcentrationScore: concentrationScore,
+		AgingScore:         50.0, // placeholder
+		QualityScore:       50.0, // placeholder
+		OverallScore:       (coverageScore*0.4 + concentrationScore*0.3 + 50.0*0.2 + 50.0*0.1),
+		EvaluatedAt:        time.Now().UTC(),
 	}
 
-	p.SetValuation(*result)
-
-	if err := s.repo.Update(ctx, p); err != nil {
-		s.logger.Error("failed to update portfolio with valuation result",
-			logging.String("portfolio_id", string(portfolioID)),
-			logging.Err(err))
-		return nil, errors.Wrap(err, errors.CodeDBConnectionError, "failed to persist valuation")
+	if err := p.SetHealthScore(score); err != nil {
+		return nil, err
 	}
 
-	s.logger.Info("portfolio valuation completed",
-		logging.String("portfolio_id", string(portfolioID)),
-		logging.Float64("total_value", result.TotalValue),
-		logging.String("method", result.Method))
+	if err := s.repo.Save(ctx, p); err != nil {
+		return nil, err
+	}
 
-	return result, nil
+	return &score, nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Query operations
-// ─────────────────────────────────────────────────────────────────────────────
-
-// GetUserPortfolios retrieves all portfolios owned by the specified user,
-// paginated.
-func (s *Service) GetUserPortfolios(
-	ctx context.Context,
-	ownerID common.UserID,
-	page common.PageRequest,
-) (*common.PageResponse[*Portfolio], error) {
-	if err := page.Validate(); err != nil {
-		return nil, errors.Wrap(err, errors.CodeInvalidParam, "invalid pagination parameters")
+func (s *portfolioServiceImpl) ComparePortfolios(ctx context.Context, portfolioIDs []string) ([]*PortfolioComparison, error) {
+	if len(portfolioIDs) > 10 {
+		return nil, errors.InvalidParam("cannot compare more than 10 portfolios")
 	}
 
-	resp, err := s.repo.FindByOwner(ctx, ownerID, page)
-	if err != nil {
-		s.logger.Error("failed to retrieve user portfolios",
-			logging.String("owner_id", string(ownerID)),
-			logging.Err(err))
-		return nil, errors.Wrap(err, errors.CodeDBConnectionError, "failed to query portfolios")
+	results := make([]*PortfolioComparison, 0, len(portfolioIDs))
+	for _, id := range portfolioIDs {
+		p, err := s.repo.FindByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+
+		// Mock tech domain coverage: distribute patents round-robin
+		coverage := make(map[string]int)
+		for i, domain := range p.TechDomains {
+			count := p.PatentCount() / len(p.TechDomains)
+			if i < p.PatentCount()%len(p.TechDomains) {
+				count++
+			}
+			coverage[domain] = count
+		}
+
+		results = append(results, &PortfolioComparison{
+			PortfolioID:        p.ID,
+			Name:               p.Name,
+			PatentCount:        p.PatentCount(),
+			TechDomainCoverage: coverage,
+			HealthScore:        p.HealthScore,
+		})
 	}
 
-	s.logger.Debug("retrieved user portfolios",
-		logging.String("owner_id", string(ownerID)),
-		logging.Int("count", len(resp.Items)),
-		logging.Int64("total", resp.Total))
-
-	return resp, nil
+	return results, nil
 }
 
+func (s *portfolioServiceImpl) IdentifyGaps(ctx context.Context, portfolioID string, targetDomains []string) ([]*GapInfo, error) {
+	p, err := s.repo.FindByID(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+
+	industryAverage := 10
+	gaps := make([]*GapInfo, 0)
+
+	// Build current coverage map
+	currentCoverage := make(map[string]int)
+	for _, domain := range p.TechDomains {
+		// Mock: distribute patents
+		currentCoverage[domain] = p.PatentCount() / len(p.TechDomains)
+	}
+
+	for _, target := range targetDomains {
+		count := currentCoverage[target]
+		if count < industryAverage {
+			severity := "Low"
+			if count == 0 {
+				severity = "Critical"
+			} else if count < industryAverage/2 {
+				severity = "High"
+			} else if count < industryAverage {
+				severity = "Medium"
+			}
+
+			gaps = append(gaps, &GapInfo{
+				TechDomain:      target,
+				DomainName:      target, // Simplification
+				CurrentCount:    count,
+				IndustryAverage: industryAverage,
+				GapSeverity:     severity,
+				Recommendation:  fmt.Sprintf("Consider acquiring or developing more patents in %s area", target),
+			})
+		}
+	}
+
+	return gaps, nil
+}
+
+func (s *portfolioServiceImpl) GetOverlapAnalysis(ctx context.Context, portfolioID1, portfolioID2 string) (*OverlapResult, error) {
+	p1, err := s.repo.FindByID(ctx, portfolioID1)
+	if err != nil {
+		return nil, err
+	}
+	p2, err := s.repo.FindByID(ctx, portfolioID2)
+	if err != nil {
+		return nil, err
+	}
+
+	map1 := make(map[string]bool)
+	for _, id := range p1.PatentIDs {
+		map1[id] = true
+	}
+
+	overlapping := make([]string, 0)
+	uniqueToP1 := make([]string, 0)
+	uniqueToP2 := make([]string, 0)
+
+	for _, id := range p1.PatentIDs {
+		found := false
+		for _, id2 := range p2.PatentIDs {
+			if id == id2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			uniqueToP1 = append(uniqueToP1, id)
+		}
+	}
+
+	for _, id := range p2.PatentIDs {
+		if map1[id] {
+			overlapping = append(overlapping, id)
+		} else {
+			uniqueToP2 = append(uniqueToP2, id)
+		}
+	}
+
+	var ratio float64
+	totalUnique := len(uniqueToP1) + len(uniqueToP2) + len(overlapping)
+	if totalUnique > 0 {
+		ratio = float64(len(overlapping)) / float64(totalUnique)
+	}
+
+	return &OverlapResult{
+		Portfolio1ID:        portfolioID1,
+		Portfolio2ID:        portfolioID2,
+		OverlappingPatentIDs: overlapping,
+		OverlapRatio:        ratio,
+		UniqueToPortfolio1:  uniqueToP1,
+		UniqueToPortfolio2:  uniqueToP2,
+	}, nil
+}
+
+//Personal.AI order the ending

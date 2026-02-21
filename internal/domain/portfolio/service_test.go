@@ -1,5 +1,4 @@
-// Package portfolio_test provides unit tests for the portfolio domain service.
-package portfolio_test
+package portfolio
 
 import (
 	"context"
@@ -7,221 +6,227 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
-	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Mock implementations
-// ─────────────────────────────────────────────────────────────────────────────
-
-type MockRepository struct {
+// mockPortfolioRepository is a mock implementation of PortfolioRepository.
+type mockPortfolioRepository struct {
 	mock.Mock
 }
 
-func (m *MockRepository) Save(ctx context.Context, p *portfolio.Portfolio) error {
-	args := m.Called(ctx, p)
+func (m *mockPortfolioRepository) Save(ctx context.Context, portfolio *Portfolio) error {
+	args := m.Called(ctx, portfolio)
 	return args.Error(0)
 }
 
-func (m *MockRepository) FindByID(ctx context.Context, id common.ID) (*portfolio.Portfolio, error) {
+func (m *mockPortfolioRepository) FindByID(ctx context.Context, id string) (*Portfolio, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*portfolio.Portfolio), args.Error(1)
+	return args.Get(0).(*Portfolio), args.Error(1)
 }
 
-func (m *MockRepository) FindByOwner(ctx context.Context, ownerID common.UserID, page common.PageRequest) (*common.PageResponse[*portfolio.Portfolio], error) {
-	args := m.Called(ctx, ownerID, page)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*common.PageResponse[*portfolio.Portfolio]), args.Error(1)
+func (m *mockPortfolioRepository) FindByOwnerID(ctx context.Context, ownerID string, opts ...QueryOption) ([]*Portfolio, error) {
+	args := m.Called(ctx, ownerID, opts)
+	return args.Get(0).([]*Portfolio), args.Error(1)
 }
 
-func (m *MockRepository) Update(ctx context.Context, p *portfolio.Portfolio) error {
-	args := m.Called(ctx, p)
-	return args.Error(0)
+func (m *mockPortfolioRepository) FindByStatus(ctx context.Context, status PortfolioStatus, opts ...QueryOption) ([]*Portfolio, error) {
+	args := m.Called(ctx, status, opts)
+	return args.Get(0).([]*Portfolio), args.Error(1)
 }
 
-func (m *MockRepository) Delete(ctx context.Context, id common.ID) error {
+func (m *mockPortfolioRepository) FindByTechDomain(ctx context.Context, techDomain string, opts ...QueryOption) ([]*Portfolio, error) {
+	args := m.Called(ctx, techDomain, opts)
+	return args.Get(0).([]*Portfolio), args.Error(1)
+}
+
+func (m *mockPortfolioRepository) Delete(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
 }
 
-func (m *MockRepository) FindByPatentID(ctx context.Context, patentID common.ID) ([]*portfolio.Portfolio, error) {
+func (m *mockPortfolioRepository) Count(ctx context.Context, ownerID string) (int64, error) {
+	args := m.Called(ctx, ownerID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *mockPortfolioRepository) ListSummaries(ctx context.Context, ownerID string, opts ...QueryOption) ([]*PortfolioSummary, error) {
+	args := m.Called(ctx, ownerID, opts)
+	return args.Get(0).([]*PortfolioSummary), args.Error(1)
+}
+
+func (m *mockPortfolioRepository) FindContainingPatent(ctx context.Context, patentID string) ([]*Portfolio, error) {
 	args := m.Called(ctx, patentID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*portfolio.Portfolio), args.Error(1)
+	return args.Get(0).([]*Portfolio), args.Error(1)
 }
 
-func (m *MockRepository) FindByTag(ctx context.Context, tag string, page common.PageRequest) (*common.PageResponse[*portfolio.Portfolio], error) {
-	args := m.Called(ctx, tag, page)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*common.PageResponse[*portfolio.Portfolio]), args.Error(1)
-}
+func TestCreatePortfolio_Success(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	svc := NewPortfolioService(repo)
+	ctx := context.Background()
 
-type MockValuator struct {
-	mock.Mock
-}
+	repo.On("Save", ctx, mock.AnythingOfType("*portfolio.Portfolio")).Return(nil)
 
-func (m *MockValuator) Valuate(ctx context.Context, patentID common.ID, factors portfolio.ValuationFactors) (float64, error) {
-	args := m.Called(ctx, patentID, factors)
-	return args.Get(0).(float64), args.Error(1)
-}
+	p, err := svc.CreatePortfolio(ctx, "Test Portfolio", "owner-1", []string{"OLED"})
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Service tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestService_CreatePortfolio_Success(t *testing.T) {
-	t.Parallel()
-
-	mockRepo := new(MockRepository)
-	mockValuator := new(MockValuator)
-	logger := logging.NewNopLogger()
-	svc := portfolio.NewService(mockRepo, mockValuator, logger)
-
-	mockRepo.On("Save", mock.Anything, mock.AnythingOfType("*portfolio.Portfolio")).
-		Return(nil)
-
-	p, err := svc.CreatePortfolio(context.Background(), "Test Portfolio", "desc", "user-1")
-
-	require.NoError(t, err)
-	require.NotNil(t, p)
+	assert.NoError(t, err)
 	assert.Equal(t, "Test Portfolio", p.Name)
-	mockRepo.AssertExpectations(t)
+	assert.Equal(t, []string{"OLED"}, p.TechDomains)
+	repo.AssertExpectations(t)
 }
 
-func TestService_CreatePortfolio_EmptyName(t *testing.T) {
-	t.Parallel()
+func TestCreatePortfolio_EmptyName(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	svc := NewPortfolioService(repo)
+	ctx := context.Background()
 
-	mockRepo := new(MockRepository)
-	mockValuator := new(MockValuator)
-	logger := logging.NewNopLogger()
-	svc := portfolio.NewService(mockRepo, mockValuator, logger)
-
-	p, err := svc.CreatePortfolio(context.Background(), "", "desc", "user-1")
-
+	_, err := svc.CreatePortfolio(ctx, "", "owner-1", nil)
 	assert.Error(t, err)
-	assert.Nil(t, p)
+	repo.AssertNotCalled(t, "Save", ctx, mock.Anything)
 }
 
-func TestService_AddPatentToPortfolio_Success(t *testing.T) {
-	t.Parallel()
+func TestAddPatentsToPortfolio_Success(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	svc := NewPortfolioService(repo)
+	ctx := context.Background()
 
-	mockRepo := new(MockRepository)
-	mockValuator := new(MockValuator)
-	logger := logging.NewNopLogger()
-	svc := portfolio.NewService(mockRepo, mockValuator, logger)
+	p, _ := NewPortfolio("Test", "owner")
+	repo.On("FindByID", ctx, p.ID).Return(p, nil)
+	repo.On("Save", ctx, p).Return(nil)
 
-	existingPortfolio, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	mockRepo.On("FindByID", mock.Anything, existingPortfolio.ID).
-		Return(existingPortfolio, nil)
-	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*portfolio.Portfolio")).
-		Return(nil)
-
-	patentID := common.NewID()
-	err = svc.AddPatentToPortfolio(context.Background(), existingPortfolio.ID, patentID)
-
-	require.NoError(t, err)
-	mockRepo.AssertExpectations(t)
+	err := svc.AddPatentsToPortfolio(ctx, p.ID, []string{"P1", "P2"})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, p.PatentCount())
 }
 
-func TestService_AddPatentToPortfolio_PortfolioNotFound(t *testing.T) {
-	t.Parallel()
+func TestAddPatentsToPortfolio_PortfolioNotFound(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	svc := NewPortfolioService(repo)
+	ctx := context.Background()
 
-	mockRepo := new(MockRepository)
-	mockValuator := new(MockValuator)
-	logger := logging.NewNopLogger()
-	svc := portfolio.NewService(mockRepo, mockValuator, logger)
+	repo.On("FindByID", ctx, "invalid").Return(nil, errors.New(errors.ErrCodeNotFound, "not found"))
 
-	nonExistentID := common.NewID()
-	mockRepo.On("FindByID", mock.Anything, nonExistentID).
-		Return(nil, assert.AnError)
-
-	err := svc.AddPatentToPortfolio(context.Background(), nonExistentID, common.NewID())
-
+	err := svc.AddPatentsToPortfolio(ctx, "invalid", []string{"P1"})
 	assert.Error(t, err)
-	mockRepo.AssertExpectations(t)
+	assert.True(t, errors.IsCode(err, errors.ErrCodeNotFound))
 }
 
-func TestService_ValuatePortfolio_Success(t *testing.T) {
-	t.Parallel()
+func TestAddPatentsToPortfolio_PartialDuplicate(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	svc := NewPortfolioService(repo)
+	ctx := context.Background()
 
-	mockRepo := new(MockRepository)
-	mockValuator := new(MockValuator)
-	logger := logging.NewNopLogger()
-	svc := portfolio.NewService(mockRepo, mockValuator, logger)
+	p, _ := NewPortfolio("Test", "owner")
+	p.AddPatent("P1")
+	repo.On("FindByID", ctx, p.ID).Return(p, nil)
+	repo.On("Save", ctx, p).Return(nil)
 
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-	patentID := common.NewID()
-	require.NoError(t, p.AddPatent(patentID))
+	err := svc.AddPatentsToPortfolio(ctx, p.ID, []string{"P1", "P2"})
+	assert.Error(t, err)
+	assert.True(t, errors.IsCode(err, errors.ErrCodeConflict))
+}
 
-	mockRepo.On("FindByID", mock.Anything, p.ID).Return(p, nil)
-	mockValuator.On("Valuate", mock.Anything, patentID, mock.AnythingOfType("portfolio.ValuationFactors")).
-		Return(100000.0, nil)
-	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*portfolio.Portfolio")).
-		Return(nil)
+func TestActivatePortfolio_Success(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	svc := NewPortfolioService(repo)
+	ctx := context.Background()
 
-	factors := map[common.ID]portfolio.ValuationFactors{
-		patentID: {
-			TechnicalScore: 0.8,
-			LegalScore:     0.7,
-			MarketScore:    0.9,
-			RemainingLife:  15.0,
-		},
+	p, _ := NewPortfolio("Test", "owner")
+	repo.On("FindByID", ctx, p.ID).Return(p, nil)
+	repo.On("Save", ctx, p).Return(nil)
+
+	err := svc.ActivatePortfolio(ctx, p.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, PortfolioStatusActive, p.Status)
+}
+
+func TestCalculateHealthScore_Success(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	svc := NewPortfolioService(repo)
+	ctx := context.Background()
+
+	p, _ := NewPortfolio("Test", "owner")
+	p.TechDomains = []string{"D1", "D2"}
+	for i := 0; i < 5; i++ {
+		p.AddPatent(string(rune('A' + i)))
 	}
+	repo.On("FindByID", ctx, p.ID).Return(p, nil)
+	repo.On("Save", ctx, p).Return(nil)
 
-	result, err := svc.ValuatePortfolio(context.Background(), p.ID, factors)
-
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Greater(t, result.TotalValue, 0.0)
-	mockRepo.AssertExpectations(t)
-	mockValuator.AssertExpectations(t)
+	score, err := svc.CalculateHealthScore(ctx, p.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, 50.0, score.CoverageScore) // 5/10 * 100
+	assert.Equal(t, 100.0, score.ConcentrationScore) // Round-robin uniform distribution assumed in score calc?
+	// Wait, in my implementation of CalculateHealthScore, numDomains=2, patentCount=5.
+	// It assumes uniform distribution for skeleton score.
+	// H = -2 * (0.5 * log2(0.5)) = -2 * (0.5 * -1) = 1.
+	// maxEntropy = log2(2) = 1.
+	// concentrationScore = 1/1 * 100 = 100.
+	assert.NotNil(t, p.HealthScore)
 }
 
-func TestService_ValuatePortfolio_FactorCountMismatch(t *testing.T) {
-	t.Parallel()
+func TestComparePortfolios_Success(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	svc := NewPortfolioService(repo)
+	ctx := context.Background()
 
-	mockRepo := new(MockRepository)
-	mockValuator := new(MockValuator)
-	logger := logging.NewNopLogger()
-	svc := portfolio.NewService(mockRepo, mockValuator, logger)
+	p1, _ := NewPortfolio("P1", "owner")
+	p1.TechDomains = []string{"D1"}
+	p1.AddPatent("Pat1")
+	p2, _ := NewPortfolio("P2", "owner")
+	p2.TechDomains = []string{"D1", "D2"}
+	p2.AddPatent("Pat2")
 
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-	require.NoError(t, p.AddPatent(common.NewID()))
-	require.NoError(t, p.AddPatent(common.NewID()))
+	repo.On("FindByID", ctx, p1.ID).Return(p1, nil)
+	repo.On("FindByID", ctx, p2.ID).Return(p2, nil)
 
-	mockRepo.On("FindByID", mock.Anything, p.ID).Return(p, nil)
-
-	// Provide factors for only one patent (mismatch).
-	factors := map[common.ID]portfolio.ValuationFactors{
-		common.NewID(): {
-			TechnicalScore: 0.8,
-			LegalScore:     0.7,
-			MarketScore:    0.9,
-			RemainingLife:  15.0,
-		},
-	}
-
-	result, err := svc.ValuatePortfolio(context.Background(), p.ID, factors)
-
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "factor count")
-	mockRepo.AssertExpectations(t)
+	results, err := svc.ComparePortfolios(ctx, []string{p1.ID, p2.ID})
+	assert.NoError(t, err)
+	assert.Len(t, results, 2)
+	assert.Equal(t, 1, results[0].PatentCount)
+	assert.Equal(t, 1, results[1].PatentCount)
 }
 
+func TestIdentifyGaps_WithGaps(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	svc := NewPortfolioService(repo)
+	ctx := context.Background()
+
+	p, _ := NewPortfolio("Test", "owner")
+	p.TechDomains = []string{"D1"} // Only D1
+	repo.On("FindByID", ctx, p.ID).Return(p, nil)
+
+	gaps, err := svc.IdentifyGaps(ctx, p.ID, []string{"D1", "D2"})
+	assert.NoError(t, err)
+	// D1 might have a gap if count < 10. D2 will definitely have a gap because it's not in p.TechDomains.
+	// My implementation distributes patents across p.TechDomains.
+	// D1 count will be p.PatentCount(). If p.PatentCount() is 0, D1 is a gap.
+	assert.NotEmpty(t, gaps)
+}
+
+func TestGetOverlapAnalysis_WithOverlap(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	svc := NewPortfolioService(repo)
+	ctx := context.Background()
+
+	p1, _ := NewPortfolio("P1", "owner")
+	p1.AddPatent("Shared")
+	p1.AddPatent("Unique1")
+
+	p2, _ := NewPortfolio("P2", "owner")
+	p2.AddPatent("Shared")
+	p2.AddPatent("Unique2")
+
+	repo.On("FindByID", ctx, p1.ID).Return(p1, nil)
+	repo.On("FindByID", ctx, p2.ID).Return(p2, nil)
+
+	res, err := svc.GetOverlapAnalysis(ctx, p1.ID, p2.ID)
+	assert.NoError(t, err)
+	assert.Contains(t, res.OverlappingPatentIDs, "Shared")
+	assert.Equal(t, 1, len(res.OverlappingPatentIDs))
+	assert.Equal(t, 1/3.0, res.OverlapRatio) // Shared / (Unique1 + Unique2 + Shared) = 1 / 3
+}
+
+//Personal.AI order the ending

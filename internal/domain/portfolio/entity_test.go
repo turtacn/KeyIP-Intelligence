@@ -1,301 +1,221 @@
-// Package portfolio_test provides unit tests for the Portfolio aggregate root
-// and its invariants.
-package portfolio_test
+package portfolio
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NewPortfolio factory tests
-// ─────────────────────────────────────────────────────────────────────────────
+func TestNewPortfolio_Success(t *testing.T) {
+	name := "Blue OLED Materials"
+	ownerID := "user-123"
+	p, err := NewPortfolio(name, ownerID)
 
-func TestNewPortfolio_ValidParams(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("My Portfolio", "Test description", "user-123")
-
-	require.NoError(t, err)
-	require.NotNil(t, p)
+	assert.NoError(t, err)
 	assert.NotEmpty(t, p.ID)
-	assert.Equal(t, "My Portfolio", p.Name)
-	assert.Equal(t, "Test description", p.Description)
-	assert.Equal(t, common.UserID("user-123"), p.OwnerID)
-	assert.Equal(t, common.StatusActive, p.Status)
-	assert.Empty(t, p.PatentIDs)
-	assert.Empty(t, p.Tags)
-	assert.Nil(t, p.TotalValue)
-	assert.Equal(t, 1, p.Version)
+	assert.Equal(t, name, p.Name)
+	assert.Equal(t, ownerID, p.OwnerID)
+	assert.Equal(t, PortfolioStatusDraft, p.Status)
+	assert.NotZero(t, p.CreatedAt)
+	assert.NotZero(t, p.UpdatedAt)
 }
 
 func TestNewPortfolio_EmptyName(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("", "description", "user-123")
-
+	_, err := NewPortfolio("", "owner")
 	assert.Error(t, err)
-	assert.Nil(t, p)
-	assert.Contains(t, err.Error(), "name")
+	assert.True(t, errors.IsCode(err, errors.ErrCodeBadRequest))
+}
+
+func TestNewPortfolio_NameTooLong(t *testing.T) {
+	name := strings.Repeat("a", 257)
+	_, err := NewPortfolio(name, "owner")
+	assert.Error(t, err)
+	assert.True(t, errors.IsCode(err, errors.ErrCodeBadRequest))
 }
 
 func TestNewPortfolio_EmptyOwnerID(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Portfolio", "desc", "")
-
+	_, err := NewPortfolio("Portfolio", "")
 	assert.Error(t, err)
-	assert.Nil(t, p)
-	assert.Contains(t, err.Error(), "owner")
+	assert.True(t, errors.IsCode(err, errors.ErrCodeBadRequest))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AddPatent tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestAddPatent_Success(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	patentID := common.NewID()
-	err = p.AddPatent(patentID)
-
+func TestPortfolio_Validate_Success(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	err := p.Validate()
 	assert.NoError(t, err)
-	assert.Equal(t, 1, p.Size())
-	assert.True(t, p.ContainsPatent(patentID))
-	assert.Equal(t, 2, p.Version, "Version should increment after add")
 }
 
-func TestAddPatent_Duplicate(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	patentID := common.NewID()
-	require.NoError(t, p.AddPatent(patentID))
-
-	err = p.AddPatent(patentID)
-
+func TestPortfolio_Validate_EmptyID(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	p.ID = ""
+	err := p.Validate()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "already in portfolio")
-	assert.Equal(t, 1, p.Size(), "Size should not change after duplicate add")
 }
 
-func TestAddPatent_EmptyID(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	err = p.AddPatent("")
-
+func TestPortfolio_Validate_InvalidStatus(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	p.Status = "Invalid"
+	err := p.Validate()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "patent ID")
 }
 
-func TestAddPatent_MultiplePatents(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	id1 := common.NewID()
-	id2 := common.NewID()
-	id3 := common.NewID()
-
-	require.NoError(t, p.AddPatent(id1))
-	require.NoError(t, p.AddPatent(id2))
-	require.NoError(t, p.AddPatent(id3))
-
-	assert.Equal(t, 3, p.Size())
-	assert.True(t, p.ContainsPatent(id1))
-	assert.True(t, p.ContainsPatent(id2))
-	assert.True(t, p.ContainsPatent(id3))
+func TestPortfolio_Validate_DuplicatePatentIDs(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	p.PatentIDs = []string{"P1", "P1"}
+	err := p.Validate()
+	assert.Error(t, err)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RemovePatent tests
-// ─────────────────────────────────────────────────────────────────────────────
+func TestPortfolio_AddPatent_Success(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	initialUpdate := p.UpdatedAt
+	time.Sleep(1 * time.Millisecond)
 
-func TestRemovePatent_Success(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	patentID := common.NewID()
-	require.NoError(t, p.AddPatent(patentID))
-
-	err = p.RemovePatent(patentID)
-
+	err := p.AddPatent("P1")
 	assert.NoError(t, err)
-	assert.Equal(t, 0, p.Size())
-	assert.False(t, p.ContainsPatent(patentID))
+	assert.Equal(t, 1, p.PatentCount())
+	assert.True(t, p.ContainsPatent("P1"))
+	assert.True(t, p.UpdatedAt.After(initialUpdate))
 }
 
-func TestRemovePatent_NotFound(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	nonExistentID := common.NewID()
-	err = p.RemovePatent(nonExistentID)
-
+func TestPortfolio_AddPatent_EmptyID(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	err := p.AddPatent("")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
 }
 
-func TestRemovePatent_EmptyID(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	err = p.RemovePatent("")
-
+func TestPortfolio_AddPatent_Duplicate(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	p.AddPatent("P1")
+	err := p.AddPatent("P1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "patent ID")
+	assert.True(t, errors.IsCode(err, errors.ErrCodeConflict))
 }
 
-func TestRemovePatent_MultipleOperations(t *testing.T) {
-	t.Parallel()
+func TestPortfolio_RemovePatent_Success(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	p.AddPatent("P1")
+	p.AddPatent("P2")
+	initialUpdate := p.UpdatedAt
+	time.Sleep(1 * time.Millisecond)
 
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	id1 := common.NewID()
-	id2 := common.NewID()
-	id3 := common.NewID()
-
-	require.NoError(t, p.AddPatent(id1))
-	require.NoError(t, p.AddPatent(id2))
-	require.NoError(t, p.AddPatent(id3))
-
-	require.NoError(t, p.RemovePatent(id2))
-
-	assert.Equal(t, 2, p.Size())
-	assert.True(t, p.ContainsPatent(id1))
-	assert.False(t, p.ContainsPatent(id2))
-	assert.True(t, p.ContainsPatent(id3))
+	err := p.RemovePatent("P1")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, p.PatentCount())
+	assert.False(t, p.ContainsPatent("P1"))
+	assert.True(t, p.UpdatedAt.After(initialUpdate))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ContainsPatent tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestContainsPatent_Exists(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	patentID := common.NewID()
-	require.NoError(t, p.AddPatent(patentID))
-
-	assert.True(t, p.ContainsPatent(patentID))
+func TestPortfolio_RemovePatent_NotFound(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	err := p.RemovePatent("P1")
+	assert.Error(t, err)
+	assert.True(t, errors.IsCode(err, errors.ErrCodeNotFound))
 }
 
-func TestContainsPatent_NotExists(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	nonExistentID := common.NewID()
-	assert.False(t, p.ContainsPatent(nonExistentID))
+func TestPortfolio_ContainsPatent(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	p.AddPatent("P1")
+	assert.True(t, p.ContainsPatent("P1"))
+	assert.False(t, p.ContainsPatent("P2"))
 }
 
-func TestContainsPatent_EmptyPortfolio(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	assert.False(t, p.ContainsPatent(common.NewID()))
+func TestPortfolio_Activate_FromDraft(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	err := p.Activate()
+	assert.NoError(t, err)
+	assert.Equal(t, PortfolioStatusActive, p.Status)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Size tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestSize_EmptyPortfolio(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	assert.Equal(t, 0, p.Size())
+func TestPortfolio_Activate_FromArchived(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	p.Activate()
+	p.Archive()
+	err := p.Activate()
+	assert.Error(t, err)
 }
 
-func TestSize_AfterAddingPatents(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	assert.Equal(t, 0, p.Size())
-
-	require.NoError(t, p.AddPatent(common.NewID()))
-	assert.Equal(t, 1, p.Size())
-
-	require.NoError(t, p.AddPatent(common.NewID()))
-	assert.Equal(t, 2, p.Size())
-
-	require.NoError(t, p.AddPatent(common.NewID()))
-	assert.Equal(t, 3, p.Size())
+func TestPortfolio_Activate_AlreadyActive(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	p.Activate()
+	err := p.Activate()
+	assert.Error(t, err)
 }
 
-func TestSize_AfterRemovingPatents(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-
-	id1 := common.NewID()
-	id2 := common.NewID()
-	require.NoError(t, p.AddPatent(id1))
-	require.NoError(t, p.AddPatent(id2))
-
-	assert.Equal(t, 2, p.Size())
-
-	require.NoError(t, p.RemovePatent(id1))
-	assert.Equal(t, 1, p.Size())
-
-	require.NoError(t, p.RemovePatent(id2))
-	assert.Equal(t, 0, p.Size())
+func TestPortfolio_Archive_FromActive(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	p.Activate()
+	err := p.Archive()
+	assert.NoError(t, err)
+	assert.Equal(t, PortfolioStatusArchived, p.Status)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SetValuation tests
-// ─────────────────────────────────────────────────────────────────────────────
+func TestPortfolio_Archive_FromDraft(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	err := p.Archive()
+	assert.Error(t, err)
+}
 
-func TestSetValuation_UpdatesValueAndVersion(t *testing.T) {
-	t.Parallel()
-
-	p, err := portfolio.NewPortfolio("Test", "desc", "user-1")
-	require.NoError(t, err)
-	initialVersion := p.Version
-
-	result := portfolio.ValuationResult{
-		TotalValue:   1000000.0,
-		AverageValue: 250000.0,
-		Method:       "MultiFactorV1",
+func TestPortfolio_SetHealthScore_Valid(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	score := HealthScore{
+		CoverageScore:      80,
+		ConcentrationScore: 70,
+		AgingScore:         60,
+		QualityScore:       90,
+		OverallScore:       75,
+		EvaluatedAt:        time.Now().UTC(),
 	}
-
-	p.SetValuation(result)
-
-	require.NotNil(t, p.TotalValue)
-	assert.Equal(t, 1000000.0, p.TotalValue.TotalValue)
-	assert.Equal(t, 250000.0, p.TotalValue.AverageValue)
-	assert.Equal(t, "MultiFactorV1", p.TotalValue.Method)
-	assert.Equal(t, initialVersion+1, p.Version)
+	err := p.SetHealthScore(score)
+	assert.NoError(t, err)
+	assert.NotNil(t, p.HealthScore)
+	assert.Equal(t, 75.0, p.HealthScore.OverallScore)
 }
 
+func TestPortfolio_SetHealthScore_OutOfRange(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	score := HealthScore{CoverageScore: 110}
+	err := p.SetHealthScore(score)
+	assert.Error(t, err)
+}
+
+func TestPortfolio_ToSummary(t *testing.T) {
+	p, _ := NewPortfolio("Portfolio", "owner")
+	p.AddPatent("P1")
+	score := HealthScore{OverallScore: 85}
+	p.SetHealthScore(score)
+
+	summary := p.ToSummary()
+	assert.Equal(t, p.ID, summary.ID)
+	assert.Equal(t, p.Name, summary.Name)
+	assert.Equal(t, p.Status, summary.Status)
+	assert.Equal(t, 1, summary.PatentCount)
+	assert.Equal(t, 85.0, summary.OverallHealthScore)
+	assert.Equal(t, p.UpdatedAt, summary.UpdatedAt)
+}
+
+func TestHealthScore_Validate_AllValid(t *testing.T) {
+	hs := HealthScore{
+		CoverageScore:      100,
+		ConcentrationScore: 0,
+		AgingScore:         50,
+		QualityScore:       75,
+		OverallScore:       80,
+	}
+	assert.NoError(t, hs.Validate())
+}
+
+func TestHealthScore_Validate_NegativeScore(t *testing.T) {
+	hs := HealthScore{CoverageScore: -1}
+	assert.Error(t, hs.Validate())
+}
+
+func TestHealthScore_Validate_ExceedsMax(t *testing.T) {
+	hs := HealthScore{OverallScore: 100.1}
+	assert.Error(t, hs.Validate())
+}
+
+//Personal.AI order the ending

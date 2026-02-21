@@ -1,271 +1,218 @@
-// Package portfolio_test provides unit tests for the patent valuation algorithms.
-package portfolio_test
+package portfolio
 
 import (
 	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	"github.com/stretchr/testify/mock"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MultiFactorValuator tests
-// ─────────────────────────────────────────────────────────────────────────────
+type mockDimensionEvaluator struct {
+	mock.Mock
+}
 
-func TestMultiFactorValuator_HighScoreFactors(t *testing.T) {
-	t.Parallel()
-
-	v := portfolio.NewMultiFactorValuator()
-	factors := portfolio.ValuationFactors{
-		TechnicalScore: 0.9,
-		LegalScore:     0.9,
-		MarketScore:    0.9,
-		RemainingLife:  15.0,
+func (m *mockDimensionEvaluator) Evaluate(ctx context.Context, patentID string) (*DimensionScore, error) {
+	args := m.Called(ctx, patentID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-
-	value, err := v.Valuate(context.Background(), common.NewID(), factors)
-
-	require.NoError(t, err)
-	// With default BaseValue=100k and high scores (0.9) across all dimensions,
-	// expect a value well above 50k (exact value depends on decay formula).
-	assert.Greater(t, value, 50000.0)
+	return args.Get(0).(*DimensionScore), args.Error(1)
 }
 
-func TestMultiFactorValuator_LowScoreFactors(t *testing.T) {
-	t.Parallel()
+func (m *mockDimensionEvaluator) Dimension() ValuationDimension {
+	args := m.Called()
+	return args.Get(0).(ValuationDimension)
+}
 
-	v := portfolio.NewMultiFactorValuator()
-	factors := portfolio.ValuationFactors{
-		TechnicalScore: 0.1,
-		LegalScore:     0.1,
-		MarketScore:    0.1,
-		RemainingLife:  15.0,
+func TestDefaultWeightConfig(t *testing.T) {
+	wc := DefaultWeightConfig()
+	assert.NoError(t, wc.Validate())
+	assert.Equal(t, 0.20, wc.TechnicalWeight)
+	assert.Equal(t, 0.25, wc.LegalWeight)
+	assert.Equal(t, 0.30, wc.CommercialWeight)
+	assert.Equal(t, 0.25, wc.StrategicWeight)
+}
+
+func TestWeightConfig_Validate_Success(t *testing.T) {
+	wc := &WeightConfig{
+		TechnicalWeight:  0.25,
+		LegalWeight:      0.25,
+		CommercialWeight: 0.25,
+		StrategicWeight:  0.25,
 	}
-
-	value, err := v.Valuate(context.Background(), common.NewID(), factors)
-
-	require.NoError(t, err)
-	// Low scores should yield a low valuation.
-	assert.Less(t, value, 20000.0)
+	assert.NoError(t, wc.Validate())
 }
 
-func TestMultiFactorValuator_ZeroRemainingLife(t *testing.T) {
-	t.Parallel()
+func TestWeightConfig_Validate_SumNotOne(t *testing.T) {
+	wc := &WeightConfig{TechnicalWeight: 0.1, LegalWeight: 0.1, CommercialWeight: 0.1, StrategicWeight: 0.1}
+	assert.Error(t, wc.Validate())
+}
 
-	v := portfolio.NewMultiFactorValuator()
-	v.DecayRate = 0.2 // Explicitly set high decay to test end-of-life valuation
-	factors := portfolio.ValuationFactors{
-		TechnicalScore: 0.8,
-		LegalScore:     0.8,
-		MarketScore:    0.8,
-		RemainingLife:  0.0, // patent expired
+func TestWeightConfig_Validate_FloatingPointTolerance(t *testing.T) {
+	wc := &WeightConfig{
+		TechnicalWeight:  0.25,
+		LegalWeight:      0.25,
+		CommercialWeight: 0.25,
+		StrategicWeight:  0.2500001,
 	}
-
-	value, err := v.Valuate(context.Background(), common.NewID(), factors)
-
-	require.NoError(t, err)
-	// With zero remaining life, decay should push value close to zero.
-	assert.Less(t, value, 5000.0)
+	assert.NoError(t, wc.Validate())
 }
 
-func TestMultiFactorValuator_InvalidTechnicalScore(t *testing.T) {
-	t.Parallel()
-
-	v := portfolio.NewMultiFactorValuator()
-	factors := portfolio.ValuationFactors{
-		TechnicalScore: 1.5, // out of range
-		LegalScore:     0.5,
-		MarketScore:    0.5,
-		RemainingLife:  10.0,
-	}
-
-	_, err := v.Valuate(context.Background(), common.NewID(), factors)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "TechnicalScore")
-}
-
-func TestMultiFactorValuator_InvalidLegalScore(t *testing.T) {
-	t.Parallel()
-
-	v := portfolio.NewMultiFactorValuator()
-	factors := portfolio.ValuationFactors{
-		TechnicalScore: 0.5,
-		LegalScore:     -0.1, // negative
-		MarketScore:    0.5,
-		RemainingLife:  10.0,
-	}
-
-	_, err := v.Valuate(context.Background(), common.NewID(), factors)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "LegalScore")
-}
-
-func TestMultiFactorValuator_InvalidMarketScore(t *testing.T) {
-	t.Parallel()
-
-	v := portfolio.NewMultiFactorValuator()
-	factors := portfolio.ValuationFactors{
-		TechnicalScore: 0.5,
-		LegalScore:     0.5,
-		MarketScore:    2.0, // out of range
-		RemainingLife:  10.0,
-	}
-
-	_, err := v.Valuate(context.Background(), common.NewID(), factors)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "MarketScore")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CalculatePortfolioValuation tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestCalculatePortfolioValuation_MultiplePatents(t *testing.T) {
-	t.Parallel()
-
-	v := portfolio.NewMultiFactorValuator()
-	patentFactors := map[common.ID]portfolio.ValuationFactors{
-		common.NewID(): {
-			TechnicalScore: 0.8,
-			LegalScore:     0.7,
-			MarketScore:    0.9,
-			RemainingLife:  15.0,
-		},
-		common.NewID(): {
-			TechnicalScore: 0.6,
-			LegalScore:     0.6,
-			MarketScore:    0.6,
-			RemainingLife:  10.0,
-		},
-		common.NewID(): {
-			TechnicalScore: 0.9,
-			LegalScore:     0.8,
-			MarketScore:    0.7,
-			RemainingLife:  12.0,
-		},
-	}
-
-	result, err := portfolio.CalculatePortfolioValuation(context.Background(), v, patentFactors)
-
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Greater(t, result.TotalValue, 0.0)
-	assert.Greater(t, result.AverageValue, 0.0)
-	assert.Greater(t, result.MedianValue, 0.0)
-	assert.Greater(t, result.HighestValue, 0.0)
-	assert.Greater(t, result.LowestValue, 0.0)
-	assert.Equal(t, 3, len(result.Breakdown))
-	assert.Equal(t, "MultiFactorV1", result.Method)
-
-	// Sanity checks on aggregates.
-	assert.InDelta(t, result.TotalValue/3, result.AverageValue, 0.01)
-	assert.GreaterOrEqual(t, result.HighestValue, result.MedianValue)
-	assert.GreaterOrEqual(t, result.MedianValue, result.LowestValue)
-}
-
-func TestCalculatePortfolioValuation_EmptyPortfolio(t *testing.T) {
-	t.Parallel()
-
-	v := portfolio.NewMultiFactorValuator()
-	patentFactors := map[common.ID]portfolio.ValuationFactors{}
-
-	result, err := portfolio.CalculatePortfolioValuation(context.Background(), v, patentFactors)
-
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "empty")
-}
-
-func TestCalculatePortfolioValuation_SinglePatent(t *testing.T) {
-	t.Parallel()
-
-	v := portfolio.NewMultiFactorValuator()
-	patentFactors := map[common.ID]portfolio.ValuationFactors{
-		common.NewID(): {
-			TechnicalScore: 0.7,
-			LegalScore:     0.7,
-			MarketScore:    0.7,
-			RemainingLife:  15.0,
-		},
-	}
-
-	result, err := portfolio.CalculatePortfolioValuation(context.Background(), v, patentFactors)
-
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	assert.Equal(t, result.TotalValue, result.AverageValue)
-	assert.Equal(t, result.MedianValue, result.HighestValue)
-	assert.Equal(t, result.LowestValue, result.HighestValue)
-	assert.Len(t, result.Breakdown, 1)
-
-	// Verify ValuationDate is set and not zero.
-	assert.False(t, result.ValuationDate.IsZero())
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CalculateClaimBreadth tests
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestCalculateClaimBreadth_ManyIndependentFewElements(t *testing.T) {
-	t.Parallel()
-
-	// Many independent claims with few elements → broad scope.
-	breadth := portfolio.CalculateClaimBreadth(10, 5, 3.0)
-
-	assert.Greater(t, breadth, 0.3, "High independent claim ratio should yield high breadth")
-}
-
-func TestCalculateClaimBreadth_FewIndependentManyElements(t *testing.T) {
-	t.Parallel()
-
-	// Few independent claims with many elements → narrow scope.
-	breadth := portfolio.CalculateClaimBreadth(20, 2, 15.0)
-
-	assert.Less(t, breadth, 0.2, "Low independent claim ratio and high element count should yield low breadth")
-}
-
-func TestCalculateClaimBreadth_ZeroClaims(t *testing.T) {
-	t.Parallel()
-
-	breadth := portfolio.CalculateClaimBreadth(0, 0, 0)
-
-	assert.Equal(t, 0.0, breadth)
-}
-
-func TestCalculateClaimBreadth_AllIndependent(t *testing.T) {
-	t.Parallel()
-
-	// All claims are independent with minimal elements.
-	breadth := portfolio.CalculateClaimBreadth(5, 5, 2.0)
-
-	assert.Greater(t, breadth, 0.7, "All independent claims with low element count should yield very high breadth")
-}
-
-func TestCalculateClaimBreadth_BoundedOutputRange(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		claims      int
-		independent int
-		avgElements float64
+func TestDetermineValuationTier(t *testing.T) {
+	tests := []struct {
+		score float64
+		want  ValuationTier
 	}{
-		{10, 5, 5.0},
-		{20, 2, 10.0},
-		{15, 8, 3.0},
-		{5, 1, 20.0},
-		{50, 25, 7.0},
+		{95, TierS},
+		{90, TierS},
+		{89.99, TierA},
+		{80, TierA},
+		{75, TierA},
+		{74.99, TierB},
+		{65, TierB},
+		{60, TierB},
+		{59.99, TierC},
+		{50, TierC},
+		{40, TierC},
+		{39.99, TierD},
+		{20, TierD},
 	}
-
-	for _, tc := range cases {
-		breadth := portfolio.CalculateClaimBreadth(tc.claims, tc.independent, tc.avgElements)
-		assert.GreaterOrEqual(t, breadth, 0.0)
-		assert.LessOrEqual(t, breadth, 1.0)
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, DetermineValuationTier(tt.score), "score: %v", tt.score)
 	}
 }
 
+func TestGenerateRecommendations(t *testing.T) {
+	t.Run("LowTechnical", func(t *testing.T) {
+		scores := map[ValuationDimension]*DimensionScore{
+			DimensionTechnical: {Dimension: DimensionTechnical, Score: 35},
+		}
+		recs := GenerateRecommendations(scores)
+		assert.NotEmpty(t, recs)
+		found := false
+		for _, r := range recs {
+			if r.Type == "strengthen" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found)
+	})
+
+	t.Run("LowLegal", func(t *testing.T) {
+		scores := map[ValuationDimension]*DimensionScore{
+			DimensionLegal: {Dimension: DimensionLegal, Score: 25},
+		}
+		recs := GenerateRecommendations(scores)
+		found := false
+		for _, r := range recs {
+			if r.Type == "enforce" && r.Priority == "critical" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found)
+	})
+
+	t.Run("HighCommercialLowStrategic", func(t *testing.T) {
+		scores := map[ValuationDimension]*DimensionScore{
+			DimensionCommercial: {Dimension: DimensionCommercial, Score: 85},
+			DimensionStrategic:  {Dimension: DimensionStrategic, Score: 40},
+		}
+		recs := GenerateRecommendations(scores)
+		found := false
+		for _, r := range recs {
+			if r.Type == "maintain" && r.Reason == "High commercial value but weak strategic positioning." {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found)
+	})
+
+	t.Run("AllHigh", func(t *testing.T) {
+		scores := map[ValuationDimension]*DimensionScore{
+			DimensionTechnical:  {Dimension: DimensionTechnical, Score: 80},
+			DimensionLegal:      {Dimension: DimensionLegal, Score: 80},
+			DimensionCommercial: {Dimension: DimensionCommercial, Score: 80},
+			DimensionStrategic:  {Dimension: DimensionStrategic, Score: 80},
+		}
+		recs := GenerateRecommendations(scores)
+		found := false
+		for _, r := range recs {
+			if r.Type == "maintain" && r.Priority == "low" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found)
+	})
+
+	t.Run("AllLow", func(t *testing.T) {
+		scores := map[ValuationDimension]*DimensionScore{
+			DimensionTechnical:  {Dimension: DimensionTechnical, Score: 25},
+			DimensionLegal:      {Dimension: DimensionLegal, Score: 25},
+			DimensionCommercial: {Dimension: DimensionCommercial, Score: 25},
+			DimensionStrategic:  {Dimension: DimensionStrategic, Score: 25},
+		}
+		recs := GenerateRecommendations(scores)
+		found := false
+		for _, r := range recs {
+			if r.Type == "abandon" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found)
+	})
+}
+
+func TestEvaluatePatent_Success(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	eval := new(mockDimensionEvaluator)
+	eval.On("Dimension").Return(DimensionTechnical)
+	eval.On("Evaluate", mock.Anything, "P1").Return(&DimensionScore{Score: 80}, nil)
+
+	engine := NewValuationEngine(repo, eval)
+	config := &WeightConfig{TechnicalWeight: 1.0}
+
+	val, err := engine.EvaluatePatent(context.Background(), "P1", config)
+	assert.NoError(t, err)
+	assert.Equal(t, 80.0, val.OverallScore)
+	assert.Equal(t, TierA, val.Tier)
+}
+
+func TestEvaluatePortfolio_Success(t *testing.T) {
+	repo := new(mockPortfolioRepository)
+	eval := new(mockDimensionEvaluator)
+	eval.On("Dimension").Return(DimensionTechnical)
+	eval.On("Evaluate", mock.Anything, "P1").Return(&DimensionScore{Score: 80}, nil)
+	eval.On("Evaluate", mock.Anything, "P2").Return(&DimensionScore{Score: 60}, nil)
+
+	p, _ := NewPortfolio("Test", "owner")
+	p.AddPatent("P1")
+	p.AddPatent("P2")
+	repo.On("FindByID", mock.Anything, p.ID).Return(p, nil)
+
+	engine := NewValuationEngine(repo, eval)
+	config := &WeightConfig{TechnicalWeight: 1.0}
+
+	val, err := engine.EvaluatePortfolio(context.Background(), p.ID, config)
+	assert.NoError(t, err)
+	assert.Equal(t, 70.0, val.AggregateScore)
+	assert.Len(t, val.PatentValuations, 2)
+	assert.Equal(t, "P1", val.TopPerformers[0])
+	assert.Equal(t, "P2", val.UnderPerformers[0])
+}
+
+func TestDimensionScore_Validate(t *testing.T) {
+	ds := &DimensionScore{Score: 105}
+	assert.Error(t, ds.Validate())
+	ds.Score = -5
+	assert.Error(t, ds.Validate())
+	ds.Score = 50
+	assert.NoError(t, ds.Validate())
+}
+
+//Personal.AI order the ending

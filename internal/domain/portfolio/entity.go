@@ -1,7 +1,3 @@
-// Package portfolio implements the patent portfolio domain aggregate,
-// which models collections of patents owned or managed by a user and
-// provides valuation capabilities based on multiple technical, legal,
-// and market factors.
 package portfolio
 
 import (
@@ -12,192 +8,124 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Portfolio — aggregate root for a patent collection
-// ─────────────────────────────────────────────────────────────────────────────
+// PortfolioStatus defines the lifecycle state of a portfolio.
+type PortfolioStatus string
 
-// Portfolio is an aggregate root representing a curated collection of patents
-// owned or managed by a single user.  It supports valuation, tagging, and
-// lifecycle management (active/archived/deleted).
-//
-// Business rules:
-//   - Each portfolio must have a non-empty name.
-//   - A patent cannot be added to the same portfolio twice.
-//   - Valuation results are cached in TotalValue and must be refreshed via
-//     the domain service when factors change.
+const (
+	PortfolioStatusActive   PortfolioStatus = "Active"
+	PortfolioStatusArchived PortfolioStatus = "Archived"
+	PortfolioStatusDraft    PortfolioStatus = "Draft"
+)
+
+// HealthScore is a value object representing the quality snapshot of a portfolio.
+type HealthScore struct {
+	CoverageScore      float64   `json:"coverage_score"`
+	ConcentrationScore float64   `json:"concentration_score"`
+	AgingScore         float64   `json:"aging_score"`
+	QualityScore       float64   `json:"quality_score"`
+	OverallScore       float64   `json:"overall_score"`
+	EvaluatedAt        time.Time `json:"evaluated_at"`
+}
+
+// Portfolio is an aggregate root representing a collection of patents.
 type Portfolio struct {
-	// BaseEntity provides ID, TenantID, CreatedAt, UpdatedAt, Version.
-	common.BaseEntity
-
-	// Name is the user-assigned title for this portfolio (e.g., "Core EV Patents").
-	Name string `json:"name"`
-
-	// Description provides additional context about the portfolio's purpose.
-	Description string `json:"description"`
-
-	// OwnerID identifies the user who owns this portfolio.
-	OwnerID common.UserID `json:"owner_id"`
-
-	// PatentIDs lists the IDs of patents included in this portfolio.
-	// Maintain uniqueness invariant: no duplicate IDs allowed.
-	PatentIDs []common.ID `json:"patent_ids"`
-
-	// TotalValue holds the most recent valuation result computed by the
-	// domain service.  Nil if no valuation has been performed yet.
-	TotalValue *ValuationResult `json:"total_value,omitempty"`
-
-	// Tags enables free-form categorization (e.g., ["lithium-ion", "OLED", "5G"]).
-	Tags []string `json:"tags,omitempty"`
-
-	// Status tracks the portfolio's lifecycle state.
-	Status common.Status `json:"status"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	OwnerID     string            `json:"owner_id"`
+	TechDomains []string          `json:"tech_domains"`
+	PatentIDs   []string          `json:"patent_ids"`
+	Tags        map[string]string `json:"tags"`
+	Status      PortfolioStatus   `json:"status"`
+	HealthScore *HealthScore      `json:"health_score"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ValuationResult — value object holding aggregated valuation metrics
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ValuationResult encapsulates the financial valuation of an entire portfolio,
-// computed as the sum of individual patent valuations plus statistical summaries.
-type ValuationResult struct {
-	// TotalValue is the sum of all patent valuations in USD.
-	TotalValue float64 `json:"total_value"`
-
-	// AverageValue is TotalValue / count(patents).
-	AverageValue float64 `json:"average_value"`
-
-	// MedianValue is the 50th percentile of individual patent values.
-	MedianValue float64 `json:"median_value"`
-
-	// HighestValue is the maximum single-patent value in the portfolio.
-	HighestValue float64 `json:"highest_value"`
-
-	// LowestValue is the minimum single-patent value in the portfolio.
-	LowestValue float64 `json:"lowest_value"`
-
-	// ValuationDate is the UTC timestamp when this valuation was computed.
-	ValuationDate time.Time `json:"valuation_date"`
-
-	// Method identifies the valuation algorithm used (e.g., "MultiFactorV1").
-	Method string `json:"method"`
-
-	// Breakdown lists the per-patent valuations that comprise TotalValue.
-	Breakdown []PatentValuation `json:"breakdown"`
+// PortfolioSummary provides a lightweight view of a portfolio.
+type PortfolioSummary struct {
+	ID                 string          `json:"id"`
+	Name               string          `json:"name"`
+	Status             PortfolioStatus `json:"status"`
+	PatentCount        int             `json:"patent_count"`
+	OverallHealthScore float64         `json:"overall_health_score"`
+	UpdatedAt          time.Time       `json:"updated_at"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PatentValuation — value object for a single patent's valuation
-// ─────────────────────────────────────────────────────────────────────────────
-
-// PatentValuation holds the financial value and contributing factors for one
-// patent within a portfolio valuation.
-type PatentValuation struct {
-	// PatentID identifies which patent this valuation applies to.
-	PatentID common.ID `json:"patent_id"`
-
-	// Value is the computed monetary value in USD.
-	Value float64 `json:"value"`
-
-	// Factors are the normalised scores and metrics that contributed to Value.
-	Factors ValuationFactors `json:"factors"`
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ValuationFactors — value object holding multi-dimensional scoring
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ValuationFactors encapsulates the normalised scores (0.0–1.0) and raw counts
-// used by the valuation algorithm to estimate a patent's worth.
-type ValuationFactors struct {
-	// TechnicalScore represents the technical innovation quality (0.0–1.0).
-	// Higher scores indicate novel, non-obvious inventions with broad applicability.
-	TechnicalScore float64 `json:"technical_score"`
-
-	// LegalScore represents the legal strength and enforceability (0.0–1.0).
-	// Considers claim clarity, prosecution history, litigation outcomes.
-	LegalScore float64 `json:"legal_score"`
-
-	// MarketScore represents commercial relevance and market size (0.0–1.0).
-	// Higher scores indicate large addressable markets or strategic importance.
-	MarketScore float64 `json:"market_score"`
-
-	// RemainingLife is the number of years until the patent expires.
-	// Used to apply time-decay to the valuation.
-	RemainingLife float64 `json:"remaining_life"`
-
-	// CitationCount is the number of times this patent has been cited by
-	// subsequent patents, indicating technical influence.
-	CitationCount int `json:"citation_count"`
-
-	// FamilySize is the count of patent family members across jurisdictions,
-	// indicating geographic coverage.
-	FamilySize int `json:"family_size"`
-
-	// ClaimBreadth quantifies the scope of the patent claims (0.0–1.0).
-	// Computed from independent claim count, element count, and dependency structure.
-	ClaimBreadth float64 `json:"claim_breadth"`
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Factory function
-// ─────────────────────────────────────────────────────────────────────────────
-
-// NewPortfolio constructs a new Portfolio with the given attributes and sets
-// default values for lifecycle fields.
-//
-// Returns an error if:
-//   - name is empty (portfolio must have an identifiable name)
-func NewPortfolio(name, description string, ownerID common.UserID) (*Portfolio, error) {
+// NewPortfolio constructs a new Portfolio in Draft status.
+func NewPortfolio(name, ownerID string) (*Portfolio, error) {
 	if name == "" {
 		return nil, errors.InvalidParam("portfolio name cannot be empty")
+	}
+	if len(name) > 256 {
+		return nil, errors.InvalidParam("portfolio name exceeds maximum length of 256 characters")
 	}
 	if ownerID == "" {
 		return nil, errors.InvalidParam("owner ID cannot be empty")
 	}
 
+	now := time.Now().UTC()
 	return &Portfolio{
-		BaseEntity: common.BaseEntity{
-			ID:        common.NewID(),
-			CreatedAt: time.Now().UTC(),
-			UpdatedAt: time.Now().UTC(),
-			Version:   1,
-		},
+		ID:          string(common.NewID()),
 		Name:        name,
-		Description: description,
 		OwnerID:     ownerID,
-		PatentIDs:   make([]common.ID, 0),
-		Tags:        make([]string, 0),
-		Status:      common.StatusActive,
+		TechDomains: make([]string, 0),
+		PatentIDs:   make([]string, 0),
+		Tags:        make(map[string]string),
+		Status:      PortfolioStatusDraft,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}, nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Methods
-// ─────────────────────────────────────────────────────────────────────────────
+// Validate ensures the portfolio entity is in a valid state.
+func (p *Portfolio) Validate() error {
+	if p.ID == "" {
+		return errors.InvalidParam("portfolio ID cannot be empty")
+	}
+	if p.Name == "" || len(p.Name) > 256 {
+		return errors.InvalidParam("invalid portfolio name")
+	}
+	if p.OwnerID == "" {
+		return errors.InvalidParam("owner ID cannot be empty")
+	}
 
-// AddPatent appends a patent ID to the portfolio's patent list.
-//
-// Returns an error if:
-//   - patentID is already in the portfolio (duplicates not allowed)
-func (p *Portfolio) AddPatent(patentID common.ID) error {
+	switch p.Status {
+	case PortfolioStatusActive, PortfolioStatusArchived, PortfolioStatusDraft:
+		// Valid
+	default:
+		return errors.InvalidParam(fmt.Sprintf("invalid portfolio status: %s", p.Status))
+	}
+
+	// Check for duplicate patent IDs
+	ids := make(map[string]bool)
+	for _, id := range p.PatentIDs {
+		if ids[id] {
+			return errors.InvalidParam(fmt.Sprintf("duplicate patent ID in portfolio: %s", id))
+		}
+		ids[id] = true
+	}
+
+	return nil
+}
+
+// AddPatent adds a patent to the portfolio.
+func (p *Portfolio) AddPatent(patentID string) error {
 	if patentID == "" {
 		return errors.InvalidParam("patent ID cannot be empty")
 	}
+
 	if p.ContainsPatent(patentID) {
 		return errors.Conflict(fmt.Sprintf("patent %s is already in portfolio %s", patentID, p.ID))
 	}
 
 	p.PatentIDs = append(p.PatentIDs, patentID)
 	p.UpdatedAt = time.Now().UTC()
-	p.Version++
 	return nil
 }
 
-// RemovePatent removes a patent ID from the portfolio's patent list.
-//
-// Returns an error if:
-//   - patentID is not found in the portfolio
-func (p *Portfolio) RemovePatent(patentID common.ID) error {
+// RemovePatent removes a patent from the portfolio.
+func (p *Portfolio) RemovePatent(patentID string) error {
 	if patentID == "" {
 		return errors.InvalidParam("patent ID cannot be empty")
 	}
@@ -214,29 +142,13 @@ func (p *Portfolio) RemovePatent(patentID common.ID) error {
 		return errors.NotFound(fmt.Sprintf("patent %s not found in portfolio %s", patentID, p.ID))
 	}
 
-	// Remove by swapping with last element and truncating.
-	p.PatentIDs[idx] = p.PatentIDs[len(p.PatentIDs)-1]
-	p.PatentIDs = p.PatentIDs[:len(p.PatentIDs)-1]
+	p.PatentIDs = append(p.PatentIDs[:idx], p.PatentIDs[idx+1:]...)
 	p.UpdatedAt = time.Now().UTC()
-	p.Version++
 	return nil
 }
 
-// SetValuation updates the portfolio's cached valuation result.
-// Typically called by the domain service after computing valuations.
-func (p *Portfolio) SetValuation(result ValuationResult) {
-	p.TotalValue = &result
-	p.UpdatedAt = time.Now().UTC()
-	p.Version++
-}
-
-// Size returns the number of patents currently in the portfolio.
-func (p *Portfolio) Size() int {
-	return len(p.PatentIDs)
-}
-
-// ContainsPatent reports whether the given patent ID is in the portfolio.
-func (p *Portfolio) ContainsPatent(patentID common.ID) bool {
+// ContainsPatent checks if a patent is in the portfolio.
+func (p *Portfolio) ContainsPatent(patentID string) bool {
 	for _, id := range p.PatentIDs {
 		if id == patentID {
 			return true
@@ -245,3 +157,77 @@ func (p *Portfolio) ContainsPatent(patentID common.ID) bool {
 	return false
 }
 
+// PatentCount returns the number of patents in the portfolio.
+func (p *Portfolio) PatentCount() int {
+	return len(p.PatentIDs)
+}
+
+// Activate transitions the portfolio from Draft to Active.
+func (p *Portfolio) Activate() error {
+	if p.Status != PortfolioStatusDraft {
+		return errors.InvalidState(fmt.Sprintf("cannot activate portfolio in %s status", p.Status))
+	}
+	p.Status = PortfolioStatusActive
+	p.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// Archive transitions the portfolio from Active to Archived.
+func (p *Portfolio) Archive() error {
+	if p.Status != PortfolioStatusActive {
+		return errors.InvalidState(fmt.Sprintf("cannot archive portfolio in %s status", p.Status))
+	}
+	p.Status = PortfolioStatusArchived
+	p.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// SetHealthScore sets the health score for the portfolio.
+func (p *Portfolio) SetHealthScore(score HealthScore) error {
+	if err := score.Validate(); err != nil {
+		return err
+	}
+	p.HealthScore = &score
+	p.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// ToSummary converts the portfolio to a summary view.
+func (p *Portfolio) ToSummary() PortfolioSummary {
+	var overallScore float64
+	if p.HealthScore != nil {
+		overallScore = p.HealthScore.OverallScore
+	}
+
+	return PortfolioSummary{
+		ID:                 p.ID,
+		Name:               p.Name,
+		Status:             p.Status,
+		PatentCount:        len(p.PatentIDs),
+		OverallHealthScore: overallScore,
+		UpdatedAt:          p.UpdatedAt,
+	}
+}
+
+// Validate ensures the health score values are within range [0, 100].
+func (hs HealthScore) Validate() error {
+	scores := []struct {
+		val  float64
+		name string
+	}{
+		{hs.CoverageScore, "CoverageScore"},
+		{hs.ConcentrationScore, "ConcentrationScore"},
+		{hs.AgingScore, "AgingScore"},
+		{hs.QualityScore, "QualityScore"},
+		{hs.OverallScore, "OverallScore"},
+	}
+
+	for _, s := range scores {
+		if s.val < 0 || s.val > 100 {
+			return errors.InvalidParam(fmt.Sprintf("%s must be between 0 and 100", s.name))
+		}
+	}
+	return nil
+}
+
+//Personal.AI order the ending
