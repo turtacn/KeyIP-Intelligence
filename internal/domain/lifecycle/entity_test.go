@@ -1,411 +1,132 @@
-// Package lifecycle_test provides unit tests for the PatentLifecycle aggregate root.
-package lifecycle_test
+package lifecycle
 
 import (
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	ptypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNewPatentLifecycle
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestNewPatentLifecycle_CN_GeneratesCorrectSchedule(t *testing.T) {
-	t.Parallel()
-
+func TestNewLifecycleRecord_Success(t *testing.T) {
+	patentID := "pat1"
+	jurisdiction := "CN"
 	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
 
-	require.NoError(t, err)
-	require.NotNil(t, lc)
-
-	// CN patents: 20-year term, annuities start year 3.
-	assert.Equal(t, ptypes.JurisdictionCN, lc.Jurisdiction)
-	assert.Equal(t, filingDate, lc.FilingDate)
-	assert.Equal(t, filingDate.AddDate(20, 0, 0), lc.ExpiryDate)
-
-	// Should have initial deadlines (e.g., examination request).
-	assert.NotEmpty(t, lc.Deadlines, "CN patent should have initial deadlines")
-
-	// Should have annuity schedule for years 3-20 (18 payments).
-	assert.Len(t, lc.AnnuitySchedule, 18, "CN patent should have 18 annuity payments (years 3-20)")
-
-	// Legal status should be "pending".
-	assert.Equal(t, "pending", lc.LegalStatus.Current)
-	assert.Len(t, lc.LegalStatus.History, 1)
-
-	// Should have a lifecycle_created event.
-	assert.Len(t, lc.Events, 1)
-	assert.Equal(t, "lifecycle_created", lc.Events[0].Type)
+	lr, err := NewLifecycleRecord(patentID, jurisdiction, filingDate)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, lr.ID)
+	assert.Equal(t, PhaseApplication, lr.CurrentPhase)
+	assert.Equal(t, 20.0, lr.TotalLifeYears)
+	assert.Equal(t, filingDate.AddDate(20, 0, 0), *lr.ExpirationDate)
+	assert.Equal(t, 1, len(lr.Events))
+	assert.Equal(t, "filed", lr.Events[0].EventType)
 }
 
-func TestNewPatentLifecycle_EmptyPatentNumber(t *testing.T) {
-	t.Parallel()
-
-	_, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"",
-		ptypes.JurisdictionCN,
-		time.Now(),
-	)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "patent_number")
-}
-
-func TestNewPatentLifecycle_ZeroFilingDate(t *testing.T) {
-	t.Parallel()
-
-	_, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		time.Time{},
-	)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "filing_date")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestGetUpcomingDeadlines
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestGetUpcomingDeadlines_ReturnsDeadlinesWithinWindow(t *testing.T) {
-	t.Parallel()
-
+func TestNewLifecycleRecord_InvalidParams(t *testing.T) {
 	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
 
-	// Add a deadline due in 5 days.
-	futureDeadline, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 5),
-		lifecycle.PriorityHigh,
-		"OA response due",
-	)
-	err = lc.AddDeadline(*futureDeadline)
-	require.NoError(t, err)
+	_, err := NewLifecycleRecord("", "CN", filingDate)
+	assert.Error(t, err)
 
-	// Add a deadline due in 20 days.
-	farFutureDeadline, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineExamination,
-		time.Now().UTC().AddDate(0, 0, 20),
-		lifecycle.PriorityMedium,
-		"Examination request",
-	)
-	err = lc.AddDeadline(*farFutureDeadline)
-	require.NoError(t, err)
+	_, err = NewLifecycleRecord("pat1", "", filingDate)
+	assert.Error(t, err)
 
-	// Get deadlines within 10 days.
-	upcoming := lc.GetUpcomingDeadlines(10)
-
-	// Should return only the first deadline.
-	assert.Len(t, upcoming, 1)
-	assert.Equal(t, lifecycle.DeadlineOAResponse, upcoming[0].Type)
+	_, err = NewLifecycleRecord("pat1", "CN", time.Time{})
+	assert.Error(t, err)
 }
 
-func TestGetUpcomingDeadlines_ExcludesCompletedDeadlines(t *testing.T) {
-	t.Parallel()
+func TestLifecycleRecord_TransitionTo_Success(t *testing.T) {
+	lr, _ := NewLifecycleRecord("pat1", "CN", time.Now())
 
+	err := lr.TransitionTo(PhaseExamination, "Request exam", "user1")
+	assert.NoError(t, err)
+	assert.Equal(t, PhaseExamination, lr.CurrentPhase)
+	assert.Equal(t, 1, len(lr.PhaseHistory))
+	assert.Equal(t, PhaseApplication, lr.PhaseHistory[0].FromPhase)
+	assert.Equal(t, PhaseExamination, lr.PhaseHistory[0].ToPhase)
+}
+
+func TestLifecycleRecord_TransitionTo_Invalid(t *testing.T) {
+	lr, _ := NewLifecycleRecord("pat1", "CN", time.Now())
+
+	// Skip Examination, go straight to Granted (invalid skip)
+	err := lr.TransitionTo(PhaseGranted, "Grant", "user1")
+	assert.Error(t, err)
+}
+
+func TestLifecycleRecord_MarkGranted_Success(t *testing.T) {
+	lr, _ := NewLifecycleRecord("pat1", "CN", time.Now())
+	_ = lr.TransitionTo(PhaseExamination, "Exam", "user1")
+
+	grantDate := time.Now()
+	err := lr.MarkGranted(grantDate)
+	assert.NoError(t, err)
+	assert.Equal(t, PhaseGranted, lr.CurrentPhase)
+	assert.Equal(t, &grantDate, lr.GrantDate)
+}
+
+func TestLifecycleRecord_MarkAbandoned_Success(t *testing.T) {
+	lr, _ := NewLifecycleRecord("pat1", "CN", time.Now())
+
+	err := lr.MarkAbandoned("Cost cutting")
+	assert.NoError(t, err)
+	assert.Equal(t, PhaseAbandoned, lr.CurrentPhase)
+	assert.NotNil(t, lr.AbandonmentDate)
+}
+
+func TestLifecycleRecord_CalculateRemainingLife(t *testing.T) {
 	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
+	lr, _ := NewLifecycleRecord("pat1", "CN", filingDate)
 
-	deadline, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 5),
-		lifecycle.PriorityHigh,
-		"OA response",
-	)
-	err = lc.AddDeadline(*deadline)
-	require.NoError(t, err)
+	// Expiration is 2040-01-01
+	asOf := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+	remaining := lr.CalculateRemainingLife(asOf)
 
-	// Mark it completed.
-	err = lc.MarkDeadlineCompleted(deadline.ID)
-	require.NoError(t, err)
+	// Approximately 10 years. We use epsilon comparison for floats.
+	assert.InEpsilon(t, 10.0, remaining, 0.01)
 
-	// Should return empty.
-	upcoming := lc.GetUpcomingDeadlines(10)
-	assert.Empty(t, upcoming)
+	_ = lr.MarkAbandoned("lost interest")
+	assert.Equal(t, 0.0, lr.CalculateRemainingLife(asOf))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestMarkDeadlineCompleted
-// ─────────────────────────────────────────────────────────────────────────────
+func TestLifecycleRecord_IsActive(t *testing.T) {
+	lr, _ := NewLifecycleRecord("pat1", "CN", time.Now())
+	assert.True(t, lr.IsActive())
 
-func TestMarkDeadlineCompleted_NoLongerInOverdue(t *testing.T) {
-	t.Parallel()
+	_ = lr.TransitionTo(PhaseExamination, "Exam", "user1")
+	assert.True(t, lr.IsActive())
 
-	// Use a recent filing date so that initial deadlines (like examination) are not overdue.
-	filingDate := time.Now().UTC().AddDate(-1, 0, 0)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
+	_ = lr.MarkGranted(time.Now())
+	assert.True(t, lr.IsActive())
 
-	// Add an overdue deadline (due yesterday).
-	overdueDeadline, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, -1),
-		lifecycle.PriorityCritical,
-		"Overdue OA",
-	)
-	err = lc.AddDeadline(*overdueDeadline)
-	require.NoError(t, err)
+	_ = lr.TransitionTo(PhaseMaintenance, "Paying annuities", "user1")
+	assert.True(t, lr.IsActive())
 
-	// Verify it's overdue.
-	overdue := lc.GetOverdueDeadlines()
-	assert.Len(t, overdue, 1)
-
-	// Mark it completed.
-	err = lc.MarkDeadlineCompleted(overdueDeadline.ID)
-	require.NoError(t, err)
-
-	// Should no longer be overdue.
-	overdue = lc.GetOverdueDeadlines()
-	assert.Empty(t, overdue)
+	_ = lr.TransitionTo(PhaseExpired, "End of term", "user1")
+	assert.False(t, lr.IsActive())
 }
 
-func TestMarkDeadlineCompleted_NotFound(t *testing.T) {
-	t.Parallel()
+func TestLifecycleRecord_Validate(t *testing.T) {
+	lr, _ := NewLifecycleRecord("pat1", "CN", time.Now())
+	assert.NoError(t, lr.Validate())
 
+	lr.ID = ""
+	assert.Error(t, lr.Validate())
+}
+
+func TestLifecycleRecord_FullLifecycle(t *testing.T) {
 	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
+	lr, _ := NewLifecycleRecord("pat1", "CN", filingDate)
 
-	err = lc.MarkDeadlineCompleted(common.ID("nonexistent"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+	assert.Equal(t, PhaseApplication, lr.CurrentPhase)
+
+	assert.NoError(t, lr.TransitionTo(PhaseExamination, "Exam requested", "user1"))
+	assert.NoError(t, lr.MarkGranted(filingDate.AddDate(3, 0, 0)))
+	assert.NoError(t, lr.TransitionTo(PhaseMaintenance, "Annuities", "user1"))
+	assert.NoError(t, lr.TransitionTo(PhaseExpired, "Term end", "system"))
+
+	assert.Equal(t, PhaseExpired, lr.CurrentPhase)
+	assert.Equal(t, 4, len(lr.PhaseHistory))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestGetNextAnnuityPayment
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestGetNextAnnuityPayment_ReturnsEarliestUnpaid(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
-
-	next := lc.GetNextAnnuityPayment()
-	require.NotNil(t, next)
-
-	// Should be year 3 (first annuity for CN patents).
-	assert.Equal(t, 3, next.Year)
-	assert.False(t, next.Paid)
-}
-
-func TestGetNextAnnuityPayment_NilWhenAllPaid(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
-
-	// Mark all annuities as paid.
-	for i := range lc.AnnuitySchedule {
-		lc.AnnuitySchedule[i].Paid = true
-	}
-
-	next := lc.GetNextAnnuityPayment()
-	assert.Nil(t, next)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestRecordPayment
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestRecordPayment_MarksAnnuityAsPaid(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
-
-	next := lc.GetNextAnnuityPayment()
-	require.NotNil(t, next)
-
-	// Record payment.
-	err = lc.RecordPayment(next.ID, next.Amount, time.Now().UTC())
-	require.NoError(t, err)
-
-	// Should be marked as paid.
-	for _, a := range lc.AnnuitySchedule {
-		if a.ID == next.ID {
-			assert.True(t, a.Paid)
-			assert.NotNil(t, a.PaidAt)
-		}
-	}
-}
-
-func TestRecordPayment_InsufficientAmount(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
-
-	next := lc.GetNextAnnuityPayment()
-	require.NotNil(t, next)
-
-	// Try to pay less than required.
-	err = lc.RecordPayment(next.ID, next.Amount-10, time.Now().UTC())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "insufficient")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestUpdateLegalStatus
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestGrant_US_RegeneratesSchedule(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, _ := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"US11123456B2",
-		ptypes.JurisdictionUS,
-		filingDate,
-	)
-
-	// US initial schedule (with nil grant date) uses filing date.
-	initialDueDate := lc.AnnuitySchedule[0].DueDate
-
-	// Grant it 2 years after filing.
-	grantDate := filingDate.AddDate(2, 0, 0)
-	err := lc.Grant(grantDate)
-	require.NoError(t, err)
-
-	// Schedule should be regenerated based on grant date.
-	// 3.5 years from grant = 5.5 years from filing.
-	newDueDate := lc.AnnuitySchedule[0].DueDate
-	assert.NotEqual(t, initialDueDate, newDueDate)
-	assert.Equal(t, grantDate.AddDate(3, 6, 0).Year(), newDueDate.Year())
-}
-
-func TestUpdateLegalStatus_RecordsInHistory(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
-
-	// Initial status is "pending" with 1 history entry.
-	assert.Equal(t, "pending", lc.LegalStatus.Current)
-	assert.Len(t, lc.LegalStatus.History, 1)
-
-	// Update to "granted".
-	err = lc.UpdateLegalStatus("granted", "examiner approved")
-	require.NoError(t, err)
-
-	assert.Equal(t, "granted", lc.LegalStatus.Current)
-	assert.Len(t, lc.LegalStatus.History, 2)
-	assert.Equal(t, "pending", lc.LegalStatus.History[1].From)
-	assert.Equal(t, "granted", lc.LegalStatus.History[1].To)
-	assert.Equal(t, "examiner approved", lc.LegalStatus.History[1].Reason)
-}
-
-func TestUpdateLegalStatus_EmptyNewStatus(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
-
-	err = lc.UpdateLegalStatus("", "some reason")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "new_status")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestRemainingLifeYears
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestRemainingLifeYears_CorrectCalculation(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	lc, err := lifecycle.NewPatentLifecycle(
-		common.NewID(),
-		"CN202010000001A",
-		ptypes.JurisdictionCN,
-		filingDate,
-	)
-	require.NoError(t, err)
-
-	// Expiry date is 2040-01-01.
-	// If today is 2025-01-01, remaining years ≈ 15.
-	// We can't control "now" easily in tests, but we can at least check it's > 0.
-	remaining := lc.RemainingLifeYears()
-	assert.Greater(t, remaining, 0.0, "patent should not be expired yet")
-
-	// If we artificially set expiry to the past:
-	lc.ExpiryDate = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-	remaining = lc.RemainingLifeYears()
-	assert.Equal(t, 0.0, remaining, "expired patent should have 0 remaining years")
-}
-
+//Personal.AI order the ending

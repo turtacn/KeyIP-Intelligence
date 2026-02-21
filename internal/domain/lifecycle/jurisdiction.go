@@ -1,198 +1,262 @@
-// Package lifecycle implements jurisdiction-specific rules for patent lifecycle management.
 package lifecycle
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	ptypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// JurisdictionRules
-// ─────────────────────────────────────────────────────────────────────────────
-
-// JurisdictionRules encapsulates all statutory rules and regulations for a
-// specific patent jurisdiction. These rules determine deadline calculations,
-// annuity schedules, and other lifecycle parameters.
-type JurisdictionRules struct {
-	// Code is the jurisdiction identifier (CN, US, EP, JP, KR, WO, etc.).
-	Code ptypes.JurisdictionCode `json:"code"`
-
-	// PatentTermYears is the statutory patent term in years (typically 20).
-	PatentTermYears int `json:"patent_term_years"`
-
-	// AnnuityStartYear is the first year when annuity payments are required.
-	// For CN/EP: year 3; for JP/KR: year 1; for US: not applicable (milestone-based).
-	AnnuityStartYear int `json:"annuity_start_year"`
-
-	// AnnuityFrequency indicates the payment schedule: "annual" or "milestone".
-	AnnuityFrequency string `json:"annuity_frequency"`
-
-	// GracePeriodMonths is the grace period after due date during which payment
-	// can still be made with a surcharge.
-	GracePeriodMonths int `json:"grace_period_months"`
-
-	// SurchargeRate is the penalty rate for late payment during grace period.
-	SurchargeRate float64 `json:"surcharge_rate"`
-
-	// ExaminationDeadlineMonths is the deadline to request substantive examination
-	// (applicable in two-stage examination systems like CN).
-	ExaminationDeadlineMonths int `json:"examination_deadline_months"`
-
-	// OAResponseDeadlineMonths is the standard deadline to respond to office actions.
-	OAResponseDeadlineMonths int `json:"oa_response_deadline_months"`
-
-	// PCTNationalPhaseMonths is the deadline to enter national phase from PCT
-	// international filing.
-	PCTNationalPhaseMonths int `json:"pct_national_phase_months"`
+// Jurisdiction represents the rules of a patent jurisdiction.
+type Jurisdiction struct {
+	Code                      string `json:"code"`
+	Name                      string `json:"name"`
+	PatentOffice              string `json:"patent_office"`
+	InventionTermYears        int    `json:"invention_term_years"`
+	UtilityModelTermYears     int    `json:"utility_model_term_years"`
+	DesignTermYears           int    `json:"design_term_years"`
+	AnnuityStartYear          int    `json:"annuity_start_year"`
+	GracePeriodMonths         int    `json:"grace_period_months"`
+	SupportsUtilityModel      bool   `json:"supports_utility_model"`
+	SupportsPCT               bool   `json:"supports_pct"`
+	OAResponseMonths          int    `json:"oa_response_months"`
+	OAExtensionAvailable      bool   `json:"oa_extension_available"`
+	OAMaxExtensionMonths      int    `json:"oa_max_extension_months"`
+	Currency                  string `json:"currency"`
+	Language                  string `json:"language"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Jurisdiction registry
-// ─────────────────────────────────────────────────────────────────────────────
-
-// jurisdictionRegistry is the internal database of jurisdiction rules.
-// In production, this should be externalized to a configuration file or database.
-var jurisdictionRegistry = map[ptypes.JurisdictionCode]JurisdictionRules{
-	ptypes.JurisdictionCN: {
-		Code:                      ptypes.JurisdictionCN,
-		PatentTermYears:           20,
-		AnnuityStartYear:          3,
-		AnnuityFrequency:          "annual",
-		GracePeriodMonths:         6,
-		SurchargeRate:             0.25,
-		ExaminationDeadlineMonths: 36,
-		OAResponseDeadlineMonths:  4,
-		PCTNationalPhaseMonths:    30,
-	},
-	ptypes.JurisdictionUS: {
-		Code:                      ptypes.JurisdictionUS,
-		PatentTermYears:           20,
-		AnnuityStartYear:          0, // US uses milestone-based maintenance fees
-		AnnuityFrequency:          "milestone",
-		GracePeriodMonths:         6,
-		SurchargeRate:             0.50,
-		ExaminationDeadlineMonths: 0, // US has automatic examination
-		OAResponseDeadlineMonths:  3,
-		PCTNationalPhaseMonths:    30,
-	},
-	ptypes.JurisdictionEP: {
-		Code:                      ptypes.JurisdictionEP,
-		PatentTermYears:           20,
-		AnnuityStartYear:          3,
-		AnnuityFrequency:          "annual",
-		GracePeriodMonths:         6,
-		SurchargeRate:             0.10,
-		ExaminationDeadlineMonths: 0, // EP has automatic examination
-		OAResponseDeadlineMonths:  4,
-		PCTNationalPhaseMonths:    31,
-	},
-	ptypes.JurisdictionJP: {
-		Code:                      ptypes.JurisdictionJP,
-		PatentTermYears:           20,
-		AnnuityStartYear:          1,
-		AnnuityFrequency:          "annual",
-		GracePeriodMonths:         6,
-		SurchargeRate:             0.20,
-		ExaminationDeadlineMonths: 36,
-		OAResponseDeadlineMonths:  3,
-		PCTNationalPhaseMonths:    30,
-	},
-	ptypes.JurisdictionKR: {
-		Code:                      ptypes.JurisdictionKR,
-		PatentTermYears:           20,
-		AnnuityStartYear:          1,
-		AnnuityFrequency:          "annual",
-		GracePeriodMonths:         6,
-		SurchargeRate:             0.30,
-		ExaminationDeadlineMonths: 36,
-		OAResponseDeadlineMonths:  2,
-		PCTNationalPhaseMonths:    31,
-	},
-	ptypes.JurisdictionWO: {
-		Code:                      ptypes.JurisdictionWO,
-		PatentTermYears:           0, // PCT is not a granting jurisdiction
-		AnnuityStartYear:          0,
-		AnnuityFrequency:          "none",
-		GracePeriodMonths:         0,
-		SurchargeRate:             0,
-		ExaminationDeadlineMonths: 0,
-		OAResponseDeadlineMonths:  3,
-		PCTNationalPhaseMonths:    30, // or 31 depending on region
-	},
+// AnnuityRules encapsulates annuity-specific rules.
+type AnnuityRules struct {
+	JurisdictionCode   string             `json:"jurisdiction_code"`
+	StartYear          int                `json:"start_year"`
+	EndYear            int                `json:"end_year"`
+	IsAnnual           bool               `json:"is_annual"`
+	PaymentSchedule    []PaymentMilestone `json:"payment_schedule"`
+	GracePeriodMonths  int                `json:"grace_period_months"`
+	LateFeeMultiplier float64            `json:"late_fee_multiplier"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Public API
-// ─────────────────────────────────────────────────────────────────────────────
+// PaymentMilestone represents a non-annual payment point.
+type PaymentMilestone struct {
+	YearMark    float64 `json:"year_mark"`
+	Description string  `json:"description"`
+}
 
-// GetJurisdictionRules retrieves the rules for a specific jurisdiction.
-func GetJurisdictionRules(code ptypes.JurisdictionCode) (*JurisdictionRules, error) {
-	rules, ok := jurisdictionRegistry[code]
+// OAResponseRules encapsulates office action response rules.
+type OAResponseRules struct {
+	JurisdictionCode    string `json:"jurisdiction_code"`
+	ResponseMonths      int    `json:"response_months"`
+	ExtensionAvailable  bool   `json:"extension_available"`
+	MaxExtensionMonths  int    `json:"max_extension_months"`
+	ExtensionFeeRequired bool   `json:"extension_fee_required"`
+}
+
+// JurisdictionRegistry defines the interface for jurisdiction rule management.
+type JurisdictionRegistry interface {
+	Get(code string) (*Jurisdiction, error)
+	List() []*Jurisdiction
+	IsSupported(code string) bool
+	GetPatentTerm(code string, patentType string) (int, error)
+	GetAnnuityRules(code string) (*AnnuityRules, error)
+	GetOAResponseRules(code string) (*OAResponseRules, error)
+}
+
+type inMemoryJurisdictionRegistry struct {
+	jurisdictions map[string]*Jurisdiction
+}
+
+// NewJurisdictionRegistry creates a new registry with preloaded data.
+func NewJurisdictionRegistry() JurisdictionRegistry {
+	r := &inMemoryJurisdictionRegistry{
+		jurisdictions: make(map[string]*Jurisdiction),
+	}
+	r.preload()
+	return r
+}
+
+func (r *inMemoryJurisdictionRegistry) preload() {
+	r.jurisdictions["CN"] = &Jurisdiction{
+		Code: "CN", Name: "China", PatentOffice: "CNIPA",
+		InventionTermYears: 20, UtilityModelTermYears: 10, DesignTermYears: 15,
+		AnnuityStartYear: 3, GracePeriodMonths: 6,
+		SupportsUtilityModel: true, SupportsPCT: true,
+		OAResponseMonths: 4, OAExtensionAvailable: true, OAMaxExtensionMonths: 2,
+		Currency: "CNY", Language: "zh",
+	}
+	r.jurisdictions["US"] = &Jurisdiction{
+		Code: "US", Name: "United States", PatentOffice: "USPTO",
+		InventionTermYears: 20, UtilityModelTermYears: 0, DesignTermYears: 15,
+		AnnuityStartYear: 0, GracePeriodMonths: 6,
+		SupportsUtilityModel: false, SupportsPCT: true,
+		OAResponseMonths: 3, OAExtensionAvailable: true, OAMaxExtensionMonths: 6,
+		Currency: "USD", Language: "en",
+	}
+	r.jurisdictions["EP"] = &Jurisdiction{
+		Code: "EP", Name: "Europe", PatentOffice: "EPO",
+		InventionTermYears: 20, UtilityModelTermYears: 0, DesignTermYears: 25,
+		AnnuityStartYear: 3, GracePeriodMonths: 6,
+		SupportsUtilityModel: false, SupportsPCT: true,
+		OAResponseMonths: 4, OAExtensionAvailable: true, OAMaxExtensionMonths: 2,
+		Currency: "EUR", Language: "en",
+	}
+	r.jurisdictions["JP"] = &Jurisdiction{
+		Code: "JP", Name: "Japan", PatentOffice: "JPO",
+		InventionTermYears: 20, UtilityModelTermYears: 10, DesignTermYears: 25,
+		AnnuityStartYear: 1, GracePeriodMonths: 6,
+		SupportsUtilityModel: true, SupportsPCT: true,
+		OAResponseMonths: 3, OAExtensionAvailable: true, OAMaxExtensionMonths: 2, // Simplified OAResponse
+		Currency: "JPY", Language: "ja",
+	}
+	r.jurisdictions["KR"] = &Jurisdiction{
+		Code: "KR", Name: "South Korea", PatentOffice: "KIPO",
+		InventionTermYears: 20, UtilityModelTermYears: 10, DesignTermYears: 20,
+		AnnuityStartYear: 1, GracePeriodMonths: 6,
+		SupportsUtilityModel: true, SupportsPCT: true,
+		OAResponseMonths: 2, OAExtensionAvailable: true, OAMaxExtensionMonths: 2,
+		Currency: "KRW", Language: "ko",
+	}
+	r.jurisdictions["WO"] = &Jurisdiction{
+		Code: "WO", Name: "PCT", PatentOffice: "WIPO",
+		InventionTermYears: 0, SupportsPCT: true,
+		OAResponseMonths: 3, Language: "en",
+	}
+	r.jurisdictions["DE"] = &Jurisdiction{
+		Code: "DE", Name: "Germany", PatentOffice: "DPMA",
+		InventionTermYears: 20, UtilityModelTermYears: 10, DesignTermYears: 25,
+		AnnuityStartYear: 3, GracePeriodMonths: 6,
+		Currency: "EUR", Language: "de",
+	}
+	r.jurisdictions["GB"] = &Jurisdiction{
+		Code: "GB", Name: "United Kingdom", PatentOffice: "UKIPO",
+		InventionTermYears: 20, DesignTermYears: 25,
+		AnnuityStartYear: 5, GracePeriodMonths: 1,
+		Currency: "GBP", Language: "en",
+	}
+	r.jurisdictions["IN"] = &Jurisdiction{
+		Code: "IN", Name: "India", PatentOffice: "IPO",
+		InventionTermYears: 20, DesignTermYears: 15,
+		AnnuityStartYear: 3, GracePeriodMonths: 6,
+		Currency: "INR", Language: "en",
+	}
+}
+
+func (r *inMemoryJurisdictionRegistry) Get(code string) (*Jurisdiction, error) {
+	j, ok := r.jurisdictions[NormalizeJurisdictionCode(code)]
 	if !ok {
-		return nil, errors.NotFound(fmt.Sprintf("jurisdiction %s not found in registry", code))
+		return nil, errors.NotFound(fmt.Sprintf("jurisdiction %s not found", code))
 	}
-	return &rules, nil
+	return j, nil
 }
 
-// GetAllJurisdictions returns a list of all registered jurisdictions.
-func GetAllJurisdictions() []JurisdictionRules {
-	var all []JurisdictionRules
-	for _, rules := range jurisdictionRegistry {
-		all = append(all, rules)
+func (r *inMemoryJurisdictionRegistry) List() []*Jurisdiction {
+	var list []*Jurisdiction
+	codes := []string{"CN", "DE", "EP", "GB", "IN", "JP", "KR", "US", "WO"} // Alphabetical
+	for _, c := range codes {
+		if j, ok := r.jurisdictions[c]; ok {
+			list = append(list, j)
+		}
 	}
-	return all
+	return list
 }
 
-// CalculateExpiryDate computes the statutory expiry date for a patent.
-// For most jurisdictions, this is FilingDate + PatentTermYears.
-func CalculateExpiryDate(jurisdiction ptypes.JurisdictionCode, filingDate time.Time) time.Time {
-	rules, err := GetJurisdictionRules(jurisdiction)
+func (r *inMemoryJurisdictionRegistry) IsSupported(code string) bool {
+	_, ok := r.jurisdictions[NormalizeJurisdictionCode(code)]
+	return ok
+}
+
+func (r *inMemoryJurisdictionRegistry) GetPatentTerm(code string, patentType string) (int, error) {
+	j, err := r.Get(code)
 	if err != nil {
-		// Fallback to 20 years if jurisdiction not found.
-		return filingDate.AddDate(20, 0, 0)
+		return 0, err
 	}
-	return filingDate.AddDate(rules.PatentTermYears, 0, 0)
+	switch patentType {
+	case "invention":
+		return j.InventionTermYears, nil
+	case "utility_model":
+		if !j.SupportsUtilityModel {
+			return 0, errors.InvalidParam(fmt.Sprintf("%s does not support utility models", code))
+		}
+		return j.UtilityModelTermYears, nil
+	case "design":
+		return j.DesignTermYears, nil
+	default:
+		return 0, errors.InvalidParam(fmt.Sprintf("invalid patent type: %s", patentType))
+	}
 }
 
-// GenerateInitialDeadlines creates the standard deadlines that apply to a
-// newly filed patent application in the specified jurisdiction.
-func GenerateInitialDeadlines(jurisdiction ptypes.JurisdictionCode, filingDate time.Time) ([]Deadline, error) {
-	rules, err := GetJurisdictionRules(jurisdiction)
+func (r *inMemoryJurisdictionRegistry) GetAnnuityRules(code string) (*AnnuityRules, error) {
+	j, err := r.Get(code)
 	if err != nil {
 		return nil, err
 	}
-
-	var deadlines []Deadline
-
-	// Add examination request deadline if applicable.
-	if rules.ExaminationDeadlineMonths > 0 {
-		examDueDate := filingDate.AddDate(0, rules.ExaminationDeadlineMonths, 0)
-		examDeadline, _ := NewDeadline(
-			DeadlineExamination,
-			examDueDate,
-			PriorityHigh,
-			fmt.Sprintf("Request substantive examination (within %d months of filing)", rules.ExaminationDeadlineMonths),
-		)
-		examDeadline.ExtensionAvailable = false
-		deadlines = append(deadlines, *examDeadline)
+	rules := &AnnuityRules{
+		JurisdictionCode:  j.Code,
+		StartYear:         j.AnnuityStartYear,
+		EndYear:           j.InventionTermYears,
+		IsAnnual:          j.Code != "US",
+		GracePeriodMonths: j.GracePeriodMonths,
+		LateFeeMultiplier: 0.25, // Default
 	}
-
-	// PCT national phase entry deadline (only if jurisdiction is WO or if this is a PCT case).
-	if jurisdiction == ptypes.JurisdictionWO && rules.PCTNationalPhaseMonths > 0 {
-		pctDueDate := filingDate.AddDate(0, rules.PCTNationalPhaseMonths, 0)
-		pctDeadline, _ := NewDeadline(
-			DeadlinePCTNationalPhase,
-			pctDueDate,
-			PriorityCritical,
-			fmt.Sprintf("Enter national phase (within %d months of priority date)", rules.PCTNationalPhaseMonths),
-		)
-		pctDeadline.ExtensionAvailable = false
-		deadlines = append(deadlines, *pctDeadline)
+	if j.Code == "US" {
+		rules.PaymentSchedule = []PaymentMilestone{
+			{YearMark: 3.5, Description: "1st Maintenance Fee"},
+			{YearMark: 7.5, Description: "2nd Maintenance Fee"},
+			{YearMark: 11.5, Description: "3rd Maintenance Fee"},
+		}
 	}
-
-	return deadlines, nil
+	return rules, nil
 }
 
+func (r *inMemoryJurisdictionRegistry) GetOAResponseRules(code string) (*OAResponseRules, error) {
+	j, err := r.Get(code)
+	if err != nil {
+		return nil, err
+	}
+	return &OAResponseRules{
+		JurisdictionCode:    j.Code,
+		ResponseMonths:      j.OAResponseMonths,
+		ExtensionAvailable:  j.OAExtensionAvailable,
+		MaxExtensionMonths:  j.OAMaxExtensionMonths,
+		ExtensionFeeRequired: j.Code == "US",
+	}, nil
+}
+
+// NormalizeJurisdictionCode standardizes jurisdiction codes.
+func NormalizeJurisdictionCode(code string) string {
+	c := strings.ToUpper(strings.TrimSpace(code))
+	switch c {
+	case "CHINA":
+		return "CN"
+	case "USA", "UNITED STATES":
+		return "US"
+	case "EUROPE":
+		return "EP"
+	case "JAPAN":
+		return "JP"
+	}
+	return c
+}
+
+// CalculateExpirationDate computes the expiration date.
+func CalculateExpirationDate(filingDate time.Time, jurisdictionCode, patentType string) (time.Time, error) {
+	reg := NewJurisdictionRegistry()
+	term, err := reg.GetPatentTerm(jurisdictionCode, patentType)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return filingDate.AddDate(term, 0, 0), nil
+}
+
+// CalculateAnnuityDueDate computes the due date for a specific year.
+func CalculateAnnuityDueDate(filingDate time.Time, yearNumber int) time.Time {
+	return filingDate.AddDate(yearNumber, 0, 0)
+}
+
+// CalculateGraceDeadline computes the grace period deadline.
+func CalculateGraceDeadline(dueDate time.Time, gracePeriodMonths int) time.Time {
+	return dueDate.AddDate(0, gracePeriodMonths, 0)
+}
+
+//Personal.AI order the ending

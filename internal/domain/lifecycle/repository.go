@@ -1,96 +1,113 @@
-// Package lifecycle provides the repository interface for patent lifecycle
-// aggregate persistence.
 package lifecycle
 
 import (
 	"context"
-
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	ptypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
+	"time"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Repository interface
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Repository defines the persistence contract for PatentLifecycle aggregates.
-// Implementations should be idempotent and thread-safe.
-type Repository interface {
-	// Save persists a PatentLifecycle aggregate (create or update).
-	// If the lifecycle already exists, it is updated; otherwise, it is created.
-	Save(ctx context.Context, lifecycle *PatentLifecycle) error
-
-	// FindByID retrieves a PatentLifecycle by its ID.
-	// Returns ErrNotFound if the lifecycle does not exist.
-	FindByID(ctx context.Context, id common.ID) (*PatentLifecycle, error)
-
-	// FindByPatentID retrieves the PatentLifecycle for a specific patent.
-	// Returns ErrNotFound if no lifecycle exists for this patent.
-	FindByPatentID(ctx context.Context, patentID common.ID) (*PatentLifecycle, error)
-
-	// FindByPatentNumber retrieves the PatentLifecycle by patent number.
-	// Returns ErrNotFound if the patent number is not found.
-	FindByPatentNumber(ctx context.Context, patentNumber string) (*PatentLifecycle, error)
-
-	// FindUpcomingDeadlines retrieves all lifecycles with deadlines due within
-	// the specified number of days across all tenants (or scoped to tenant if
-	// tenantID is provided).
-	FindUpcomingDeadlines(ctx context.Context, withinDays int, tenantID *common.TenantID) ([]*PatentLifecycle, error)
-
-	// FindOverdueDeadlines retrieves all lifecycles with overdue deadlines.
-	FindOverdueDeadlines(ctx context.Context, tenantID *common.TenantID) ([]*PatentLifecycle, error)
-
-	// FindUpcomingAnnuities retrieves all lifecycles with annuity payments due
-	// within the specified number of days.
-	FindUpcomingAnnuities(ctx context.Context, withinDays int, tenantID *common.TenantID) ([]*PatentLifecycle, error)
-
-	// FindByJurisdiction retrieves all lifecycles for a specific jurisdiction.
-	FindByJurisdiction(ctx context.Context, jurisdiction ptypes.JurisdictionCode, tenantID *common.TenantID) ([]*PatentLifecycle, error)
-
-	// Delete removes a PatentLifecycle from the repository.
-	// This is typically used only for test cleanup or administrative purposes.
-	Delete(ctx context.Context, id common.ID) error
-
-	// List retrieves lifecycles with pagination support.
-	List(ctx context.Context, offset, limit int, tenantID *common.TenantID) ([]*PatentLifecycle, int64, error)
+// LifecycleQueryOptions aggregate all optional query parameters.
+type LifecycleQueryOptions struct {
+	Offset        int
+	Limit         int
+	SortField     string
+	SortAscending bool
+	OwnerID       string
+	FromDate      time.Time
+	ToDate        time.Time
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Query specifications (optional, for advanced filtering)
-// ─────────────────────────────────────────────────────────────────────────────
+// LifecycleQueryOption defines a function signature for providing query options.
+type LifecycleQueryOption func(*LifecycleQueryOptions)
 
-// LifecycleQuery represents advanced filtering criteria for lifecycle searches.
-// This can be used to implement complex queries in the repository.
-type LifecycleQuery struct {
-	// TenantID filters by tenant.
-	TenantID *common.TenantID
-
-	// PatentIDs filters by a list of patent IDs.
-	PatentIDs []common.ID
-
-	// Jurisdictions filters by a list of jurisdiction codes.
-	Jurisdictions []ptypes.JurisdictionCode
-
-	// LegalStatus filters by current legal status (e.g., "pending", "granted").
-	LegalStatus []string
-
-	// HasOverdueDeadlines filters lifecycles with at least one overdue deadline.
-	HasOverdueDeadlines *bool
-
-	// HasUnpaidAnnuities filters lifecycles with at least one unpaid annuity.
-	HasUnpaidAnnuities *bool
-
-	// ExpiresAfter filters lifecycles that expire after the specified date.
-	ExpiresAfter *common.Time
-
-	// ExpiresBefore filters lifecycles that expire before the specified date.
-	ExpiresBefore *common.Time
+// WithLifecyclePagination sets the pagination parameters.
+func WithLifecyclePagination(offset, limit int) LifecycleQueryOption {
+	return func(o *LifecycleQueryOptions) {
+		if offset < 0 {
+			offset = 0
+		}
+		if limit <= 0 {
+			limit = 20
+		}
+		if limit > 100 {
+			limit = 100
+		}
+		o.Offset = offset
+		o.Limit = limit
+	}
 }
 
-// FindByQuery retrieves lifecycles matching the specified query criteria.
-// This is an optional advanced feature that repositories may implement.
-type AdvancedRepository interface {
-	Repository
-	FindByQuery(ctx context.Context, query *LifecycleQuery, offset, limit int) ([]*PatentLifecycle, int64, error)
+// WithLifecycleSortBy sets the sorting parameters.
+func WithLifecycleSortBy(field string, ascending bool) LifecycleQueryOption {
+	return func(o *LifecycleQueryOptions) {
+		o.SortField = field
+		o.SortAscending = ascending
+	}
 }
 
+// WithOwnerFilter sets an owner filter.
+func WithOwnerFilter(ownerID string) LifecycleQueryOption {
+	return func(o *LifecycleQueryOptions) {
+		o.OwnerID = ownerID
+	}
+}
+
+// WithDateRange sets a date range filter.
+func WithDateRange(from, to time.Time) LifecycleQueryOption {
+	return func(o *LifecycleQueryOptions) {
+		o.FromDate = from
+		o.ToDate = to
+	}
+}
+
+// ApplyLifecycleOptions applies the provided options to a default LifecycleQueryOptions.
+func ApplyLifecycleOptions(opts ...LifecycleQueryOption) LifecycleQueryOptions {
+	options := LifecycleQueryOptions{
+		Offset: 0,
+		Limit:  20,
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return options
+}
+
+// LifecycleRepository defines the persistence contract for LifecycleRecord aggregates.
+type LifecycleRepository interface {
+	Save(ctx context.Context, record *LifecycleRecord) error
+	FindByID(ctx context.Context, id string) (*LifecycleRecord, error)
+	FindByPatentID(ctx context.Context, patentID string) (*LifecycleRecord, error)
+	FindByPhase(ctx context.Context, phase LifecyclePhase, opts ...LifecycleQueryOption) ([]*LifecycleRecord, error)
+	FindExpiring(ctx context.Context, withinDays int) ([]*LifecycleRecord, error)
+	FindByJurisdiction(ctx context.Context, jurisdictionCode string, opts ...LifecycleQueryOption) ([]*LifecycleRecord, error)
+	Delete(ctx context.Context, id string) error
+	Count(ctx context.Context, phase LifecyclePhase) (int64, error)
+}
+
+// AnnuityRepository defines the persistence contract for AnnuityRecord entities.
+type AnnuityRepository interface {
+	Save(ctx context.Context, record *AnnuityRecord) error
+	SaveBatch(ctx context.Context, records []*AnnuityRecord) error
+	FindByID(ctx context.Context, id string) (*AnnuityRecord, error)
+	FindByPatentID(ctx context.Context, patentID string) ([]*AnnuityRecord, error)
+	FindByStatus(ctx context.Context, status AnnuityStatus) ([]*AnnuityRecord, error)
+	FindPending(ctx context.Context, beforeDate time.Time) ([]*AnnuityRecord, error)
+	FindOverdue(ctx context.Context, asOfDate time.Time) ([]*AnnuityRecord, error)
+	SumByPortfolio(ctx context.Context, portfolioID string, fromDate, toDate time.Time) (int64, string, error)
+	Delete(ctx context.Context, id string) error
+}
+
+// DeadlineRepository defines the persistence contract for Deadline entities.
+type DeadlineRepository interface {
+	Save(ctx context.Context, deadline *Deadline) error
+	FindByID(ctx context.Context, id string) (*Deadline, error)
+	FindByPatentID(ctx context.Context, patentID string) ([]*Deadline, error)
+	FindByOwnerID(ctx context.Context, ownerID string, from, to time.Time) ([]*Deadline, error)
+	FindOverdue(ctx context.Context, ownerID string, asOf time.Time) ([]*Deadline, error)
+	FindUpcoming(ctx context.Context, ownerID string, withinDays int) ([]*Deadline, error)
+	FindByType(ctx context.Context, deadlineType DeadlineType) ([]*Deadline, error)
+	FindPendingReminders(ctx context.Context, reminderDate time.Time) ([]*Deadline, error)
+	Delete(ctx context.Context, id string) error
+	CountByUrgency(ctx context.Context, ownerID string) (map[DeadlineUrgency]int64, error)
+}
+
+//Personal.AI order the ending

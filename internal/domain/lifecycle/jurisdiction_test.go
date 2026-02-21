@@ -1,198 +1,95 @@
-// Package lifecycle_test provides unit tests for jurisdiction rules.
-package lifecycle_test
+package lifecycle
 
 import (
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
-	ptypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestGetJurisdictionRules
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestGetJurisdictionRules_CN(t *testing.T) {
-	t.Parallel()
-
-	rules, err := lifecycle.GetJurisdictionRules(ptypes.JurisdictionCN)
-	require.NoError(t, err)
-	require.NotNil(t, rules)
-
-	assert.Equal(t, ptypes.JurisdictionCN, rules.Code)
-	assert.Equal(t, 20, rules.PatentTermYears)
-	assert.Equal(t, 3, rules.AnnuityStartYear)
-	assert.Equal(t, "annual", rules.AnnuityFrequency)
-	assert.Equal(t, 6, rules.GracePeriodMonths)
-	assert.Equal(t, 0.25, rules.SurchargeRate)
-	assert.Equal(t, 36, rules.ExaminationDeadlineMonths)
-	assert.Equal(t, 4, rules.OAResponseDeadlineMonths)
+func TestNewJurisdictionRegistry(t *testing.T) {
+	reg := NewJurisdictionRegistry()
+	assert.NotNil(t, reg)
+	assert.True(t, len(reg.List()) >= 9)
 }
 
-func TestGetJurisdictionRules_US(t *testing.T) {
-	t.Parallel()
-
-	rules, err := lifecycle.GetJurisdictionRules(ptypes.JurisdictionUS)
-	require.NoError(t, err)
-	require.NotNil(t, rules)
-
-	assert.Equal(t, ptypes.JurisdictionUS, rules.Code)
-	assert.Equal(t, "milestone", rules.AnnuityFrequency)
-	assert.Equal(t, 0.50, rules.SurchargeRate)
+func TestJurisdictionRegistry_Get_CN(t *testing.T) {
+	reg := NewJurisdictionRegistry()
+	j, err := reg.Get("CN")
+	assert.NoError(t, err)
+	assert.Equal(t, "CNIPA", j.PatentOffice)
+	assert.Equal(t, 20, j.InventionTermYears)
+	assert.True(t, j.SupportsUtilityModel)
 }
 
-func TestGetJurisdictionRules_EP(t *testing.T) {
-	t.Parallel()
-
-	rules, err := lifecycle.GetJurisdictionRules(ptypes.JurisdictionEP)
-	require.NoError(t, err)
-	require.NotNil(t, rules)
-
-	assert.Equal(t, ptypes.JurisdictionEP, rules.Code)
-	assert.Equal(t, 31, rules.PCTNationalPhaseMonths)
+func TestJurisdictionRegistry_Get_US(t *testing.T) {
+	reg := NewJurisdictionRegistry()
+	j, err := reg.Get("US")
+	assert.NoError(t, err)
+	assert.Equal(t, "USPTO", j.PatentOffice)
+	assert.False(t, j.SupportsUtilityModel)
 }
 
-func TestGetJurisdictionRules_JP(t *testing.T) {
-	t.Parallel()
-
-	rules, err := lifecycle.GetJurisdictionRules(ptypes.JurisdictionJP)
-	require.NoError(t, err)
-	assert.Equal(t, 1, rules.AnnuityStartYear, "JP annuities start from year 1")
+func TestJurisdictionRegistry_Get_NotFound(t *testing.T) {
+	reg := NewJurisdictionRegistry()
+	_, err := reg.Get("XYZ")
+	assert.Error(t, err)
 }
 
-func TestGetJurisdictionRules_KR(t *testing.T) {
-	t.Parallel()
-
-	rules, err := lifecycle.GetJurisdictionRules(ptypes.JurisdictionKR)
-	require.NoError(t, err)
-	assert.Equal(t, 1, rules.AnnuityStartYear, "KR annuities start from year 1")
+func TestJurisdictionRegistry_List_Sorted(t *testing.T) {
+	reg := NewJurisdictionRegistry()
+	list := reg.List()
+	assert.Equal(t, "CN", list[0].Code)
+	assert.Equal(t, "DE", list[1].Code)
+	assert.Equal(t, "WO", list[len(list)-1].Code)
 }
 
-func TestGetJurisdictionRules_NotFound(t *testing.T) {
-	t.Parallel()
+func TestJurisdictionRegistry_GetPatentTerm_CN(t *testing.T) {
+	reg := NewJurisdictionRegistry()
+	term, err := reg.GetPatentTerm("CN", "invention")
+	assert.NoError(t, err)
+	assert.Equal(t, 20, term)
 
-	_, err := lifecycle.GetJurisdictionRules("XX")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+	term, err = reg.GetPatentTerm("CN", "utility_model")
+	assert.NoError(t, err)
+	assert.Equal(t, 10, term)
+
+	term, err = reg.GetPatentTerm("CN", "design")
+	assert.NoError(t, err)
+	assert.Equal(t, 15, term)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestCalculateExpiryDate
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestCalculateExpiryDate_CN(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	expiryDate := lifecycle.CalculateExpiryDate(ptypes.JurisdictionCN, filingDate)
-
-	expected := time.Date(2040, 1, 1, 0, 0, 0, 0, time.UTC)
-	assert.Equal(t, expected, expiryDate)
+func TestJurisdictionRegistry_GetAnnuityRules_US(t *testing.T) {
+	reg := NewJurisdictionRegistry()
+	rules, err := reg.GetAnnuityRules("US")
+	assert.NoError(t, err)
+	assert.False(t, rules.IsAnnual)
+	assert.Equal(t, 3, len(rules.PaymentSchedule))
 }
 
-func TestCalculateExpiryDate_US(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2015, 6, 15, 0, 0, 0, 0, time.UTC)
-	expiryDate := lifecycle.CalculateExpiryDate(ptypes.JurisdictionUS, filingDate)
-
-	expected := time.Date(2035, 6, 15, 0, 0, 0, 0, time.UTC)
-	assert.Equal(t, expected, expiryDate)
+func TestNormalizeJurisdictionCode(t *testing.T) {
+	assert.Equal(t, "CN", NormalizeJurisdictionCode("cn"))
+	assert.Equal(t, "US", NormalizeJurisdictionCode(" USA "))
+	assert.Equal(t, "CN", NormalizeJurisdictionCode("CHINA"))
 }
 
-func TestCalculateExpiryDate_UnknownJurisdiction(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	expiryDate := lifecycle.CalculateExpiryDate("XX", filingDate)
-
-	// Should fallback to 20 years.
-	expected := time.Date(2040, 1, 1, 0, 0, 0, 0, time.UTC)
-	assert.Equal(t, expected, expiryDate)
+func TestCalculateExpirationDate(t *testing.T) {
+	filingDate := time.Date(2020, 1, 15, 0, 0, 0, 0, time.UTC)
+	expiry, err := CalculateExpirationDate(filingDate, "CN", "invention")
+	assert.NoError(t, err)
+	assert.Equal(t, time.Date(2040, 1, 15, 0, 0, 0, 0, time.UTC), expiry)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestGenerateInitialDeadlines
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestGenerateInitialDeadlines_CN(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	deadlines, err := lifecycle.GenerateInitialDeadlines(ptypes.JurisdictionCN, filingDate)
-
-	require.NoError(t, err)
-	assert.NotEmpty(t, deadlines, "CN patents should have initial deadlines")
-
-	// Should include examination request deadline (36 months).
-	var hasExamDeadline bool
-	for _, d := range deadlines {
-		if d.Type == lifecycle.DeadlineExamination {
-			hasExamDeadline = true
-			expected := filingDate.AddDate(0, 36, 0)
-			assert.Equal(t, expected, d.DueDate)
-			assert.Equal(t, lifecycle.PriorityHigh, d.Priority)
-		}
-	}
-	assert.True(t, hasExamDeadline, "CN should have examination deadline")
+func TestCalculateAnnuityDueDate(t *testing.T) {
+	filingDate := time.Date(2020, 3, 10, 0, 0, 0, 0, time.UTC)
+	due := CalculateAnnuityDueDate(filingDate, 5)
+	assert.Equal(t, time.Date(2025, 3, 10, 0, 0, 0, 0, time.UTC), due)
 }
 
-func TestGenerateInitialDeadlines_US(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	deadlines, err := lifecycle.GenerateInitialDeadlines(ptypes.JurisdictionUS, filingDate)
-
-	require.NoError(t, err)
-	// US has automatic examination, so no examination request deadline.
-	for _, d := range deadlines {
-		assert.NotEqual(t, lifecycle.DeadlineExamination, d.Type)
-	}
+func TestCalculateGraceDeadline(t *testing.T) {
+	dueDate := time.Date(2025, 3, 10, 0, 0, 0, 0, time.UTC)
+	grace := CalculateGraceDeadline(dueDate, 6)
+	assert.Equal(t, time.Date(2025, 9, 10, 0, 0, 0, 0, time.UTC), grace)
 }
 
-func TestGenerateInitialDeadlines_WO(t *testing.T) {
-	t.Parallel()
-
-	filingDate := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	deadlines, err := lifecycle.GenerateInitialDeadlines(ptypes.JurisdictionWO, filingDate)
-
-	require.NoError(t, err)
-
-	// Should include PCT national phase entry deadline.
-	var hasPCTDeadline bool
-	for _, d := range deadlines {
-		if d.Type == lifecycle.DeadlinePCTNationalPhase {
-			hasPCTDeadline = true
-			assert.Equal(t, lifecycle.PriorityCritical, d.Priority)
-		}
-	}
-	assert.True(t, hasPCTDeadline, "WO should have PCT national phase deadline")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestGetAllJurisdictions
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestGetAllJurisdictions(t *testing.T) {
-	t.Parallel()
-
-	all := lifecycle.GetAllJurisdictions()
-	assert.NotEmpty(t, all, "should return all registered jurisdictions")
-
-	// Should include at least CN, US, EP, JP, KR, WO.
-	codes := make(map[ptypes.JurisdictionCode]bool)
-	for _, rules := range all {
-		codes[rules.Code] = true
-	}
-
-	assert.True(t, codes[ptypes.JurisdictionCN])
-	assert.True(t, codes[ptypes.JurisdictionUS])
-	assert.True(t, codes[ptypes.JurisdictionEP])
-	assert.True(t, codes[ptypes.JurisdictionJP])
-	assert.True(t, codes[ptypes.JurisdictionKR])
-	assert.True(t, codes[ptypes.JurisdictionWO])
-}
-
+//Personal.AI order the ending

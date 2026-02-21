@@ -1,422 +1,216 @@
-// Package lifecycle implements the patent lifecycle management domain, which is
-// the core subsystem responsible for tracking patent validity periods, managing
-// renewal deadlines, calculating annuity payments, and monitoring legal status
-// changes across multiple jurisdictions.
-//
-// Patent lifecycle management is mission-critical: missing a deadline can result
-// in irreversible loss of patent rights, and incorrect annuity calculations can
-// lead to financial penalties or inadvertent abandonment.
 package lifecycle
 
 import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	ptypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PatentLifecycle — aggregate root for patent lifecycle management
-// ─────────────────────────────────────────────────────────────────────────────
+// LifecyclePhase defines the phases of a patent lifecycle.
+type LifecyclePhase string
 
-// PatentLifecycle is the aggregate root that encapsulates all lifecycle-related
-// information for a single patent: deadlines, annuity schedule, legal status,
-// and lifecycle events.  It enforces domain invariants and business rules that
-// vary by jurisdiction.
-type PatentLifecycle struct {
-	// BaseEntity provides ID, tenant ID, and audit timestamps.
-	common.BaseEntity
+const (
+	PhaseApplication LifecyclePhase = "Application"
+	PhaseExamination LifecyclePhase = "Examination"
+	PhaseGranted     LifecyclePhase = "Granted"
+	PhaseMaintenance LifecyclePhase = "Maintenance"
+	PhaseExpired     LifecyclePhase = "Expired"
+	PhaseAbandoned   LifecyclePhase = "Abandoned"
+	PhaseRevoked     LifecyclePhase = "Revoked"
+	PhaseLapsed      LifecyclePhase = "Lapsed"
+)
 
-	// PatentID is the foreign key linking this lifecycle record to the patent entity.
-	PatentID common.ID `json:"patent_id"`
-
-	// PatentNumber is the official patent number in the jurisdiction's format
-	// (e.g., "CN202310001234A", "US11123456B2").
-	PatentNumber string `json:"patent_number"`
-
-	// Jurisdiction is the patent office that issued this patent.
-	Jurisdiction ptypes.JurisdictionCode `json:"jurisdiction"`
-
-	// FilingDate is the original filing date (priority date if applicable).
-	FilingDate time.Time `json:"filing_date"`
-
-	// GrantDate is the date the patent was granted; nil for pending applications.
-	GrantDate *time.Time `json:"grant_date,omitempty"`
-
-	// ExpiryDate is the calculated statutory expiry date (typically FilingDate + 20 years).
-	ExpiryDate time.Time `json:"expiry_date"`
-
-	// Deadlines is the list of all administrative deadlines (OA responses,
-	// examination requests, renewals, etc.) for this patent.
-	Deadlines []Deadline `json:"deadlines"`
-
-	// AnnuitySchedule contains the full payment schedule for all maintenance fees
-	// over the patent's lifetime.
-	AnnuitySchedule []AnnuityPayment `json:"annuity_schedule"`
-
-	// LegalStatus tracks the current legal status and its history.
-	LegalStatus LegalStatus `json:"legal_status"`
-
-	// Events records all lifecycle events (status changes, deadline modifications,
-	// payment confirmations) for audit purposes.
-	Events []LifecycleEvent `json:"events"`
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Value objects
-// ─────────────────────────────────────────────────────────────────────────────
-
-// LegalStatus represents the current legal status of a patent and its full
-// history of status changes.
-type LegalStatus struct {
-	// Current is the present legal status (e.g., "pending", "granted", "expired",
-	// "abandoned", "lapsed").
-	Current string `json:"current"`
-
-	// History records all status transitions in chronological order.
-	History []StatusChange `json:"history"`
-}
-
-// StatusChange records a single legal-status transition.
-type StatusChange struct {
-	// From is the previous status.
-	From string `json:"from"`
-
-	// To is the new status.
-	To string `json:"to"`
-
-	// Date is the effective date of the status change.
-	Date time.Time `json:"date"`
-
-	// Reason explains why the status changed (e.g., "granted by examiner",
-	// "annuity not paid", "abandoned by applicant").
-	Reason string `json:"reason"`
-}
-
-// LifecycleEvent is an audit log entry for significant lifecycle actions.
+// LifecycleEvent represents an event in the patent lifecycle.
 type LifecycleEvent struct {
-	// Type categorizes the event (e.g., "deadline_added", "payment_recorded",
-	// "status_changed", "deadline_extended").
-	Type string `json:"type"`
-
-	// Date is the timestamp when the event occurred.
-	Date time.Time `json:"date"`
-
-	// Description provides human-readable details about the event.
-	Description string `json:"description"`
-
-	// Handled indicates whether this event has been processed by downstream
-	// systems (e.g., notification sent, calendar updated).
-	Handled bool `json:"handled"`
+	ID          string            `json:"id"`
+	EventType   string            `json:"event_type"`
+	EventDate   time.Time         `json:"event_date"`
+	Description string            `json:"description"`
+	Metadata    map[string]string `json:"metadata"`
+	TriggeredBy string            `json:"triggered_by"`
+	CreatedAt   time.Time         `json:"created_at"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Factory function
-// ─────────────────────────────────────────────────────────────────────────────
+// PhaseTransition represents a transition between lifecycle phases.
+type PhaseTransition struct {
+	FromPhase      LifecyclePhase `json:"from_phase"`
+	ToPhase        LifecyclePhase `json:"to_phase"`
+	TransitionDate time.Time      `json:"transition_date"`
+	Reason         string         `json:"reason"`
+	TriggeredBy    string         `json:"triggered_by"`
+}
 
-// NewPatentLifecycle creates a new PatentLifecycle aggregate with jurisdiction-
-// specific deadlines and annuity schedule automatically generated.
-//
-// Business rules:
-//   - PatentNumber must not be empty
-//   - FilingDate must not be zero
-//   - Jurisdiction must be a recognised code
-//   - Initial legal status is "pending"
-//   - Deadlines and annuity schedule are generated based on jurisdiction rules
-func NewPatentLifecycle(
-	patentID common.ID,
-	patentNumber string,
-	jurisdiction ptypes.JurisdictionCode,
-	filingDate time.Time,
-) (*PatentLifecycle, error) {
-	if patentNumber == "" {
-		return nil, errors.InvalidParam("patent_number must not be empty")
+// LifecycleRecord is the aggregate root for patent lifecycle.
+type LifecycleRecord struct {
+	ID                 string            `json:"id"`
+	PatentID           string            `json:"patent_id"`
+	CurrentPhase       LifecyclePhase    `json:"current_phase"`
+	PhaseHistory       []PhaseTransition `json:"phase_history"`
+	Events             []*LifecycleEvent `json:"events"`
+	FilingDate         time.Time         `json:"filing_date"`
+	GrantDate          *time.Time        `json:"grant_date,omitempty"`
+	ExpirationDate     *time.Time        `json:"expiration_date,omitempty"`
+	AbandonmentDate    *time.Time        `json:"abandonment_date,omitempty"`
+	JurisdictionCode   string            `json:"jurisdiction_code"`
+	RemainingLifeYears float64           `json:"remaining_life_years"`
+	TotalLifeYears     float64           `json:"total_life_years"`
+	CreatedAt          time.Time         `json:"created_at"`
+	UpdatedAt          time.Time         `json:"updated_at"`
+}
+
+var validTransitions = map[LifecyclePhase][]LifecyclePhase{
+	PhaseApplication: {PhaseExamination, PhaseAbandoned},
+	PhaseExamination: {PhaseGranted, PhaseAbandoned},
+	PhaseGranted:     {PhaseMaintenance, PhaseRevoked, PhaseAbandoned},
+	PhaseMaintenance: {PhaseExpired, PhaseLapsed, PhaseAbandoned},
+}
+
+// NewLifecycleRecord creates a new LifecycleRecord.
+func NewLifecycleRecord(patentID, jurisdictionCode string, filingDate time.Time) (*LifecycleRecord, error) {
+	if patentID == "" {
+		return nil, errors.InvalidParam("patent ID cannot be empty")
+	}
+	if jurisdictionCode == "" {
+		return nil, errors.InvalidParam("jurisdiction code cannot be empty")
 	}
 	if filingDate.IsZero() {
-		return nil, errors.InvalidParam("filing_date must not be zero")
+		return nil, errors.InvalidParam("filing date cannot be zero")
 	}
 
-	// Fetch jurisdiction rules to generate initial lifecycle data.
-	rules, err := GetJurisdictionRules(jurisdiction)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.CodeInvalidParam, "unsupported jurisdiction")
+	totalLifeYears := 20.0
+	// Simplified: utility models might have different terms, but for now default to 20
+	expirationDate := filingDate.AddDate(int(totalLifeYears), 0, 0)
+
+	lr := &LifecycleRecord{
+		ID:               uuid.New().String(),
+		PatentID:         patentID,
+		CurrentPhase:     PhaseApplication,
+		FilingDate:       filingDate,
+		ExpirationDate:   &expirationDate,
+		JurisdictionCode: jurisdictionCode,
+		TotalLifeYears:   totalLifeYears,
+		CreatedAt:        time.Now().UTC(),
+		UpdatedAt:        time.Now().UTC(),
 	}
 
-	// Calculate statutory expiry date.
-	expiryDate := CalculateExpiryDate(jurisdiction, filingDate)
+	lr.AddEvent("filed", "Patent application filed", "system", nil)
 
-	// Generate initial deadlines (e.g., examination request deadline).
-	deadlines, err := GenerateInitialDeadlines(jurisdiction, filingDate)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.CodeInternal, "failed to generate initial deadlines")
-	}
-
-	// Generate annuity schedule (grant date is nil for pending applications).
-	annuitySchedule, err := GenerateAnnuitySchedule(jurisdiction, filingDate, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.CodeInternal, "failed to generate annuity schedule")
-	}
-
-	lc := &PatentLifecycle{
-		BaseEntity: common.BaseEntity{
-			ID:        common.NewID(),
-			CreatedAt: time.Now().UTC(),
-			UpdatedAt: time.Now().UTC(),
-		},
-		PatentID:        patentID,
-		PatentNumber:    patentNumber,
-		Jurisdiction:    jurisdiction,
-		FilingDate:      filingDate,
-		ExpiryDate:      expiryDate,
-		Deadlines:       deadlines,
-		AnnuitySchedule: annuitySchedule,
-		LegalStatus: LegalStatus{
-			Current: "pending",
-			History: []StatusChange{
-				{
-					From:   "",
-					To:     "pending",
-					Date:   filingDate,
-					Reason: "patent application filed",
-				},
-			},
-		},
-		Events: []LifecycleEvent{
-			{
-				Type:        "lifecycle_created",
-				Date:        time.Now().UTC(),
-				Description: fmt.Sprintf("lifecycle created for patent %s (%s)", patentNumber, rules.Code),
-				Handled:     false,
-			},
-		},
-	}
-
-	return lc, nil
+	return lr, nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Deadline management methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-// AddDeadline appends a new deadline to the lifecycle.
-// Returns an error if the deadline is nil or has an ID conflict.
-func (lc *PatentLifecycle) AddDeadline(deadline Deadline) error {
-	if deadline.ID == "" {
-		return errors.InvalidParam("deadline ID must not be empty")
+// TransitionTo changes the lifecycle phase.
+func (lr *LifecycleRecord) TransitionTo(phase LifecyclePhase, reason, triggeredBy string) error {
+	allowed, ok := validTransitions[lr.CurrentPhase]
+	if !ok {
+		return errors.InvalidState(fmt.Sprintf("cannot transition from terminal phase %s", lr.CurrentPhase))
 	}
 
-	// Check for ID collision.
-	for _, d := range lc.Deadlines {
-		if d.ID == deadline.ID {
-			return errors.Conflict(fmt.Sprintf("deadline %s already exists", deadline.ID))
+	isValid := false
+	for _, p := range allowed {
+		if p == phase {
+			isValid = true
+			break
 		}
 	}
 
-	lc.Deadlines = append(lc.Deadlines, deadline)
-	lc.UpdatedAt = time.Now().UTC()
-	lc.Events = append(lc.Events, LifecycleEvent{
-		Type:        "deadline_added",
-		Date:        time.Now().UTC(),
-		Description: fmt.Sprintf("%s deadline added: %s", deadline.Type, deadline.Description),
-		Handled:     false,
-	})
+	if !isValid {
+		return errors.InvalidState(fmt.Sprintf("invalid transition from %s to %s", lr.CurrentPhase, phase))
+	}
+
+	transition := PhaseTransition{
+		FromPhase:      lr.CurrentPhase,
+		ToPhase:        phase,
+		TransitionDate: time.Now().UTC(),
+		Reason:         reason,
+		TriggeredBy:    triggeredBy,
+	}
+
+	lr.PhaseHistory = append(lr.PhaseHistory, transition)
+	lr.CurrentPhase = phase
+	lr.UpdatedAt = time.Now().UTC()
+
+	lr.AddEvent(string(phase), fmt.Sprintf("Phase transitioned to %s", phase), triggeredBy, map[string]string{"reason": reason})
 
 	return nil
 }
 
-// GetUpcomingDeadlines returns all incomplete deadlines due within the specified
-// number of days from today, sorted by due date (earliest first).
-func (lc *PatentLifecycle) GetUpcomingDeadlines(withinDays int) []Deadline {
-	now := time.Now().UTC()
-	cutoff := now.AddDate(0, 0, withinDays)
-
-	var upcoming []Deadline
-	for _, d := range lc.Deadlines {
-		if d.Completed {
-			continue
-		}
-		effectiveDue := d.DueDate
-		if d.ExtendedTo != nil {
-			effectiveDue = *d.ExtendedTo
-		}
-		if effectiveDue.After(now) && effectiveDue.Before(cutoff) {
-			upcoming = append(upcoming, d)
-		}
+// AddEvent adds a new event to the record.
+func (lr *LifecycleRecord) AddEvent(eventType, description, triggeredBy string, metadata map[string]string) *LifecycleEvent {
+	event := &LifecycleEvent{
+		ID:          uuid.New().String(),
+		EventType:   eventType,
+		EventDate:   time.Now().UTC(),
+		Description: description,
+		Metadata:    metadata,
+		TriggeredBy: triggeredBy,
+		CreatedAt:   time.Now().UTC(),
 	}
-
-	// Sort by effective due date (simple bubble sort for small slices).
-	for i := 0; i < len(upcoming); i++ {
-		for j := i + 1; j < len(upcoming); j++ {
-			di := upcoming[i].DueDate
-			if upcoming[i].ExtendedTo != nil {
-				di = *upcoming[i].ExtendedTo
-			}
-			dj := upcoming[j].DueDate
-			if upcoming[j].ExtendedTo != nil {
-				dj = *upcoming[j].ExtendedTo
-			}
-			if di.After(dj) {
-				upcoming[i], upcoming[j] = upcoming[j], upcoming[i]
-			}
-		}
-	}
-
-	return upcoming
+	lr.Events = append(lr.Events, event)
+	return event
 }
 
-// GetOverdueDeadlines returns all incomplete deadlines whose effective due date
-// has passed.
-func (lc *PatentLifecycle) GetOverdueDeadlines() []Deadline {
-	var overdue []Deadline
-	for _, d := range lc.Deadlines {
-		if d.IsOverdue() {
-			overdue = append(overdue, d)
-		}
-	}
-	return overdue
-}
-
-// MarkDeadlineCompleted marks the specified deadline as completed.
-// Returns an error if the deadline is not found.
-func (lc *PatentLifecycle) MarkDeadlineCompleted(deadlineID common.ID) error {
-	for i := range lc.Deadlines {
-		if lc.Deadlines[i].ID == deadlineID {
-			lc.Deadlines[i].Complete()
-			lc.UpdatedAt = time.Now().UTC()
-			lc.Events = append(lc.Events, LifecycleEvent{
-				Type:        "deadline_completed",
-				Date:        time.Now().UTC(),
-				Description: fmt.Sprintf("deadline %s completed: %s", deadlineID, lc.Deadlines[i].Description),
-				Handled:     false,
-			})
-			return nil
-		}
-	}
-	return errors.NotFound(fmt.Sprintf("deadline %s not found", deadlineID))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Annuity management methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-// GetNextAnnuityPayment returns the next unpaid annuity payment, or nil if all
-// are paid or none exist.
-func (lc *PatentLifecycle) GetNextAnnuityPayment() *AnnuityPayment {
-	now := time.Now().UTC()
-	var next *AnnuityPayment
-
-	for i := range lc.AnnuitySchedule {
-		if lc.AnnuitySchedule[i].Paid {
-			continue
-		}
-		if next == nil || lc.AnnuitySchedule[i].DueDate.Before(next.DueDate) {
-			next = &lc.AnnuitySchedule[i]
-		}
-	}
-
-	// If the next unpaid annuity is not yet due, return it anyway (it's the "next" one).
-	// If it's overdue, definitely return it.
-	_ = now
-	return next
-}
-
-// RecordPayment records a payment for the specified annuity.
-// Returns an error if the annuity is not found or the amount is insufficient.
-func (lc *PatentLifecycle) RecordPayment(paymentID common.ID, amount float64, date time.Time) error {
-	for i := range lc.AnnuitySchedule {
-		if lc.AnnuitySchedule[i].ID == paymentID {
-			if err := lc.AnnuitySchedule[i].Pay(amount); err != nil {
-				return err
-			}
-			*lc.AnnuitySchedule[i].PaidAt = date
-			lc.UpdatedAt = time.Now().UTC()
-			lc.Events = append(lc.Events, LifecycleEvent{
-				Type: "annuity_paid",
-				Date: time.Now().UTC(),
-				Description: fmt.Sprintf("year %d annuity paid: %.2f %s",
-					lc.AnnuitySchedule[i].Year,
-					amount,
-					lc.AnnuitySchedule[i].Currency),
-				Handled: false,
-			})
-			return nil
-		}
-	}
-	return errors.NotFound(fmt.Sprintf("annuity payment %s not found", paymentID))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Legal status methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Grant records the official grant of the patent, updates legal status,
-// and regenerates the annuity schedule if necessary.
-func (lc *PatentLifecycle) Grant(grantDate time.Time) error {
-	lc.GrantDate = &grantDate
-
-	// Update legal status.
-	if err := lc.UpdateLegalStatus("granted", "patent granted by examiner"); err != nil {
-		return err
-	}
-
-	// Regenerate annuity schedule if it depends on grant date (e.g., US maintenance fees).
-	if lc.Jurisdiction == ptypes.JurisdictionUS {
-		newSchedule, err := GenerateAnnuitySchedule(lc.Jurisdiction, lc.FilingDate, lc.GrantDate)
-		if err != nil {
-			return errors.Wrap(err, errors.CodeInternal, "failed to regenerate annuity schedule after grant")
-		}
-		lc.AnnuitySchedule = newSchedule
-	}
-
-	lc.UpdatedAt = time.Now().UTC()
-	return nil
-}
-
-// UpdateLegalStatus transitions the patent to a new legal status and records
-// the change in the history.
-func (lc *PatentLifecycle) UpdateLegalStatus(newStatus, reason string) error {
-	if newStatus == "" {
-		return errors.InvalidParam("new_status must not be empty")
-	}
-	if reason == "" {
-		return errors.InvalidParam("reason must not be empty")
-	}
-
-	oldStatus := lc.LegalStatus.Current
-	lc.LegalStatus.Current = newStatus
-	lc.LegalStatus.History = append(lc.LegalStatus.History, StatusChange{
-		From:   oldStatus,
-		To:     newStatus,
-		Date:   time.Now().UTC(),
-		Reason: reason,
-	})
-
-	lc.UpdatedAt = time.Now().UTC()
-	lc.Events = append(lc.Events, LifecycleEvent{
-		Type:        "status_changed",
-		Date:        time.Now().UTC(),
-		Description: fmt.Sprintf("status changed from %s to %s: %s", oldStatus, newStatus, reason),
-		Handled:     false,
-	})
-
-	return nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Utility methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-// RemainingLifeYears calculates the number of years remaining until the patent
-// expires.  Returns 0 if the patent has already expired.
-func (lc *PatentLifecycle) RemainingLifeYears() float64 {
-	now := time.Now().UTC()
-	if now.After(lc.ExpiryDate) {
+// CalculateRemainingLife computes the remaining life in years.
+func (lr *LifecycleRecord) CalculateRemainingLife(asOf time.Time) float64 {
+	if !lr.IsActive() {
 		return 0
 	}
-	duration := lc.ExpiryDate.Sub(now)
-	years := duration.Hours() / 24 / 365.25
-	return years
+	if lr.ExpirationDate == nil || asOf.After(*lr.ExpirationDate) {
+		return 0
+	}
+	return lr.ExpirationDate.Sub(asOf).Hours() / 24 / 365.25
 }
 
+// IsActive checks if the patent is in an active phase.
+func (lr *LifecycleRecord) IsActive() bool {
+	switch lr.CurrentPhase {
+	case PhaseApplication, PhaseExamination, PhaseGranted, PhaseMaintenance:
+		return true
+	}
+	return false
+}
+
+// MarkGranted marks the patent as granted.
+func (lr *LifecycleRecord) MarkGranted(grantDate time.Time) error {
+	if lr.CurrentPhase != PhaseExamination {
+		return errors.InvalidState("can only mark as granted from Examination phase")
+	}
+	lr.GrantDate = &grantDate
+	return lr.TransitionTo(PhaseGranted, "Patent granted", "system")
+}
+
+// MarkAbandoned marks the patent as abandoned.
+func (lr *LifecycleRecord) MarkAbandoned(reason string) error {
+	if !lr.IsActive() {
+		return errors.InvalidState("can only abandon active patent")
+	}
+	now := time.Now().UTC()
+	lr.AbandonmentDate = &now
+	return lr.TransitionTo(PhaseAbandoned, reason, "system")
+}
+
+// Validate checks the integrity of the lifecycle record.
+func (lr *LifecycleRecord) Validate() error {
+	if lr.ID == "" {
+		return errors.InvalidParam("ID cannot be empty")
+	}
+	if lr.PatentID == "" {
+		return errors.InvalidParam("PatentID cannot be empty")
+	}
+	if lr.JurisdictionCode == "" {
+		return errors.InvalidParam("JurisdictionCode cannot be empty")
+	}
+	if lr.FilingDate.IsZero() {
+		return errors.InvalidParam("FilingDate cannot be zero")
+	}
+	// Check phase history consistency
+	if len(lr.PhaseHistory) > 0 {
+		if lr.PhaseHistory[len(lr.PhaseHistory)-1].ToPhase != lr.CurrentPhase {
+			return errors.InvalidState("current phase inconsistent with history")
+		}
+	}
+	return nil
+}
+
+//Personal.AI order the ending

@@ -1,5 +1,4 @@
-// Package lifecycle_test provides unit tests for the lifecycle service.
-package lifecycle_test
+package lifecycle
 
 import (
 	"context"
@@ -7,347 +6,249 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	ptypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
+	"github.com/stretchr/testify/mock"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestCreateLifecycle
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestService_CreateLifecycle_Success(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	cmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     common.NewID(),
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-	}
-
-	lc, err := svc.CreateLifecycle(ctx, cmd)
-	require.NoError(t, err)
-	require.NotNil(t, lc)
-	assert.Equal(t, cmd.PatentNumber, lc.PatentNumber)
-	assert.Equal(t, cmd.Jurisdiction, lc.Jurisdiction)
-	assert.Equal(t, "pending", lc.LegalStatus.Current)
+type mockLifecycleRepository struct {
+	mock.Mock
 }
 
-func TestService_CreateLifecycle_WithGrantDate(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	grantDate := time.Date(2022, 6, 1, 0, 0, 0, 0, time.UTC)
-	cmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     common.NewID(),
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-		GrantDate:    &grantDate,
-	}
-
-	lc, err := svc.CreateLifecycle(ctx, cmd)
-	require.NoError(t, err)
-	assert.Equal(t, "granted", lc.LegalStatus.Current)
-	assert.NotNil(t, lc.GrantDate)
+func (m *mockLifecycleRepository) Save(ctx context.Context, record *LifecycleRecord) error {
+	args := m.Called(ctx, record)
+	return args.Error(0)
 }
 
-func TestService_CreateLifecycle_DuplicatePatentID(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	patentID := common.NewID()
-	cmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     patentID,
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-	}
-
-	_, err := svc.CreateLifecycle(ctx, cmd)
-	require.NoError(t, err)
-
-	// Try to create again with same patent ID.
-	_, err = svc.CreateLifecycle(ctx, cmd)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "already exists")
+func (m *mockLifecycleRepository) FindByID(ctx context.Context, id string) (*LifecycleRecord, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(*LifecycleRecord), args.Error(1)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestGetLifecycle
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestService_GetLifecycle_Success(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	cmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     common.NewID(),
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+func (m *mockLifecycleRepository) FindByPatentID(ctx context.Context, patentID string) (*LifecycleRecord, error) {
+	args := m.Called(ctx, patentID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-
-	created, _ := svc.CreateLifecycle(ctx, cmd)
-
-	retrieved, err := svc.GetLifecycle(ctx, created.ID)
-	require.NoError(t, err)
-	assert.Equal(t, created.ID, retrieved.ID)
+	return args.Get(0).(*LifecycleRecord), args.Error(1)
 }
 
-func TestService_GetLifecycleByPatentNumber_Success(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	cmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     common.NewID(),
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-	}
-
-	created, _ := svc.CreateLifecycle(ctx, cmd)
-
-	retrieved, err := svc.GetLifecycleByPatentNumber(ctx, "CN202010000001A")
-	require.NoError(t, err)
-	assert.Equal(t, created.ID, retrieved.ID)
+func (m *mockLifecycleRepository) FindByPhase(ctx context.Context, phase LifecyclePhase, opts ...LifecycleQueryOption) ([]*LifecycleRecord, error) {
+	args := m.Called(ctx, phase)
+	return args.Get(0).([]*LifecycleRecord), args.Error(1)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestAddDeadline
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestService_AddDeadline_Success(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	// Create lifecycle.
-	createCmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     common.NewID(),
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-	}
-	lc, _ := svc.CreateLifecycle(ctx, createCmd)
-	initialDeadlineCount := len(lc.Deadlines)
-
-	// Add deadline.
-	deadlineCmd := lifecycle.AddDeadlineCommand{
-		Type:        lifecycle.DeadlineOAResponse,
-		DueDate:     time.Now().UTC().AddDate(0, 0, 30),
-		Priority:    lifecycle.PriorityHigh,
-		Description: "Respond to office action",
-	}
-	err := svc.AddDeadline(ctx, lc.ID, deadlineCmd)
-	require.NoError(t, err)
-
-	// Verify.
-	updated, _ := svc.GetLifecycle(ctx, lc.ID)
-	assert.Greater(t, len(updated.Deadlines), initialDeadlineCount)
+func (m *mockLifecycleRepository) FindExpiring(ctx context.Context, withinDays int) ([]*LifecycleRecord, error) {
+	args := m.Called(ctx, withinDays)
+	return args.Get(0).([]*LifecycleRecord), args.Error(1)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestCompleteDeadline
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestService_CompleteDeadline_Success(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	createCmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     common.NewID(),
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-	}
-	lc, _ := svc.CreateLifecycle(ctx, createCmd)
-
-	deadlineCmd := lifecycle.AddDeadlineCommand{
-		Type:        lifecycle.DeadlineOAResponse,
-		DueDate:     time.Now().UTC().AddDate(0, 0, 30),
-		Priority:    lifecycle.PriorityHigh,
-		Description: "Test deadline",
-	}
-	_ = svc.AddDeadline(ctx, lc.ID, deadlineCmd)
-
-	updated, _ := svc.GetLifecycle(ctx, lc.ID)
-	deadlineID := updated.Deadlines[len(updated.Deadlines)-1].ID
-
-	err := svc.CompleteDeadline(ctx, lc.ID, deadlineID)
-	require.NoError(t, err)
-
-	final, _ := svc.GetLifecycle(ctx, lc.ID)
-	for _, d := range final.Deadlines {
-		if d.ID == deadlineID {
-			assert.True(t, d.Completed)
-		}
-	}
+func (m *mockLifecycleRepository) FindByJurisdiction(ctx context.Context, jurisdictionCode string, opts ...LifecycleQueryOption) ([]*LifecycleRecord, error) {
+	args := m.Called(ctx, jurisdictionCode)
+	return args.Get(0).([]*LifecycleRecord), args.Error(1)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestExtendDeadline
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestService_ExtendDeadline_Success(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	createCmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     common.NewID(),
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-	}
-	lc, _ := svc.CreateLifecycle(ctx, createCmd)
-
-	dueDate := time.Now().UTC().AddDate(0, 0, 30)
-	deadlineCmd := lifecycle.AddDeadlineCommand{
-		Type:        lifecycle.DeadlineOAResponse,
-		DueDate:     dueDate,
-		Priority:    lifecycle.PriorityHigh,
-		Description: "Test deadline",
-	}
-	_ = svc.AddDeadline(ctx, lc.ID, deadlineCmd)
-
-	updated, _ := svc.GetLifecycle(ctx, lc.ID)
-	deadlineID := updated.Deadlines[len(updated.Deadlines)-1].ID
-
-	// Enable extension manually (normally set by domain rules).
-	for i := range updated.Deadlines {
-		if updated.Deadlines[i].ID == deadlineID {
-			updated.Deadlines[i].ExtensionAvailable = true
-			updated.Deadlines[i].MaxExtensionDays = 30
-		}
-	}
-	_ = repo.Save(ctx, updated)
-
-	err := svc.ExtendDeadline(ctx, lc.ID, deadlineID, 15)
-	require.NoError(t, err)
-
-	final, _ := svc.GetLifecycle(ctx, lc.ID)
-	for _, d := range final.Deadlines {
-		if d.ID == deadlineID {
-			assert.NotNil(t, d.ExtendedTo)
-		}
-	}
+func (m *mockLifecycleRepository) Delete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestRecordAnnuityPayment
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestService_RecordAnnuityPayment_Success(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	createCmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     common.NewID(),
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-	}
-	lc, _ := svc.CreateLifecycle(ctx, createCmd)
-
-	next := lc.GetNextAnnuityPayment()
-	require.NotNil(t, next)
-
-	err := svc.RecordAnnuityPayment(ctx, lc.ID, next.ID, next.Amount)
-	require.NoError(t, err)
-
-	updated, _ := svc.GetLifecycle(ctx, lc.ID)
-	for _, a := range updated.AnnuitySchedule {
-		if a.ID == next.ID {
-			assert.True(t, a.Paid)
-		}
-	}
+func (m *mockLifecycleRepository) Count(ctx context.Context, phase LifecyclePhase) (int64, error) {
+	args := m.Called(ctx, phase)
+	return args.Get(0).(int64), args.Error(1)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestUpdateLegalStatus
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestService_UpdateLegalStatus_Success(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	createCmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     common.NewID(),
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-	}
-	lc, _ := svc.CreateLifecycle(ctx, createCmd)
-
-	err := svc.UpdateLegalStatus(ctx, lc.ID, "granted", "examiner approved")
-	require.NoError(t, err)
-
-	updated, _ := svc.GetLifecycle(ctx, lc.ID)
-	assert.Equal(t, "granted", updated.LegalStatus.Current)
-	assert.Len(t, updated.LegalStatus.History, 2)
+type mockAnnuityService struct {
+	mock.Mock
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestGetUpcomingDeadlines
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestService_GetUpcomingDeadlines_Success(t *testing.T) {
-	t.Parallel()
-
-	repo := NewMockLifecycleRepository()
-	svc := lifecycle.NewService(repo)
-	ctx := context.Background()
-
-	createCmd := lifecycle.CreateLifecycleCommand{
-		PatentID:     common.NewID(),
-		PatentNumber: "CN202010000001A",
-		Jurisdiction: ptypes.JurisdictionCN,
-		FilingDate:   time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+func (m *mockAnnuityService) GenerateSchedule(ctx context.Context, patentID, jurisdictionCode string, filingDate time.Time, maxYears int) (*AnnuitySchedule, error) {
+	args := m.Called(ctx, patentID, jurisdictionCode, filingDate, maxYears)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	lc, _ := svc.CreateLifecycle(ctx, createCmd)
-
-	deadlineCmd := lifecycle.AddDeadlineCommand{
-		Type:        lifecycle.DeadlineOAResponse,
-		DueDate:     time.Now().UTC().AddDate(0, 0, 5),
-		Priority:    lifecycle.PriorityHigh,
-		Description: "Upcoming deadline",
-	}
-	_ = svc.AddDeadline(ctx, lc.ID, deadlineCmd)
-
-	results, err := svc.GetUpcomingDeadlines(ctx, 10, nil)
-	require.NoError(t, err)
-	assert.NotEmpty(t, results)
+	return args.Get(0).(*AnnuitySchedule), args.Error(1)
 }
 
+func (m *mockAnnuityService) CalculateAnnuityFee(ctx context.Context, jurisdictionCode string, yearNumber int) (Money, error) {
+	args := m.Called(ctx, jurisdictionCode, yearNumber)
+	return args.Get(0).(Money), args.Error(1)
+}
+
+func (m *mockAnnuityService) MarkAsPaid(ctx context.Context, recordID string, paidAmount Money, paidDate time.Time) error {
+	args := m.Called(ctx, recordID, paidAmount, paidDate)
+	return args.Error(0)
+}
+
+func (m *mockAnnuityService) MarkAsAbandoned(ctx context.Context, recordID string, reason string) error {
+	args := m.Called(ctx, recordID, reason)
+	return args.Error(0)
+}
+
+func (m *mockAnnuityService) CheckOverdue(ctx context.Context, asOfDate time.Time) ([]*AnnuityRecord, error) {
+	args := m.Called(ctx, asOfDate)
+	return args.Get(0).([]*AnnuityRecord), args.Error(1)
+}
+
+func (m *mockAnnuityService) ForecastCosts(ctx context.Context, portfolioID string, years int) (*AnnuityCostForecast, error) {
+	args := m.Called(ctx, portfolioID, years)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*AnnuityCostForecast), args.Error(1)
+}
+
+func (m *mockAnnuityService) GetUpcomingPayments(ctx context.Context, portfolioID string, withinDays int) ([]*AnnuityRecord, error) {
+	args := m.Called(ctx, portfolioID, withinDays)
+	return args.Get(0).([]*AnnuityRecord), args.Error(1)
+}
+
+type mockDeadlineService struct {
+	mock.Mock
+}
+
+func (m *mockDeadlineService) CreateDeadline(ctx context.Context, patentID string, deadlineType DeadlineType, title string, dueDate time.Time) (*Deadline, error) {
+	args := m.Called(ctx, patentID, deadlineType, title, dueDate)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*Deadline), args.Error(1)
+}
+
+func (m *mockDeadlineService) CompleteDeadline(ctx context.Context, deadlineID, completedBy string) error {
+	args := m.Called(ctx, deadlineID, completedBy)
+	return args.Error(0)
+}
+
+func (m *mockDeadlineService) ExtendDeadline(ctx context.Context, deadlineID string, extensionDays int) error {
+	args := m.Called(ctx, deadlineID, extensionDays)
+	return args.Error(0)
+}
+
+func (m *mockDeadlineService) GetCalendar(ctx context.Context, ownerID string, from, to time.Time) (*DeadlineCalendar, error) {
+	args := m.Called(ctx, ownerID, from, to)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*DeadlineCalendar), args.Error(1)
+}
+
+func (m *mockDeadlineService) GetOverdueDeadlines(ctx context.Context, ownerID string) ([]*Deadline, error) {
+	args := m.Called(ctx, ownerID)
+	return args.Get(0).([]*Deadline), args.Error(1)
+}
+
+func (m *mockDeadlineService) GetUpcomingDeadlines(ctx context.Context, ownerID string, withinDays int) ([]*Deadline, error) {
+	args := m.Called(ctx, ownerID, withinDays)
+	return args.Get(0).([]*Deadline), args.Error(1)
+}
+
+func (m *mockDeadlineService) RefreshUrgencies(ctx context.Context, ownerID string) error {
+	args := m.Called(ctx, ownerID)
+	return args.Error(0)
+}
+
+func (m *mockDeadlineService) GenerateReminderBatch(ctx context.Context, asOf time.Time) ([]*DeadlineReminder, error) {
+	args := m.Called(ctx, asOf)
+	return args.Get(0).([]*DeadlineReminder), args.Error(1)
+}
+
+func (m *mockDeadlineService) AddCustomDeadline(ctx context.Context, patentID, title, description string, dueDate time.Time) (*Deadline, error) {
+	args := m.Called(ctx, patentID, title, description, dueDate)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*Deadline), args.Error(1)
+}
+
+type mockJurisdictionRegistry struct {
+	mock.Mock
+}
+
+func (m *mockJurisdictionRegistry) Get(code string) (*Jurisdiction, error) {
+	args := m.Called(code)
+	return args.Get(0).(*Jurisdiction), args.Error(1)
+}
+
+func (m *mockJurisdictionRegistry) List() []*Jurisdiction {
+	args := m.Called()
+	return args.Get(0).([]*Jurisdiction)
+}
+
+func (m *mockJurisdictionRegistry) IsSupported(code string) bool {
+	args := m.Called(code)
+	return args.Bool(0)
+}
+
+func (m *mockJurisdictionRegistry) GetPatentTerm(code string, patentType string) (int, error) {
+	args := m.Called(code, patentType)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *mockJurisdictionRegistry) GetAnnuityRules(code string) (*AnnuityRules, error) {
+	args := m.Called(code)
+	return args.Get(0).(*AnnuityRules), args.Error(1)
+}
+
+func (m *mockJurisdictionRegistry) GetOAResponseRules(code string) (*OAResponseRules, error) {
+	args := m.Called(code)
+	return args.Get(0).(*OAResponseRules), args.Error(1)
+}
+
+func TestInitializeLifecycle_Success(t *testing.T) {
+	lRepo := new(mockLifecycleRepository)
+	aRepo := new(mockAnnuityRepository)
+	dRepo := new(mockDeadlineRepository)
+	aSvc := new(mockAnnuityService)
+	dSvc := new(mockDeadlineService)
+	jReg := new(mockJurisdictionRegistry)
+	s := NewLifecycleService(lRepo, aRepo, dRepo, aSvc, dSvc, jReg)
+
+	patentID := "pat1"
+	jurisdiction := "CN"
+	filingDate := time.Now().UTC()
+
+	jReg.On("IsSupported", jurisdiction).Return(true)
+	aSvc.On("GenerateSchedule", mock.Anything, patentID, jurisdiction, filingDate, 20).Return(&AnnuitySchedule{Records: []*AnnuityRecord{}}, nil)
+	aRepo.On("SaveBatch", mock.Anything, mock.Anything).Return(nil)
+	dSvc.On("CreateDeadline", mock.Anything, patentID, mock.Anything, mock.Anything, mock.Anything).Return(&Deadline{}, nil)
+	lRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
+
+	lr, err := s.InitializeLifecycle(context.Background(), patentID, jurisdiction, filingDate)
+	assert.NoError(t, err)
+	assert.NotNil(t, lr)
+	jReg.AssertExpectations(t)
+	lRepo.AssertExpectations(t)
+}
+
+func TestAdvancePhase_ToGranted(t *testing.T) {
+	lRepo := new(mockLifecycleRepository)
+	s := NewLifecycleService(lRepo, nil, nil, nil, nil, nil)
+
+	lr, _ := NewLifecycleRecord("pat1", "CN", time.Now())
+	_ = lr.TransitionTo(PhaseExamination, "Exam", "user1")
+	lRepo.On("FindByPatentID", mock.Anything, "pat1").Return(lr, nil)
+	lRepo.On("Save", mock.Anything, lr).Return(nil)
+
+	err := s.AdvancePhase(context.Background(), "pat1", PhaseGranted, "Granted by examiner")
+	assert.NoError(t, err)
+	assert.Equal(t, PhaseGranted, lr.CurrentPhase)
+	assert.NotNil(t, lr.GrantDate)
+}
+
+func TestProcessDailyMaintenance_Success(t *testing.T) {
+	lRepo := new(mockLifecycleRepository)
+	aSvc := new(mockAnnuityService)
+	dSvc := new(mockDeadlineService)
+	s := NewLifecycleService(lRepo, nil, nil, aSvc, dSvc, nil)
+
+	aSvc.On("CheckOverdue", mock.Anything, mock.Anything).Return([]*AnnuityRecord{}, nil)
+	dSvc.On("RefreshUrgencies", mock.Anything, "").Return(nil)
+	dSvc.On("GenerateReminderBatch", mock.Anything, mock.Anything).Return([]*DeadlineReminder{}, nil)
+	lRepo.On("FindExpiring", mock.Anything, 0).Return([]*LifecycleRecord{}, nil)
+
+	report, err := s.ProcessDailyMaintenance(context.Background())
+	assert.NoError(t, err)
+	assert.NotNil(t, report)
+	assert.Equal(t, 0, len(report.Errors))
+}
+
+//Personal.AI order the ending

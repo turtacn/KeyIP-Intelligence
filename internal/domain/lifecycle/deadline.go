@@ -1,260 +1,415 @@
-// Package lifecycle defines the deadline management value objects and their
-// business logic for patent lifecycle tracking.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DeadlineType enumeration
-// ─────────────────────────────────────────────────────────────────────────────
-
-// DeadlineType categorizes the nature of a patent-related deadline.
+// DeadlineType defines the type of a deadline.
 type DeadlineType string
 
 const (
-	// DeadlineFilingResponse is the deadline to respond to an initial filing
-	// office action or formality examination report.
-	DeadlineFilingResponse DeadlineType = "filing_response"
-
-	// DeadlineExamination is the deadline to request substantive examination
-	// (applicable in jurisdictions that have a two-stage examination process).
-	DeadlineExamination DeadlineType = "examination"
-
-	// DeadlineOAResponse is the deadline to respond to an office action during
-	// substantive examination (e.g., objections, rejections, clarity issues).
-	DeadlineOAResponse DeadlineType = "oa_response"
-
-	// DeadlineAnnuity is the deadline to pay an annual maintenance fee.
-	DeadlineAnnuity DeadlineType = "annuity"
-
-	// DeadlineRenewal is the deadline to renew a trademark, design, or other
-	// renewable IP right (not typically used for utility patents).
-	DeadlineRenewal DeadlineType = "renewal"
-
-	// DeadlinePCTNationalPhase is the deadline to enter the national/regional
-	// phase of a PCT application (typically 30 or 31 months from priority date).
-	DeadlinePCTNationalPhase DeadlineType = "pct_national_phase"
-
-	// DeadlineOpposition is the deadline to file or respond to an opposition
-	// against a granted patent or published application.
-	DeadlineOpposition DeadlineType = "opposition"
-
-	// DeadlineAppeal is the deadline to file an appeal against an examiner's
-	// final rejection or adverse decision.
-	DeadlineAppeal DeadlineType = "appeal"
-
-	// DeadlineCustom is a user-defined deadline that doesn't fit standard categories.
-	DeadlineCustom DeadlineType = "custom"
+	DeadlineTypeFilingResponse      DeadlineType = "FilingResponse"
+	DeadlineTypeAnnuityPayment      DeadlineType = "AnnuityPayment"
+	DeadlineTypePCTNationalPhase    DeadlineType = "PCTNationalPhase"
+	DeadlineTypePriorityClaimFiling DeadlineType = "PriorityClaimFiling"
+	DeadlineTypeOppositionFiling    DeadlineType = "OppositionFiling"
+	DeadlineTypeRenewal             DeadlineType = "Renewal"
+	DeadlineTypeCustom              DeadlineType = "Custom"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DeadlinePriority enumeration
-// ─────────────────────────────────────────────────────────────────────────────
-
-// DeadlinePriority indicates the urgency level of a deadline.
-type DeadlinePriority string
+// DeadlineUrgency defines the urgency level of a deadline.
+type DeadlineUrgency string
 
 const (
-	// PriorityCritical: missing this deadline results in irreversible loss
-	// (e.g., patent rights abandoned, application deemed withdrawn).
-	PriorityCritical DeadlinePriority = "critical"
-
-	// PriorityHigh: missing this deadline has severe consequences but may be
-	// recoverable with extraordinary measures (e.g., petition for revival).
-	PriorityHigh DeadlinePriority = "high"
-
-	// PriorityMedium: important deadline with moderate consequences (e.g.,
-	// delay in prosecution, additional fees).
-	PriorityMedium DeadlinePriority = "medium"
-
-	// PriorityLow: informational or internal deadline with minimal external impact.
-	PriorityLow DeadlinePriority = "low"
+	UrgencyCritical DeadlineUrgency = "Critical"
+	UrgencyHigh     DeadlineUrgency = "High"
+	UrgencyMedium   DeadlineUrgency = "Medium"
+	UrgencyLow      DeadlineUrgency = "Low"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Deadline value object
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Deadline represents a single time-bound obligation in the patent lifecycle.
-// Deadlines are immutable once created, except for completion and extension.
+// Deadline represents a single deadline in the patent lifecycle.
 type Deadline struct {
-	// ID uniquely identifies this deadline.
-	ID common.ID `json:"id"`
-
-	// Type categorizes the deadline.
-	Type DeadlineType `json:"type"`
-
-	// DueDate is the statutory or contractual deadline (not considering extensions).
-	DueDate time.Time `json:"due_date"`
-
-	// Priority indicates the urgency and impact of missing this deadline.
-	Priority DeadlinePriority `json:"priority"`
-
-	// Description provides human-readable context about what action is required.
-	Description string `json:"description"`
-
-	// Completed indicates whether the required action has been taken.
-	Completed bool `json:"completed"`
-
-	// CompletedAt is the timestamp when the deadline was marked as completed.
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
-
-	// ReminderDays lists the number of days before the due date when reminders
-	// should be sent (e.g., [30, 14, 7, 1] means send reminders 30 days, 14 days,
-	// 7 days, and 1 day before the deadline).
-	ReminderDays []int `json:"reminder_days"`
-
-	// ExtensionAvailable indicates whether this deadline can be extended by
-	// filing a request with the patent office.
-	ExtensionAvailable bool `json:"extension_available"`
-
-	// MaxExtensionDays is the maximum number of days by which the deadline can
-	// be extended (0 if extension is not available).
-	MaxExtensionDays int `json:"max_extension_days"`
-
-	// ExtendedTo is the new due date if an extension has been granted.
-	ExtendedTo *time.Time `json:"extended_to,omitempty"`
+	ID                 string          `json:"id"`
+	PatentID           string          `json:"patent_id"`
+	Type               DeadlineType    `json:"type"`
+	Title              string          `json:"title"`
+	Description        string          `json:"description"`
+	DueDate            time.Time       `json:"due_date"`
+	ReminderDates      []time.Time     `json:"reminder_dates"`
+	Urgency            DeadlineUrgency `json:"urgency"`
+	IsCompleted        bool            `json:"is_completed"`
+	CompletedAt        *time.Time      `json:"completed_at,omitempty"`
+	CompletedBy        string          `json:"completed_by,omitempty"`
+	JurisdictionCode   string          `json:"jurisdiction_code"`
+	ExtensionAvailable bool            `json:"extension_available"`
+	MaxExtensionDays   int             `json:"max_extension_days"`
+	ExtendedDueDate    *time.Time      `json:"extended_due_date,omitempty"`
+	Notes              string          `json:"notes"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Factory function
-// ─────────────────────────────────────────────────────────────────────────────
-
-// NewDeadline creates a new Deadline value object with validation.
-//
-// Business rules:
-//   - DueDate must not be zero
-//   - Description must not be empty
-//   - Default reminder schedule is [30, 14, 7, 1] days before due date
-func NewDeadline(
-	deadlineType DeadlineType,
-	dueDate time.Time,
-	priority DeadlinePriority,
-	description string,
-) (*Deadline, error) {
-	if dueDate.IsZero() {
-		return nil, errors.InvalidParam("due_date must not be zero")
+// NewDeadline creates a new Deadline.
+func NewDeadline(patentID string, deadlineType DeadlineType, title string, dueDate time.Time) (*Deadline, error) {
+	if patentID == "" {
+		return nil, errors.InvalidParam("patent ID cannot be empty")
 	}
-	if description == "" {
-		return nil, errors.InvalidParam("description must not be empty")
+	if title == "" {
+		return nil, errors.InvalidParam("title cannot be empty")
 	}
 
-	return &Deadline{
-		ID:                 common.NewID(),
-		Type:               deadlineType,
-		DueDate:            dueDate,
-		Priority:           priority,
-		Description:        description,
-		Completed:          false,
-		ReminderDays:       []int{30, 14, 7, 1}, // Default reminder schedule
-		ExtensionAvailable: false,
-		MaxExtensionDays:   0,
-	}, nil
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Query methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-// IsOverdue returns true if the deadline has passed and has not been completed.
-// Takes into account any granted extension.
-func (d *Deadline) IsOverdue() bool {
-	if d.Completed {
-		return false
-	}
 	now := time.Now().UTC()
-	effectiveDue := d.DueDate
-	if d.ExtendedTo != nil {
-		effectiveDue = *d.ExtendedTo
-	}
-	return now.After(effectiveDue)
-}
-
-// DaysUntilDue returns the number of days until the deadline is due.
-// Negative values indicate the deadline is overdue.
-// Takes into account any granted extension.
-func (d *Deadline) DaysUntilDue() int {
-	now := time.Now().UTC()
-	effectiveDue := d.DueDate
-	if d.ExtendedTo != nil {
-		effectiveDue = *d.ExtendedTo
-	}
-
-	// Normalize both to the start of the day for date-only comparison.
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	due := time.Date(effectiveDue.Year(), effectiveDue.Month(), effectiveDue.Day(), 0, 0, 0, 0, time.UTC)
+	dueDay := time.Date(dueDate.Year(), dueDate.Month(), dueDate.Day(), 0, 0, 0, 0, time.UTC)
 
-	days := int(due.Sub(today).Hours() / 24)
-	return days
+	if dueDay.Before(today) {
+		return nil, errors.InvalidParam("due date cannot be in the past")
+	}
+
+	d := &Deadline{
+		ID:            uuid.New().String(),
+		PatentID:      patentID,
+		Type:          deadlineType,
+		Title:         title,
+		DueDate:       dueDate,
+		IsCompleted:   false,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		ReminderDates: GenerateDefaultReminderDates(dueDate, now),
+	}
+	d.Urgency = d.CalculateUrgency(now)
+	return d, nil
 }
 
-// NeedsAttention returns true if the deadline is incomplete and due within 7 days.
-func (d *Deadline) NeedsAttention() bool {
-	if d.Completed {
-		return false
+// CalculateUrgency computes the urgency based on the days remaining until the deadline.
+func (d *Deadline) CalculateUrgency(asOf time.Time) DeadlineUrgency {
+	days := d.DaysUntilDue(asOf)
+	switch {
+	case days <= 7:
+		return UrgencyCritical
+	case days <= 30:
+		return UrgencyHigh
+	case days <= 90:
+		return UrgencyMedium
+	default:
+		return UrgencyLow
 	}
-	daysUntil := d.DaysUntilDue()
-	return daysUntil >= 0 && daysUntil <= 7
 }
 
-// ShouldRemind returns true if today is one of the configured reminder days.
-// For example, if ReminderDays = [30, 14, 7, 1] and the deadline is 7 days away,
-// this returns true.
-func (d *Deadline) ShouldRemind() bool {
-	if d.Completed {
-		return false
+// Complete marks the deadline as completed.
+func (d *Deadline) Complete(completedBy string) error {
+	if d.IsCompleted {
+		return errors.InvalidState("deadline already completed")
 	}
-	daysUntil := d.DaysUntilDue()
-	for _, reminderDay := range d.ReminderDays {
-		if daysUntil == reminderDay {
-			return true
-		}
-	}
-	return false
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Command methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Complete marks the deadline as completed and records the completion timestamp.
-func (d *Deadline) Complete() {
 	now := time.Now().UTC()
-	d.Completed = true
+	d.IsCompleted = true
 	d.CompletedAt = &now
-}
-
-// Extend grants an extension to the deadline.
-//
-// Business rules:
-//   - Extension must be available (ExtensionAvailable = true)
-//   - Extension days must not exceed MaxExtensionDays
-//   - Cannot extend an already completed deadline
-func (d *Deadline) Extend(days int) error {
-	if d.Completed {
-		return errors.InvalidState("cannot extend a completed deadline")
-	}
-	if !d.ExtensionAvailable {
-		return errors.InvalidState("extension is not available for this deadline")
-	}
-	if days <= 0 {
-		return errors.InvalidParam("extension days must be positive")
-	}
-	if days > d.MaxExtensionDays {
-		return errors.InvalidParam(
-			fmt.Sprintf("extension days (%d) exceed maximum allowed (%d)",
-				days, d.MaxExtensionDays),
-		)
-	}
-
-	newDueDate := d.DueDate.AddDate(0, 0, days)
-	d.ExtendedTo = &newDueDate
+	d.CompletedBy = completedBy
+	d.UpdatedAt = now
 	return nil
 }
 
+// Extend extends the deadline if allowed.
+func (d *Deadline) Extend(extensionDays int) error {
+	if d.IsCompleted {
+		return errors.InvalidState("cannot extend a completed deadline")
+	}
+	if !d.ExtensionAvailable {
+		return errors.InvalidState("extension not available for this deadline")
+	}
+	if extensionDays > d.MaxExtensionDays {
+		return errors.InvalidParam(fmt.Sprintf("extension days %d exceeds maximum %d", extensionDays, d.MaxExtensionDays))
+	}
+
+	newDue := d.DueDate.AddDate(0, 0, extensionDays)
+	d.ExtendedDueDate = &newDue
+	d.ReminderDates = GenerateDefaultReminderDates(newDue, time.Now().UTC())
+	d.Urgency = d.CalculateUrgency(time.Now().UTC())
+	d.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// IsOverdue checks if the deadline is overdue.
+func (d *Deadline) IsOverdue(asOf time.Time) bool {
+	if d.IsCompleted {
+		return false
+	}
+	return d.EffectiveDueDate().Before(asOf)
+}
+
+// DaysUntilDue calculates the number of days until the deadline.
+func (d *Deadline) DaysUntilDue(asOf time.Time) int {
+	due := d.EffectiveDueDate()
+
+	// Start of day normalization
+	t1 := time.Date(asOf.Year(), asOf.Month(), asOf.Day(), 0, 0, 0, 0, time.UTC)
+	t2 := time.Date(due.Year(), due.Month(), due.Day(), 0, 0, 0, 0, time.UTC)
+
+	return int(t2.Sub(t1).Hours() / 24)
+}
+
+// EffectiveDueDate returns the current active due date.
+func (d *Deadline) EffectiveDueDate() time.Time {
+	if d.ExtendedDueDate != nil {
+		return *d.ExtendedDueDate
+	}
+	return d.DueDate
+}
+
+// DeadlineCalendar represents a calendar view of deadlines.
+type DeadlineCalendar struct {
+	OwnerID       string      `json:"owner_id"`
+	Deadlines     []*Deadline `json:"deadlines"`
+	OverdueCount  int         `json:"overdue_count"`
+	CriticalCount int         `json:"critical_count"`
+	HighCount     int         `json:"high_count"`
+	UpcomingWeek  []*Deadline `json:"upcoming_week"`
+	UpcomingMonth []*Deadline `json:"upcoming_month"`
+	GeneratedAt   time.Time   `json:"generated_at"`
+}
+
+// DeadlineService defines the domain service for managing deadlines.
+type DeadlineService interface {
+	CreateDeadline(ctx context.Context, patentID string, deadlineType DeadlineType, title string, dueDate time.Time) (*Deadline, error)
+	CompleteDeadline(ctx context.Context, deadlineID, completedBy string) error
+	ExtendDeadline(ctx context.Context, deadlineID string, extensionDays int) error
+	GetCalendar(ctx context.Context, ownerID string, from, to time.Time) (*DeadlineCalendar, error)
+	GetOverdueDeadlines(ctx context.Context, ownerID string) ([]*Deadline, error)
+	GetUpcomingDeadlines(ctx context.Context, ownerID string, withinDays int) ([]*Deadline, error)
+	RefreshUrgencies(ctx context.Context, ownerID string) error
+	GenerateReminderBatch(ctx context.Context, asOf time.Time) ([]*DeadlineReminder, error)
+	AddCustomDeadline(ctx context.Context, patentID, title, description string, dueDate time.Time) (*Deadline, error)
+}
+
+type deadlineServiceImpl struct {
+	repo DeadlineRepository
+}
+
+// NewDeadlineService creates a new DeadlineService.
+func NewDeadlineService(repo DeadlineRepository) DeadlineService {
+	return &deadlineServiceImpl{repo: repo}
+}
+
+func (s *deadlineServiceImpl) CreateDeadline(ctx context.Context, patentID string, deadlineType DeadlineType, title string, dueDate time.Time) (*Deadline, error) {
+	d, err := NewDeadline(patentID, deadlineType, title, dueDate)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.Save(ctx, d); err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+func (s *deadlineServiceImpl) CompleteDeadline(ctx context.Context, deadlineID, completedBy string) error {
+	d, err := s.repo.FindByID(ctx, deadlineID)
+	if err != nil {
+		return err
+	}
+	if err := d.Complete(completedBy); err != nil {
+		return err
+	}
+	return s.repo.Save(ctx, d)
+}
+
+func (s *deadlineServiceImpl) ExtendDeadline(ctx context.Context, deadlineID string, extensionDays int) error {
+	d, err := s.repo.FindByID(ctx, deadlineID)
+	if err != nil {
+		return err
+	}
+	if err := d.Extend(extensionDays); err != nil {
+		return err
+	}
+	return s.repo.Save(ctx, d)
+}
+
+func (s *deadlineServiceImpl) GetCalendar(ctx context.Context, ownerID string, from, to time.Time) (*DeadlineCalendar, error) {
+	deadlines, err := s.repo.FindByOwnerID(ctx, ownerID, from, to)
+	if err != nil {
+		return nil, err
+	}
+
+	cal := &DeadlineCalendar{
+		OwnerID:     ownerID,
+		Deadlines:   deadlines,
+		GeneratedAt: time.Now().UTC(),
+	}
+
+	now := time.Now().UTC()
+	weekCutoff := now.AddDate(0, 0, 7)
+	monthCutoff := now.AddDate(0, 0, 30)
+
+	for _, d := range deadlines {
+		if d.IsOverdue(now) {
+			cal.OverdueCount++
+		}
+		switch d.Urgency {
+		case UrgencyCritical:
+			cal.CriticalCount++
+		case UrgencyHigh:
+			cal.HighCount++
+		}
+
+		if !d.IsCompleted {
+			due := d.EffectiveDueDate()
+			if (due.After(now) || due.Equal(now)) && due.Before(weekCutoff) {
+				cal.UpcomingWeek = append(cal.UpcomingWeek, d)
+			}
+			if (due.After(now) || due.Equal(now)) && due.Before(monthCutoff) {
+				cal.UpcomingMonth = append(cal.UpcomingMonth, d)
+			}
+		}
+	}
+
+	// Sort by DueDate ascending
+	sortDeadlines := func(ds []*Deadline) {
+		for i := 0; i < len(ds); i++ {
+			for j := i + 1; j < len(ds); j++ {
+				if ds[i].EffectiveDueDate().After(ds[j].EffectiveDueDate()) {
+					ds[i], ds[j] = ds[j], ds[i]
+				}
+			}
+		}
+	}
+	sortDeadlines(cal.Deadlines)
+	sortDeadlines(cal.UpcomingWeek)
+	sortDeadlines(cal.UpcomingMonth)
+
+	return cal, nil
+}
+
+func (s *deadlineServiceImpl) GetOverdueDeadlines(ctx context.Context, ownerID string) ([]*Deadline, error) {
+	return s.repo.FindOverdue(ctx, ownerID, time.Now().UTC())
+}
+
+func (s *deadlineServiceImpl) GetUpcomingDeadlines(ctx context.Context, ownerID string, withinDays int) ([]*Deadline, error) {
+	return s.repo.FindUpcoming(ctx, ownerID, withinDays)
+}
+
+func (s *deadlineServiceImpl) RefreshUrgencies(ctx context.Context, ownerID string) error {
+	deadlines, err := s.repo.FindUpcoming(ctx, ownerID, 365) // Refresh for next year
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	for _, d := range deadlines {
+		if !d.IsCompleted {
+			newUrgency := d.CalculateUrgency(now)
+			if newUrgency != d.Urgency {
+				d.Urgency = newUrgency
+				d.UpdatedAt = now
+				if err := s.repo.Save(ctx, d); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (s *deadlineServiceImpl) GenerateReminderBatch(ctx context.Context, asOf time.Time) ([]*DeadlineReminder, error) {
+	deadlines, err := s.repo.FindPendingReminders(ctx, asOf)
+	if err != nil {
+		return nil, err
+	}
+
+	var reminders []*DeadlineReminder
+	for _, d := range deadlines {
+		// Matching logic: check if asOf matches any of the ReminderDates
+		match := false
+		asOfDate := time.Date(asOf.Year(), asOf.Month(), asOf.Day(), 0, 0, 0, 0, time.UTC)
+		for _, rd := range d.ReminderDates {
+			rdDate := time.Date(rd.Year(), rd.Month(), rd.Day(), 0, 0, 0, 0, time.UTC)
+			if asOfDate.Equal(rdDate) {
+				match = true
+				break
+			}
+		}
+
+		if match && !d.IsCompleted {
+			reminders = append(reminders, &DeadlineReminder{
+				DeadlineID:   d.ID,
+				PatentID:     d.PatentID,
+				Title:        d.Title,
+				DueDate:      d.EffectiveDueDate(),
+				Urgency:      d.Urgency,
+				DaysUntilDue: d.DaysUntilDue(asOf),
+			})
+		}
+	}
+	return reminders, nil
+}
+
+func (s *deadlineServiceImpl) AddCustomDeadline(ctx context.Context, patentID, title, description string, dueDate time.Time) (*Deadline, error) {
+	d, err := NewDeadline(patentID, DeadlineTypeCustom, title, dueDate)
+	if err != nil {
+		return nil, err
+	}
+	d.Description = description
+	if err := s.repo.Save(ctx, d); err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+// DeadlineReminder represents a reminder to be sent.
+type DeadlineReminder struct {
+	DeadlineID   string          `json:"deadline_id"`
+	PatentID     string          `json:"patent_id"`
+	Title        string          `json:"title"`
+	DueDate      time.Time       `json:"due_date"`
+	Urgency      DeadlineUrgency `json:"urgency"`
+	DaysUntilDue int             `json:"days_until_due"`
+	RecipientIDs []string        `json:"recipient_ids"`
+	ReminderType string          `json:"reminder_type"`
+}
+
+// GenerateDefaultReminderDates creates standard reminder dates.
+func GenerateDefaultReminderDates(dueDate time.Time, asOf time.Time) []time.Time {
+	days := []int{7, 14, 30, 60}
+	var dates []time.Time
+	for _, d := range days {
+		remDate := dueDate.AddDate(0, 0, -d)
+		if remDate.After(asOf) {
+			dates = append(dates, remDate)
+		}
+	}
+	// Sort ascending? The requirement says按时间升序排列.
+	// Since we go 7, 14, 30, 60, adding them results in 60 being earliest.
+	// Wait, dueDate - 60 is earlier than dueDate - 7.
+	// So let's do it in reverse.
+	var sortedDates []time.Time
+	for i := len(days) - 1; i >= 0; i-- {
+		remDate := dueDate.AddDate(0, 0, -days[i])
+		if remDate.After(asOf) || time.Date(remDate.Year(), remDate.Month(), remDate.Day(), 0, 0, 0, 0, time.UTC).Equal(time.Date(asOf.Year(), asOf.Month(), asOf.Day(), 0, 0, 0, 0, time.UTC)) {
+			sortedDates = append(sortedDates, remDate)
+		}
+	}
+	return sortedDates
+}
+
+// CalculateJurisdictionExtension returns the extension rules for a jurisdiction.
+func CalculateJurisdictionExtension(jurisdictionCode string, deadlineType DeadlineType) (bool, int) {
+	switch jurisdictionCode {
+	case "CN":
+		if deadlineType == DeadlineTypeFilingResponse {
+			return true, 60
+		}
+	case "US":
+		if deadlineType == DeadlineTypeFilingResponse {
+			return true, 180
+		}
+	case "EP":
+		if deadlineType == DeadlineTypeFilingResponse {
+			return true, 60
+		}
+	}
+	return false, 0
+}
+
+//Personal.AI order the ending

@@ -1,344 +1,458 @@
-// Package lifecycle implements annuity payment management for patent maintenance fees.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	ptypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AnnuityPayment value object
-// ─────────────────────────────────────────────────────────────────────────────
+// AnnuityStatus defines the status of an annuity payment.
+type AnnuityStatus string
 
-// AnnuityPayment represents a single annual maintenance fee payment obligation.
-// Different jurisdictions have vastly different annuity structures, payment
-// schedules, and penalty regimes.
-type AnnuityPayment struct {
-	// ID uniquely identifies this payment record.
-	ID common.ID `json:"id"`
+const (
+	AnnuityStatusPending     AnnuityStatus = "Pending"
+	AnnuityStatusPaid        AnnuityStatus = "Paid"
+	AnnuityStatusOverdue     AnnuityStatus = "Overdue"
+	AnnuityStatusGracePeriod AnnuityStatus = "GracePeriod"
+	AnnuityStatusAbandoned   AnnuityStatus = "Abandoned"
+)
 
-	// Year indicates which year of the patent term this payment covers.
-	// For CN patents, year 1 is counted from filing date; for US patents,
-	// maintenance fees are due at years 3.5, 7.5, and 11.5.
-	Year int `json:"year"`
-
-	// DueDate is the statutory deadline for payment (before grace period).
-	DueDate time.Time `json:"due_date"`
-
-	// Amount is the base payment amount in the specified currency.
-	Amount float64 `json:"amount"`
-
-	// Currency is the ISO 4217 currency code (CNY, USD, EUR, JPY, etc.).
-	Currency string `json:"currency"`
-
-	// Paid indicates whether the payment has been made.
-	Paid bool `json:"paid"`
-
-	// PaidAt is the timestamp when the payment was recorded.
-	PaidAt *time.Time `json:"paid_at,omitempty"`
-
-	// PaidAmount is the actual amount paid (may include surcharge if late).
-	PaidAmount *float64 `json:"paid_amount,omitempty"`
-
-	// GracePeriodEnd is the last date to pay with a surcharge (if applicable).
-	// After this date, the patent may lapse or require petition for revival.
-	GracePeriodEnd *time.Time `json:"grace_period_end,omitempty"`
-
-	// SurchargeRate is the penalty rate applied for late payment during grace period.
-	// For example, 0.25 means 25% surcharge.
-	SurchargeRate float64 `json:"surcharge_rate"`
+// Money is a value object representing an amount of money in a specific currency.
+type Money struct {
+	Amount   int64  `json:"amount"`   // Amount in smallest currency unit (e.g., cents)
+	Currency string `json:"currency"` // ISO 4217 currency code
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Factory function
-// ─────────────────────────────────────────────────────────────────────────────
+// NewMoney creates a new Money value object.
+func NewMoney(amount int64, currency string) Money {
+	return Money{
+		Amount:   amount,
+		Currency: currency,
+	}
+}
 
-// NewAnnuityPayment creates a new AnnuityPayment with validation.
-//
-// Business rules:
-//   - Year must be positive
-//   - DueDate must not be zero
-//   - Amount must be non-negative
-//   - Currency must not be empty
-func NewAnnuityPayment(year int, dueDate time.Time, amount float64, currency string) (*AnnuityPayment, error) {
-	if year < 1 {
-		return nil, errors.InvalidParam("year must be positive")
-	}
-	if dueDate.IsZero() {
-		return nil, errors.InvalidParam("due_date must not be zero")
-	}
-	if amount < 0 {
-		return nil, errors.InvalidParam("amount must be non-negative")
-	}
-	if currency == "" {
-		return nil, errors.InvalidParam("currency must not be empty")
-	}
+// ToFloat64 converts the money amount to a float64 (major currency unit).
+func (m Money) ToFloat64() float64 {
+	return float64(m.Amount) / 100.0
+}
 
-	return &AnnuityPayment{
-		ID:            common.NewID(),
-		Year:          year,
-		DueDate:       dueDate,
-		Amount:        amount,
-		Currency:      currency,
-		Paid:          false,
-		SurchargeRate: 0,
+// Add adds another Money object to this one, provided they have the same currency.
+func (m Money) Add(other Money) (Money, error) {
+	if m.Currency != other.Currency {
+		return Money{}, errors.InvalidParam("cannot add money with different currencies")
+	}
+	return Money{
+		Amount:   m.Amount + other.Amount,
+		Currency: m.Currency,
 	}, nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Query methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-// IsOverdue returns true if the due date has passed and payment has not been made.
-func (a *AnnuityPayment) IsOverdue() bool {
-	if a.Paid {
-		return false
+// Validate ensures the money object is valid.
+func (m Money) Validate() error {
+	if m.Amount < 0 {
+		return errors.InvalidParam("money amount cannot be negative")
 	}
-	now := time.Now().UTC()
-	return now.After(a.DueDate)
-}
-
-// IsInGracePeriod returns true if the payment is overdue but still within the
-// grace period (if one exists).
-func (a *AnnuityPayment) IsInGracePeriod() bool {
-	if a.Paid || a.GracePeriodEnd == nil {
-		return false
+	if m.Currency == "" {
+		return errors.InvalidParam("currency code cannot be empty")
 	}
-	now := time.Now().UTC()
-	return now.After(a.DueDate) && now.Before(*a.GracePeriodEnd)
-}
-
-// CalculateSurcharge computes the late payment penalty if the payment is made
-// during the grace period.
-func (a *AnnuityPayment) CalculateSurcharge() float64 {
-	if !a.IsInGracePeriod() {
-		return 0
-	}
-	return a.Amount * a.SurchargeRate
-}
-
-// TotalDue returns the total amount due including surcharge if applicable.
-func (a *AnnuityPayment) TotalDue() float64 {
-	return a.Amount + a.CalculateSurcharge()
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Command methods
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Pay records a payment for this annuity.
-//
-// Business rules:
-//   - Amount must be >= TotalDue()
-//   - Cannot pay an already paid annuity
-func (a *AnnuityPayment) Pay(amount float64) error {
-	if a.Paid {
-		return errors.InvalidState("annuity payment has already been recorded")
-	}
-
-	totalDue := a.TotalDue()
-	if amount < totalDue {
-		return errors.InvalidParam(
-			fmt.Sprintf("insufficient payment: %.2f %s required, %.2f %s provided",
-				totalDue, a.Currency, amount, a.Currency),
-		)
-	}
-
-	now := time.Now().UTC()
-	a.Paid = true
-	a.PaidAt = &now
-	a.PaidAmount = &amount
-
 	return nil
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Schedule generation
-// ─────────────────────────────────────────────────────────────────────────────
+// AnnuityRecord represents a single annuity payment record.
+type AnnuityRecord struct {
+	ID               string        `json:"id"`
+	PatentID         string        `json:"patent_id"`
+	JurisdictionCode string        `json:"jurisdiction_code"`
+	YearNumber       int           `json:"year_number"`
+	DueDate          time.Time     `json:"due_date"`
+	GraceDeadline    time.Time     `json:"grace_deadline"`
+	Amount           Money         `json:"amount"`
+	PaidAmount       *Money        `json:"paid_amount,omitempty"`
+	PaidDate         *time.Time    `json:"paid_date,omitempty"`
+	Status           AnnuityStatus `json:"status"`
+	Currency         string        `json:"currency"`
+	Notes            string        `json:"notes"`
+	CreatedAt        time.Time     `json:"created_at"`
+	UpdatedAt        time.Time     `json:"updated_at"`
+}
 
-// GenerateAnnuitySchedule creates the complete annuity payment schedule for a
-// patent based on its jurisdiction.
-//
-// Jurisdiction-specific rules:
-//   - CN: Years 3-20 (18 payments), due on anniversary of filing, 6-month grace period
-//   - US: Years 3.5, 7.5, 11.5 (3 "maintenance fees"), 6-month grace period
-//   - EP: Years 3-20 (18 payments), due on anniversary of filing, 6-month grace period
-//   - JP: Years 1-20 (20 payments), due on anniversary of filing
-//   - KR: Years 1-20 (20 payments), due on anniversary of filing
-//
-// Amount calculations are simplified here; in production, these should come
-// from an official fee schedule database.
-func GenerateAnnuitySchedule(
-	jurisdiction ptypes.JurisdictionCode,
-	filingDate time.Time,
-	grantDate *time.Time,
-) ([]AnnuityPayment, error) {
-	rules, err := GetJurisdictionRules(jurisdiction)
-	if err != nil {
-		return nil, err
+// AnnuitySchedule represents a collection of annuity records for a patent.
+type AnnuitySchedule struct {
+	PatentID           string           `json:"patent_id"`
+	JurisdictionCode   string           `json:"jurisdiction_code"`
+	Records            []*AnnuityRecord `json:"records"`
+	TotalEstimatedCost Money            `json:"total_estimated_cost"`
+	NextDueRecord      *AnnuityRecord   `json:"next_due_record"`
+	GeneratedAt        time.Time        `json:"generated_at"`
+}
+
+// AnnuityCostForecast represents a forecast of annuity costs for a portfolio.
+type AnnuityCostForecast struct {
+	PortfolioID        string           `json:"portfolio_id"`
+	ForecastYears      int              `json:"forecast_years"`
+	YearlyCosts        map[int]Money    `json:"yearly_costs"`
+	TotalForecastCost  Money            `json:"total_forecast_cost"`
+	CostByJurisdiction map[string]Money `json:"cost_by_jurisdiction"`
+	CostByPatent       map[string]Money `json:"cost_by_patent"`
+	GeneratedAt        time.Time        `json:"generated_at"`
+}
+
+// AnnuityService defines the domain service for managing annuities.
+type AnnuityService interface {
+	GenerateSchedule(ctx context.Context, patentID, jurisdictionCode string, filingDate time.Time, maxYears int) (*AnnuitySchedule, error)
+	CalculateAnnuityFee(ctx context.Context, jurisdictionCode string, yearNumber int) (Money, error)
+	MarkAsPaid(ctx context.Context, recordID string, paidAmount Money, paidDate time.Time) error
+	MarkAsAbandoned(ctx context.Context, recordID string, reason string) error
+	CheckOverdue(ctx context.Context, asOfDate time.Time) ([]*AnnuityRecord, error)
+	ForecastCosts(ctx context.Context, portfolioID string, years int) (*AnnuityCostForecast, error)
+	GetUpcomingPayments(ctx context.Context, portfolioID string, withinDays int) ([]*AnnuityRecord, error)
+}
+
+type annuityServiceImpl struct {
+	annuityRepo   AnnuityRepository
+	portfolioRepo portfolio.PortfolioRepository
+}
+
+// NewAnnuityService creates a new AnnuityService.
+func NewAnnuityService(annuityRepo AnnuityRepository, portfolioRepo portfolio.PortfolioRepository) AnnuityService {
+	return &annuityServiceImpl{
+		annuityRepo:   annuityRepo,
+		portfolioRepo: portfolioRepo,
+	}
+}
+
+func (s *annuityServiceImpl) GenerateSchedule(ctx context.Context, patentID, jurisdictionCode string, filingDate time.Time, maxYears int) (*AnnuitySchedule, error) {
+	var records []*AnnuityRecord
+	var totalAmount int64
+	var currency string
+
+	switch jurisdictionCode {
+	case "CN":
+		currency = "CNY"
+		for y := 3; y <= 20 && y <= maxYears; y++ {
+			fee, _ := s.CalculateAnnuityFee(ctx, "CN", y)
+			dueDate := filingDate.AddDate(y, 0, 0)
+			graceDeadline := dueDate.AddDate(0, 6, 0)
+			record := &AnnuityRecord{
+				ID:               uuid.New().String(),
+				PatentID:         patentID,
+				JurisdictionCode: "CN",
+				YearNumber:       y,
+				DueDate:          dueDate,
+				GraceDeadline:    graceDeadline,
+				Amount:           fee,
+				Status:           AnnuityStatusPending,
+				Currency:         currency,
+				CreatedAt:        time.Now().UTC(),
+				UpdatedAt:        time.Now().UTC(),
+			}
+			records = append(records, record)
+			totalAmount += fee.Amount
+		}
+	case "US":
+		currency = "USD"
+		milestones := []struct {
+			year float64
+			val  int
+		}{
+			{3.5, 4},
+			{7.5, 8},
+			{11.5, 12},
+		}
+		for _, m := range milestones {
+			if int(m.year) > maxYears {
+				continue
+			}
+			fee, _ := s.CalculateAnnuityFee(ctx, "US", m.val)
+			months := int(m.year * 12)
+			dueDate := filingDate.AddDate(0, months, 0)
+			graceDeadline := dueDate.AddDate(0, 6, 0)
+			record := &AnnuityRecord{
+				ID:               uuid.New().String(),
+				PatentID:         patentID,
+				JurisdictionCode: "US",
+				YearNumber:       m.val,
+				DueDate:          dueDate,
+				GraceDeadline:    graceDeadline,
+				Amount:           fee,
+				Status:           AnnuityStatusPending,
+				Currency:         currency,
+				CreatedAt:        time.Now().UTC(),
+				UpdatedAt:        time.Now().UTC(),
+			}
+			records = append(records, record)
+			totalAmount += fee.Amount
+		}
+	case "EP":
+		currency = "EUR"
+		for y := 3; y <= 20 && y <= maxYears; y++ {
+			fee, _ := s.CalculateAnnuityFee(ctx, "EP", y)
+			dueDate := filingDate.AddDate(y, 0, 0)
+			graceDeadline := dueDate.AddDate(0, 6, 0)
+			record := &AnnuityRecord{
+				ID:               uuid.New().String(),
+				PatentID:         patentID,
+				JurisdictionCode: "EP",
+				YearNumber:       y,
+				DueDate:          dueDate,
+				GraceDeadline:    graceDeadline,
+				Amount:           fee,
+				Status:           AnnuityStatusPending,
+				Currency:         currency,
+				CreatedAt:        time.Now().UTC(),
+				UpdatedAt:        time.Now().UTC(),
+			}
+			records = append(records, record)
+			totalAmount += fee.Amount
+		}
+	case "JP":
+		currency = "JPY"
+		for y := 1; y <= 20 && y <= maxYears; y++ {
+			fee, _ := s.CalculateAnnuityFee(ctx, "JP", y)
+			dueDate := filingDate.AddDate(y, 0, 0)
+			graceDeadline := dueDate.AddDate(0, 6, 0)
+			record := &AnnuityRecord{
+				ID:               uuid.New().String(),
+				PatentID:         patentID,
+				JurisdictionCode: "JP",
+				YearNumber:       y,
+				DueDate:          dueDate,
+				GraceDeadline:    graceDeadline,
+				Amount:           fee,
+				Status:           AnnuityStatusPending,
+				Currency:         currency,
+				CreatedAt:        time.Now().UTC(),
+				UpdatedAt:        time.Now().UTC(),
+			}
+			records = append(records, record)
+			totalAmount += fee.Amount
+		}
+	default:
+		return nil, errors.InvalidParam(fmt.Sprintf("unsupported jurisdiction: %s", jurisdictionCode))
 	}
 
-	var schedule []AnnuityPayment
+	schedule := &AnnuitySchedule{
+		PatentID:           patentID,
+		JurisdictionCode:   jurisdictionCode,
+		Records:            records,
+		TotalEstimatedCost: NewMoney(totalAmount, currency),
+		GeneratedAt:        time.Now().UTC(),
+	}
 
-	switch jurisdiction {
-	case ptypes.JurisdictionCN:
-		schedule = generateCNSchedule(filingDate, rules)
-	case ptypes.JurisdictionUS:
-		schedule = generateUSSchedule(filingDate, grantDate, rules)
-	case ptypes.JurisdictionEP:
-		schedule = generateEPSchedule(filingDate, rules)
-	case ptypes.JurisdictionJP:
-		schedule = generateJPSchedule(filingDate, rules)
-	case ptypes.JurisdictionKR:
-		schedule = generateKRSchedule(filingDate, rules)
-	default:
-		return nil, errors.InvalidParam(fmt.Sprintf("unsupported jurisdiction: %s", jurisdiction))
+	if len(records) > 0 {
+		schedule.NextDueRecord = records[0]
 	}
 
 	return schedule, nil
 }
 
-// generateCNSchedule creates annuity schedule for Chinese patents (years 3-20).
-func generateCNSchedule(filingDate time.Time, rules *JurisdictionRules) []AnnuityPayment {
-	var schedule []AnnuityPayment
-
-	for year := rules.AnnuityStartYear; year <= rules.PatentTermYears; year++ {
-		dueDate := filingDate.AddDate(year, 0, 0)
-		gracePeriodEnd := dueDate.AddDate(0, rules.GracePeriodMonths, 0)
-
-		// Simplified fee structure (actual fees increase with year).
-		amount := float64(900 + (year-3)*200)
-
-		ap := AnnuityPayment{
-			ID:              common.NewID(),
-			Year:            year,
-			DueDate:         dueDate,
-			Amount:          amount,
-			Currency:        "CNY",
-			Paid:            false,
-			GracePeriodEnd:  &gracePeriodEnd,
-			SurchargeRate:   rules.SurchargeRate,
+func (s *annuityServiceImpl) CalculateAnnuityFee(ctx context.Context, jurisdictionCode string, yearNumber int) (Money, error) {
+	switch jurisdictionCode {
+	case "CN":
+		var amount int64
+		switch {
+		case yearNumber >= 3 && yearNumber <= 6:
+			amount = 90000
+		case yearNumber >= 7 && yearNumber <= 9:
+			amount = 120000
+		case yearNumber >= 10 && yearNumber <= 12:
+			amount = 200000
+		case yearNumber >= 13 && yearNumber <= 15:
+			amount = 400000
+		case yearNumber >= 16 && yearNumber <= 20:
+			amount = 600000
+		default:
+			return Money{}, errors.InvalidParam("invalid year for CN annuity")
 		}
-		schedule = append(schedule, ap)
+		return NewMoney(amount, "CNY"), nil
+	case "US":
+		var amount int64
+		switch yearNumber {
+		case 4: // 3.5 years
+			amount = 160000
+		case 8: // 7.5 years
+			amount = 360000
+		case 12: // 11.5 years
+			amount = 740000
+		default:
+			return Money{}, errors.InvalidParam("invalid year for US maintenance fee")
+		}
+		return NewMoney(amount, "USD"), nil
+	case "EP":
+		if yearNumber < 3 || yearNumber > 20 {
+			return Money{}, errors.InvalidParam("invalid year for EP annuity")
+		}
+		amount := int64(47000 + (yearNumber-3)*7500) // approx 50-100 increase
+		return NewMoney(amount, "EUR"), nil
+	case "JP":
+		if yearNumber < 1 || yearNumber > 20 {
+			return Money{}, errors.InvalidParam("invalid year for JP annuity")
+		}
+		// JP: 6600 + claims * 500 (simplified to 10000 + year * 2000)
+		amount := int64(1000000 + int64(yearNumber)*200000)
+		return NewMoney(amount, "JPY"), nil
 	}
-
-	return schedule
+	return Money{}, errors.InvalidParam(fmt.Sprintf("unsupported jurisdiction: %s", jurisdictionCode))
 }
 
-// generateUSSchedule creates maintenance fee schedule for US patents (milestone-based).
-func generateUSSchedule(filingDate time.Time, grantDate *time.Time, rules *JurisdictionRules) []AnnuityPayment {
-	var schedule []AnnuityPayment
-
-	// US maintenance fees are due at 3.5, 7.5, and 11.5 years from grant date.
-	// If grant date is nil, use filing date as fallback (should not happen in practice).
-	baseDate := filingDate
-	if grantDate != nil {
-		baseDate = *grantDate
+func (s *annuityServiceImpl) MarkAsPaid(ctx context.Context, recordID string, paidAmount Money, paidDate time.Time) error {
+	record, err := s.annuityRepo.FindByID(ctx, recordID)
+	if err != nil {
+		return err
+	}
+	if record.Status == AnnuityStatusPaid {
+		return errors.InvalidState("annuity already paid")
+	}
+	if record.Status == AnnuityStatusAbandoned {
+		return errors.InvalidState("cannot pay an abandoned annuity")
 	}
 
-	milestones := []struct {
-		year   float64
-		amount float64
-	}{
-		{3.5, 1600},
-		{7.5, 3600},
-		{11.5, 7400},
-	}
+	record.Status = AnnuityStatusPaid
+	record.PaidAmount = &paidAmount
+	record.PaidDate = &paidDate
+	record.UpdatedAt = time.Now().UTC()
 
-	for _, m := range milestones {
-		years := int(m.year)
-		months := int((m.year - float64(years)) * 12)
-		dueDate := baseDate.AddDate(years, months, 0)
-		gracePeriodEnd := dueDate.AddDate(0, rules.GracePeriodMonths, 0)
-
-		ap := AnnuityPayment{
-			ID:             common.NewID(),
-			Year:           int(m.year * 2), // Store as integer (7, 15, 23 for display convenience)
-			DueDate:        dueDate,
-			Amount:         m.amount,
-			Currency:       "USD",
-			Paid:           false,
-			GracePeriodEnd: &gracePeriodEnd,
-			SurchargeRate:  rules.SurchargeRate,
-		}
-		schedule = append(schedule, ap)
-	}
-
-	return schedule
+	return s.annuityRepo.Save(ctx, record)
 }
 
-// generateEPSchedule creates annuity schedule for European patents (years 3-20).
-func generateEPSchedule(filingDate time.Time, rules *JurisdictionRules) []AnnuityPayment {
-	var schedule []AnnuityPayment
-
-	for year := rules.AnnuityStartYear; year <= rules.PatentTermYears; year++ {
-		dueDate := filingDate.AddDate(year, 0, 0)
-		gracePeriodEnd := dueDate.AddDate(0, rules.GracePeriodMonths, 0)
-
-		// Simplified fee structure (actual fees vary and increase with year).
-		amount := float64(465 + (year-3)*50)
-
-		ap := AnnuityPayment{
-			ID:             common.NewID(),
-			Year:           year,
-			DueDate:        dueDate,
-			Amount:         amount,
-			Currency:       "EUR",
-			Paid:           false,
-			GracePeriodEnd: &gracePeriodEnd,
-			SurchargeRate:  rules.SurchargeRate,
-		}
-		schedule = append(schedule, ap)
+func (s *annuityServiceImpl) MarkAsAbandoned(ctx context.Context, recordID string, reason string) error {
+	record, err := s.annuityRepo.FindByID(ctx, recordID)
+	if err != nil {
+		return err
 	}
-
-	return schedule
+	record.Status = AnnuityStatusAbandoned
+	record.Notes = reason
+	record.UpdatedAt = time.Now().UTC()
+	return s.annuityRepo.Save(ctx, record)
 }
 
-// generateJPSchedule creates annuity schedule for Japanese patents (years 1-20).
-func generateJPSchedule(filingDate time.Time, rules *JurisdictionRules) []AnnuityPayment {
-	var schedule []AnnuityPayment
-
-	for year := 1; year <= rules.PatentTermYears; year++ {
-		dueDate := filingDate.AddDate(year, 0, 0)
-		amount := float64(4300 + year*300)
-
-		ap := AnnuityPayment{
-			ID:       common.NewID(),
-			Year:     year,
-			DueDate:  dueDate,
-			Amount:   amount,
-			Currency: "JPY",
-			Paid:     false,
-		}
-		schedule = append(schedule, ap)
+func (s *annuityServiceImpl) CheckOverdue(ctx context.Context, asOfDate time.Time) ([]*AnnuityRecord, error) {
+	records, err := s.annuityRepo.FindPending(ctx, asOfDate)
+	if err != nil {
+		return nil, err
 	}
 
-	return schedule
+	var changed []*AnnuityRecord
+	for _, r := range records {
+		originalStatus := r.Status
+		if asOfDate.After(r.GraceDeadline) {
+			r.Status = AnnuityStatusOverdue
+		} else if asOfDate.After(r.DueDate) {
+			r.Status = AnnuityStatusGracePeriod
+		}
+
+		if r.Status != originalStatus {
+			r.UpdatedAt = time.Now().UTC()
+			if err := s.annuityRepo.Save(ctx, r); err != nil {
+				return nil, err
+			}
+			changed = append(changed, r)
+		}
+	}
+	return changed, nil
 }
 
-// generateKRSchedule creates annuity schedule for Korean patents (years 1-20).
-func generateKRSchedule(filingDate time.Time, rules *JurisdictionRules) []AnnuityPayment {
-	var schedule []AnnuityPayment
-
-	for year := 1; year <= rules.PatentTermYears; year++ {
-		dueDate := filingDate.AddDate(year, 0, 0)
-		amount := float64(45000 + year*5000)
-
-		ap := AnnuityPayment{
-			ID:       common.NewID(),
-			Year:     year,
-			DueDate:  dueDate,
-			Amount:   amount,
-			Currency: "KRW",
-			Paid:     false,
-		}
-		schedule = append(schedule, ap)
+func (s *annuityServiceImpl) ForecastCosts(ctx context.Context, portfolioID string, years int) (*AnnuityCostForecast, error) {
+	p, err := s.portfolioRepo.FindByID(ctx, portfolioID)
+	if err != nil {
+		return nil, err
 	}
 
-	return schedule
+	forecast := &AnnuityCostForecast{
+		PortfolioID:        portfolioID,
+		ForecastYears:      years,
+		YearlyCosts:        make(map[int]Money),
+		CostByJurisdiction: make(map[string]Money),
+		CostByPatent:       make(map[string]Money),
+		GeneratedAt:        time.Now().UTC(),
+	}
+
+	now := time.Now().UTC()
+	end := now.AddDate(years, 0, 0)
+
+	var totalAmount int64
+	var commonCurrency string
+
+	for _, patentID := range p.PatentIDs {
+		records, err := s.annuityRepo.FindByPatentID(ctx, patentID)
+		if err != nil {
+			continue
+		}
+
+		var patentTotal int64
+		var patentCurrency string
+
+		for _, r := range records {
+			if r.Status == AnnuityStatusPending || r.Status == AnnuityStatusGracePeriod {
+				if r.DueDate.After(now) && r.DueDate.Before(end) {
+					year := r.DueDate.Year()
+
+					// Update yearly costs
+					yc := forecast.YearlyCosts[year]
+					if yc.Currency == "" {
+						yc.Currency = r.Currency
+					}
+					if yc.Currency == r.Currency {
+						yc.Amount += r.Amount.Amount
+						forecast.YearlyCosts[year] = yc
+					}
+
+					// Update jurisdiction costs
+					jc := forecast.CostByJurisdiction[r.JurisdictionCode]
+					if jc.Currency == "" {
+						jc.Currency = r.Currency
+					}
+					if jc.Currency == r.Currency {
+						jc.Amount += r.Amount.Amount
+						forecast.CostByJurisdiction[r.JurisdictionCode] = jc
+					}
+
+					patentTotal += r.Amount.Amount
+					patentCurrency = r.Currency
+
+					if commonCurrency == "" {
+						commonCurrency = r.Currency
+					}
+					if commonCurrency == r.Currency {
+						totalAmount += r.Amount.Amount
+					}
+				}
+			}
+		}
+		forecast.CostByPatent[patentID] = NewMoney(patentTotal, patentCurrency)
+	}
+
+	forecast.TotalForecastCost = NewMoney(totalAmount, commonCurrency)
+	return forecast, nil
 }
 
+func (s *annuityServiceImpl) GetUpcomingPayments(ctx context.Context, portfolioID string, withinDays int) ([]*AnnuityRecord, error) {
+	p, err := s.portfolioRepo.FindByID(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	cutoff := now.AddDate(0, 0, withinDays)
+
+	var upcoming []*AnnuityRecord
+	for _, patentID := range p.PatentIDs {
+		records, err := s.annuityRepo.FindByPatentID(ctx, patentID)
+		if err != nil {
+			continue
+		}
+		for _, r := range records {
+			if (r.Status == AnnuityStatusPending || r.Status == AnnuityStatusGracePeriod) &&
+				r.DueDate.After(now) && r.DueDate.Before(cutoff) {
+				upcoming = append(upcoming, r)
+			}
+		}
+	}
+	return upcoming, nil
+}
+
+//Personal.AI order the ending

@@ -1,374 +1,169 @@
-// Package lifecycle_test provides unit tests for the Deadline value object.
-package lifecycle_test
+package lifecycle
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
+	"github.com/stretchr/testify/mock"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNewDeadline
-// ─────────────────────────────────────────────────────────────────────────────
+type mockDeadlineRepository struct {
+	mock.Mock
+}
 
-func TestNewDeadline_ValidParams(t *testing.T) {
-	t.Parallel()
+func (m *mockDeadlineRepository) Save(ctx context.Context, deadline *Deadline) error {
+	args := m.Called(ctx, deadline)
+	return args.Error(0)
+}
 
-	dueDate := time.Now().UTC().AddDate(0, 0, 30)
-	d, err := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		dueDate,
-		lifecycle.PriorityHigh,
-		"Respond to office action",
-	)
+func (m *mockDeadlineRepository) FindByID(ctx context.Context, id string) (*Deadline, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*Deadline), args.Error(1)
+}
 
-	require.NoError(t, err)
-	require.NotNil(t, d)
+func (m *mockDeadlineRepository) FindByPatentID(ctx context.Context, patentID string) ([]*Deadline, error) {
+	args := m.Called(ctx, patentID)
+	return args.Get(0).([]*Deadline), args.Error(1)
+}
+
+func (m *mockDeadlineRepository) FindByOwnerID(ctx context.Context, ownerID string, from, to time.Time) ([]*Deadline, error) {
+	args := m.Called(ctx, ownerID, from, to)
+	return args.Get(0).([]*Deadline), args.Error(1)
+}
+
+func (m *mockDeadlineRepository) FindOverdue(ctx context.Context, ownerID string, asOf time.Time) ([]*Deadline, error) {
+	args := m.Called(ctx, ownerID, asOf)
+	return args.Get(0).([]*Deadline), args.Error(1)
+}
+
+func (m *mockDeadlineRepository) FindUpcoming(ctx context.Context, ownerID string, withinDays int) ([]*Deadline, error) {
+	args := m.Called(ctx, ownerID, withinDays)
+	return args.Get(0).([]*Deadline), args.Error(1)
+}
+
+func (m *mockDeadlineRepository) FindByType(ctx context.Context, deadlineType DeadlineType) ([]*Deadline, error) {
+	args := m.Called(ctx, deadlineType)
+	return args.Get(0).([]*Deadline), args.Error(1)
+}
+
+func (m *mockDeadlineRepository) FindPendingReminders(ctx context.Context, reminderDate time.Time) ([]*Deadline, error) {
+	args := m.Called(ctx, reminderDate)
+	return args.Get(0).([]*Deadline), args.Error(1)
+}
+
+func (m *mockDeadlineRepository) Delete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *mockDeadlineRepository) CountByUrgency(ctx context.Context, ownerID string) (map[DeadlineUrgency]int64, error) {
+	args := m.Called(ctx, ownerID)
+	return args.Get(0).(map[DeadlineUrgency]int64), args.Error(1)
+}
+
+func TestNewDeadline_Success(t *testing.T) {
+	now := time.Now().UTC()
+	dueDate := now.AddDate(0, 0, 30)
+	d, err := NewDeadline("pat1", DeadlineTypeFilingResponse, "OA Response", dueDate)
+	assert.NoError(t, err)
 	assert.NotEmpty(t, d.ID)
-	assert.Equal(t, lifecycle.DeadlineOAResponse, d.Type)
-	assert.Equal(t, dueDate, d.DueDate)
-	assert.Equal(t, lifecycle.PriorityHigh, d.Priority)
-	assert.Equal(t, "Respond to office action", d.Description)
-	assert.False(t, d.Completed)
-	assert.Nil(t, d.CompletedAt)
-	assert.Equal(t, []int{30, 14, 7, 1}, d.ReminderDays)
-	assert.False(t, d.ExtensionAvailable)
-	assert.Equal(t, 0, d.MaxExtensionDays)
+	assert.Equal(t, UrgencyHigh, d.Urgency)
+	assert.NotEmpty(t, d.ReminderDates)
 }
 
-func TestNewDeadline_ZeroDueDate(t *testing.T) {
-	t.Parallel()
-
-	_, err := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Time{},
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "due_date")
+func TestNewDeadline_PastDueDate(t *testing.T) {
+	now := time.Now().UTC()
+	dueDate := now.AddDate(0, 0, -1)
+	_, err := NewDeadline("pat1", DeadlineTypeFilingResponse, "OA Response", dueDate)
+	assert.Error(t, err)
 }
 
-func TestNewDeadline_EmptyDescription(t *testing.T) {
-	t.Parallel()
+func TestDeadline_CalculateUrgency(t *testing.T) {
+	now := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
 
-	_, err := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 30),
-		lifecycle.PriorityHigh,
-		"",
-	)
+	d1 := &Deadline{DueDate: now.AddDate(0, 0, 5)}
+	assert.Equal(t, UrgencyCritical, d1.CalculateUrgency(now))
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "description")
+	d2 := &Deadline{DueDate: now.AddDate(0, 0, 20)}
+	assert.Equal(t, UrgencyHigh, d2.CalculateUrgency(now))
+
+	d3 := &Deadline{DueDate: now.AddDate(0, 0, 60)}
+	assert.Equal(t, UrgencyMedium, d3.CalculateUrgency(now))
+
+	d4 := &Deadline{DueDate: now.AddDate(0, 0, 120)}
+	assert.Equal(t, UrgencyLow, d4.CalculateUrgency(now))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestIsOverdue
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestIsOverdue_PastDateNotCompleted(t *testing.T) {
-	t.Parallel()
-
-	// Due yesterday
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, -1),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-
-	assert.True(t, d.IsOverdue(), "past due date should be overdue")
-}
-
-func TestIsOverdue_FutureDate(t *testing.T) {
-	t.Parallel()
-
-	// Due tomorrow
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 1),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-
-	assert.False(t, d.IsOverdue(), "future due date should not be overdue")
-}
-
-func TestIsOverdue_CompletedDeadline(t *testing.T) {
-	t.Parallel()
-
-	// Due yesterday but completed
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, -1),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-	d.Complete()
-
-	assert.False(t, d.IsOverdue(), "completed deadline should not be overdue")
-}
-
-func TestIsOverdue_WithExtension(t *testing.T) {
-	t.Parallel()
-
-	// Due yesterday
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, -1),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-	d.ExtensionAvailable = true
-	d.MaxExtensionDays = 30
-
-	// Extend by 10 days
-	err := d.Extend(10)
-	require.NoError(t, err)
-
-	// Now should not be overdue (extended to 9 days from now)
-	assert.False(t, d.IsOverdue())
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestDaysUntilDue
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestDaysUntilDue_FutureDate(t *testing.T) {
-	t.Parallel()
-
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 10),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-
-	days := d.DaysUntilDue()
-	assert.InDelta(t, 10, days, 1, "should be approximately 10 days until due")
-}
-
-func TestDaysUntilDue_PastDate(t *testing.T) {
-	t.Parallel()
-
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, -5),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-
-	days := d.DaysUntilDue()
-	assert.Less(t, days, 0, "past due date should return negative days")
-}
-
-func TestDaysUntilDue_Today(t *testing.T) {
-	t.Parallel()
-
-	// Due in approximately 1 hour
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().Add(1*time.Hour),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-
-	days := d.DaysUntilDue()
-	assert.Equal(t, 0, days, "deadline today should return 0 days")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestComplete
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestComplete_MarksAsCompleted(t *testing.T) {
-	t.Parallel()
-
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 10),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-
-	assert.False(t, d.Completed)
-	assert.Nil(t, d.CompletedAt)
-
-	d.Complete()
-
-	assert.True(t, d.Completed)
+func TestDeadline_Complete_Success(t *testing.T) {
+	d := &Deadline{IsCompleted: false}
+	err := d.Complete("user1")
+	assert.NoError(t, err)
+	assert.True(t, d.IsCompleted)
 	assert.NotNil(t, d.CompletedAt)
+	assert.Equal(t, "user1", d.CompletedBy)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestExtend
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestExtend_Success(t *testing.T) {
-	t.Parallel()
-
-	dueDate := time.Now().UTC().AddDate(0, 0, 30)
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		dueDate,
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-	d.ExtensionAvailable = true
-	d.MaxExtensionDays = 60
-
+func TestDeadline_Extend_Success(t *testing.T) {
+	now := time.Now().UTC()
+	d := &Deadline{
+		DueDate:            now.AddDate(0, 0, 30),
+		ExtensionAvailable: true,
+		MaxExtensionDays:   60,
+	}
 	err := d.Extend(30)
-	require.NoError(t, err)
-	require.NotNil(t, d.ExtendedTo)
-	assert.Equal(t, dueDate.AddDate(0, 0, 30), *d.ExtendedTo)
+	assert.NoError(t, err)
+	assert.NotNil(t, d.ExtendedDueDate)
+	assert.Equal(t, d.DueDate.AddDate(0, 0, 30), *d.ExtendedDueDate)
 }
 
-func TestExtend_NotAvailable(t *testing.T) {
-	t.Parallel()
+func TestDeadline_IsOverdue(t *testing.T) {
+	now := time.Now().UTC()
+	d := &Deadline{DueDate: now.AddDate(0, 0, -5)}
+	assert.True(t, d.IsOverdue(now))
 
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 30),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-	d.ExtensionAvailable = false
-
-	err := d.Extend(10)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not available")
+	d.IsCompleted = true
+	assert.False(t, d.IsOverdue(now))
 }
 
-func TestExtend_ExceedsMaxDays(t *testing.T) {
-	t.Parallel()
+func TestGenerateDefaultReminderDates(t *testing.T) {
+	now := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
+	dueDate := now.AddDate(0, 0, 45) // 45 days in future
 
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 30),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-	d.ExtensionAvailable = true
-	d.MaxExtensionDays = 30
-
-	err := d.Extend(60)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "exceed maximum")
+	reminders := GenerateDefaultReminderDates(dueDate, now)
+	// Reminders are at 7, 14, 30, 60 days before.
+	// 45 - 60 = -15 (past)
+	// 45 - 30 = 15 (future)
+	// 45 - 14 = 31 (future)
+	// 45 - 7 = 38 (future)
+	// Should have 3 reminders.
+	assert.Equal(t, 3, len(reminders))
 }
 
-func TestExtend_CompletedDeadline(t *testing.T) {
-	t.Parallel()
-
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 30),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-	d.ExtensionAvailable = true
-	d.MaxExtensionDays = 30
-	d.Complete()
-
-	err := d.Extend(10)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "completed")
+func TestCalculateJurisdictionExtension(t *testing.T) {
+	avail, days := CalculateJurisdictionExtension("CN", DeadlineTypeFilingResponse)
+	assert.True(t, avail)
+	assert.Equal(t, 60, days)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestShouldRemind
-// ─────────────────────────────────────────────────────────────────────────────
+func TestGetCalendar_Success(t *testing.T) {
+	repo := new(mockDeadlineRepository)
+	s := NewDeadlineService(repo)
 
-func TestShouldRemind_OnReminderDay(t *testing.T) {
-	t.Parallel()
+	now := time.Now().UTC()
+	d1 := &Deadline{DueDate: now.AddDate(0, 0, 5), Urgency: UrgencyCritical}
+	d2 := &Deadline{DueDate: now.AddDate(0, 0, 20), Urgency: UrgencyHigh}
 
-	// Due in exactly 7 days
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 7),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-	d.ReminderDays = []int{30, 14, 7, 1}
+	repo.On("FindByOwnerID", mock.Anything, "user1", mock.Anything, mock.Anything).Return([]*Deadline{d1, d2}, nil)
 
-	assert.True(t, d.ShouldRemind(), "should remind on day 7")
+	cal, err := s.GetCalendar(context.Background(), "user1", now, now.AddDate(0, 0, 30))
+	assert.NoError(t, err)
+	assert.Equal(t, 1, cal.CriticalCount)
+	assert.Equal(t, 1, cal.HighCount)
 }
 
-func TestShouldRemind_NotOnReminderDay(t *testing.T) {
-	t.Parallel()
-
-	// Due in 15 days (not in reminder list)
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 15),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-	d.ReminderDays = []int{30, 14, 7, 1}
-
-	assert.False(t, d.ShouldRemind())
-}
-
-func TestShouldRemind_CompletedDeadline(t *testing.T) {
-	t.Parallel()
-
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 7),
-		lifecycle.PriorityHigh,
-		"Test",
-	)
-	d.ReminderDays = []int{7}
-	d.Complete()
-
-	assert.False(t, d.ShouldRemind(), "completed deadline should not trigger reminder")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TestNeedsAttention
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestNeedsAttention_WithinSevenDays(t *testing.T) {
-	t.Parallel()
-
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 5),
-		lifecycle.PriorityCritical,
-		"Test",
-	)
-
-	assert.True(t, d.NeedsAttention())
-}
-
-func TestNeedsAttention_MoreThanSevenDays(t *testing.T) {
-	t.Parallel()
-
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 10),
-		lifecycle.PriorityCritical,
-		"Test",
-	)
-
-	assert.False(t, d.NeedsAttention())
-}
-
-func TestNeedsAttention_Completed(t *testing.T) {
-	t.Parallel()
-
-	d, _ := lifecycle.NewDeadline(
-		lifecycle.DeadlineOAResponse,
-		time.Now().UTC().AddDate(0, 0, 3),
-		lifecycle.PriorityCritical,
-		"Test",
-	)
-	d.Complete()
-
-	assert.False(t, d.NeedsAttention())
-}
-
+//Personal.AI order the ending
