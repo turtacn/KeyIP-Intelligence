@@ -428,4 +428,18 @@ func NewParsingError(message string) *AppError {
 	return New(ErrCodeValidation, message)
 }
 
+var (
+	ErrInferenceTimeout        = New(ErrCodeTimeout, "inference timed out")
+	ErrModelBackendUnavailable = New(ErrCodeServiceUnavailable, "model backend unavailable")
+	ErrServingUnavailable      = New(ErrCodeServiceUnavailable, "serving unavailable")
+)
+
+func Is(err, target error) bool {
+	return stdliberrors.Is(err, target)
+}
+
+func As(err error, target interface{}) bool {
+	return stdliberrors.As(err, target)
+}
+
 //Personal.AI order the ending

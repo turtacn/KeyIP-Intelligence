@@ -21,14 +21,19 @@ import (
 type AnalysisTask int
 
 const (
-	TaskFTO                 AnalysisTask = iota // Freedom to Operate
-	TaskInfringementRisk                        // Infringement risk assessment
-	TaskPatentLandscape                         // Patent landscape analysis
-	TaskPortfolioStrategy                       // Patent portfolio strategy
-	TaskValuation                               // Patent valuation
-	TaskClaimDrafting                           // Claim drafting assistance
-	TaskPriorArtSearch                          // Prior art search strategy
-	TaskOfficeActionResponse                    // Office action response advice
+	TaskFTO                  AnalysisTask = iota // Freedom to Operate
+	TaskInfringementRisk                         // Infringement risk assessment
+	TaskPatentLandscape                          // Patent landscape analysis
+	TaskPortfolioStrategy                        // Patent portfolio strategy
+	TaskValuation                                // Patent valuation
+	TaskClaimDrafting                            // Claim drafting assistance
+	TaskPriorArtSearch                           // Prior art search strategy
+	TaskOfficeActionResponse                     // Office action response advice
+	TaskValidity                                 // Validity/Invalidity search
+	TaskClaimConstruction                        // Claim construction analysis
+	TaskPortfolioReview      = TaskPortfolioStrategy
+	TaskInfringement         = TaskInfringementRisk
+	TaskLandscape            = TaskPatentLandscape
 )
 
 var analysisTaskNames = map[AnalysisTask]string{
@@ -40,6 +45,50 @@ var analysisTaskNames = map[AnalysisTask]string{
 	TaskClaimDrafting:        "ClaimDrafting",
 	TaskPriorArtSearch:       "PriorArtSearch",
 	TaskOfficeActionResponse: "OfficeActionResponse",
+	TaskValidity:             "Validity",
+	TaskClaimConstruction:    "ClaimConstruction",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (t *AnalysisTask) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), "\"")
+	for k, v := range analysisTaskNames {
+		if strings.EqualFold(v, s) {
+			*t = k
+			return nil
+		}
+	}
+	// Fallback for snake_case variants often used in JSON
+	switch strings.ToLower(s) {
+	case "fto":
+		*t = TaskFTO
+	case "infringement", "infringement_risk":
+		*t = TaskInfringementRisk
+	case "landscape", "patent_landscape":
+		*t = TaskPatentLandscape
+	case "portfolio", "portfolio_review", "portfolio_strategy":
+		*t = TaskPortfolioStrategy
+	case "validity":
+		*t = TaskValidity
+	case "claim_construction":
+		*t = TaskClaimConstruction
+	case "valuation":
+		*t = TaskValuation
+	case "claim_drafting":
+		*t = TaskClaimDrafting
+	case "prior_art", "prior_art_search":
+		*t = TaskPriorArtSearch
+	case "office_action", "office_action_response":
+		*t = TaskOfficeActionResponse
+	default:
+		return fmt.Errorf("unknown task: %s", s)
+	}
+	return nil
+}
+
+// MarshalJSON implements json.Marshaler.
+func (t AnalysisTask) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("%q", t.String())), nil
 }
 
 func (t AnalysisTask) String() string {

@@ -91,7 +91,7 @@ func TestModelState_String(t *testing.T) {
 }
 
 func TestGNNModelManager_Load_Success(t *testing.T) {
-	backend := &mockModelBackend{}
+	backend := &mockModelBackendModel{}
 	cfg := DefaultGNNModelConfig()
 	mgr, err := NewGNNModelManager(cfg, backend, nil, nil)
 	if err != nil {
@@ -106,7 +106,7 @@ func TestGNNModelManager_Load_Success(t *testing.T) {
 }
 
 func TestGNNModelManager_Load_AlreadyReady(t *testing.T) {
-	backend := &mockModelBackend{}
+	backend := &mockModelBackendModel{}
 	cfg := DefaultGNNModelConfig()
 	mgr, _ := NewGNNModelManager(cfg, backend, nil, nil)
 	_ = mgr.Load(context.Background())
@@ -120,8 +120,7 @@ func TestGNNModelManager_Load_BackendUnhealthy(t *testing.T) {
 	unhealthyBackend := &unhealthyMockBackend{}
 	cfg := DefaultGNNModelConfig()
 	mgr, _ := NewGNNModelManager(cfg, unhealthyBackend, nil, nil)
-	err := mgr.Load(context.Background())
-	if err == nil {
+	if err := mgr.Load(context.Background()); err == nil {
 		t.Fatal("expected error for unhealthy backend")
 	}
 	if mgr.State() != ModelStateError {
@@ -133,7 +132,7 @@ func TestGNNModelManager_Load_BackendUnhealthy(t *testing.T) {
 }
 
 func TestGNNModelManager_Unload(t *testing.T) {
-	backend := &mockModelBackend{}
+	backend := &mockModelBackendModel{}
 	cfg := DefaultGNNModelConfig()
 	mgr, _ := NewGNNModelManager(cfg, backend, nil, nil)
 	_ = mgr.Load(context.Background())
@@ -146,7 +145,7 @@ func TestGNNModelManager_Unload(t *testing.T) {
 }
 
 func TestGNNModelManager_Unload_AlreadyUnloaded(t *testing.T) {
-	backend := &mockModelBackend{}
+	backend := &mockModelBackendModel{}
 	cfg := DefaultGNNModelConfig()
 	mgr, _ := NewGNNModelManager(cfg, backend, nil, nil)
 	if err := mgr.Unload(context.Background()); err != nil {
@@ -156,14 +155,14 @@ func TestGNNModelManager_Unload_AlreadyUnloaded(t *testing.T) {
 
 func TestGNNModelManager_Config(t *testing.T) {
 	cfg := DefaultGNNModelConfig()
-	mgr, _ := NewGNNModelManager(cfg, &mockModelBackend{}, nil, nil)
+	mgr, _ := NewGNNModelManager(cfg, &mockModelBackendModel{}, nil, nil)
 	if mgr.Config().ModelID != cfg.ModelID {
 		t.Error("Config() returned different config")
 	}
 }
 
 func TestNewGNNModelManager_NilConfig(t *testing.T) {
-	_, err := NewGNNModelManager(nil, &mockModelBackend{}, nil, nil)
+	_, err := NewGNNModelManager(nil, &mockModelBackendModel{}, nil, nil)
 	if err == nil {
 		t.Fatal("expected error for nil config")
 	}
@@ -179,7 +178,7 @@ func TestNewGNNModelManager_NilBackend(t *testing.T) {
 func TestNewGNNModelManager_InvalidConfig(t *testing.T) {
 	cfg := DefaultGNNModelConfig()
 	cfg.EmbeddingDim = -1
-	_, err := NewGNNModelManager(cfg, &mockModelBackend{}, nil, nil)
+	_, err := NewGNNModelManager(cfg, &mockModelBackendModel{}, nil, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid config")
 	}
@@ -243,25 +242,25 @@ func TestReadoutType_Values(t *testing.T) {
 // Mock Backend Definition
 // ---------------------------------------------------------------------------
 
-type mockModelBackend struct {
+type mockModelBackendModel struct {
 	predictFn func(ctx context.Context, req *common.PredictRequest) (*common.PredictResponse, error)
 }
 
-func (m *mockModelBackend) Predict(ctx context.Context, req *common.PredictRequest) (*common.PredictResponse, error) {
+func (m *mockModelBackendModel) Predict(ctx context.Context, req *common.PredictRequest) (*common.PredictResponse, error) {
 	if m.predictFn != nil {
 		return m.predictFn(ctx, req)
 	}
 	return &common.PredictResponse{Outputs: map[string][]byte{"out": []byte("{}")}}, nil
 }
 
-func (m *mockModelBackend) PredictStream(ctx context.Context, req *common.PredictRequest) (<-chan *common.PredictResponse, error) {
+func (m *mockModelBackendModel) PredictStream(ctx context.Context, req *common.PredictRequest) (<-chan *common.PredictResponse, error) {
 	return nil, nil
 }
 
-func (m *mockModelBackend) Healthy(ctx context.Context) error {
+func (m *mockModelBackendModel) Healthy(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockModelBackend) Close() error {
+func (m *mockModelBackendModel) Close() error {
 	return nil
 }

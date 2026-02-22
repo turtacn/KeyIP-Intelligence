@@ -274,7 +274,7 @@ func (s *scopeAnalyzerImpl) AnalyzeScope(ctx context.Context, claim *ParsedClaim
 	featureCount := len(claim.Features)
 	markushExpansion := computeMarkushExpansion(claim)
 	numericalWidth := computeNumericalRangeWidth(claim)
-	phraseImpact := transitionalPhraseImpactDescriptions[claim.TransitionalPhrase]
+	phraseImpact := transitionalPhraseImpactDescriptions[TransitionalPhraseType(claim.TransitionalPhrase)]
 	if phraseImpact == "" {
 		phraseImpact = "Unknown transitional phrase; scope impact cannot be determined precisely."
 	}
@@ -314,7 +314,7 @@ func (s *scopeAnalyzerImpl) ComputeScopeBreadth(ctx context.Context, claim *Pars
 	}
 
 	// 2. Transitional phrase adjustment.
-	phraseAdj, ok := transitionalPhraseAdjustments[claim.TransitionalPhrase]
+	phraseAdj, ok := transitionalPhraseAdjustments[TransitionalPhraseType(claim.TransitionalPhrase)]
 	if !ok {
 		phraseAdj = 0.0
 	}
@@ -340,13 +340,10 @@ func (s *scopeAnalyzerImpl) ComputeScopeBreadth(ctx context.Context, claim *Pars
 		if mg == nil {
 			continue
 		}
-		memberCount := mg.Count
-		if memberCount <= 0 {
-			memberCount = len(mg.Members)
-		}
+		memberCount := len(mg.Members)
 		if memberCount >= 5 {
 			markushAdj += 0.08
-			if mg.IsOpen {
+			if mg.IsOpenEnded {
 				markushAdj += 0.05
 			}
 			break // Apply adjustment once for the most significant Markush group
@@ -469,7 +466,7 @@ func (s *scopeAnalyzerImpl) AnalyzeClaimSetScope(ctx context.Context, claimSet *
 		}
 		analyses = append(analyses, sa)
 
-		if claim.ClaimType == ClaimTypeIndependent {
+		if claim.ClaimType == ClaimIndependent {
 			independentCount++
 			independentBreadthSum += sa.BreadthScore
 			independentBreadthCount++
@@ -551,7 +548,7 @@ func (s *scopeAnalyzerImpl) IdentifyScopeGaps(ctx context.Context, claimSet *Par
 		if _, ok := expectedCategories[cat]; ok {
 			expectedCategories[cat] = true
 		}
-		if claim.ClaimType == ClaimTypeIndependent {
+		if claim.ClaimType == ClaimIndependent {
 			independentClaimNumbers = append(independentClaimNumbers, claim.ClaimNumber)
 		}
 	}
@@ -580,7 +577,7 @@ func (s *scopeAnalyzerImpl) IdentifyScopeGaps(ctx context.Context, claimSet *Par
 	// Check that each independent claim has at least one dependent claim.
 	dependentMap := buildDependencyMap(claimSet)
 	for _, claim := range claimSet.Claims {
-		if claim.ClaimType != ClaimTypeIndependent {
+		if claim.ClaimType != ClaimIndependent {
 			continue
 		}
 		deps := dependentMap[claim.ClaimNumber]
@@ -601,7 +598,7 @@ func (s *scopeAnalyzerImpl) IdentifyScopeGaps(ctx context.Context, claimSet *Par
 	// If a dependent claim depends on another dependent (chain depth >= 2),
 	// check that intermediate links exist.
 	for _, claim := range claimSet.Claims {
-		if claim.ClaimType != ClaimTypeDependent {
+		if claim.ClaimType != ClaimDependent {
 			continue
 		}
 		for _, depOn := range claim.DependsOn {
@@ -627,10 +624,7 @@ func (s *scopeAnalyzerImpl) IdentifyScopeGaps(ctx context.Context, claimSet *Par
 			if mg == nil {
 				continue
 			}
-			memberCount := mg.Count
-			if memberCount <= 0 {
-				memberCount = len(mg.Members)
-			}
+			memberCount := len(mg.Members)
 			if memberCount > 0 && memberCount < 3 {
 				gaps = append(gaps, &ScopeGap{
 					Description: fmt.Sprintf("Claim %d contains a Markush group with only %d member(s). "+
@@ -649,7 +643,7 @@ func (s *scopeAnalyzerImpl) IdentifyScopeGaps(ctx context.Context, claimSet *Par
 	// If all independent claims are narrow, the overall protection is weak.
 	allNarrow := true
 	for _, claim := range claimSet.Claims {
-		if claim.ClaimType != ClaimTypeIndependent {
+		if claim.ClaimType != ClaimIndependent {
 			continue
 		}
 		breadth, err := s.ComputeScopeBreadth(ctx, claim)
@@ -1051,10 +1045,7 @@ func computeMarkushExpansion(claim *ParsedClaim) int {
 		if mg == nil {
 			continue
 		}
-		count := mg.Count
-		if count <= 0 {
-			count = len(mg.Members)
-		}
+		count := len(mg.Members)
 		if count > 0 {
 			hasMarkush = true
 			total *= count
@@ -1103,7 +1094,7 @@ func extractKeyLimitations(claim *ParsedClaim) []string {
 	var limitations []string
 
 	// Closed transitional phrase is itself a limitation.
-	if claim.TransitionalPhrase == PhraseConsistingOf {
+	if claim.TransitionalType == PhraseConsistingOf {
 		limitations = append(limitations, "Closed transitional phrase 'consisting of' excludes additional elements.")
 	}
 
@@ -1122,8 +1113,8 @@ func extractKeyLimitations(claim *ParsedClaim) []string {
 		if f == nil {
 			continue
 		}
-		if f.IsEssential && len(f.Description) > 50 {
-			desc := f.Description
+		if f.IsEssential && len(f.Text) > 50 {
+			desc := f.Text
 			if len(desc) > 80 {
 				desc = desc[:77] + "..."
 			}
@@ -1146,9 +1137,9 @@ func suggestBroadeningOpportunities(claim *ParsedClaim, breadth float64) []strin
 	}
 	var suggestions []string
 
-	if claim.TransitionalPhrase == PhraseConsistingOf {
+	if claim.TransitionalType == PhraseConsistingOf {
 		suggestions = append(suggestions, "Replace 'consisting of' with 'comprising' to allow additional unrecited elements.")
-	} else if claim.TransitionalPhrase == PhraseConsistingEssentiallyOf {
+	} else if claim.TransitionalType == PhraseConsistingEssentiallyOf {
 		suggestions = append(suggestions, "Consider using 'comprising' instead of 'consisting essentially of' for maximum breadth.")
 	}
 
@@ -1161,7 +1152,7 @@ func suggestBroadeningOpportunities(claim *ParsedClaim, breadth float64) []strin
 	}
 
 	for _, mg := range claim.MarkushGroups {
-		if mg != nil && !mg.IsOpen {
+		if mg != nil && !mg.IsOpenEnded {
 			suggestions = append(suggestions, "Convert closed Markush groups to open-ended format (e.g., 'selected from the group including').")
 			break
 		}
@@ -1188,7 +1179,7 @@ func identifyNarrowingRisks(claim *ParsedClaim, breadth float64) []string {
 			"which may require narrowing amendments.")
 	}
 
-	if claim.TransitionalPhrase == PhraseComprising && len(claim.Features) <= 2 {
+	if claim.TransitionalType == PhraseComprising && len(claim.Features) <= 2 {
 		risks = append(risks, "Very few features with open-ended language may trigger enablement "+
 			"or written description challenges (35 U.S.C. §112).")
 	}
@@ -1197,10 +1188,7 @@ func identifyNarrowingRisks(claim *ParsedClaim, breadth float64) []string {
 		if mg == nil {
 			continue
 		}
-		count := mg.Count
-		if count <= 0 {
-			count = len(mg.Members)
-		}
+		count := len(mg.Members)
 		if count > 20 {
 			risks = append(risks, fmt.Sprintf("Large Markush group (%d members) may face unity of invention "+
 				"objections or restriction requirements.", count))
@@ -1255,7 +1243,7 @@ func buildLayerLayout(claimSet *ParsedClaimSet) [][]int {
 
 	// Independent claims are at layer 0.
 	for _, c := range claimSet.Claims {
-		if c.ClaimType == ClaimTypeIndependent || len(c.DependsOn) == 0 {
+		if c.ClaimType == ClaimIndependent || len(c.DependsOn) == 0 {
 			layerOf[c.ClaimNumber] = 0
 			queue = append(queue, c.ClaimNumber)
 		}

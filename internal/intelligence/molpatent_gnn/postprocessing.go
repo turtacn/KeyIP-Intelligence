@@ -12,16 +12,6 @@ import (
 // Domain Types (Interfaces & Structs)
 // ---------------------------------------------------------------------------
 
-// SimilarityLevel classifies the similarity between two embeddings.
-type SimilarityLevel string
-
-const (
-	SimilarityHigh   SimilarityLevel = "HIGH"
-	SimilarityMedium SimilarityLevel = "MEDIUM"
-	SimilarityLow    SimilarityLevel = "LOW"
-	SimilarityNone   SimilarityLevel = "NONE"
-)
-
 // ---------------------------------------------------------------------------
 // Similarity classification thresholds (configurable via PostprocessorConfig)
 // ---------------------------------------------------------------------------
