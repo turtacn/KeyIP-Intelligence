@@ -314,7 +314,7 @@ var (
 	// --- Dependency references (English) ---
 	reDependencyEN = regexp.MustCompile(
 		`(?i)(?:of|in|according\s+to|as\s+(?:claimed|defined|set\s+forth)\s+in)\s+claims?\s+` +
-			`(\d+(?:\s*(?:,|and|or|to)\s*\d+)*)`)
+			`(\d+(?:\s*(?:,?\s*(?:and|or)|,|to)\s*\d+)*)`)
 
 	// --- Dependency references (Chinese) ---
 	reDependencyCN = regexp.MustCompile(

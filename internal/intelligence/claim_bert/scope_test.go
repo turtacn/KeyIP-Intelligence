@@ -105,6 +105,16 @@ func (m *mockClaimEmbedder) registerOrthogonalEmbeddings(idA, idB string) {
 	m.featureEmbeddings[idB] = embB
 }
 
+// registerUniqueOrthogonalEmbedding registers an embedding that is orthogonal
+// to others by using a unique index.
+func (m *mockClaimEmbedder) registerUniqueOrthogonalEmbedding(id string, index int) {
+	emb := make([]float32, m.embedDim)
+	if index < m.embedDim {
+		emb[index] = 1.0
+	}
+	m.featureEmbeddings[id] = emb
+}
+
 // ---------------------------------------------------------------------------
 // Factory functions for test claims
 // ---------------------------------------------------------------------------
@@ -599,9 +609,12 @@ func TestCompareScopes_SharedAndUniqueFeatures(t *testing.T) {
 		embedder.registerIdenticalEmbedding(claimA.Features[i].ID, claimB.Features[i].ID)
 	}
 	// A has 2 unique, B has 1 unique.
-	embedder.registerOrthogonalEmbeddings(claimA.Features[3].ID, "dummy-a3")
-	embedder.registerOrthogonalEmbeddings(claimA.Features[4].ID, "dummy-a4")
-	embedder.registerOrthogonalEmbeddings(claimB.Features[3].ID, "dummy-b3")
+	// Use indices > 0 to avoid collision with IdenticalEmbedding (which uses i+1 * 0.1, distributed)
+	// Actually IdenticalEmbedding uses a distributed vector.
+	// Let's use high indices for uniqueness.
+	embedder.registerUniqueOrthogonalEmbedding(claimA.Features[3].ID, 10)
+	embedder.registerUniqueOrthogonalEmbedding(claimA.Features[4].ID, 11)
+	embedder.registerUniqueOrthogonalEmbedding(claimB.Features[3].ID, 12)
 
 	comp, err := analyzer.CompareScopes(context.Background(), claimA, claimB)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -873,13 +874,22 @@ func convertClaimsToFeatures(m []*MappedClaim) []*ClaimElementFeature {
 
 // groupClaimsByPatent groups claims by their PatentID.
 func groupClaimsByPatent(claims []*ClaimInput) map[string][]*ClaimInput {
-	// ClaimInput in mapper.go doesn't have PatentID.
-	// Assuming claims are passed in a way we can group them, or we skip grouping for now.
-	// If ClaimInput definition was changed, we should use it.
-	// Checking mapper.go, ClaimInput has no PatentID.
-	// We will treat all as one group for now or rely on ClaimID prefix.
 	m := make(map[string][]*ClaimInput)
-	m["default"] = claims
+	for _, c := range claims {
+		if c == nil {
+			continue
+		}
+		pid := c.PatentID
+		if pid == "" {
+			// Fallback: extract from ClaimID if prefixed (e.g., "US1234567-C1") or use _unknown_
+			if idx := strings.Index(c.ClaimID, "-"); idx > 0 {
+				pid = c.ClaimID[:idx]
+			} else {
+				pid = "_unknown_"
+			}
+		}
+		m[pid] = append(m[pid], c)
+	}
 	return m
 }
 
