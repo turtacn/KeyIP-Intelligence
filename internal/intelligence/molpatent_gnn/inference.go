@@ -9,6 +9,7 @@ import (
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
 // ---------------------------------------------------------------------------
@@ -92,11 +93,11 @@ type SimilarityRequest struct {
 
 // SimilarityResponse contains multi-fingerprint similarity scores.
 type SimilarityResponse struct {
-	FusedScore      float64            `json:"fused_score"`
-	Scores          map[string]float64 `json:"scores"`
-	Level           SimilarityLevel    `json:"level"`
-	InferenceMs     int64              `json:"inference_ms"`
-	ModelVersion    string             `json:"model_version"`
+	FusedScore      float64                  `json:"fused_score"`
+	Scores          map[string]float64       `json:"scores"`
+	Level           molecule.SimilarityLevel `json:"level"`
+	InferenceMs     int64                    `json:"inference_ms"`
+	ModelVersion    string                   `json:"model_version"`
 }
 
 // SimilarSearchRequest asks for molecules similar to a query.
@@ -115,21 +116,11 @@ type SimilarSearchResponse struct {
 
 // VectorMatch represents a single vector search hit.
 type VectorMatch struct {
-	MoleculeID string  `json:"molecule_id"`
-	SMILES     string  `json:"smiles"`
-	Score      float64 `json:"score"`
-	Level      SimilarityLevel `json:"level"`
+	MoleculeID string                   `json:"molecule_id"`
+	SMILES     string                   `json:"smiles"`
+	Score      float64                  `json:"score"`
+	Level      molecule.SimilarityLevel `json:"level"`
 }
-
-// SimilarityLevel classifies a similarity score.
-type SimilarityLevel string
-
-const (
-	SimilarityHigh   SimilarityLevel = "HIGH"
-	SimilarityMedium SimilarityLevel = "MEDIUM"
-	SimilarityLow    SimilarityLevel = "LOW"
-	SimilarityNone   SimilarityLevel = "NONE"
-)
 
 // ---------------------------------------------------------------------------
 // Default fusion weights

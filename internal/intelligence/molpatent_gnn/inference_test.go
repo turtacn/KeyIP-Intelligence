@@ -9,6 +9,7 @@ import (
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
 // ---------------------------------------------------------------------------
@@ -134,16 +135,16 @@ func (m *mockGNNPostprocessor) FuseScores(scores map[string]float64, weights map
 	return total / wSum, nil
 }
 
-func (m *mockGNNPostprocessor) ClassifySimilarity(score float64) SimilarityLevel {
+func (m *mockGNNPostprocessor) ClassifySimilarity(score float64) molecule.SimilarityLevel {
 	switch {
 	case score >= 0.85:
-		return SimilarityHigh
+		return molecule.SimilarityHigh
 	case score >= 0.70:
-		return SimilarityMedium
+		return molecule.SimilarityMedium
 	case score >= 0.55:
-		return SimilarityLow
+		return molecule.SimilarityLow
 	default:
-		return SimilarityNone
+		return molecule.SimilarityNone
 	}
 }
 
@@ -535,14 +536,14 @@ func TestSimilarityLevelClassification(t *testing.T) {
 	pp := &mockGNNPostprocessor{}
 	tests := []struct {
 		score float64
-		want  SimilarityLevel
+		want  molecule.SimilarityLevel
 	}{
-		{0.95, SimilarityHigh},
-		{0.85, SimilarityHigh},
-		{0.75, SimilarityMedium},
-		{0.60, SimilarityLow},
-		{0.40, SimilarityNone},
-		{0.0, SimilarityNone},
+		{0.95, molecule.SimilarityHigh},
+		{0.85, molecule.SimilarityHigh},
+		{0.75, molecule.SimilarityMedium},
+		{0.60, molecule.SimilarityLow},
+		{0.40, molecule.SimilarityNone},
+		{0.0, molecule.SimilarityNone},
 	}
 	for _, tt := range tests {
 		got := pp.ClassifySimilarity(tt.score)

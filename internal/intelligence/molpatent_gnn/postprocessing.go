@@ -6,11 +6,13 @@ import (
 	"math/bits"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
 // ---------------------------------------------------------------------------
 // Domain Types (Interfaces & Structs)
 // ---------------------------------------------------------------------------
+
 
 // ---------------------------------------------------------------------------
 // Similarity classification thresholds (configurable via PostprocessorConfig)
@@ -302,16 +304,16 @@ func (p *gnnPostprocessorImpl) FuseScores(scores map[string]float64, weights map
 // ClassifySimilarity — threshold-based level assignment
 // ---------------------------------------------------------------------------
 
-func (p *gnnPostprocessorImpl) ClassifySimilarity(score float64) SimilarityLevel {
+func (p *gnnPostprocessorImpl) ClassifySimilarity(score float64) molecule.SimilarityLevel {
 	switch {
 	case score >= p.config.ThresholdHigh:
-		return SimilarityHigh
+		return molecule.SimilarityHigh
 	case score >= p.config.ThresholdMedium:
-		return SimilarityMedium
+		return molecule.SimilarityMedium
 	case score >= p.config.ThresholdLow:
-		return SimilarityLow
+		return molecule.SimilarityLow
 	default:
-		return SimilarityNone
+		return molecule.SimilarityNone
 	}
 }
 

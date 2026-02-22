@@ -3,6 +3,8 @@ package molpatent_gnn
 import (
 	"math"
 	"testing"
+
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
 // ---------------------------------------------------------------------------
@@ -582,21 +584,21 @@ func TestClassifySimilarity_Levels(t *testing.T) {
 	pp := newTestPostprocessor()
 	tests := []struct {
 		score float64
-		want  SimilarityLevel
+		want  molecule.SimilarityLevel
 	}{
-		{1.00, SimilarityHigh},
-		{0.95, SimilarityHigh},
-		{0.85, SimilarityHigh},   // exact boundary
-		{0.849, SimilarityMedium},
-		{0.75, SimilarityMedium},
-		{0.70, SimilarityMedium}, // exact boundary
-		{0.699, SimilarityLow},
-		{0.60, SimilarityLow},
-		{0.55, SimilarityLow},    // exact boundary
-		{0.549, SimilarityNone},
-		{0.30, SimilarityNone},
-		{0.00, SimilarityNone},
-		{-0.10, SimilarityNone},
+		{1.00, molecule.SimilarityHigh},
+		{0.95, molecule.SimilarityHigh},
+		{0.85, molecule.SimilarityHigh}, // exact boundary
+		{0.849, molecule.SimilarityMedium},
+		{0.75, molecule.SimilarityMedium},
+		{0.70, molecule.SimilarityMedium}, // exact boundary
+		{0.699, molecule.SimilarityLow},
+		{0.60, molecule.SimilarityLow},
+		{0.55, molecule.SimilarityLow}, // exact boundary
+		{0.549, molecule.SimilarityNone},
+		{0.30, molecule.SimilarityNone},
+		{0.00, molecule.SimilarityNone},
+		{-0.10, molecule.SimilarityNone},
 	}
 	for _, tt := range tests {
 		got := pp.ClassifySimilarity(tt.score)
@@ -614,15 +616,15 @@ func TestClassifySimilarity_CustomThresholds(t *testing.T) {
 	})
 	tests := []struct {
 		score float64
-		want  SimilarityLevel
+		want  molecule.SimilarityLevel
 	}{
-		{0.95, SimilarityHigh},
-		{0.90, SimilarityHigh},
-		{0.89, SimilarityMedium},
-		{0.75, SimilarityMedium},
-		{0.74, SimilarityLow},
-		{0.60, SimilarityLow},
-		{0.59, SimilarityNone},
+		{0.95, molecule.SimilarityHigh},
+		{0.90, molecule.SimilarityHigh},
+		{0.89, molecule.SimilarityMedium},
+		{0.75, molecule.SimilarityMedium},
+		{0.74, molecule.SimilarityLow},
+		{0.60, molecule.SimilarityLow},
+		{0.59, molecule.SimilarityNone},
 	}
 	for _, tt := range tests {
 		got := pp.ClassifySimilarity(tt.score)
@@ -723,7 +725,7 @@ func TestIntegration_EmbedThenClassify(t *testing.T) {
 	level := pp.ClassifySimilarity(sim)
 
 	// cos(45°) ≈ 0.7071 → MEDIUM
-	if level != SimilarityMedium {
+	if level != molecule.SimilarityMedium {
 		t.Errorf("expected MEDIUM for cos(45°)≈0.707, got %s (sim=%f)", level, sim)
 	}
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
 // ---------------------------------------------------------------------------
@@ -157,7 +158,7 @@ type GNNPostprocessor interface {
 	ComputeCosineSimilarity(a, b []float32) (float64, error)
 	ComputeTanimotoSimilarity(a, b []byte) (float64, error)
 	FuseScores(scores map[string]float64, weights map[string]float64) (float64, error)
-	ClassifySimilarity(score float64) SimilarityLevel
+	ClassifySimilarity(score float64) molecule.SimilarityLevel
 }
 
 // ---------------------------------------------------------------------------

@@ -240,4 +240,14 @@ const (
 	MaxResultsLimit          = 500
 )
 
+// SimilarityLevel classifies a similarity score.
+type SimilarityLevel string
+
+const (
+	SimilarityHigh   SimilarityLevel = "HIGH"
+	SimilarityMedium SimilarityLevel = "MEDIUM"
+	SimilarityLow    SimilarityLevel = "LOW"
+	SimilarityNone   SimilarityLevel = "NONE"
+)
+
 //Personal.AI order the ending
