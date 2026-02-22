@@ -143,7 +143,16 @@ func DecodeFloat64Matrix(input interface{}) ([][]float64, error) {
 		return mat, nil
 	}
 
-	// Case 2: Slice of interface{} (from JSON unmarshal)
+	// Case 2: []byte (JSON)
+	if b, ok := input.([]byte); ok {
+		var raw interface{}
+		if err := json.Unmarshal(b, &raw); err != nil {
+			return nil, fmt.Errorf("unmarshal json: %w", err)
+		}
+		return DecodeFloat64Matrix(raw)
+	}
+
+	// Case 3: Slice of interface{} (from JSON unmarshal)
 	slice, ok := input.([]interface{})
 	if !ok {
 		return nil, fmt.Errorf("expected []interface{}, got %T", input)
