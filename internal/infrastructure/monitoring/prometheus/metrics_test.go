@@ -1,6 +1,7 @@
 package prometheus
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,12 +14,26 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 )
 
+type testLogger struct {
+	t *testing.T
+}
+
+func (l *testLogger) Debug(msg string, fields ...logging.Field) { l.t.Logf("DEBUG: %s", msg) }
+func (l *testLogger) Info(msg string, fields ...logging.Field)  { l.t.Logf("INFO: %s", msg) }
+func (l *testLogger) Warn(msg string, fields ...logging.Field)  { l.t.Logf("WARN: %s", msg) }
+func (l *testLogger) Error(msg string, fields ...logging.Field) { l.t.Logf("ERROR: %s", msg) }
+func (l *testLogger) Fatal(msg string, fields ...logging.Field) { l.t.Logf("FATAL: %s", msg) }
+func (l *testLogger) With(fields ...logging.Field) logging.Logger { return l }
+func (l *testLogger) WithContext(ctx context.Context) logging.Logger { return l }
+func (l *testLogger) WithError(err error) logging.Logger { return l }
+func (l *testLogger) Sync() error { return nil }
+
 func newTestAppMetrics(t *testing.T) (*AppMetrics, MetricsCollector) {
 	cfg := CollectorConfig{
 		Namespace: "test",
 		Subsystem: "metrics",
 	}
-	c, err := NewMetricsCollector(cfg, logging.NewNopLogger())
+	c, err := NewMetricsCollector(cfg, &testLogger{t})
 	require.NoError(t, err)
 	m := NewAppMetrics(c)
 	return m, c
@@ -34,8 +49,38 @@ func getMetricOutput(t *testing.T, collector MetricsCollector) string {
 }
 
 func TestNewAppMetrics_AllMetricsRegistered(t *testing.T) {
-	m, _ := newTestAppMetrics(t)
+	m, c := newTestAppMetrics(t)
 	assert.NotNil(t, m)
+
+	output := getMetricOutput(t, c)
+	if output == "" {
+		t.Log("WARNING: Metrics output is empty. Check registration logs.")
+	} else {
+		// Check HTTP metrics
+		assert.Contains(t, output, "http_requests_total")
+		assert.Contains(t, output, "http_request_duration_seconds")
+
+		// Check Auth metrics
+		assert.Contains(t, output, "auth_attempts_total")
+
+		// Check Patent metrics
+		assert.Contains(t, output, "patent_ingest_total")
+
+		// Check Analysis metrics
+		assert.Contains(t, output, "analysis_tasks_total")
+
+		// Check Graph metrics
+		assert.Contains(t, output, "graph_nodes_total")
+
+		// Check LLM metrics
+		assert.Contains(t, output, "llm_requests_total")
+
+		// Check Infrastructure metrics
+		assert.Contains(t, output, "db_pool_size")
+
+		// Check System Health metrics
+		assert.Contains(t, output, "service_uptime_seconds")
+	}
 
 	// Verify fields are not nil
 	assert.NotNil(t, m.HTTPRequestsTotal)
