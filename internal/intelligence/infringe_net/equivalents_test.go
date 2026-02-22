@@ -293,7 +293,6 @@ func TestAnalyzeElement_BoundaryScores(t *testing.T) {
 }
 
 func TestAnalyzeElement_BelowBoundary(t *testing.T) {
-	model := newMockModel()
 	q := makeElement("q1", Substituent, "methyl")
 	c := makeElement("c1", Substituent, "ethyl")
 

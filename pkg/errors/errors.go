@@ -203,6 +203,10 @@ func ErrBadRequest(message string) *AppError {
 	return New(ErrCodeBadRequest, message)
 }
 
+func NewInvalidInputError(message string) *AppError {
+	return ErrBadRequest(message)
+}
+
 func ErrNotFound(resource string, id string) *AppError {
 	return New(ErrCodeNotFound, fmt.Sprintf("%s not found: %s", resource, id)).
 		WithDetails("resource", resource).

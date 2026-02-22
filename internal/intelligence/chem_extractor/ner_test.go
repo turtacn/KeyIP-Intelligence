@@ -27,10 +27,10 @@ func (m *mockNERBackend) Predict(ctx context.Context, req *common.PredictRequest
 	} else {
 		emission = makeAllOEmission(len(tokens), len(DefaultLabelSet))
 	}
-	encoded, _ := common.EncodeFloat64Matrix(emission)
+	// In a real scenario, this would be unmarshaled JSON ([]interface{}),
+	// but common.DecodeFloat64Matrix also accepts [][]float64 directly.
 	return &common.PredictResponse{
-		Outputs:         map[string][]byte{"emission": encoded},
-		InferenceTimeMs: 5,
+		Outputs: map[string]interface{}{"emission": emission},
 	}, nil
 }
 

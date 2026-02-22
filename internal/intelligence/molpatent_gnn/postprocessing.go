@@ -9,6 +9,42 @@ import (
 )
 
 // ---------------------------------------------------------------------------
+// Domain Types (Interfaces & Structs)
+// ---------------------------------------------------------------------------
+
+// InferenceMeta carries metadata about the inference call.
+type InferenceMeta struct {
+	ModelVersion string `json:"model_version"`
+	TaskType     string `json:"task_type"`
+}
+
+// EmbeddingResult carries the result of an embedding post-processing.
+type EmbeddingResult struct {
+	NormalizedVector []float32 `json:"normalized_vector"`
+	L2Norm           float64   `json:"l2_norm"`
+}
+
+// SimilarityLevel classifies the similarity between two embeddings.
+type SimilarityLevel string
+
+const (
+	SimilarityHigh   SimilarityLevel = "HIGH"
+	SimilarityMedium SimilarityLevel = "MEDIUM"
+	SimilarityLow    SimilarityLevel = "LOW"
+	SimilarityNone   SimilarityLevel = "NONE"
+)
+
+// GNNPostprocessor defines the interface for GNN output post-processing.
+type GNNPostprocessor interface {
+	ProcessEmbedding(raw []float32, meta *InferenceMeta) (*EmbeddingResult, error)
+	ProcessBatchEmbedding(raw [][]float32, meta []*InferenceMeta) ([]*EmbeddingResult, error)
+	ComputeCosineSimilarity(a, b []float32) (float64, error)
+	ComputeTanimotoSimilarity(a, b []byte) (float64, error)
+	FuseScores(scores map[string]float64, weights map[string]float64) (float64, error)
+	ClassifySimilarity(score float64) SimilarityLevel
+}
+
+// ---------------------------------------------------------------------------
 // Similarity classification thresholds (configurable via PostprocessorConfig)
 // ---------------------------------------------------------------------------
 

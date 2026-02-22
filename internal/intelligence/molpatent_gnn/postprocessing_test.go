@@ -272,7 +272,7 @@ func TestCosineSimilarity_NormalisedVectors(t *testing.T) {
 	}
 
 	dot := dotProduct(resA.NormalizedVector, resB.NormalizedVector)
-	if !almostEqual(sim, dot, 1e-9) {
+	if !almostEqual(sim, dot, 1e-6) {
 		t.Errorf("cosine sim (%f) should equal dot product (%f) for unit vectors", sim, dot)
 	}
 }

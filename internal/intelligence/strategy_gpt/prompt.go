@@ -932,7 +932,9 @@ Be strategic: prioritize maintaining broad claim scope while ensuring allowance.
 
 func defaultFuncMap() template.FuncMap {
 	return template.FuncMap{
-		"join":       strings.Join,
+		"join": func(sep string, elems []string) string {
+			return strings.Join(elems, sep)
+		},
 		"upper":      strings.ToUpper,
 		"lower":      strings.ToLower,
 		"trimSpace":  strings.TrimSpace,

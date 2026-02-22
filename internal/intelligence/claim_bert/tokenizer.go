@@ -642,16 +642,17 @@ func (t *WordPieceTokenizer) pretokenize(text string) []pretokenizeSpan {
 	return spans
 }
 
+type chemMatch struct {
+	start, end int
+}
+
 func (t *WordPieceTokenizer) findChemicalSpans(text string) []pretokenizeSpan {
-	type match struct {
-		start, end int
-	}
-	var allMatches []match
+	var allMatches []chemMatch
 
 	for _, pat := range t.chemicalPatterns {
 		locs := pat.FindAllStringIndex(text, -1)
 		for _, loc := range locs {
-			allMatches = append(allMatches, match{loc[0], loc[1]})
+			allMatches = append(allMatches, chemMatch{loc[0], loc[1]})
 		}
 	}
 
@@ -674,9 +675,8 @@ func (t *WordPieceTokenizer) findChemicalSpans(text string) []pretokenizeSpan {
 	return selected
 }
 
-func sortMatches(matches []match) {
+func sortMatches(matches []chemMatch) {
 	// Simple insertion sort (chemical matches are typically few)
-	type match = struct{ start, end int }
 	for i := 1; i < len(matches); i++ {
 		key := matches[i]
 		j := i - 1
@@ -709,8 +709,8 @@ func compileChemicalPatterns() []*regexp.Regexp {
 		// Molecular formulas: e.g. C6H12O6, H2SO4, Ca(OH)2
 		`\b[A-Z][a-z]?\d*(?:\([A-Z][a-z]?\d*\)\d*)*(?:[A-Z][a-z]?\d*)*\b`,
 
-		// Markush keywords: C1-C6 alkyl, aryl, heteroaryl, etc.
-		`(?:C\d+-C\d+\s*)?(?:alkyl|aryl|heteroaryl|cycloalkyl|heterocycl\w*|halogen|halo)\b`,
+		// Markush keywords: alkyl, aryl, heteroaryl, etc.
+		`\b(?:alkyl|aryl|heteroaryl|cycloalkyl|heterocycl\w*|halogen|halo)\b`,
 
 		// IUPAC-style chemical names with numbers and hyphens
 		// e.g. 2-methylpropan-1-ol, 4-(2-hydroxyethyl)piperazine
