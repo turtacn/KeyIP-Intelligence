@@ -27,6 +27,7 @@ package infringement
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -252,6 +253,11 @@ type AlertRepository interface {
 	FindOverSLA(ctx context.Context) ([]*Alert, error)
 }
 
+// MessageProducer abstracts the messaging system.
+type MessageProducer interface {
+	Publish(ctx context.Context, msg *kafkainfra.ProducerMessage) error
+}
+
 // AlertService defines the application-level contract for infringement alert management.
 type AlertService interface {
 	// CreateAlert creates a new infringement alert after deduplication and dispatches notifications.
@@ -285,8 +291,8 @@ type AlertService interface {
 // alertServiceImpl is the concrete implementation of AlertService.
 type alertServiceImpl struct {
 	alertRepo      AlertRepository
-	patentService  patent.Service
-	producer       kafkainfra.Producer
+	patentService  *patent.PatentService
+	producer       MessageProducer
 	cache          redis.Cache
 	logger         logging.Logger
 	mu             sync.RWMutex
@@ -303,8 +309,8 @@ type AlertServiceConfig struct {
 // NewAlertService constructs a new AlertService with all required dependencies.
 func NewAlertService(
 	alertRepo AlertRepository,
-	patentService patent.Service,
-	producer kafkainfra.Producer,
+	patentService *patent.PatentService,
+	producer MessageProducer,
 	cache redis.Cache,
 	logger logging.Logger,
 	cfg AlertServiceConfig,
@@ -342,13 +348,13 @@ func (s *alertServiceImpl) CreateAlert(ctx context.Context, req *CreateAlertRequ
 	dedupSince := time.Now().UTC().Add(-s.dedupWindow)
 	existing, err := s.alertRepo.FindDuplicate(ctx, req.PatentNumber, req.MoleculeID, dedupSince)
 	if err != nil {
-		s.logger.Error("failed to check alert deduplication", "error", err,
-			"patent", req.PatentNumber, "molecule", req.MoleculeID)
+		s.logger.Error("failed to check alert deduplication", logging.Err(err),
+			logging.String("patent", req.PatentNumber), logging.String("molecule", req.MoleculeID))
 		return nil, errors.NewInternal("deduplication check failed: %v", err)
 	}
 	if existing != nil {
 		s.logger.Info("duplicate alert suppressed",
-			"existing_id", existing.ID, "patent", req.PatentNumber, "molecule", req.MoleculeID)
+			logging.String("existing_id", existing.ID), logging.String("patent", req.PatentNumber), logging.String("molecule", req.MoleculeID))
 		return existing, nil
 	}
 
@@ -360,7 +366,7 @@ func (s *alertServiceImpl) CreateAlert(ctx context.Context, req *CreateAlertRequ
 		// During quiet hours, only deliver via in-app channel.
 		channels = DispatchChannelInApp
 		s.logger.Info("quiet hours active, restricting to in-app only",
-			"watchlist", req.WatchlistID, "level", req.Level.String())
+			logging.String("watchlist", req.WatchlistID), logging.String("level", req.Level.String()))
 	}
 
 	now := time.Now().UTC()
@@ -382,22 +388,22 @@ func (s *alertServiceImpl) CreateAlert(ctx context.Context, req *CreateAlertRequ
 	}
 
 	if err := s.alertRepo.Save(ctx, alert); err != nil {
-		s.logger.Error("failed to persist alert", "error", err, "alert_id", alert.ID)
+		s.logger.Error("failed to persist alert", logging.Err(err), logging.String("alert_id", alert.ID))
 		return nil, errors.NewInternal("failed to save alert: %v", err)
 	}
 
 	// Dispatch notifications asynchronously via message queue.
 	if err := s.dispatchAlert(ctx, alert); err != nil {
 		// Dispatch failure is non-fatal — the alert is already persisted.
-		s.logger.Error("failed to dispatch alert notification", "error", err, "alert_id", alert.ID)
+		s.logger.Error("failed to dispatch alert notification", logging.Err(err), logging.String("alert_id", alert.ID))
 	}
 
 	// Invalidate stats cache for the watchlist.
 	s.invalidateStatsCache(ctx, alert.WatchlistID)
 
 	s.logger.Info("alert created",
-		"alert_id", alert.ID, "level", alert.Level.String(),
-		"patent", alert.PatentNumber, "molecule", alert.MoleculeID)
+		logging.String("alert_id", alert.ID), logging.String("level", alert.Level.String()),
+		logging.String("patent", alert.PatentNumber), logging.String("molecule", alert.MoleculeID))
 
 	return alert, nil
 }
@@ -434,7 +440,7 @@ func (s *alertServiceImpl) AcknowledgeAlert(ctx context.Context, alertID string,
 
 	s.invalidateStatsCache(ctx, alert.WatchlistID)
 
-	s.logger.Info("alert acknowledged", "alert_id", alertID, "user_id", userID)
+	s.logger.Info("alert acknowledged", logging.String("alert_id", alertID), logging.String("user_id", userID))
 	return nil
 }
 
@@ -476,7 +482,7 @@ func (s *alertServiceImpl) DismissAlert(ctx context.Context, req *DismissAlertRe
 
 	s.invalidateStatsCache(ctx, alert.WatchlistID)
 
-	s.logger.Info("alert dismissed", "alert_id", req.AlertID, "reason", req.Reason, "user_id", userID)
+	s.logger.Info("alert dismissed", logging.String("alert_id", req.AlertID), logging.String("reason", req.Reason), logging.String("user_id", userID))
 	return nil
 }
 
@@ -517,12 +523,12 @@ func (s *alertServiceImpl) EscalateAlert(ctx context.Context, alertID string, re
 
 	// Re-dispatch with escalated channels.
 	if err := s.dispatchAlert(ctx, alert); err != nil {
-		s.logger.Error("failed to dispatch escalated alert", "error", err, "alert_id", alertID)
+		s.logger.Error("failed to dispatch escalated alert", logging.Err(err), logging.String("alert_id", alertID))
 	}
 
 	s.invalidateStatsCache(ctx, alert.WatchlistID)
 
-	s.logger.Info("alert escalated", "alert_id", alertID, "reason", reason)
+	s.logger.Info("alert escalated", logging.String("alert_id", alertID), logging.String("reason", reason))
 	return nil
 }
 
@@ -594,7 +600,7 @@ func (s *alertServiceImpl) UpdateAlertConfig(ctx context.Context, req *AlertConf
 		s.dedupWindow = time.Duration(req.DedupWindowMin) * time.Minute
 	}
 
-	s.logger.Info("alert config updated", "watchlist_id", req.WatchlistID)
+	s.logger.Info("alert config updated", logging.String("watchlist_id", req.WatchlistID))
 	return nil
 }
 
@@ -636,14 +642,14 @@ func (s *alertServiceImpl) ProcessOverSLAAlerts(ctx context.Context) (int, error
 		if elapsed > sla && alert.Status == AlertStatusOpen {
 			reason := fmt.Sprintf("auto-escalated: exceeded SLA of %s (elapsed: %s)", sla, elapsed.Round(time.Minute))
 			if err := s.EscalateAlert(ctx, alert.ID, reason); err != nil {
-				s.logger.Error("failed to auto-escalate alert", "error", err, "alert_id", alert.ID)
+				s.logger.Error("failed to auto-escalate alert", logging.Err(err), logging.String("alert_id", alert.ID))
 				continue
 			}
 			escalated++
 		}
 	}
 
-	s.logger.Info("over-SLA alert processing complete", "total_overdue", len(overdue), "escalated", escalated)
+	s.logger.Info("over-SLA alert processing complete", logging.Int("total_overdue", len(overdue)), logging.Int("escalated", escalated))
 	return escalated, nil
 }
 
@@ -685,7 +691,7 @@ func (s *alertServiceImpl) isQuietHours(watchlistID string) bool {
 
 	loc, err := time.LoadLocation(qh.Timezone)
 	if err != nil {
-		s.logger.Error("invalid timezone in quiet hours config", "timezone", qh.Timezone, "error", err)
+		s.logger.Error("invalid timezone in quiet hours config", logging.String("timezone", qh.Timezone), logging.Err(err))
 		return false
 	}
 
@@ -693,7 +699,7 @@ func (s *alertServiceImpl) isQuietHours(watchlistID string) bool {
 	startH, startM, err1 := parseHHMM(qh.Start)
 	endH, endM, err2 := parseHHMM(qh.End)
 	if err1 != nil || err2 != nil {
-		s.logger.Error("invalid quiet hours time format", "start", qh.Start, "end", qh.End)
+		s.logger.Error("invalid quiet hours time format", logging.String("start", qh.Start), logging.String("end", qh.End))
 		return false
 	}
 
@@ -762,10 +768,21 @@ func (s *alertServiceImpl) dispatchAlert(ctx context.Context, alert *Alert) erro
 			Timestamp:    alert.CreatedAt.Format(time.RFC3339),
 		}
 
-		topic := fmt.Sprintf("alert.dispatch.%s", ch.name)
-		if err := s.producer.Publish(ctx, topic, alert.ID, msg); err != nil {
+		payload, err := json.Marshal(msg)
+		if err != nil {
+			s.logger.Error("failed to marshal alert notification", logging.Err(err))
+			continue
+		}
+
+		pm := &kafkainfra.ProducerMessage{
+			Topic: fmt.Sprintf("alert.dispatch.%s", ch.name),
+			Key:   []byte(alert.ID),
+			Value: payload,
+		}
+
+		if err := s.producer.Publish(ctx, pm); err != nil {
 			s.logger.Error("failed to publish alert to channel",
-				"channel", ch.name, "alert_id", alert.ID, "error", err)
+				logging.String("channel", ch.name), logging.String("alert_id", alert.ID), logging.Err(err))
 			if firstErr == nil {
 				firstErr = err
 			}
@@ -782,7 +799,7 @@ func (s *alertServiceImpl) invalidateStatsCache(ctx context.Context, watchlistID
 	}
 	cacheKey := fmt.Sprintf("alert_stats:%s", watchlistID)
 	if err := s.cache.Delete(ctx, cacheKey); err != nil {
-		s.logger.Error("failed to invalidate stats cache", "key", cacheKey, "error", err)
+		s.logger.Error("failed to invalidate stats cache", logging.String("key", cacheKey), logging.Err(err))
 	}
 }
 

@@ -7,6 +7,9 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
+// PatentID is a string alias for a patent identifier.
+type PatentID string
+
 // PatentStatus represents the lifecycle stage of a patent.
 type PatentStatus string
 

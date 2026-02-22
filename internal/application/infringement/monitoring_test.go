@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // --- Mock WatchlistRepository ---
@@ -152,20 +154,20 @@ func (m *mockAlertServiceForMonitoring) CreateAlert(ctx context.Context, req *Cr
 func (m *mockAlertServiceForMonitoring) GetAlert(ctx context.Context, alertID string) (*Alert, error) {
 	return nil, nil
 }
-func (m *mockAlertServiceForMonitoring) AcknowledgeAlert(ctx context.Context, alertID string) error {
+func (m *mockAlertServiceForMonitoring) AcknowledgeAlert(ctx context.Context, alertID string, userID string) error {
 	return nil
 }
-func (m *mockAlertServiceForMonitoring) DismissAlert(ctx context.Context, req *DismissAlertRequest) error {
+func (m *mockAlertServiceForMonitoring) DismissAlert(ctx context.Context, req *DismissAlertRequest, userID string) error {
 	return nil
 }
-func (m *mockAlertServiceForMonitoring) EscalateAlert(ctx context.Context, alertID string) error {
+func (m *mockAlertServiceForMonitoring) EscalateAlert(ctx context.Context, alertID string, reason string) error {
 	return nil
 }
 func (m *mockAlertServiceForMonitoring) ResolveAlert(ctx context.Context, alertID, resolution string) error {
 	return nil
 }
-func (m *mockAlertServiceForMonitoring) ListAlerts(ctx context.Context, opts AlertListOptions) ([]*Alert, *AlertPaginationResult, error) {
-	return nil, &AlertPaginationResult{}, nil
+func (m *mockAlertServiceForMonitoring) ListAlerts(ctx context.Context, opts AlertListOptions) ([]*Alert, *commontypes.PaginationResult, error) {
+	return nil, &commontypes.PaginationResult{}, nil
 }
 func (m *mockAlertServiceForMonitoring) GetAlertStats(ctx context.Context, watchlistID string) (*AlertStats, error) {
 	return &AlertStats{}, nil

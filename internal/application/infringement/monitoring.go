@@ -8,6 +8,7 @@ package infringement
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -127,7 +128,7 @@ func (r *CreateWatchlistRequest) Validate() error {
 	if r.SimilarityThreshold < 0 || r.SimilarityThreshold > 1 {
 		return errors.NewValidation("similarity_threshold must be between 0 and 1")
 	}
-	if r.ScanFrequency < ScanFrequencyDaily || r.ScanFrequency > ScanFrequencyMonthly {
+	if r.ScanFrequency != 0 && (r.ScanFrequency < ScanFrequencyDaily || r.ScanFrequency > ScanFrequencyMonthly) {
 		return errors.NewValidation("invalid scan_frequency")
 	}
 	if len(r.PatentNumbers) == 0 && len(r.MoleculeIDs) == 0 {
@@ -229,7 +230,7 @@ type monitoringServiceImpl struct {
 	watchlistRepo  WatchlistRepository
 	scanResultRepo ScanResultRepository
 	alertService   AlertService
-	producer       kafkainfra.Producer
+	producer       MessageProducer
 	cache          redis.Cache
 	logger         logging.Logger
 	mu             sync.RWMutex
@@ -240,7 +241,7 @@ func NewMonitoringService(
 	watchlistRepo WatchlistRepository,
 	scanResultRepo ScanResultRepository,
 	alertService AlertService,
-	producer kafkainfra.Producer,
+	producer MessageProducer,
 	cache redis.Cache,
 	logger logging.Logger,
 ) MonitoringService {
@@ -292,14 +293,19 @@ func (s *monitoringServiceImpl) CreateWatchlist(ctx context.Context, req *Create
 		return nil, errors.NewInternal("failed to save watchlist: %v", err)
 	}
 
-	_ = s.producer.Publish(ctx, "monitoring.watchlist.created", watchlist.ID, map[string]any{
+	payload, _ := json.Marshal(map[string]any{
 		"watchlist_id": watchlist.ID,
 		"name":         watchlist.Name,
 		"owner_id":     watchlist.OwnerID,
 		"timestamp":    now.Format(time.RFC3339),
 	})
+	_ = s.producer.Publish(ctx, &kafkainfra.ProducerMessage{
+		Topic: "monitoring.watchlist.created",
+		Key:   []byte(watchlist.ID),
+		Value: payload,
+	})
 
-	s.logger.Info("watchlist created", "id", watchlist.ID, "name", watchlist.Name)
+	s.logger.Info("watchlist created", logging.String("id", watchlist.ID), logging.String("name", watchlist.Name))
 	return watchlist, nil
 }
 
@@ -344,7 +350,7 @@ func (s *monitoringServiceImpl) UpdateWatchlist(ctx context.Context, req *Update
 		return nil, errors.NewInternal("failed to update watchlist: %v", err)
 	}
 
-	s.logger.Info("watchlist updated", "id", watchlist.ID)
+	s.logger.Info("watchlist updated", logging.String("id", watchlist.ID))
 	return watchlist, nil
 }
 
@@ -369,7 +375,7 @@ func (s *monitoringServiceImpl) DeleteWatchlist(ctx context.Context, watchlistID
 		return errors.NewInternal("failed to archive watchlist: %v", err)
 	}
 
-	s.logger.Info("watchlist archived", "id", watchlistID)
+	s.logger.Info("watchlist archived", logging.String("id", watchlistID))
 	return nil
 }
 
@@ -551,7 +557,7 @@ func (s *monitoringServiceImpl) RunScan(ctx context.Context, watchlistID string)
 	startedAt := time.Now().UTC()
 	scanID := generateScanID(watchlistID, startedAt)
 
-	s.logger.Info("scan started", "scan_id", scanID, "watchlist_id", watchlistID)
+	s.logger.Info("scan started", logging.String("scan_id", scanID), logging.String("watchlist_id", watchlistID))
 
 	// Execute pairwise comparison between patents and molecules.
 	var matches []ScanMatch
@@ -606,7 +612,7 @@ func (s *monitoringServiceImpl) RunScan(ctx context.Context, watchlistID string)
 	}
 
 	if err := s.scanResultRepo.Save(ctx, result); err != nil {
-		s.logger.Error("failed to save scan result", "error", err, "scan_id", scanID)
+		s.logger.Error("failed to save scan result", logging.Err(err), logging.String("scan_id", scanID))
 	}
 
 	// Update watchlist scan metadata.
@@ -618,18 +624,23 @@ func (s *monitoringServiceImpl) RunScan(ctx context.Context, watchlistID string)
 	watchlist.TotalAlerts += alertsCreated
 	watchlist.UpdatedAt = now
 	if err := s.watchlistRepo.Update(ctx, watchlist); err != nil {
-		s.logger.Error("failed to update watchlist after scan", "error", err)
+		s.logger.Error("failed to update watchlist after scan", logging.Err(err))
 	}
 
-	_ = s.producer.Publish(ctx, "monitoring.scan.completed", scanID, map[string]any{
+	payload, _ := json.Marshal(map[string]any{
 		"scan_id":        scanID,
 		"watchlist_id":   watchlistID,
 		"matches_found":  len(matches),
 		"alerts_created": alertsCreated,
 		"duration_ms":    result.Duration.Milliseconds(),
 	})
+	_ = s.producer.Publish(ctx, &kafkainfra.ProducerMessage{
+		Topic: "monitoring.scan.completed",
+		Key:   []byte(scanID),
+		Value: payload,
+	})
 
-	s.logger.Info("scan completed", "scan_id", scanID, "matches", len(matches), "alerts", alertsCreated)
+	s.logger.Info("scan completed", logging.String("scan_id", scanID), logging.Int("matches", len(matches)), logging.Int("alerts", alertsCreated))
 	return result, nil
 }
 
@@ -647,13 +658,13 @@ func (s *monitoringServiceImpl) RunScheduledScans(ctx context.Context) (int, err
 			continue
 		}
 		if _, scanErr := s.RunScan(ctx, wl.ID); scanErr != nil {
-			s.logger.Error("scheduled scan failed", "watchlist_id", wl.ID, "error", scanErr)
+			s.logger.Error("scheduled scan failed", logging.String("watchlist_id", wl.ID), logging.Err(scanErr))
 			continue
 		}
 		scansRun++
 	}
 
-	s.logger.Info("scheduled scans completed", "total_due", len(dueWatchlists), "scans_run", scansRun)
+	s.logger.Info("scheduled scans completed", logging.Int("total_due", len(dueWatchlists)), logging.Int("scans_run", scansRun))
 	return scansRun, nil
 }
 
@@ -708,4 +719,3 @@ func generateScanID(watchlistID string, ts time.Time) string {
 }
 
 //Personal.AI order the ending
-

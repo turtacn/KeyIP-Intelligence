@@ -24,6 +24,7 @@ type PatentRepository interface {
 	GetByJurisdiction(ctx context.Context, jurisdiction string, limit, offset int) ([]*Patent, int64, error)
 	GetExpiringPatents(ctx context.Context, daysAhead int, limit, offset int) ([]*Patent, int64, error)
 	FindDuplicates(ctx context.Context, fullTextHash string) ([]*Patent, error)
+	FindByMoleculeID(ctx context.Context, moleculeID string) ([]*Patent, error)
 
 	// Claims
 	CreateClaim(ctx context.Context, claim *Claim) error

@@ -7,6 +7,12 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
+// MoleculeDomainService defines the interface for molecule domain operations.
+type MoleculeDomainService interface {
+	Canonicalize(ctx context.Context, smiles string) (string, string, error)
+	CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error)
+}
+
 // MoleculeService coordinates molecule-related business operations.
 type MoleculeService struct {
 	repo             MoleculeRepository
@@ -336,6 +342,23 @@ func (s *MoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID 
 		if err := mol.AddProperty(p); err != nil { return err }
 	}
 	return s.repo.Update(ctx, mol)
+}
+
+// Canonicalize standardizes a SMILES string and returns canonical SMILES and InChIKey.
+func (s *MoleculeService) Canonicalize(ctx context.Context, smiles string) (string, string, error) {
+	ids, err := s.fpCalculator.Standardize(ctx, smiles)
+	if err != nil {
+		return "", "", err
+	}
+	return ids.CanonicalSMILES, ids.InChIKey, nil
+}
+
+// CanonicalizeFromInChI converts InChI to canonical SMILES and InChIKey.
+func (s *MoleculeService) CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error) {
+	// Note: Currently assumes fpCalculator.Standardize can handle InChI or this is a placeholder.
+	// In a real implementation, we would use RDKit to convert InChI to SMILES.
+	// For now, returning not implemented to satisfy interface.
+	return "", "", errors.New(errors.ErrCodeNotImplemented, "InChI canonicalization not implemented")
 }
 
 // TagMolecule adds tags to an existing molecule.

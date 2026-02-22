@@ -4,6 +4,7 @@ package infringement
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
@@ -88,7 +89,7 @@ type CompetitorPortfolioAnalysis struct {
 	TechnologyBreakdown map[string]int       `json:"technology_breakdown"`
 	TopIPCClasses       []IPCClassCount      `json:"top_ipc_classes"`
 	FilingTrend         []MonthlyFilingCount `json:"filing_trend"`
-	AnalyzedAt          time.Time            `json:"analyzed_at"`
+	AnalyzedAt          time.Time                `json:"analyzed_at"`
 }
 
 // IPCClassCount pairs an IPC classification code with its occurrence count.
@@ -180,7 +181,7 @@ type CompetitorTrackingService interface {
 // competitorTrackingServiceImpl is the concrete implementation.
 type competitorTrackingServiceImpl struct {
 	competitorRepo CompetitorRepository
-	producer       kafkainfra.Producer
+	producer       MessageProducer
 	cache          redis.Cache
 	logger         logging.Logger
 	mu             sync.RWMutex
@@ -189,7 +190,7 @@ type competitorTrackingServiceImpl struct {
 // NewCompetitorTrackingService constructs a new CompetitorTrackingService.
 func NewCompetitorTrackingService(
 	competitorRepo CompetitorRepository,
-	producer kafkainfra.Producer,
+	producer MessageProducer,
 	cache redis.Cache,
 	logger logging.Logger,
 ) CompetitorTrackingService {
@@ -221,7 +222,7 @@ func (s *competitorTrackingServiceImpl) TrackCompetitor(ctx context.Context, req
 			if err := s.competitorRepo.Update(ctx, existing); err != nil {
 				return nil, errors.NewInternal("failed to reactivate competitor: %v", err)
 			}
-			s.logger.Info("competitor reactivated", "id", existing.ID, "name", existing.Name)
+			s.logger.Info("competitor reactivated", logging.String("id", existing.ID), logging.String("name", existing.Name))
 			return existing, nil
 		}
 		return existing, nil
@@ -243,14 +244,19 @@ func (s *competitorTrackingServiceImpl) TrackCompetitor(ctx context.Context, req
 		return nil, errors.NewInternal("failed to save competitor: %v", err)
 	}
 
-	_ = s.producer.Publish(ctx, "competitor.tracked", competitor.ID, map[string]any{
+	payload, _ := json.Marshal(map[string]any{
 		"competitor_id": competitor.ID,
 		"name":          competitor.Name,
 		"watchlist_id":  competitor.WatchlistID,
 		"timestamp":     now.Format(time.RFC3339),
 	})
+	_ = s.producer.Publish(ctx, &kafkainfra.ProducerMessage{
+		Topic: "competitor.tracked",
+		Key:   []byte(competitor.ID),
+		Value: payload,
+	})
 
-	s.logger.Info("competitor tracked", "id", competitor.ID, "name", competitor.Name)
+	s.logger.Info("competitor tracked", logging.String("id", competitor.ID), logging.String("name", competitor.Name))
 	return competitor, nil
 }
 
@@ -275,7 +281,7 @@ func (s *competitorTrackingServiceImpl) RemoveCompetitor(ctx context.Context, co
 		return errors.NewInternal("failed to archive competitor: %v", err)
 	}
 
-	s.logger.Info("competitor archived", "id", competitorID, "name", competitor.Name)
+	s.logger.Info("competitor archived", logging.String("id", competitorID), logging.String("name", competitor.Name))
 	return nil
 }
 
@@ -354,7 +360,7 @@ func (s *competitorTrackingServiceImpl) AnalyzeCompetitorPortfolio(ctx context.C
 
 	_ = s.cache.Set(ctx, cacheKey, analysis, 30*time.Minute)
 
-	s.logger.Info("competitor portfolio analyzed", "id", competitorID, "total_patents", analysis.TotalPatents)
+	s.logger.Info("competitor portfolio analyzed", logging.String("id", competitorID), logging.Int("total_patents", analysis.TotalPatents))
 	return analysis, nil
 }
 
@@ -388,20 +394,25 @@ func (s *competitorTrackingServiceImpl) DetectNewFilings(ctx context.Context, co
 	competitor.LastScanAt = &now
 	competitor.UpdatedAt = now
 	if err := s.competitorRepo.Update(ctx, competitor); err != nil {
-		s.logger.Error("failed to update last scan time", "error", err, "competitor_id", competitorID)
+		s.logger.Error("failed to update last scan time", logging.Err(err), logging.String("competitor_id", competitorID))
 	}
 
 	for _, d := range detections {
-		_ = s.producer.Publish(ctx, "competitor.new_filing", d.PatentNumber, map[string]any{
+		payload, _ := json.Marshal(map[string]any{
 			"competitor_id": d.CompetitorID,
 			"patent_number": d.PatentNumber,
 			"detected_at":   d.DetectedAt.Format(time.RFC3339),
 		})
+		_ = s.producer.Publish(ctx, &kafkainfra.ProducerMessage{
+			Topic: "competitor.new_filing",
+			Key:   []byte(d.PatentNumber),
+			Value: payload,
+		})
 	}
 
 	s.logger.Info("new filing detection complete",
-		"competitor_id", competitorID, "scan_since", scanSince.Format(time.RFC3339),
-		"detections", len(detections))
+		logging.String("competitor_id", competitorID), logging.String("scan_since", scanSince.Format(time.RFC3339)),
+		logging.Int("detections", len(detections)))
 
 	return detections, nil
 }
@@ -482,7 +493,7 @@ func (s *competitorTrackingServiceImpl) GetCompetitiveLandscape(ctx context.Cont
 	_ = s.cache.Set(ctx, cacheKey, landscape, 1*time.Hour)
 
 	s.logger.Info("competitive landscape generated",
-		"area", technologyArea, "competitors", len(competitors), "patents", totalPatents)
+		logging.String("area", technologyArea), logging.Int("competitors", len(competitors)), logging.Int("patents", totalPatents))
 
 	return landscape, nil
 }
@@ -564,8 +575,8 @@ func (s *competitorTrackingServiceImpl) ComparePortfolios(ctx context.Context, c
 	}
 
 	s.logger.Info("portfolio comparison complete",
-		"competitor_a", compA.Name, "competitor_b", compB.Name,
-		"overlapping_areas", len(overlapping))
+		logging.String("competitor_a", compA.Name), logging.String("competitor_b", compB.Name),
+		logging.Int("overlapping_areas", len(overlapping)))
 
 	return comparison, nil
 }
@@ -578,4 +589,3 @@ func generateCompetitorID(name, watchlistID string, ts time.Time) string {
 }
 
 //Personal.AI order the ending
-
