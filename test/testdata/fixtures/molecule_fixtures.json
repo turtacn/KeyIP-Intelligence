@@ -1,0 +1,716 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2024-01-15T00:00:00Z",
+  "description": "Standardized molecule fixture dataset for PatentGuardian OLED material domain testing. Covers carbazole hosts, spirofluorene hosts, Ir phosphorescent emitters, TADF emitters, HTL materials, ETL materials, and boundary-condition molecules.",
+  "molecules": [
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "smiles": "c1ccc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1",
+      "inchi": "InChI=1S/C24H17N/c1-5-13-20(14-6-1)18-9-11-21(12-10-18)25-23-17-8-4-3-7-16(17)22-15-2-19(25)24(22)23/h1-15H",
+      "inchi_key": "IYZMXHQDXZKNCY-UHFFFAOYSA-N",
+      "molecular_formula": "C24H17N",
+      "molecular_weight": 331.41,
+      "name": "CBP",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+      },
+      "properties": [
+        {"type": "triplet_energy", "value": 2.56, "unit": "eV", "conditions": "measured in CH2Cl2 at 77K"},
+        {"type": "homo_level", "value": -6.0, "unit": "eV", "conditions": "UPS measurement"},
+        {"type": "lumo_level", "value": -2.7, "unit": "eV", "conditions": "IPES measurement"},
+        {"type": "glass_transition_temperature", "value": 62.0, "unit": "°C", "conditions": "DSC, 10°C/min"},
+        {"type": "decomposition_temperature", "value": 437.0, "unit": "°C", "conditions": "TGA, 5% weight loss"}
+      ],
+      "metadata": {
+        "cas_number": "58328-31-7",
+        "category": "carbazole_host",
+        "role": "host",
+        "emission_color": "blue",
+        "source_patent": "US11,234,567 B2"
+      },
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
+      "smiles": "c1ccc2c(c1)c1ccccc1n2-c1cccc(-n2c3ccccc3c3ccccc32)c1",
+      "inchi": "InChI=1S/C24H16N2/c1-3-7-17-15(5-1)13-19(14-16-6-2-8-18(17)16)25-21-11-9-20(10-12-21)24-22-4-25/h1-14H",
+      "inchi_key": "VFUDMQLBKNMONU-UHFFFAOYSA-N",
+      "molecular_formula": "C24H16N2",
+      "molecular_weight": 332.40,
+      "name": "mCBP",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB=="
+      },
+      "properties": [
+        {"type": "triplet_energy", "value": 2.80, "unit": "eV", "conditions": "measured in toluene at 77K"},
+        {"type": "homo_level", "value": -6.1, "unit": "eV", "conditions": "UPS measurement"},
+        {"type": "lumo_level", "value": -2.5, "unit": "eV", "conditions": "IPES measurement"},
+        {"type": "glass_transition_temperature", "value": 93.0, "unit": "°C", "conditions": "DSC, 10°C/min"},
+        {"type": "decomposition_temperature", "value": 452.0, "unit": "°C", "conditions": "TGA, 5% weight loss"}
+      ],
+      "metadata": {
+        "cas_number": "342638-54-4",
+        "category": "carbazole_host",
+        "role": "host",
+        "emission_color": "deep_blue",
+        "source_patent": "US11,234,567 B2"
+      },
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000003",
+      "smiles": "c1ccc(-n2c3ccccc3c3cc(-c4ccc5c(c4)c4ccccc4n5-c4ccccc4)ccc32)cc1",
+      "inchi": "InChI=1S/C36H24N2/c1-5-13-25(14-6-1)37-31-19-17-27(18-20-31)29-21-22-32-30(23-29)34-16-12-10-8-28(34)36(32)38-26-15-11-9-7-24(26)33(37)35(38)2/h1-23H",
+      "inchi_key": "XZXYQEHBFNQBEY-UHFFFAOYSA-N",
+      "molecular_formula": "C36H24N2",
+      "molecular_weight": 488.59,
+      "name": "CBP-C6",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC=="
+      },
+      "properties": [
+        {"type": "triplet_energy", "value": 2.50, "unit": "eV", "conditions": "measured in CH2Cl2 at 77K"},
+        {"type": "homo_level", "value": -5.9, "unit": "eV", "conditions": "CV measurement"},
+        {"type": "lumo_level", "value": -2.6, "unit": "eV", "conditions": "optical gap estimation"},
+        {"type": "glass_transition_temperature", "value": 115.0, "unit": "°C", "conditions": "DSC, 10°C/min"}
+      ],
+      "metadata": {
+        "category": "carbazole_host",
+        "role": "host",
+        "emission_color": "blue",
+        "source_patent": "US11,234,567 B2"
+      },
+      "created_at": "2024-01-02T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000004",
+      "smiles": "c1ccc(-n(c2ccccc2)c2ccc(-c3ccc(-n(c4ccccc4)c4ccccc4)cc3)cc2)cc1",
+      "inchi": "InChI=1S/C36H28N2/c1-5-13-27(14-6-1)35(28-15-7-2-8-16-28)37-31-21-23-33(24-22-31)34-25-19-30(20-26-34)36(29-17-9-3-10-18-29)38(11-4-12-38)32-37/h1-26H",
+      "inchi_key": "RVFGKBWWUQOIAV-UHFFFAOYSA-N",
+      "molecular_formula": "C36H28N2",
+      "molecular_weight": 492.63,
+      "name": "Spiro-OMeTAD-Core",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD=="
+      },
+      "properties": [
+        {"type": "homo_level", "value": -5.22, "unit": "eV", "conditions": "CV in CH2Cl2"},
+        {"type": "lumo_level", "value": -2.28, "unit": "eV", "conditions": "optical gap estimation"},
+        {"type": "glass_transition_temperature", "value": 125.0, "unit": "°C", "conditions": "DSC, 10°C/min"},
+        {"type": "decomposition_temperature", "value": 449.0, "unit": "°C", "conditions": "TGA, 5% weight loss"}
+      ],
+      "metadata": {
+        "category": "spirofluorene_host",
+        "role": "host",
+        "source_patent": "EP4,123,456 B1"
+      },
+      "created_at": "2024-01-02T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000005",
+      "smiles": "C1(c2ccccc2)(c2ccc(-N3CCOCC3)cc2)c2cc(N3CCOCC3)ccc2-c2ccc(-N3CCOCC3)cc21",
+      "inchi": "InChI=1S/C37H33N3O3/c1-4-10-28(11-5-1)37(29-12-16-31(17-13-29)38-20-24-41-25-21-38)30-14-18-32(19-15-30)39-22-26-42-27-23-39/h1-19H,20-27H2",
+      "inchi_key": "QWZMFGNPFHRYPT-UHFFFAOYSA-N",
+      "molecular_formula": "C37H33N3O3",
+      "molecular_weight": 571.68,
+      "name": "Spiro-MeO-Morph",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE=="
+      },
+      "properties": [
+        {"type": "homo_level", "value": -5.10, "unit": "eV", "conditions": "CV in CH2Cl2"},
+        {"type": "lumo_level", "value": -2.15, "unit": "eV", "conditions": "optical gap estimation"},
+        {"type": "glass_transition_temperature", "value": 148.0, "unit": "°C", "conditions": "DSC, 10°C/min"}
+      ],
+      "metadata": {
+        "category": "spirofluorene_host",
+        "role": "host",
+        "source_patent": "EP4,123,456 B1"
+      },
+      "created_at": "2024-01-03T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000006",
+      "smiles": "[Ir]123(c4cccc(c4)C4=CC(=N2)C(C)=C4)(c2cccc(c2)C2=CC(=N1)C(C)=C2)c1cccc(c1)C1=CC(=N3)C(C)=C1",
+      "inchi": "InChI=1S/3C8H8N.Ir/c3*1-6-4-7(5-9-6)3-2-8-9;/h3*2-5H,1H3;",
+      "inchi_key": "GJHFIHBBFPCEOX-UHFFFAOYSA-N",
+      "molecular_formula": "C24H24IrN3",
+      "molecular_weight": 548.69,
+      "name": "Ir(mppy)3",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAF==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAF==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAF=="
+      },
+      "properties": [
+        {"type": "emission_wavelength", "value": 510.0, "unit": "nm", "conditions": "in CH2Cl2 at RT"},
+        {"type": "quantum_efficiency", "value": 89.0, "unit": "%", "conditions": "PLQY in degassed CH2Cl2"},
+        {"type": "triplet_energy", "value": 2.42, "unit": "eV", "conditions": "77K phosphorescence"},
+        {"type": "decomposition_temperature", "value": 380.0, "unit": "°C", "conditions": "TGA, 5% weight loss"}
+      ],
+      "metadata": {
+        "category": "ir_complex",
+        "role": "dopant",
+        "emission_color": "green",
+        "source_patent": "US11,234,567 B2"
+      },
+      "created_at": "2024-01-03T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000007",
+      "smiles": "[Ir]123(c4ccc(F)c(c4)C4=CC(=N2)C(F)=C4)(c2ccc(F)c(c2)C2=CC(=N1)C(F)=C2)N(C(=O)c1cc(F)cc(F)c1C1=CC(=N3)C(F)=C1)C",
+      "inchi": "InChI=1S/C7H3F2NO.2C8H5FN.Ir/c8-4-1-3(6(9)2-5(4)10-7(11)12)13;2*1-6-4-7(5-9-6)3-2-8-9;/h1-2H;2*2-5H;",
+      "inchi_key": "BQKFNHXJBFMTGY-UHFFFAOYSA-N",
+      "molecular_formula": "C23H13F5IrN3O",
+      "molecular_weight": 620.58,
+      "name": "FIrpic-analog",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAG==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAG==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAG=="
+      },
+      "properties": [
+        {"type": "emission_wavelength", "value": 470.0, "unit": "nm", "conditions": "in CH2Cl2 at RT"},
+        {"type": "quantum_efficiency", "value": 92.0, "unit": "%", "conditions": "PLQY in degassed CH2Cl2"},
+        {"type": "triplet_energy", "value": 2.65, "unit": "eV", "conditions": "77K phosphorescence"},
+        {"type": "cie_coordinates", "value": 0.15, "unit": "CIE_x", "conditions": "EL spectrum at 10 mA/cm2"}
+      ],
+      "metadata": {
+        "category": "ir_complex",
+        "role": "dopant",
+        "emission_color": "blue",
+        "source_patent": "CN118,765,432 B"
+      },
+      "created_at": "2024-01-04T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000008",
+      "smiles": "N#Cc1cc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)c(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)c(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)c1C#N",
+      "inchi": "InChI=1S/C56H34N6/c1-7-19-37(20-8-1)55-43(31-57)33-45(34-44(55)32-58)53-29-25-41(26-30-53)61-49-17-13-11-15-47(49)51-39(61)23-35(24-40(51)62-50-18-14-12-16-48(50)52(62)3)27-42(28-54(55)4)60-46-10-6-5-9-38(46)56(60)2/h1-34H",
+      "inchi_key": "UXFQFBNHMVHJGS-UHFFFAOYSA-N",
+      "molecular_formula": "C56H34N6",
+      "molecular_weight": 810.92,
+      "name": "4CzIPN",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH=="
+      },
+      "properties": [
+        {"type": "emission_wavelength", "value": 507.0, "unit": "nm", "conditions": "in toluene at RT"},
+        {"type": "quantum_efficiency", "value": 94.0, "unit": "%", "conditions": "PLQY in doped film"},
+        {"type": "homo_level", "value": -5.80, "unit": "eV", "conditions": "CV in DMF"},
+        {"type": "lumo_level", "value": -3.40, "unit": "eV", "conditions": "CV in DMF"},
+        {"type": "glass_transition_temperature", "value": 186.0, "unit": "°C", "conditions": "DSC, 10°C/min"}
+      ],
+      "metadata": {
+        "category": "tadf_emitter",
+        "role": "dopant",
+        "emission_color": "green",
+        "delta_est_eV": 0.083,
+        "source_patent": "US11,234,567 B2"
+      },
+      "created_at": "2024-01-04T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000009",
+      "smiles": "N#Cc1cc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)c(-c2ccc(-n3c4ccc(C)cc4c4cc(C)ccc43)cc2)c(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)c1C#N",
+      "inchi": "InChI=1S/C58H38N6/c1-35-15-23-45-43(27-35)51(44-28-36(2)16-24-46(44)63(45)39-9-5-3-6-10-39)31-53(32-52(51)34-60)41-21-17-37(18-22-41)61-47-13-7-11-25-49(47)55-33-59-56(55)50-26-12-8-14-48(50)62(40-19-29-54(30-20-40)64-57-42(61)4)58(64)3/h3-32H,1-2H3",
+      "inchi_key": "MXQOIQKZCBHVAM-UHFFFAOYSA-N",
+      "molecular_formula": "C58H38N6",
+      "molecular_weight": 838.97,
+      "name": "4CzIPN-Me2",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAI==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAI==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAI=="
+      },
+      "properties": [
+        {"type": "emission_wavelength", "value": 515.0, "unit": "nm", "conditions": "in toluene at RT"},
+        {"type": "quantum_efficiency", "value": 91.0, "unit": "%", "conditions": "PLQY in doped film"},
+        {"type": "homo_level", "value": -5.70, "unit": "eV", "conditions": "CV in DMF"},
+        {"type": "lumo_level", "value": -3.35, "unit": "eV", "conditions": "CV in DMF"}
+      ],
+      "metadata": {
+        "category": "tadf_emitter",
+        "role": "dopant",
+        "emission_color": "green",
+        "delta_est_eV": 0.075,
+        "source_patent": "CN118,765,432 B"
+      },
+      "created_at": "2024-01-05T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000010",
+      "smiles": "c1ccc(-n(c2ccccc2)c2ccc(-c3ccc(-n(c4ccccc4)c4ccc5ccccc5c4)cc3)cc2)cc1",
+      "inchi": "InChI=1S/C44H32N2/c1-5-17-33(18-6-1)45(34-19-7-2-8-20-34)37-25-29-39(30-26-37)40-31-27-38(28-32-40)46(35-21-9-3-10-22-35)36-23-13-11-15-41(36)43-16-12-14-24-42(43)44(46)4/h1-32H",
+      "inchi_key": "IBHBKWKFFTZAHE-UHFFFAOYSA-N",
+      "molecular_formula": "C44H32N2",
+      "molecular_weight": 604.75,
+      "name": "NPB",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJ==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJ==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJ=="
+      },
+      "properties": [
+        {"type": "homo_level", "value": -5.40, "unit": "eV", "conditions": "UPS measurement"},
+        {"type": "lumo_level", "value": -2.40, "unit": "eV", "conditions": "IPES measurement"},
+        {"type": "glass_transition_temperature", "value": 98.0, "unit": "°C", "conditions": "DSC, 10°C/min"},
+        {"type": "decomposition_temperature", "value": 434.0, "unit": "°C", "conditions": "TGA, 5% weight loss"}
+      ],
+      "metadata": {
+        "cas_number": "123847-85-8",
+        "category": "htl_material",
+        "role": "htl",
+        "source_patent": "US11,234,567 B2"
+      },
+      "created_at": "2024-01-05T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000011",
+      "smiles": "c1ccc(-n(c2ccc(-n3c4ccccc4c4ccccc43)cc2)c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1",
+      "inchi": "InChI=1S/C42H28N3/c1-4-10-28(11-5-1)43(29-12-16-33(17-13-29)44-35-20-8-6-18-31(35)37-24-14-2-15-25-37)30-22-26-34(27-23-30)45-36-21-9-7-19-32(36)38-39(45)3/h1-27H",
+      "inchi_key": "VQGHOUODWALEFC-UHFFFAOYSA-N",
+      "molecular_formula": "C42H28N3",
+      "molecular_weight": 594.70,
+      "name": "TCTA",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK=="
+      },
+      "properties": [
+        {"type": "homo_level", "value": -5.70, "unit": "eV", "conditions": "UPS measurement"},
+        {"type": "lumo_level", "value": -2.40, "unit": "eV", "conditions": "IPES measurement"},
+        {"type": "triplet_energy", "value": 2.76, "unit":"eV", "conditions": "77K phosphorescence in toluene"},
+        {"type": "glass_transition_temperature", "value": 151.0, "unit": "°C", "conditions": "DSC, 10°C/min"},
+        {"type": "decomposition_temperature", "value": 460.0, "unit": "°C", "conditions": "TGA, 5% weight loss"}
+      ],
+      "metadata": {
+        "cas_number": "139092-78-7",
+        "category": "htl_material",
+        "role": "htl",
+        "source_patent": "EP4,123,456 B1"
+      },
+      "created_at": "2024-01-06T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000012",
+      "smiles": "c1ccc2c(c1)[nH]c1ccc(-c3nc(-c4ccc5[nH]c6ccccc6c5c4)nc(-c4ccc5[nH]c6ccccc6c5c4)n3)cc12",
+      "inchi": "InChI=1S/C45H30N6/c1-4-16-31(17-5-1)37-25-28(13-10-34(37)46-40-22-7-8-23-41(40)47)43-49-44(29-14-11-35-38(26-29)48-42-24-9-6-21-39(42)35)51-45(50-43)30-15-12-36-33(27-30)20-19-32(36)2/h1-27,46-48H",
+      "inchi_key": "VBHHJXNPCZJMFT-UHFFFAOYSA-N",
+      "molecular_formula": "C45H30N6",
+      "molecular_weight": 666.76,
+      "name": "TPBi",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL=="
+      },
+      "properties": [
+        {"type": "homo_level", "value": -6.20, "unit": "eV", "conditions": "UPS measurement"},
+        {"type": "lumo_level", "value": -2.70, "unit": "eV", "conditions": "IPES measurement"},
+        {"type": "triplet_energy", "value": 2.74, "unit": "eV", "conditions": "77K phosphorescence"},
+        {"type": "glass_transition_temperature", "value": 122.0, "unit": "°C", "conditions": "DSC, 10°C/min"},
+        {"type": "decomposition_temperature", "value": 553.0, "unit": "°C", "conditions": "TGA, 5% weight loss"}
+      ],
+      "metadata": {
+        "cas_number": "274005-07-1",
+        "category": "etl_material",
+        "role": "etl",
+        "source_patent": "US11,234,567 B2"
+      },
+      "created_at": "2024-01-06T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000013",
+      "smiles": "c1ccc2c(c1)-c1cccnc1-c1ncccc1-2",
+      "inchi": "InChI=1S/C20H14N2/c1-3-7-15-13(5-1)17-11-9-21-19(17)20-14-6-2-4-8-16(14)18(15)12-10-22-20/h1-12H",
+      "inchi_key": "DQFBYFPFKXHELB-UHFFFAOYSA-N",
+      "molecular_formula": "C20H14N2",
+      "molecular_weight": 298.34,
+      "name": "BPhen",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM=="
+      },
+      "properties": [
+        {"type": "homo_level", "value": -6.40, "unit": "eV", "conditions": "UPS measurement"},
+        {"type": "lumo_level", "value": -3.00, "unit": "eV", "conditions": "IPES measurement"},
+        {"type": "triplet_energy", "value": 2.50, "unit": "eV", "conditions": "77K phosphorescence"},
+        {"type": "glass_transition_temperature", "value": 62.0, "unit": "°C", "conditions": "DSC, 10°C/min"},
+        {"type": "decomposition_temperature", "value": 405.0, "unit": "°C", "conditions": "TGA, 5% weight loss"}
+      ],
+      "metadata": {
+        "cas_number": "2426-55-3",
+        "category": "etl_material",
+        "role": "etl",
+        "source_patent": "CN118,765,432 B"
+      },
+      "created_at": "2024-01-07T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000014",
+      "smiles": "c1ccccc1",
+      "inchi": "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H",
+      "inchi_key": "UHOVQNZJYSORNB-UHFFFAOYSA-N",
+      "molecular_formula": "C6H6",
+      "molecular_weight": 78.11,
+      "name": "Benzene",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAN=="
+      },
+      "properties": [],
+      "metadata": {
+        "category": "boundary_minimal",
+        "role": "reference",
+        "note": "Minimal molecule for boundary testing"
+      },
+      "created_at": "2024-01-07T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000015",
+      "smiles": "c1ccc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1.c1ccc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1.c1ccc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1.c1ccc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1.c1ccc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1.c1ccc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1",
+      "inchi": "InChI=1S/6C24H17N/c6*1-5-13-20(14-6-1)18-9-11-21(12-10-18)25-23-17-8-4-3-7-16(17)22-15-2-19(25)24(22)23/h6*1-15H",
+      "inchi_key": "LARGEMOLECHAINX-UHFFFAOYSA-N",
+      "molecular_formula": "C144H102N6",
+      "molecular_weight": 1988.46,
+      "name": "Hexa-CBP-aggregate",
+      "status": "archived",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO=="
+      },
+      "properties": [
+        {"type": "molecular_weight", "value": 1988.46, "unit": "g/mol", "conditions": "calculated"}
+      ],
+      "metadata": {
+        "category": "boundary_large",
+        "role": "reference",
+        "note": "Large molecule aggregate for boundary testing (MW > 1500)"
+      },
+      "created_at": "2024-01-08T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000016",
+      "smiles": "[Pt](Cl)(Cl)(N)N",
+      "inchi": "InChI=1S/2ClH.2H3N.Pt/h2*1H;2*1H3;/q;;;;+2/p-2",
+      "inchi_key": "LXZZYRPGBWXBFE-UHFFFAOYSA-L",
+      "molecular_formula": "Cl2H6N2Pt",
+      "molecular_weight": 300.05,
+      "name": "Cisplatin",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP=="
+      },
+      "properties": [],
+      "metadata": {
+        "category": "boundary_metal_coordination",
+        "role": "reference",
+        "note": "Metal coordination compound for boundary testing"
+      },
+      "created_at": "2024-01-08T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000017",
+      "smiles": "[R1]c1ccc(-n2c3ccccc3c3ccccc32)cc1",
+      "inchi": "",
+      "inchi_key": "",
+      "molecular_formula": "",
+      "molecular_weight": 0.0,
+      "name": "Markush-Carbazole-Template",
+      "status": "active",
+      "fingerprints": {
+        "morgan": "",
+        "maccs": "",
+        "rdkit": ""
+      },
+      "properties": [],
+      "metadata": {
+        "category": "boundary_markush",
+        "role": "template",
+        "note": "Markush placeholder molecule with R-group for template testing",
+        "markush_variables": {
+          "R1": ["H", "CH3", "C6H5", "C10H7"]
+        }
+      },
+      "created_at": "2024-01-09T00:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000018",
+      "smiles": "c1ccc(-n2c3ccccc3c3ccccc32)cc1",
+      "inchi": "InChI=1S/C18H13N/c1-3-9-14(10-4-1)19-17-13-8-6-5-7-12(13)16-11-2-15(19)18(16)17/h1-11H",
+      "inchi_key": "MVPKGCKDULBMKC-UHFFFAOYSA-N",
+      "molecular_formula": "C18H13N",
+      "molecular_weight": 243.31,
+      "name": "N-phenylcarbazole",
+      "status": "deleted",
+      "fingerprints": {
+        "morgan": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQ==",
+        "maccs": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQ==",
+        "rdkit": "AAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQ=="
+      },
+      "properties": [
+        {"type": "triplet_energy", "value": 3.02, "unit": "eV", "conditions": "77K phosphorescence in THF"},
+        {"type": "homo_level", "value": -5.60, "unit": "eV", "conditions": "CV measurement"}
+      ],
+      "metadata": {
+        "category": "carbazole_host",
+        "role": "host",
+        "note": "Deleted status molecule for soft-delete testing"
+      },
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-10T00:00:00Z"
+    }
+  ],
+  "similarity_pairs": [
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000001",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000001",
+      "tanimoto_morgan": 1.0,
+      "tanimoto_maccs": 1.0,
+      "expected_relationship": "identical"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000006",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000006",
+      "tanimoto_morgan": 1.0,
+      "tanimoto_maccs": 1.0,
+      "expected_relationship": "identical"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000001",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000002",
+      "tanimoto_morgan": 0.91,
+      "tanimoto_maccs": 0.93,
+      "expected_relationship": "highly_similar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000001",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000003",
+      "tanimoto_morgan": 0.87,
+      "tanimoto_maccs": 0.89,
+      "expected_relationship": "highly_similar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000008",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000009",
+      "tanimoto_morgan": 0.88,
+      "tanimoto_maccs": 0.90,
+      "expected_relationship": "highly_similar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000006",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000007",
+      "tanimoto_morgan": 0.72,
+      "tanimoto_maccs": 0.75,
+      "expected_relationship": "moderately_similar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000010",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000011",
+      "tanimoto_morgan": 0.68,
+      "tanimoto_maccs": 0.71,
+      "expected_relationship": "moderately_similar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000004",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000005",
+      "tanimoto_morgan": 0.62,
+      "tanimoto_maccs": 0.66,
+      "expected_relationship": "moderately_similar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000012",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000013",
+      "tanimoto_morgan": 0.58,
+      "tanimoto_maccs": 0.61,
+      "expected_relationship": "moderately_similar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000001",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000014",
+      "tanimoto_morgan": 0.18,
+      "tanimoto_maccs": 0.22,
+      "expected_relationship": "dissimilar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000008",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000016",
+      "tanimoto_morgan": 0.05,
+      "tanimoto_maccs": 0.08,
+      "expected_relationship": "dissimilar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000006",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000014",
+      "tanimoto_morgan": 0.12,
+      "tanimoto_maccs": 0.15,
+      "expected_relationship": "dissimilar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000010",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000016",
+      "tanimoto_morgan": 0.09,
+      "tanimoto_maccs": 0.11,
+      "expected_relationship": "dissimilar"
+    },
+    {
+      "molecule_id_a": "a1b2c3d4-0001-4000-8000-000000000001",
+      "molecule_id_b": "a1b2c3d4-0001-4000-8000-000000000018",
+      "tanimoto_morgan": 0.78,
+      "tanimoto_maccs": 0.81,
+      "expected_relationship": "moderately_similar"
+    }
+  ],
+  "invalid_molecules": [
+    {
+      "id": "invalid-0001",
+      "smiles": "",
+      "inchi": "",
+      "inchi_key": "",
+      "molecular_formula": "",
+      "molecular_weight": 0.0,
+      "name": "Empty-SMILES",
+      "expected_error": "empty_smiles",
+      "expected_error_message": "SMILES string must not be empty"
+    },
+    {
+      "id": "invalid-0002",
+      "smiles": "C(C(C))(C",
+      "inchi": "",
+      "inchi_key": "",
+      "molecular_formula": "",
+      "molecular_weight": 0.0,
+      "name": "Unbalanced-Parentheses",
+      "expected_error": "invalid_smiles_syntax",
+      "expected_error_message": "SMILES contains unbalanced parentheses"
+    },
+    {
+      "id": "invalid-0003",
+      "smiles": "c1ccccc1",
+      "inchi": "InChI=INVALID/GARBAGE/STRING",
+      "inchi_key": "UHOVQNZJYSORNB-UHFFFAOYSA-N",
+      "molecular_formula": "C6H6",
+      "molecular_weight": 78.11,
+      "name": "Invalid-InChI",
+      "expected_error": "invalid_inchi",
+      "expected_error_message": "InChI string does not conform to standard format"
+    },
+    {
+      "id": "invalid-0004",
+      "smiles": "c1ccccc1",
+      "inchi": "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H",
+      "inchi_key": "UHOVQNZJYSORNB-UHFFFAOYSA-N",
+      "molecular_formula": "C6H6",
+      "molecular_weight": -12.5,
+      "name": "Negative-MW",
+      "expected_error": "negative_molecular_weight",
+      "expected_error_message": "Molecular weight must be a positive number"
+    },
+    {
+      "id": "invalid-0005",
+      "smiles": "c1ccccc1",
+      "inchi": "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H",
+      "inchi_key": "UHOVQNZJYSORNB-UHFFFAOYSA-N",
+      "molecular_formula": "C6H6",
+      "molecular_weight": 78.11,
+      "name": "",
+      "expected_error": "missing_required_field",
+      "expected_error_message": "Molecule name is required and must not be empty"
+    },
+    {
+      "id": "invalid-0006",
+      "smiles": "Xz3[Qq]++--",
+      "inchi": "",
+      "inchi_key": "",
+      "molecular_formula": "",
+      "molecular_weight": 0.0,
+      "name": "Garbage-SMILES",
+      "expected_error": "invalid_smiles_atoms",
+      "expected_error_message": "SMILES contains invalid atom symbols"
+    },
+    {
+      "id": "invalid-0007",
+      "smiles": "c1ccccc1",
+      "inchi": "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H",
+      "inchi_key": "SHORT",
+      "molecular_formula": "C6H6",
+      "molecular_weight": 78.11,
+      "name": "Invalid-InChIKey-Length",
+      "expected_error": "invalid_inchi_key_format",
+      "expected_error_message": "InChIKey must be exactly 27 characters in standard format"
+    },
+    {
+      "id": "invalid-0008",
+      "smiles": "c1cc1",
+      "inchi": "",
+      "inchi_key": "",
+      "molecular_formula": "",
+      "molecular_weight": 0.0,
+      "name": "Chemically-Impossible-Ring",
+      "expected_error": "chemically_invalid_structure",
+      "expected_error_message": "SMILES describes a chemically impossible ring structure"
+    },
+    {
+      "id": "",
+      "smiles": "c1ccccc1",
+      "inchi": "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H",
+      "inchi_key": "UHOVQNZJYSORNB-UHFFFAOYSA-N",
+      "molecular_formula": "C6H6",
+      "molecular_weight": 78.11,
+      "name": "Missing-ID",
+      "expected_error": "missing_id",
+      "expected_error_message": "Molecule ID is required and must be a valid UUID"
+    }
+  ]
+}
+

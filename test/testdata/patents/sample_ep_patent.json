@@ -1,0 +1,1152 @@
+{
+  "metadata": {
+    "source": "EPO",
+    "format_version": "2.1.0",
+    "extracted_at": "2024-08-05T09:42:15Z",
+    "extraction_method": "ops_api_v3.2",
+    "raw_format": "xml_ep_patent_fulltext_v1",
+    "normalization_pipeline": "etl_v2.3",
+    "checksum": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
+    "language": "en",
+    "translation_available": true
+  },
+  "patent": {
+    "id": "550e8400-e29b-41d4-a716-446655440003",
+    "patent_number": "EP3845582B1",
+    "publication_number": "EP3845582A1",
+    "application_number": "EP20209876.5",
+    "title": "Triazine-based electron transport materials for organic light-emitting devices",
+    "title_de": "Triazin-basierte Elektronentransportmaterialien für organische Leuchtdioden",
+    "title_fr": "Matériaux de transport d'électrons à base de triazine pour dispositifs électroluminescents organiques",
+    "abstract": "The present invention relates to novel triazine-based compounds for use as electron transport materials in organic light-emitting devices. The compounds have a 1,3,5-triazine core substituted at the 2-, 4-, and 6-positions with nitrogen-containing heteroaryl groups and aryl groups selected to optimize electron mobility and LUMO energy level alignment with adjacent device layers. Specifically, the triazine core is functionalized with pyridyl, pyrimidyl, or quinolyl groups at one or two positions, and with phenyl or naphthyl groups bearing optional alkyl substituents at the remaining positions. The resulting materials exhibit electron mobilities exceeding 1×10⁻⁴ cm²/Vs, LUMO energy levels in the range of -2.7 to -3.2 eV, and glass transition temperatures above 120°C. When incorporated as electron transport layers in phosphorescent and TADF-based OLEDs, the compounds enable devices with external quantum efficiencies above 20%, low driving voltages below 3.5 V, and significantly improved operational lifetimes compared to conventional electron transport materials such as TPBi and BPhen. The invention further provides methods for synthesizing these compounds via palladium-catalyzed cross-coupling reactions and organic light-emitting devices incorporating the same.",
+    "abstract_de": "Die vorliegende Erfindung betrifft neuartige Triazin-basierte Verbindungen zur Verwendung als Elektronentransportmaterialien in organischen Leuchtdioden. Die Verbindungen weisen einen 1,3,5-Triazin-Kern auf, der an den 2-, 4- und 6-Positionen mit stickstoffhaltigen Heteroarylgruppen und Arylgruppen substituiert ist, die zur Optimierung der Elektronenmobilität und der LUMO-Energieniveau-Ausrichtung mit benachbarten Geräteschichten ausgewählt sind. Die resultierenden Materialien zeigen Elektronenmobilitäten über 1×10⁻⁴ cm²/Vs, LUMO-Energieniveaus im Bereich von -2,7 bis -3,2 eV und Glasübergangstemperaturen über 120°C. Bei Einbau als Elektronentransportschichten in phosphoreszierenden und TADF-basierten OLEDs ermöglichen die Verbindungen Bauelemente mit externen Quanteneffizienzen über 20%, niedrigen Betriebsspannungen unter 3,5 V und deutlich verbesserten Betriebslebensdauern.",
+    "abstract_fr": "La présente invention concerne de nouveaux composés à base de triazine destinés à être utilisés comme matériaux de transport d'électrons dans des dispositifs électroluminescents organiques. Les composés présentent un noyau 1,3,5-triazine substitué aux positions 2, 4 et 6 par des groupes hétéroaryle contenant de l'azote et des groupes aryle sélectionnés pour optimiser la mobilité des électrons et l'alignement du niveau d'énergie LUMO avec les couches adjacentes du dispositif. Les matériaux résultants présentent des mobilités d'électrons supérieures à 1×10⁻⁴ cm²/Vs, des niveaux d'énergie LUMO dans la plage de -2,7 à -3,2 eV et des températures de transition vitreuse supérieures à 120°C. Lorsqu'ils sont incorporés en tant que couches de transport d'électrons dans des OLED phosphorescentes et à base de TADF, les composés permettent des dispositifs avec des efficacités quantiques externes supérieures à 20%.",
+    "filing_date": "2020-11-25",
+    "publication_date": "2021-07-07",
+    "grant_date": "2023-05-10",
+    "priority_date": "2019-12-03",
+    "priority_claims": [
+      {
+        "country": "US",
+        "application_number": "US62/943,218",
+        "filing_date": "2019-12-03",
+        "type": "provisional"
+      }
+    ],
+    "legal_status": "granted",
+    "jurisdiction": "EP",
+    "patent_type": "invention",
+    "designated_states": [
+      {"country": "DE", "status": "validated", "validation_date": "2023-08-15", "language": "de", "national_patent_number": "EP3845582B1-DE"},
+      {"country": "FR", "status": "validated", "validation_date": "2023-08-20", "language": "fr", "national_patent_number": "EP3845582B1-FR"},
+      {"country": "GB", "status": "validated", "validation_date": "2023-08-10", "language": "en", "national_patent_number": "EP3845582B1-GB"},
+      {"country": "NL", "status": "validated", "validation_date": "2023-08-18", "language": "en", "national_patent_number": "EP3845582B1-NL"},
+      {"country": "IT", "status": "lapsed", "lapse_reason": "translation_not_filed", "lapse_date": "2023-11-10"},
+      {"country": "ES", "status": "lapsed", "lapse_reason": "validation_fee_not_paid", "lapse_date": "2023-11-10"},
+      {"country": "SE", "status": "validated", "validation_date": "2023-09-01", "language": "en", "national_patent_number": "EP3845582B1-SE"},
+      {"country": "CH", "status": "validated", "validation_date": "2023-08-25", "language": "de", "national_patent_number": "EP3845582B1-CH"}
+    ],
+    "assignees": [
+      {
+        "name": "Lumitec Advanced Materials GmbH",
+        "country": "DE",
+        "type": "corporation",
+        "address": "Friedrichstraße 152, 10117 Berlin, Germany",
+        "registration_number": "HRB 218745B"
+      }
+    ],
+    "inventors": [
+      {"name": "Schmidt, Klaus", "country": "DE", "is_corresponding": true},
+      {"name": "Dubois, Marie-Claire", "country": "FR", "is_corresponding": false},
+      {"name": "Park, Joon-Ho", "country": "KR", "is_corresponding": false}
+    ],
+    "ipc_codes": [
+      {"code": "C07D251/24", "version": "2006.01", "classification_level": "main", "description": "1,3,5-Triazines with nitrogen-containing substituents"},
+      {"code": "C07D401/14", "version": "2006.01", "classification_level": "further", "description": "Heterocyclic compounds containing two or more hetero rings with nitrogen"},
+      {"code": "C09K11/06", "version": "2006.01", "classification_level": "further", "description": "Organic luminescent materials"},
+      {"code": "H10K85/60", "version": "2023.01", "classification_level": "further", "description": "Materials for organic electroluminescent devices"},
+      {"code": "H10K50/17", "version": "2023.01", "classification_level": "additional", "description": "Carrier transport layers in OLEDs"}
+    ],
+    "cpc_codes": [
+      {"code": "C07D251/24", "version": "2024.01"},
+      {"code": "C07D401/14", "version": "2024.01"},
+      {"code": "C09K2211/1029", "version": "2024.01"},
+      {"code": "H10K85/6572", "version": "2024.01"},
+      {"code": "H10K50/171", "version": "2024.01"},
+      {"code": "H10K2101/30", "version": "2024.01"}
+    ],
+    "description": {
+      "technical_field": "The present invention relates to the field of organic semiconductor materials, and more particularly to triazine-based compounds for use as electron transport materials in organic light-emitting devices (OLEDs). The invention further relates to organic light-emitting devices incorporating such electron transport materials and to methods for preparing the same.",
+      "background_art": "Organic light-emitting devices (OLEDs) have attracted considerable attention as next-generation display and solid-state lighting technologies due to their self-emissive nature, wide viewing angle, fast response time, and compatibility with flexible substrates. A typical OLED comprises a multilayer structure including an anode, a hole injection layer (HIL), a hole transport layer (HTL), an emitting layer (EML), an electron transport layer (ETL), an electron injection layer (EIL), and a cathode.\n\nThe electron transport layer plays a critical role in determining device performance, as it governs the injection and transport of electrons from the cathode to the emitting layer. An ideal ETL material should possess: (i) a sufficiently deep LUMO energy level (-2.7 to -3.2 eV) for efficient electron injection from the cathode; (ii) high electron mobility (>10⁻⁵ cm²/Vs) for balanced charge transport; (iii) a high triplet energy level (T₁) to confine triplet excitons within the emitting layer; and (iv) adequate thermal stability (Tg > 100°C) for long-term device operation.\n\nConventional ETL materials such as 1,3,5-tris(1-phenyl-1H-benzimidazol-2-yl)benzene (TPBi) and 4,7-diphenyl-1,10-phenanthroline (BPhen) have been widely used. However, TPBi suffers from relatively low electron mobility (~3×10⁻⁵ cm²/Vs) leading to charge imbalance, while BPhen has poor morphological stability (Tg = 62°C) causing device degradation under prolonged operation.\n\nUS 9,512,136 B2 discloses triazine-based compounds with simple phenyl substituents for OLED applications. While these compounds show improved electron mobility compared to TPBi, their LUMO levels are insufficiently deep for efficient electron injection, resulting in high driving voltages.\n\nWO 2018/104521 A1 describes pyrimidine-based electron transport materials with improved thermal stability. However, the electron mobilities of these materials remain below 5×10⁻⁵ cm²/Vs, which is insufficient for high-performance devices.\n\nSchmidt et al. (Journal of Materials Chemistry C, 2019, 7, 12345) reported a systematic study of triazine derivatives with various heteroaryl substituents, demonstrating that the incorporation of pyridyl groups at the triazine core significantly enhances electron mobility. However, the reported compounds exhibited limited thermal stability and suboptimal LUMO energy levels.\n\nThere remains a need for electron transport materials that simultaneously provide high electron mobility, appropriate LUMO energy levels, high thermal stability, and high triplet energy levels for efficient and stable OLED devices.",
+      "summary_of_invention": {
+        "technical_problem": "The present invention addresses the technical problem of providing electron transport materials for OLEDs that simultaneously exhibit high electron mobility (>1×10⁻⁴ cm²/Vs), appropriately deep LUMO energy levels (-2.7 to -3.2 eV), high glass transition temperatures (Tg > 120°C), and high triplet energy levels (T₁ > 2.7 eV), thereby enabling OLED devices with low driving voltage, high efficiency, and long operational lifetime.",
+        "technical_solution": "The above problem is solved by providing compounds having a 1,3,5-triazine core structure substituted at the 2-, 4-, and 6-positions with specific combinations of nitrogen-containing heteroaryl groups (X) and aryl groups (Y). The nitrogen-containing heteroaryl groups X are selected from pyridyl, pyrimidyl, and quinolyl, which provide deep LUMO levels and efficient electron transport pathways through their electron-deficient aromatic systems. The aryl groups Y are selected from phenyl, naphthyl, and biphenyl, which provide morphological stability and tune the molecular packing. Optional alkyl substituents R₁ and R₂ on the aryl groups further modulate the solubility, film-forming properties, and intermolecular interactions. The synergistic combination of the electron-deficient triazine core with nitrogen-containing heteroaryl substituents creates a highly efficient electron transport pathway, while the aryl groups and alkyl substituents ensure adequate thermal and morphological stability.",
+        "beneficial_effects": "The compounds of the present invention provide the following advantages over the prior art: (1) Electron mobilities exceeding 1×10⁻⁴ cm²/Vs, which is 3-10 times higher than conventional ETL materials such as TPBi; (2) LUMO energy levels in the range of -2.7 to -3.2 eV, enabling efficient electron injection and low driving voltages; (3) Glass transition temperatures above 120°C (up to 158°C), ensuring excellent morphological stability; (4) Triplet energy levels above 2.7 eV, sufficient for confining triplet excitons in blue phosphorescent and TADF devices; (5) When used as ETL materials, the compounds enable OLED devices with maximum EQE above 20%, driving voltages below 3.5 V at 1000 cd/m², and T95 lifetimes exceeding 1000 hours for green phosphorescent devices."
+      },
+      "detailed_description": {
+        "synthesis_general": "The compounds of the present invention are synthesized via palladium-catalyzed Suzuki-Miyaura cross-coupling reactions. In a typical procedure, 2,4,6-trichloro-1,3,5-triazine (cyanuric chloride) is reacted sequentially with the appropriate heteroaryl and aryl boronic acids or boronate esters in the presence of a palladium catalyst (Pd(PPh₃)₄ or Pd(dppf)Cl₂) and an inorganic base (K₂CO₃ or Cs₂CO₃) in a toluene/water or dioxane/water mixed solvent system. The sequential coupling allows selective introduction of different substituents at the 2-, 4-, and 6-positions. The crude products are purified by silica gel column chromatography followed by sublimation purification under high vacuum (10⁻⁴ Pa) to obtain materials of >99.5% purity suitable for OLED device fabrication.",
+        "examples": [
+          {
+            "number": 1,
+            "compound_name": "Compound E-1",
+            "smiles": "c1ccnc(-c2nc(-c3cccnc3)nc(-c3ccccc3)n2)c1",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2,4,6-trichloro-1,3,5-triazine (1.84 g, 10.0 mmol)", "pyridine-3-boronic acid pinacol ester (4.51 g, 22.0 mmol)"],
+                "catalyst": "Pd(PPh₃)₄ (0.35 g, 0.30 mmol)",
+                "base": "K₂CO₃ (4.15 g, 30.0 mmol)",
+                "solvent": "1,4-dioxane/water (40 mL/10 mL)",
+                "temperature": "85°C",
+                "duration": "12 h",
+                "yield": 58.2,
+                "description": "Under nitrogen atmosphere, cyanuric chloride and pyridine-3-boronic acid pinacol ester (2.2 equiv) were coupled selectively at the 2- and 4-positions. The reaction mixture was heated to 85°C for 12 h, then cooled to room temperature. After aqueous workup and column chromatography (hexane:ethyl acetate = 3:1), the 2,4-di(pyridin-3-yl)-6-chloro-1,3,5-triazine intermediate was obtained."
+              },
+              {
+                "step_number": 2,
+                "reagents": ["2,4-di(pyridin-3-yl)-6-chloro-1,3,5-triazine (1.80 g, 6.7 mmol)", "phenylboronic acid (0.90 g, 7.4 mmol)"],
+                "catalyst": "Pd(PPh₃)₄ (0.23 g, 0.20 mmol)",
+                "base": "K₂CO₃ (2.78 g, 20.1 mmol)",
+                "solvent": "1,4-dioxane/water (30 mL/8 mL)",
+                "temperature": "95°C",
+                "duration": "16 h",
+                "yield": 72.5,
+                "description": "The intermediate was coupled with phenylboronic acid at the 6-position. After workup, column chromatography (hexane:ethyl acetate = 2:1), and sublimation purification (240°C, 10⁻⁴ Pa), compound E-1 was obtained as a white solid (1.50 g, overall yield 48.3%)."
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (500 MHz, CDCl₃) δ 9.38 (d, J = 1.8 Hz, 2H), 8.72 (dd, J = 4.8, 1.6 Hz, 2H), 8.58 (d, J = 7.2 Hz, 2H), 8.48 (dt, J = 8.0, 1.9 Hz, 2H), 7.62-7.55 (m, 3H), 7.45 (ddd, J = 8.0, 4.8, 0.9 Hz, 2H)",
+              "nmr_13c": "¹³C NMR (125 MHz, CDCl₃) δ 171.8, 171.2, 152.1, 150.2, 136.5, 135.8, 132.4, 131.8, 129.2, 128.8, 123.8",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 311.12 [M]⁺ (calcd for C₁₈H₁₃N₅: 311.12)",
+              "elemental_analysis": "Anal. Calcd for C₁₈H₁₃N₅: C, 69.44; H, 4.21; N, 22.50. Found: C, 69.31; H, 4.26; N, 22.42"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/CBP:Ir(ppy)₃ 8wt% (20 nm)/E-1 (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 2.8,
+              "max_luminance": 85600,
+              "max_current_efficiency": 78.5,
+              "max_eqe": 21.8,
+              "cie_coordinates": [0.31, 0.63],
+              "lifetime_t95": 1250,
+              "electron_mobility_cm2_vs": 1.8e-4
+            }
+          },
+          {
+            "number": 2,
+            "compound_name": "Compound E-2",
+            "smiles": "c1ccnc(-c2nc(-c3cccnc3)nc(-c3ccc4ccccc4c3)n2)c1",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2,4-di(pyridin-3-yl)-6-chloro-1,3,5-triazine (1.80 g, 6.7 mmol)", "2-naphthylboronic acid (1.27 g, 7.4 mmol)"],
+                "catalyst": "Pd(PPh₃)₄ (0.23 g, 0.20 mmol)",
+                "base": "K₂CO₃ (2.78 g, 20.1 mmol)",
+                "solvent": "1,4-dioxane/water (30 mL/8 mL)",
+                "temperature": "95°C",
+                "duration": "18 h",
+                "yield": 68.3,
+                "description": "Coupling of the di-pyridyl triazine intermediate with 2-naphthylboronic acid. After purification and sublimation (255°C, 10⁻⁴ Pa), compound E-2 was obtained as a white solid."
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (500 MHz, CDCl₃) δ 9.40 (d, J = 1.8 Hz, 2H), 8.74 (dd, J = 4.8, 1.6 Hz, 2H), 8.68 (s, 1H), 8.52 (dt, J = 8.0, 1.9 Hz, 2H), 8.08 (dd, J = 8.6, 1.7 Hz, 1H), 7.98-7.88 (m, 3H), 7.58-7.50 (m, 2H), 7.46 (ddd, J = 8.0, 4.8, 0.9 Hz, 2H)",
+              "nmr_13c": "¹³C NMR (125 MHz, CDCl₃) δ 172.0, 171.3, 152.2, 150.3, 135.9, 134.8, 133.5, 132.8, 129.5, 128.9, 128.5, 127.8, 127.2, 126.8, 123.9",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 361.13 [M]⁺ (calcd for C₂₂H₁₅N₅: 361.13)",
+              "elemental_analysis": "Anal. Calcd for C₂₂H₁₅N₅: C, 73.12; H, 4.18; N, 19.38. Found: C, 72.98; H, 4.23; N, 19.30"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/CBP:Ir(ppy)₃ 8wt% (20 nm)/E-2 (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 2.9,
+              "max_luminance": 78200,
+              "max_current_efficiency": 75.2,
+              "max_eqe": 20.9,
+              "cie_coordinates": [0.31, 0.63],
+              "lifetime_t95": 1180,
+              "electron_mobility_cm2_vs": 1.5e-4
+            }
+          },
+          {
+            "number": 3,
+            "compound_name": "Compound E-3",
+            "smiles": "c1ccnc(-c2nc(-c3ccncn3)nc(-c3ccccc3)n2)c1",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2-chloro-4-(pyridin-3-yl)-6-phenyl-1,3,5-triazine (1.79 g, 6.7 mmol)", "pyrimidine-5-boronic acid pinacol ester (1.52 g, 7.4 mmol)"],
+                "catalyst": "Pd(dppf)Cl₂ (0.15 g, 0.20 mmol)",
+                "base": "Cs₂CO₃ (6.55 g, 20.1 mmol)",
+                "solvent": "1,4-dioxane/water (30 mL/8 mL)",
+                "temperature": "100°C",
+                "duration": "20 h",
+                "yield": 55.8,
+                "description": "Coupling with pyrimidine-5-boronic acid ester using Pd(dppf)Cl₂ catalyst. After purification and sublimation (235°C, 10⁻⁴ Pa), compound E-3 was obtained."
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (500 MHz, CDCl₃) δ 9.36 (d, J = 1.8 Hz, 1H), 9.28 (s, 1H), 8.92 (s, 2H), 8.70 (dd, J = 4.8, 1.6 Hz, 1H), 8.56 (d, J = 7.2 Hz, 2H), 8.46 (dt, J = 8.0, 1.9 Hz, 1H), 7.60-7.52 (m, 3H), 7.44 (ddd, J = 8.0, 4.8, 0.9 Hz, 1H)",
+              "nmr_13c": "¹³C NMR (125 MHz, CDCl₃) δ 171.5, 170.8, 159.2, 157.8, 152.0, 150.1, 136.4, 135.7, 132.3, 131.7, 129.1, 128.7, 123.7",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 312.11 [M]⁺ (calcd for C₁₇H₁₂N₆: 312.11)",
+              "elemental_analysis": "Anal. Calcd for C₁₇H₁₂N₆: C, 65.38; H, 3.87; N, 26.91. Found: C, 65.22; H, 3.92; N, 26.83"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/CBP:Ir(ppy)₃ 8wt% (20 nm)/E-3 (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 2.7,
+              "max_luminance": 92100,
+              "max_current_efficiency": 82.3,
+              "max_eqe": 22.6,
+              "cie_coordinates": [0.31, 0.63],
+              "lifetime_t95": 1380,
+              "electron_mobility_cm2_vs": 2.2e-4
+            }
+          },
+          {
+            "number": 4,
+            "compound_name": "Compound E-4",
+            "smiles": "c1ccc2nc(-c3nc(-c4cccnc4)nc(-c4ccccc4)n3)ccc2c1",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2-chloro-4-(pyridin-3-yl)-]()6-phenyl-1,3,5-triazine (1.79 g, 6.7 mmol)", "quinoline-3-boronic acid pinacol ester (1.89 g, 7.4 mmol)"],
+                "catalyst": "Pd(dppf)Cl₂ (0.15 g, 0.20 mmol)",
+                "base": "Cs₂CO₃ (6.55 g, 20.1 mmol)",
+                "solvent": "1,4-dioxane/water (30 mL/8 mL)",
+                "temperature": "100°C",
+                "duration": "22 h",
+                "yield": 52.1,
+                "description": "Coupling with quinoline-3-boronic acid ester. The quinolyl group provides an extended π-system for enhanced electron transport. After purification and sublimation (265°C, 10⁻⁴ Pa), compound E-4 was obtained as a pale yellow solid."
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (500 MHz, CDCl₃) δ 9.42 (d, J = 2.2 Hz, 1H), 9.38 (d, J = 1.8 Hz, 1H), 8.75 (dd, J = 4.8, 1.6 Hz, 1H), 8.62 (d, J = 2.2 Hz, 1H), 8.58 (d, J = 7.2 Hz, 2H), 8.50 (dt, J = 8.0, 1.9 Hz, 1H), 8.18 (d, J = 8.5 Hz, 1H), 7.92 (d, J = 8.1 Hz, 1H), 7.78 (ddd, J = 8.4, 6.9, 1.4 Hz, 1H), 7.62-7.54 (m, 4H), 7.46 (ddd, J = 8.0, 4.8, 0.9 Hz, 1H)",
+              "nmr_13c": "¹³C NMR (125 MHz, CDCl₃) δ 172.2, 171.0, 152.3, 150.4, 149.8, 148.2, 137.5, 136.6, 135.9, 132.5, 131.9, 130.2, 129.8, 129.3, 128.9, 128.2, 127.5, 123.9",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 361.13 [M]⁺ (calcd for C₂₂H₁₅N₅: 361.13)",
+              "elemental_analysis": "Anal. Calcd for C₂₂H₁₅N₅: C, 73.12; H, 4.18; N, 19.38. Found: C, 72.95; H, 4.24; N, 19.31"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/CBP:Ir(ppy)₃ 8wt% (20 nm)/E-4 (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 2.6,
+              "max_luminance": 96800,
+              "max_current_efficiency": 85.1,
+              "max_eqe": 23.4,
+              "cie_coordinates": [0.31, 0.64],
+              "lifetime_t95": 1420,
+              "electron_mobility_cm2_vs": 2.8e-4
+            }
+          },
+          {
+            "number": 5,
+            "compound_name": "Compound E-5",
+            "smiles": "Cc1ccc(-c2nc(-c3cccnc3)nc(-c3cccnc3)n2)cc1C",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2,4-di(pyridin-3-yl)-6-chloro-1,3,5-triazine (1.80 g, 6.7 mmol)", "3,4-dimethylphenylboronic acid (1.11 g, 7.4 mmol)"],
+                "catalyst": "Pd(PPh₃)₄ (0.23 g, 0.20 mmol)",
+                "base": "K₂CO₃ (2.78 g, 20.1 mmol)",
+                "solvent": "1,4-dioxane/water (30 mL/8 mL)",
+                "temperature": "90°C",
+                "duration": "14 h",
+                "yield": 74.8,
+                "description": "Coupling with 3,4-dimethylphenylboronic acid. The methyl substituents enhance solubility and suppress crystallization. After purification and sublimation (230°C, 10⁻⁴ Pa), compound E-5 was obtained as a white solid (1.69 g, overall yield 52.6%)."
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (500 MHz, CDCl₃) δ 9.35 (d, J = 1.8 Hz, 2H), 8.70 (dd, J = 4.8, 1.6 Hz, 2H), 8.46 (dt, J = 8.0, 1.9 Hz, 2H), 8.38 (d, J = 1.6 Hz, 1H), 8.32 (dd, J = 7.9, 1.7 Hz, 1H), 7.44 (ddd, J = 8.0, 4.8, 0.9 Hz, 2H), 7.28 (d, J = 7.9 Hz, 1H), 2.38 (s, 3H), 2.35 (s, 3H)",
+              "nmr_13c": "¹³C NMR (125 MHz, CDCl₃) δ 172.0, 171.4, 152.0, 150.1, 141.2, 137.5, 136.4, 135.8, 132.2, 130.5, 129.8, 128.2, 123.7, 20.2, 19.8",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 339.15 [M]⁺ (calcd for C₂₀H₁₇N₅: 339.15)",
+              "elemental_analysis": "Anal. Calcd for C₂₀H₁₇N₅: C, 70.78; H, 5.05; N, 20.64. Found: C, 70.62; H, 5.10; N, 20.56"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/CBP:Ir(ppy)₃ 8wt% (20 nm)/E-5 (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 2.9,
+              "max_luminance": 82400,
+              "max_current_efficiency": 76.8,
+              "max_eqe": 21.2,
+              "cie_coordinates": [0.31, 0.63],
+              "lifetime_t95": 1150,
+              "electron_mobility_cm2_vs": 1.6e-4
+            }
+          }
+        ],
+        "comparative_examples": [
+          {
+            "number": 1,
+            "compound_name": "Comparative Compound C-1 (TPBi)",
+            "smiles": "c1ccc(-c2nc3ccccc3[nH]2)cc1-c1ccc(-c2nc3ccccc3[nH]2)cc1-c1ccc(-c2nc3ccccc3[nH]2)cc1",
+            "description": "1,3,5-Tris(1-phenyl-1H-benzimidazol-2-yl)benzene (TPBi), a widely used conventional ETL material. Does not contain a triazine core.",
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/CBP:Ir(ppy)₃ 8wt% (20 nm)/TPBi (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 3.5,
+              "max_luminance": 52300,
+              "max_current_efficiency": 55.2,
+              "max_eqe": 16.5,
+              "cie_coordinates": [0.32, 0.63],
+              "lifetime_t95": 620,
+              "electron_mobility_cm2_vs": 3.3e-5
+            },
+            "comparison_notes": "TPBi exhibits electron mobility approximately one order of magnitude lower than the inventive compounds, resulting in charge imbalance and reduced device efficiency. Its LUMO level (-2.7 eV) is at the shallow end of the optimal range."
+          },
+          {
+            "number": 2,
+            "compound_name": "Comparative Compound C-2 (BPhen)",
+            "smiles": "c1ccc(-c2ccc3ccc4ccc(-c5ccccc5)nc4c3n2)cc1",
+            "description": "4,7-Diphenyl-1,10-phenanthroline (BPhen), a conventional ETL material with good electron mobility but poor thermal stability.",
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/CBP:Ir(ppy)₃ 8wt% (20 nm)/BPhen (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 3.0,
+              "max_luminance": 68500,
+              "max_current_efficiency": 62.8,
+              "max_eqe": 18.2,
+              "cie_coordinates": [0.31, 0.63],
+              "lifetime_t95": 380,
+              "electron_mobility_cm2_vs": 1.2e-4
+            },
+            "comparison_notes": "While BPhen has comparable electron mobility to the inventive compounds, its extremely low Tg (62°C) leads to rapid morphological degradation and short device lifetime. The T95 lifetime is less than one-third of the inventive compounds."
+          }
+        ],
+        "industrial_applicability": "The compounds of the present invention are synthesized from commercially available starting materials via well-established palladium-catalyzed cross-coupling chemistry. The synthetic routes are short (2-3 steps), scalable, and provide the target compounds in good overall yields (45-55%). The products can be purified to >99.5% purity by sublimation, meeting the stringent purity requirements for OLED device fabrication. The materials are compatible with standard vacuum thermal evaporation processes used in industrial OLED manufacturing lines. The combination of high electron mobility, appropriate energy levels, and excellent thermal stability makes these materials particularly suitable for commercial OLED display and lighting applications."
+      }
+    },
+    "claims": [
+      {
+        "number": 1,
+        "type": "independent",
+        "depends_on": null,
+        "category": "product",
+        "text": "A compound for use as an electron transport material in an organic light-emitting device, the compound having a triazine core structure, characterized in that the compound has the general formula (I): wherein the 1,3,5-triazine core is substituted at the 2-position with a group X, at the 4-position with a group X' which may be the same as or different from X, and at the 6-position with a group Y; wherein X and X' are each independently selected from the group consisting of pyridin-3-yl, pyrimidin-5-yl, and quinolin-3-yl; Y is selected from the group consisting of phenyl, naphthyl, and biphenyl, each optionally substituted with one or two substituents R₁ and R₂; R₁ and R₂ are each independently selected from hydrogen, C₁-C₄ alkyl, and phenyl; and m is 1 or 2, representing the number of optional substituents on Y.",
+        "preamble": "A compound for use as an electron transport material in an organic light-emitting device, the compound having a triazine core structure",
+        "characterizing_portion": "the compound has the general formula (I): wherein the 1,3,5-triazine core is substituted at the 2-position with a group X, at the 4-position with a group X' which may be the same as or different from X, and at the 6-position with a group Y; wherein X and X' are each independently selected from the group consisting of pyridin-3-yl, pyrimidin-5-yl, and quinolin-3-yl; Y is selected from the group consisting of phenyl, naphthyl, and biphenyl, each optionally substituted with one or two substituents R₁ and R₂; R₁ and R₂ are each independently selected from hydrogen, C₁-C₄ alkyl, and phenyl; and m is 1 or 2",
+        "elements": [
+          {"id": "E1-1", "description": "1,3,5-Triazine core structure", "is_novel": true, "type": "structural"},
+          {"id": "E1-2", "description": "X and X' substituent selection from pyridin-3-yl, pyrimidin-5-yl, quinolin-3-yl", "is_novel": true, "type": "substituent"},
+          {"id": "E1-3", "description": "Y substituent selection from phenyl, naphthyl, biphenyl", "is_novel": false, "type": "substituent"},
+          {"id": "E1-4", "description": "R₁, R₂ independently selected from H, C₁-C₄ alkyl, phenyl", "is_novel": false, "type": "substituent"},
+          {"id": "E1-5", "description": "m parameter is 1 or 2", "is_novel": false, "type": "parameter"}
+        ]
+      },
+      {
+        "number": 2,
+        "type": "dependent",
+        "depends_on": 1,
+        "category": "product",
+        "text": "The compound according to claim 1, characterized in that X and X' are both pyridin-3-yl.",
+        "preamble": "The compound according to claim 1",
+        "characterizing_portion": "X and X' are both pyridin-3-yl",
+        "elements": [
+          {"id": "E2-1", "description": "X and X' narrowed to pyridin-3-yl", "is_novel": false, "type": "substituent_narrowing"}
+        ]
+      },
+      {
+        "number": 3,
+        "type": "dependent",
+        "depends_on": 1,
+        "category": "product",
+        "text": "The compound according to claim 1 or 2, characterized in that Y is phenyl optionally substituted with one or two C₁-C₄ alkyl groups.",
+        "preamble": "The compound according to claim 1 or 2",
+        "characterizing_portion": "Y is phenyl optionally substituted with one or two C₁-C₄ alkyl groups",
+        "elements": [
+          {"id": "E3-1", "description": "Y narrowed to optionally alkyl-substituted phenyl", "is_novel": false, "type": "substituent_narrowing"}
+        ]
+      },
+      {
+        "number": 4,
+        "type": "dependent",
+        "depends_on": 1,
+        "category": "product",
+        "text": "The compound according to any one of claims 1 to 3, characterized in that the compound is selected from the group consisting of: 2,4-di(pyridin-3-yl)-6-phenyl-1,3,5-triazine (E-1); 2,4-di(pyridin-3-yl)-6-(naphthalen-2-yl)-1,3,5-triazine (E-2); 2-(pyridin-3-yl)-4-(pyrimidin-5-yl)-6-phenyl-1,3,5-triazine (E-3); 2-(pyridin-3-yl)-4-(quinolin-3-yl)-6-phenyl-1,3,5-triazine (E-4); and 2,4-di(pyridin-3-yl)-6-(3,4-dimethylphenyl)-1,3,5-triazine (E-5).",
+        "preamble": "The compound according to any one of claims 1 to 3",
+        "characterizing_portion": "the compound is selected from the group consisting of E-1, E-2, E-3, E-4, and E-5",
+        "elements": [
+          {"id": "E4-1", "description": "Enumeration of five specific compounds", "is_novel": false, "type": "compound_enumeration"}
+        ]
+      },
+      {
+        "number": 5,
+        "type": "independent",
+        "depends_on": null,
+        "category": "use",
+        "text": "Use of a compound according to any one of claims 1 to 4 as an electron transport material in an organic light-emitting device.",
+        "preamble": "Use of a compound according to any one of claims 1 to 4",
+        "characterizing_portion": "as an electron transport material in an organic light-emitting device",
+        "elements": [
+          {"id": "E5-1", "description": "Use as ETL material", "is_novel": true, "type": "use"},
+          {"id": "E5-2", "description": "In OLED device context", "is_novel": false, "type": "context"}
+        ]
+      },
+      {
+        "number": 6,
+        "type": "independent",
+        "depends_on": null,
+        "category": "product",
+        "text": "An organic light-emitting device comprising an anode, a cathode, and an organic layer stack disposed between the anode and the cathode, characterized in that the organic layer stack comprises an electron transport layer containing a compound according to any one of claims 1 to 4, and an emitting layer containing a phosphorescent emitter or a thermally activated delayed fluorescence emitter.",
+        "preamble": "An organic light-emitting device comprising an anode, a cathode, and an organic layer stack disposed between the anode and the cathode",
+        "characterizing_portion": "the organic layer stack comprises an electron transport layer containing a compound according to any one of claims 1 to 4, and an emitting layer containing a phosphorescent emitter or a thermally activated delayed fluorescence emitter",
+        "elements": [
+          {"id": "E6-1", "description": "Anode/cathode/organic layer stack device structure", "is_novel": false, "type": "structural"},
+          {"id": "E6-2", "description": "ETL containing compound of claims 1-4", "is_novel": true, "type": "material_usage"},
+          {"id": "E6-3", "description": "EML with phosphorescent or TADF emitter", "is_novel": false, "type": "material_usage"}
+        ]
+      },
+      {
+        "number": 7,
+        "type": "dependent",
+        "depends_on": 6,
+        "category": "product",
+        "text": "The organic light-emitting device according to claim 6, characterized in that the electron transport layer has a thickness of 20 to 60 nm.",
+        "preamble": "The organic light-emitting device according to claim 6",
+        "characterizing_portion": "the electron transport layer has a thickness of 20 to 60 nm",
+        "elements": [
+          {"id": "E7-1", "description": "ETL thickness range 20-60 nm", "is_novel": false, "type": "parameter"}
+        ]
+      },
+      {
+        "number": 8,
+        "type": "dependent",
+        "depends_on": 6,
+        "category": "product",
+        "text": "The organic light-emitting device according to claim 6 or 7, characterized in that the organic layer stack further comprises a hole injection layer comprising HAT-CN, a hole transport layer comprising TAPC or NPB, and an electron injection layer comprising LiF or Liq.",
+        "preamble": "The organic light-emitting device according to claim 6 or 7",
+        "characterizing_portion": "the organic layer stack further comprises a hole injection layer comprising HAT-CN, a hole transport layer comprising TAPC or NPB, and an electron injection layer comprising LiF or Liq",
+        "elements": [
+          {"id": "E8-1", "description": "HIL material HAT-CN", "is_novel": false, "type": "material_usage"},
+          {"id": "E8-2", "description": "HTL material TAPC or NPB", "is_novel": false, "type": "material_usage"},
+          {"id": "E8-3", "description": "EIL material LiF or Liq", "is_novel": false, "type": "material_usage"}
+        ]
+      }
+    ],
+    "markush_structures": [
+      {
+        "id": "MK-EP-001",
+        "claim_reference": 1,
+        "core_smarts": "[#6]1:[#7]:[#6](:[#7]:[#6](:[#7]:1)-[*:3])-[*:1].[*:2]",
+        "core_description": "1,3,5-Triazine core with three substitution positions: X at C2, X' at C4, Y at C6",
+        "variable_groups": [
+          {
+            "position": "X",
+            "attachment_point": "C2-triazine",
+            "options": [
+              {"smiles": "c1ccncc1", "name": "pyridin-3-yl", "name_en": "pyridin-3-yl"},
+              {"smiles": "c1cnc nc1", "name": "pyrimidin-5-yl", "name_en": "pyrimidin-5-yl"},
+              {"smiles": "c1cc2ccccc2nc1", "name": "quinolin-3-yl", "name_en": "quinolin-3-yl"}
+            ]
+          },
+          {
+            "position": "X_prime",
+            "attachment_point": "C4-triazine",
+            "options_same_as": "X"
+          },
+          {
+            "position": "Y",
+            "attachment_point": "C6-triazine",
+            "options": [
+              {"smiles": "c1ccccc1", "name": "phenyl", "name_en": "phenyl"},
+              {"smiles": "c1ccc2ccccc2c1", "name": "naphthyl", "name_en": "naphthyl"},
+              {"smiles": "c1ccc(-c2ccccc2)cc1", "name": "biphenyl", "name_en": "biphenyl"}
+            ]
+          },
+          {
+            "position": "R1",
+            "attachment_point": "Y-ring-substituent-1",
+            "options": [
+              {"smiles": "[H]", "name": "hydrogen", "name_en": "hydrogen"},
+              {"smiles": "C", "name": "methyl", "name_en": "methyl"},
+              {"smiles": "CC", "name": "ethyl", "name_en": "ethyl"},
+              {"smiles": "CCC", "name": "n-propyl", "name_en": "n-propyl"},
+              {"smiles": "CCCC", "name": "n-butyl", "name_en": "n-butyl"},
+              {"smiles": "c1ccccc1", "name": "phenyl", "name_en": "phenyl"}
+            ]
+          },
+          {
+            "position": "R2",
+            "attachment_point": "Y-ring-substituent-2",
+            "options_same_as": "R1"
+          }
+        ],
+        "constraints": [
+          "X and X' may be the same or different",
+          "m = 1 or 2 (number of substituents on Y)",
+          "When m = 1, R₂ = H"
+        ],
+        "estimated_compound_count": 540,
+        "estimation_formula": "3(X) × 3(X') × 3(Y) × 6(R1) × [1(m=1, R2=H) + 6(m=2)] = 9 × 3 × (6 + 36) = 9 × 3 × 42 = 1134 total; accounting for m constraint and symmetry reduction ≈ 540 unique compounds"
+      }
+    ],
+    "molecules": [
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440201",
+        "compound_label": "E-1",
+        "smiles": "c1ccnc(-c2nc(-c3cccnc3)nc(-c3ccccc3)n2)c1",
+        "inchi_key": "DIPYRIDYLTRIAZINEPH-UHFFFAOYSA-N",
+        "molecular_weight": 311.12,
+        "molecular_formula": "C₁₈H₁₃N₅",
+        "location": "Example 1, paragraph [0048]",
+        "role": "core_compound",
+        "is_in_claims": true,
+        "claim_references": [1, 2, 3, 4],
+        "properties": {
+          "t1_ev": 2.82,
+          "homo_ev": -6.45,
+          "lumo_ev": -2.88,
+          "tg_celsius": 128,
+          "td_celsius": 385,
+          "electron_mobility_cm2_vs": 1.8e-4
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440202",
+        "compound_label": "E-2",
+        "smiles": "c1ccnc(-c2nc(-c3cccnc3)nc(-c3ccc4ccccc4c3)n2)c1",
+        "inchi_key": "DIPYRIDYLTRIAZINENAPH-UHFFFAOYSA-N",
+        "molecular_weight": 361.13,
+        "molecular_formula": "C₂₂H₁₅N₅",
+        "location": "Example 2, paragraph [0055]",
+        "role": "example",
+        "is_in_claims": true,
+        "claim_references": [1, 2, 4],
+        "properties": {
+          "t1_ev": 2.75,
+          "homo_ev": -6.38,
+          "lumo_ev": -2.95,
+          "tg_celsius": 142,
+          "td_celsius": 398,
+          "electron_mobility_cm2_vs": 1.5e-4
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440203",
+        "compound_label": "E-3",
+        "smiles": "c1ccnc(-c2nc(-c3ccncn3)nc(-c3ccccc3)n2)c1",
+        "inchi_key": "PYRIDYLPYRIMTRIAZINE-UHFFFAOYSA-N",
+        "molecular_weight": 312.11,
+        "molecular_formula": "C₁₇H₁₂N₆",
+        "location": "Example 3, paragraph [0061]",
+        "role": "example",
+        "is_in_claims": true,
+        "claim_references": [1, 3, 4],
+        "properties": {
+          "t1_ev": 2.88,
+          "homo_ev": -6.52,
+          "lumo_ev": -3.05,
+          "tg_celsius": 122,
+          "td_celsius": 372,
+          "electron_mobility_cm2_vs": 2.2e-4
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440204",
+        "compound_label": "E-4",
+        "smiles": "c1ccc2nc(-c3nc(-c4cccnc4)nc(-c4ccccc4)n3)ccc2c1",
+        "inchi_key": "PYRIDYLQUINTRIAZINE-UHFFFAOYSA-N",
+        "molecular_weight": 361.13,
+        "molecular_formula": "C₂₂H₁₅N₅",
+        "location": "Example 4, paragraph [0067]",
+        "role": "example",
+        "is_in_claims": true,
+        "claim_references": [1, 4],
+        "properties": {
+          "t1_ev": 2.71,
+          "homo_ev": -6.35,
+          "lumo_ev": -3.12,
+          "tg_celsius": 158,
+          "td_celsius": 412,
+          "electron_mobility_cm2_vs": 2.8e-4
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440205",
+        "compound_label": "E-5",
+        "smiles": "Cc1ccc(-c2nc(-c3cccnc3)nc(-c3cccnc3)n2)cc1C",
+        "inchi_key": "DIPYRIDYLTRIAZINEDMPH-UHFFFAOYSA-N",
+        "molecular_weight": 339.15,
+        "molecular_formula": "C₂₀H₁₇N₅",
+        "location": "Example 5, paragraph [0073]",
+        "role": "example",
+        "is_in_claims": true,
+        "claim_references": [1, 2, 3, 4],
+        "properties": {
+          "t1_ev": 2.80,
+          "homo_ev": -6.40,
+          "lumo_ev": -2.82,
+          "tg_celsius": 135,
+          "td_celsius": 390,
+          "electron_mobility_cm2_vs": 1.6e-4
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440206",
+        "compound_label": "C-1 (TPBi)",
+        "smiles": "c1ccc(-n2c3ccccc3nc2-c2ccc(-c3nc4ccccc4n3-c3ccccc3)cc2-c2nc3ccccc3n2-c2ccccc2)cc1",
+        "inchi_key": "TVIVIEFSHFOWTE-UHFFFAOYSA-N",
+        "molecular_weight": 654.76,
+        "molecular_formula": "C₄₅H₃₀N₆",
+        "location": "Comparative Example 1, paragraph [0079]",
+        "role": "comparative",
+        "is_in_claims": false,
+        "claim_references": [],
+        "properties": {
+          "t1_ev": 2.74,
+          "homo_ev": -6.20,
+          "lumo_ev": -2.70,
+          "tg_celsius": 124,
+          "td_celsius": 362,
+          "electron_mobility_cm2_vs": 3.3e-5
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440207",
+        "compound_label": "C-2 (BPhen)",
+        "smiles": "c1ccc(-c2ccc3ccc4ccc(-c5ccccc5)nc4c3n2)cc1",
+        "inchi_key": "DQFBYFPFKXHELB-UHFFFAOYSA-N",
+        "molecular_weight": 332.40,
+        "molecular_formula": "C₂₄H₁₆N₂",
+        "location": "Comparative Example 2, paragraph [0083]",
+        "role": "comparative",
+        "is_in_claims": false,
+        "claim_references": [],
+        "properties": {
+          "t1_ev": 2.50,
+          "homo_ev": -6.40,
+          "lumo_ev": -3.00,
+          "tg_celsius": 62,
+          "td_celsius": 340,
+          "electron_mobility_cm2_vs": 1.2e-4
+        }
+      }
+    ],
+    "citations": [
+      {
+        "type": "patent",
+        "citation_id": "US9,512,136B2",
+        "title": "Triazine compounds for organic light-emitting devices",
+        "jurisdiction": "US",
+        "filing_date": "2014-06-15",
+        "cited_by": "examiner",
+        "relevance": "X",
+        "epo_category": "X",
+        "epo_category_description": "particularly relevant if taken alone",
+        "relevant_claims": [1, 5, 6],
+        "relevant_passages": "Column 3, lines 15-45; Column 8, claims 1-3",
+        "examiner_comment": "Discloses triazine-based compounds with phenyl substituents for OLED ETL applications. However, the substituents at the 2- and 4-positions are limited to phenyl and biphenyl groups, not nitrogen-containing heteroaryl groups as claimed."
+      },
+      {
+        "type": "patent",
+        "citation_id": "WO2018/104521A1",
+        "title": "Electron transport materials based on nitrogen-containing heterocycles",
+        "jurisdiction": "WO",
+        "filing_date": "2017-12-05",
+        "cited_by": "examiner",
+        "relevance": "Y",
+        "epo_category": "Y",
+        "epo_category_description": "particularly relevant if combined with another document",
+        "relevant_claims": [1, 2, 3],
+        "relevant_passages": "Page 12, paragraphs [0045]-[0052]; Page 28, claims 1-5",
+        "examiner_comment": "Discloses pyrimidine-based ETL materials with nitrogen-containing heteroaryl substituents. Relevant in combination with D1 (US9,512,136B2) for assessing inventive step of the specific triazine + pyridyl/pyrimidyl/quinolyl combination."
+      },
+      {
+        "type": "patent",
+        "citation_id": "EP2891659B1",
+        "title": "Heterocyclic compounds for organic electroluminescent devices",
+        "jurisdiction": "EP",
+        "filing_date": "2013-09-02",
+        "cited_by": "examiner",
+        "relevance": "A",
+        "epo_category": "A",
+        "epo_category_description": "technological background",
+        "relevant_claims": [],
+        "relevant_passages": "Paragraphs [0015]-[0025]",
+        "examiner_comment": "General background on heterocyclic ETL materials for OLEDs."
+      },
+      {
+        "type": "non_patent_literature",
+        "citation_id": "NPL-EP-001",
+        "authors": "Schmidt, K.; Weber, M.; Hoffmann, T.",
+        "title": "Efficient electron transport in OLEDs using triazine derivatives: a structure-property relationship study",
+        "journal": "Journal of Materials Chemistry C",
+        "year": 2019,
+        "volume": "7",
+        "issue": "42",
+        "pages": "12345-12358",
+        "doi": "10.1039/C9TC04567A",
+        "cited_by": "applicant",
+        "relevance": "A",
+        "epo_category": "A",
+        "epo_category_description": "technological background",
+        "examiner_comment": "Applicant's own prior publication. Provides background on triazine-based ETL materials but does not disclose the specific combination of substituents claimed."
+      },
+      {
+        "type": "non_patent_literature",
+        "citation_id": "NPL-EP-002",
+        "authors": "Tanaka, H.; Adachi, C.",
+        "title": "High-performance electron transport layers for phosphorescent OLEDs",
+        "journal": "Advanced Functional Materials",
+        "year": 2018,
+        "volume": "28",
+        "issue": "35",
+        "pages": "1802680",
+        "doi": "10.1002/adfm.201802680",
+        "cited_by": "examiner",
+        "relevance": "Y",
+        "epo_category": "Y",
+        "epo_category_description": "particularly relevant if combined with another document",
+        "examiner_comment": "Discloses the concept of using nitrogen-containing heteroaryl groups to enhance electron mobility in ETL materials. Relevant in combination with D1 for inventive step assessment."
+      },
+      {
+        "type": "non_patent_literature",
+        "citation_id": "NPL-EP-003",
+        "authors": "Park, J.-H.; Kim, S.-Y.; Lee, C.-H.",
+        "title": "Triazine-based materials for organic electronics: synthesis, properties, and device applications",
+        "journal": "Chemical Reviews",
+        "year": 2020,
+        "volume": "120",
+        "issue": "18",
+        "pages": "9678-9742",
+        "doi": "10.1021/acs.chemrev.0c00237",
+        "cited_by": "applicant",
+        "relevance": "A",
+        "epo_category": "A",
+        "epo_category_description": "technological background",
+        "examiner_comment": "Comprehensive review article on triazine-based organic electronic materials."
+      }
+    ],
+    "prosecution_history": [
+      {
+        "event_type": "filing",
+        "date": "2020-11-25",
+        "description": "European patent application filed",
+        "details": {
+          "filing_office": "European Patent Office (Munich)",
+          "filing_method": "online_filing_epoline",
+          "original_claims_count": 10,
+          "designated_contracting_states": "all EPC contracting states",
+          "priority_claimed": true,
+          "priority_document": "US62/943,218 (2019-12-03)"
+        }
+      },
+      {
+        "event_type": "formalities_examination",
+        "date": "2021-01-15",
+        "description": "Formalities examination completed, application found to comply with formal requirements",
+        "details": {
+          "rule_reference": "Rule 57 EPC",
+          "deficiencies_found": false
+        }
+      },
+      {
+        "event_type": "search_report",
+        "date": "2021-04-15",
+        "description": "European search report issued",
+        "details": {
+          "search_division": "The Hague",
+          "x_documents": 1,
+          "y_documents": 2,
+          "a_documents": 3,
+          "total_citations": 6,
+          "x_document_list": ["US9,512,136B2"],
+          "y_document_list": ["WO2018/104521A1", "NPL-EP-002"],
+          "a_document_list": ["EP2891659B1", "NPL-EP-001", "NPL-EP-003"],
+          "search_opinion": "The subject-matter of claim 1 appears to be novel over D1 (US9,512,136B2) which discloses triazine compounds with phenyl substituents but not nitrogen-containing heteroaryl groups at the 2- and 4-positions. Inventive step needs to be assessed in view of the combination of D1 with D2 (WO2018/104521A1) or D5 (NPL-EP-002).",
+          "preliminary_opinion_on_patentability": "positive_with_reservations"
+        }
+      },
+      {
+        "event_type": "publication_with_search",
+        "date": "2021-07-07",
+        "description": "Publication of application with European search report (A1 publication)",
+        "details": {
+          "publication_number": "EP3845582A1",
+          "publication_type": "A1",
+          "bulletin_number": "2021/27"
+        }
+      },
+      {
+        "event_type": "examination_request",
+        "date": "2021-07-20",
+        "description": "Request for substantive examination filed under Article 94 EPC",
+        "details": {
+          "examination_fee_paid": true,
+          "fee_amount_eur": 1880,
+          "designation_fee_paid": true,
+          "rule_reference": "Rule 70(1) EPC"
+        }
+      },
+      {
+        "event_type": "examination_communication",
+        "date": "2022-03-10",
+        "description": "Communication under Article 94(3) EPC (first examination report)",
+        "details": {
+          "examining_division": "Munich, Division 3.4.02",
+          "objections": [
+            {
+              "type": "inventive_step",
+              "article": "Article 56 EPC",
+              "description": "The examining division raised an objection under Article 56 EPC regarding the inventive step of claim 1 in view of the combination of D1 (US9,512,136B2) with D5 (NPL-EP-002). D1 discloses triazine-based ETL compounds, and D5 teaches that nitrogen-containing heteroaryl substituents enhance electron mobility. The combination would render obvious the claimed triazine compounds with pyridyl/pyrimidyl/quinolyl substituents."
+            },
+            {
+              "type": "clarity",
+              "article": "Article 84 EPC",
+              "description": "The term 'optionally substituted' in claim 1 was considered insufficiently clear regarding the number and positions of substituents on Y."
+            }
+          ],
+          "response_deadline": "2022-07-10"
+        }
+      },
+      {
+        "event_type": "applicant_response",
+        "date": "2022-06-28",
+        "description": "Applicant's response to first examination report",
+        "details": {
+          "amendments": [
+            "Claim 1 amended to specify 'optionally substituted with one or two substituents R₁ and R₂' and added 'm is 1 or 2' parameter for clarity",
+            "Original claims 9 and 10 (method claims) deleted to focus protection on product and use claims",
+            "Claims renumbered from 10 to 8"
+          ],
+          "arguments": [
+            {
+              "regarding": "inventive_step",
+              "argument": "The applicant argued that D5 (NPL-EP-002) teaches the general concept of nitrogen-containing heteroaryl groups for ETL materials but does not suggest their specific combination with a triazine core. The synergistic effect of the triazine core with pyridyl/pyrimidyl/quinolyl groups — resulting in electron mobilities exceeding 1×10⁻⁴ cm²/Vs while maintaining T₁ > 2.7 eV — constitutes a surprising technical effect not predictable from the prior art. Comparative data showing 3-10× improvement in electron mobility over TPBi and 3× improvement in device lifetime over BPhen support the non-obviousness of the claimed combination."
+            },
+            {
+              "regarding": "clarity",
+              "argument": "Claim 1 has been amended to explicitly define the substitution pattern using parameter m, resolving the clarity objection."
+            }
+          ],
+          "supporting_data": {
+            "additional_comparative_experiments": true,
+            "declaration_filed": false
+          }
+        }
+      },
+      {
+        "event_type": "rule_71_3_communication",
+        "date": "2022-11-30",
+        "description": "Communication under Rule 71(3) EPC — intention to grant the European patent",
+        "details": {
+          "rule_reference": "Rule 71(3) EPC",
+          "text_intended_for_grant": "Claims 1-8 as filed on 2022-06-28; description as originally filed with adaptations",
+          "claims_count": 8,
+          "response_deadline": "2023-03-30",
+          "fees_due": {
+            "grant_fee_eur": 1040,
+            "printing_fee_eur": 0,
+            "claims_fee_eur": 0,
+            "translation_of_claims_required": true,
+            "translation_languages": ["de", "fr"]
+          }
+        }
+      },
+      {
+        "event_type": "grant_fee_paid",
+        "date": "2023-02-15",
+        "description": "Grant fee paid and translations of claims filed in German and French",
+        "details": {
+          "grant_fee_eur": 1040,
+          "claims_translation_de_filed": true,
+          "claims_translation_fr_filed": true,
+          "approved_text_confirmed": true
+        }
+      },
+      {
+        "event_type": "grant",
+        "date": "2023-05-10",
+        "description": "European patent granted and published (B1 publication)",
+        "details": {
+          "publication_type": "B1",
+          "publication_number": "EP3845582B1",
+          "bulletin_number": "2023/19",
+          "granted_claims_count": 8,
+          "grant_decision_date": "2023-04-20",
+          "mention_of_grant_published": "2023-05-10"
+        }
+      },
+      {
+        "event_type": "opposition_period_start",
+        "date": "2023-05-10",
+        "description": "Nine-month opposition period commenced under Article 99 EPC",
+        "details": {
+          "article_reference": "Article 99(1) EPC",
+          "opposition_period_months": 9,
+          "opposition_deadline": "2024-02-10",
+          "opposition_fee_eur": 880,
+          "grounds_available": [
+            "Article 100(a) — lack of novelty or inventive step",
+            "Article 100(b) — insufficient disclosure",
+            "Article 100(c) — subject-matter extends beyond content of application as filed"
+          ]
+        }
+      },
+      {
+        "event_type": "validation_period",
+        "date": "2023-05-10",
+        "description": "Validation period for designated contracting states commenced",
+        "details": {
+          "validation_deadline_general": "2023-11-10",
+          "validation_deadline_months": 3,
+          "note": "For most EPC contracting states, the patent must be validated within 3 months of the mention of grant by filing translations and paying national fees. Some states (e.g., DE, FR, GB) have specific requirements."
+        }
+      },
+      {
+        "event_type": "validations_completed",
+        "date": "2023-09-01",
+        "description": "Patent validated in DE, FR, GB, NL, SE, CH; lapsed in IT and ES",
+        "details": {
+          "validated": [
+            {"country": "DE", "date": "2023-08-15", "translation_language": "de", "fee_eur": 60},
+            {"country": "FR", "date": "2023-08-20", "translation_language": "fr", "fee_eur": 40},
+            {"country": "GB", "date": "2023-08-10", "translation_language": "en", "fee_gbp": 30},
+            {"country": "NL", "date": "2023-08-18", "translation_language": "en", "fee_eur": 25},
+            {"country": "SE", "date": "2023-09-01", "translation_language": "en", "fee_sek": 500},
+            {"country": "CH", "date": "2023-08-25", "translation_language": "de", "fee_chf": 200}
+          ],
+          "lapsed": [
+            {"country": "IT", "reason": "translation_not_filed", "deadline_missed": "2023-11-10"},
+            {"country": "ES", "reason": "validation_fee_not_paid", "deadline_missed": "2023-11-10"}
+          ]
+        }
+      },
+      {
+        "event_type": "opposition_period_end",
+        "date": "2024-02-10",
+        "description": "Nine-month opposition period expired with no opposition filed",
+        "details": {
+          "oppositions_received": 0,
+          "status": "patent_maintained_unamended",
+          "article_reference": "Article 99 EPC"
+        }
+      }
+    ],
+    "opposition_info": {
+      "opposition_period_start": "2023-05-10",
+      "opposition_period_end": "2024-02-10",
+      "opposition_period_months": 9,
+      "oppositions_filed": 0,
+      "status": "no_opposition",
+      "is_final": true,
+      "legal_basis": "Article 99(1) EPC",
+      "available_grounds": [
+        {"ground": "Article 100(a) EPC", "description": "The subject-matter of the European patent is not patentable (lack of novelty or inventive step)"},
+        {"ground": "Article 100(b) EPC", "description": "The European patent does not disclose the invention in a manner sufficiently clear and complete"},
+        {"ground": "Article 100(c) EPC", "description": "The subject-matter extends beyond the content of the application as filed"}
+      ],
+      "appeal_info": {
+        "appeal_possible": false,
+        "reason": "No opposition was filed; appeal under Article 107 EPC is only available against decisions of the Opposition Division"
+      }
+    },
+    "validation_info": {
+      "validation_deadline": "2023-11-10",
+      "validation_deadline_basis": "3 months from mention of grant in European Patent Bulletin (Rule 71a(1) EPC for London Agreement states; national law for others)",
+      "validated_countries": ["DE", "FR", "GB", "NL", "SE", "CH"],
+      "lapsed_countries": ["IT", "ES"],
+      "total_validation_cost_eur": 8500,
+      "london_agreement_applicable": true,
+      "london_agreement_countries": ["DE", "FR", "GB", "NL", "SE", "CH"],
+      "annual_renewal_cost_eur": {
+        "DE": 70,
+        "FR": 38,
+        "GB": 70,
+        "NL": 40,
+        "SE": 50,
+        "CH": 100
+      },
+      "renewal_cost_notes": "After grant, renewal fees are paid to each national patent office individually. Amounts shown are for the 4th year (2024). Fees increase annually according to each country's fee schedule."
+    },
+    "family_id": "FAM-2019-OLED-ETL-001",
+    "family_members": [
+      {
+        "jurisdiction": "EP",
+        "patent_number": "EP3845582B1",
+        "application_number": "EP20209876.5",
+        "status": "granted",
+        "grant_date": "2023-05-10",
+        "validated_in": ["DE", "FR", "GB", "NL", "SE", "CH"]
+      },
+      {
+        "jurisdiction": "US",
+        "patent_number": "US11,482,673B2",
+        "application_number": "US17/105,234",
+        "status": "granted",
+        "filing_date": "2020-11-25",
+        "grant_date": "2022-10-25"
+      },
+      {
+        "jurisdiction": "CN",
+        "patent_number": "CN114829358B",
+        "application_number": "CN202080089456.2",
+        "status": "granted",
+        "filing_date": "2020-11-25",
+        "grant_date": "2023-09-15"
+      },
+      {
+        "jurisdiction": "KR",
+        "patent_number": "KR10-2567890B1",
+        "application_number": "KR10-2022-7020456",
+        "status": "granted",
+        "filing_date": "2020-11-25",
+        "grant_date": "2023-08-20"
+      },
+      {
+        "jurisdiction": "JP",
+        "application_number": "JP2022-531678",
+        "status": "pending",
+        "filing_date": "2020-11-25",
+        "expected_grant_date": "2025-03-01"
+      },
+      {
+        "jurisdiction": "WO",
+        "publication_number": "WO2021/110845A1",
+        "application_number": "PCT/EP2020/083456",
+        "status": "national_phase_entered",
+        "filing_date": "2020-11-25",
+        "publication_date": "2021-06-10",
+        "national_phases_entered": ["US", "CN", "KR", "JP"]
+      }
+    ],
+    "annuity_info": {
+      "epo_renewal_years_paid": 4,
+      "epo_renewal_note": "Renewal fees for years 1-3 are included in the filing/examination fees. Year 4 renewal was paid to EPO before grant. After grant, renewals are paid to national offices of validated states.",
+      "next_epo_renewal_year": null,
+      "epo_fee_history": [
+        {"year": 3, "amount_eur": 545, "paid_date": "2023-02-15", "status": "paid", "paid_to": "EPO"},
+        {"year": 4, "amount_eur": 680, "paid_date": "2023-11-20", "status": "paid", "paid_to": "EPO (pre-grant)"}
+      ],
+      "national_renewals": [
+        {
+          "country": "DE",
+          "currency": "EUR",
+          "next_due_date": "2025-11-30",
+          "next_year": 5,
+          "amount": 70,
+          "payment_history": [
+            {"year": 4, "amount": 60, "paid_date": "2023-11-25", "status": "paid"}
+          ],
+          "fee_schedule_url": "https://www.dpma.de/english/patents/fees/index.html"
+        },
+        {
+          "country": "FR",
+          "currency": "EUR",
+          "next_due_date": "2025-11-30",
+          "next_year": 5,
+          "amount": 38,
+          "payment_history": [
+            {"year": 4, "amount": 36, "paid_date": "2023-11-28", "status": "paid"}
+          ],
+          "fee_schedule_url": "https://www.inpi.fr/en/understanding-intellectual-property/patents/fees"
+        },
+        {
+          "country": "GB",
+          "currency": "GBP",
+          "next_due_date": "2025-11-30",
+          "next_year": 5,
+          "amount": 70,
+          "payment_history": [
+            {"year": 4, "amount": 60, "paid_date": "2023-11-22", "status": "paid"}
+          ],
+          "fee_schedule_url": "https://www.gov.uk/government/publications/patent-forms-and-fees"
+        },
+        {
+          "country": "NL",
+          "currency": "EUR",
+          "next_due_date": "2025-11-30",
+          "next_year": 5,
+          "amount": 40,
+          "payment_history": [
+            {"year": 4, "amount": 40, "paid_date": "2023-11-30", "status": "paid"}
+          ]
+        },
+        {
+          "country": "SE",
+          "currency": "SEK",
+          "next_due_date": "2025-11-30",
+          "next_year": 5,
+          "amount": 600,
+          "payment_history": [
+            {"year": 4, "amount": 500, "paid_date": "2023-12-01", "status": "paid"}
+          ]
+        },
+        {
+          "country": "CH",
+          "currency": "CHF",
+          "next_due_date": "2025-11-30",
+          "next_year": 5,
+          "amount": 110,
+          "payment_history": [
+            {"year": 4, "amount": 100, "paid_date": "2023-11-26", "status": "paid"}
+          ]
+        }
+      ],
+      "total_annual_renewal_cost_estimate": {
+        "year_5": {"total_eur_equivalent": 398, "breakdown": "DE:70 + FR:38 + GB:~82 + NL:40 + SE:~55 + CH:~113"},
+        "year_10": {"total_eur_equivalent": 1250, "note": "Fees increase significantly in later years"},
+        "year_20": {"total_eur_equivalent": 4200, "note": "Maximum fee levels for most countries"}
+      },
+      "estimated_total_cost_20y_eur": 42000,
+      "grace_period_months": 6,
+      "grace_period_surcharge_percent": 50,
+      "grace_period_note": "Most EPC contracting states allow a 6-month grace period for late payment of renewal fees with a 50% surcharge (Rule 51(2) EPC for EPO; national law after grant)"
+    },
+    "valuation": {
+      "technical_score": 85,
+      "legal_score": 82,
+      "commercial_score": 78,
+      "strategic_score": 80,
+      "overall_score": 80.8,
+      "score_weights": {
+        "technical": 0.2,
+        "legal": 0.2,
+        "commercial": 0.3,
+        "strategic": 0.3
+      },
+      "score_formula": "technical×0.2 + legal×0.2 + commercial×0.3 + strategic×0.3 = 17.0 + 16.4 + 23.4 + 24.0 = 80.8",
+      "tier": "A",
+      "tier_thresholds": {"S": 90, "A": 75, "B": 60, "C": 45, "D": 0},
+      "assessment_date": "2024-07-20",
+      "assessor": "patent_valuation_model_v3.2",
+      "key_strengths": [
+        "Strong novelty position: no X-category document fully anticipates the claimed combination of triazine core with nitrogen-containing heteroaryl substituents",
+        "Robust inventive step arguments supported by quantitative comparative data (3-10× electron mobility improvement)",
+        "Clean prosecution history with only one office action before grant; no amendments to independent claims' scope",
+        "Opposition period expired without challenge, confirming patent stability",
+        "Broad family coverage: granted in US, EP, CN, KR with JP pending",
+        "Validated in 6 key European markets covering >85% of EU OLED display market"
+      ],
+      "key_risks": [
+        "IT and ES designations lapsed, leaving gaps in Southern European coverage",
+        "JP application still pending; potential narrowing of claims during Japanese examination",
+        "Triazine-based ETL materials are an active research area with potential design-around risk",
+        "Applicant's own prior publication (NPL-EP-001) limits the scope of protectable subject matter"
+      ],
+      "estimated_market_value_eur": 3500000,
+      "licensing_potential": "high",
+      "licensing_notes": "Strong licensing position for OLED display manufacturers in Europe (Samsung SDI, LG Display, BOE European operations). The validated countries cover major OLED manufacturing and sales markets in Europe."
+    },
+    "extended_metadata": {
+      "oled_layer": "electron_transport_layer",
+      "material_class": "triazine_derivative",
+      "core_skeleton": "1,3,5-triazine",
+      "best_electron_mobility_cm2_vs": 2.8e-4,
+      "best_compound": "E-4",
+      "best_eqe_percent": 23.4,
+      "lumo_range_ev": [-3.12, -2.82],
+      "tg_range_celsius": [122, 158],
+      "t1_range_ev": [2.71, 2.88],
+      "emission_mechanism_compatibility": ["phosphorescence", "TADF"],
+      "epc_procedure_complete": true,
+      "opposition_survived": true,
+      "london_agreement_applicable": true,
+      "unitary_patent_opted_in": false,
+      "upc_opted_out": true,
+      "upc_opt_out_date": "2023-05-15",
+      "upc_opt_out_note": "Opt-out from the Unified Patent Court registered during the sunrise period to maintain national court jurisdiction",
+      "data_quality_score": 0.94,
+      "completeness_score": 0.96,
+      "last_verified": "2024-08-05",
+      "verification_method": "manual_review_plus_automated_validation",
+      "ops_api_response_cached": true,
+      "ops_api_cache_expiry": "2024-09-05T09:42:15Z"
+    },
+    "created_at": "2024-05-15T10:15:00Z",
+    "updated_at": "2024-08-05T09:42:15Z"
+  }
+}
+
+

@@ -1,0 +1,74 @@
+# OLED Host, HTL, ETL, HIL, EIL functional-layer materials SMILES dataset
+# Generated: 2024-01-15 | Version: 1.0.0
+# Format: <SMILES>\t<MoleculeName>
+# Description: Organic semiconductor molecules covering all OLED device functional layers
+# Energy levels from literature; T1 values annotated where relevant for host materials
+# Total entries: 35 molecules ordered by functional layer
+#
+# =============================================================================
+# Section 1: Host Materials (12 molecules)
+# Requirement: T1 of host > T1 of emitter for energy confinement
+# =============================================================================
+c1ccc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1-n1c2ccccc2c2ccccc21	CBP-[Host]-HOMO=-6.0eV-LUMO=-2.9eV-Tg=62C-T1=2.56eV-001
+c1cc(-n2c3ccccc3c3ccccc32)cc(-n2c3ccccc3c3ccccc32)c1	mCP-[Host]-HOMO=-5.9eV-LUMO=-2.4eV-Tg=65C-T1=2.90eV-002
+O=P(c1ccccc1)(c1ccccc1)c1ccccc1Oc1ccccc1P(=O)(c1ccccc1)c1ccccc1	DPEPO-[Host]-HOMO=-6.1eV-LUMO=-2.0eV-Tg=93C-T1=3.00eV-003
+O=P(c1ccccc1)(c1ccccc1)c1ccc2c(c1)sc1cc(P(=O)(c3ccccc3)c3ccccc3)ccc12	PPT-[Host]-HOMO=-6.3eV-LUMO=-2.7eV-Tg=N/A-T1=2.80eV-004
+Cc1cc(-n2c3ccccc3c3ccccc32)ccc1-c1ccc(-n2c3ccccc3c3ccccc32)cc1C	CDBP-[Host]-HOMO=-5.9eV-LUMO=-2.8eV-Tg=100C-T1=2.79eV-005
+c1ccc([Si](c2ccccc2)(c2ccccc2)c2cccc(-n3c4ccccc4c4ccccc43)c2)cc1	SimCP-[Host]-HOMO=-5.9eV-LUMO=-2.4eV-Tg=101C-T1=2.90eV-006
+N#Cc1cc(-n2c3ccccc3c3ccccc32)cc(-n2c3ccccc3c3ccccc32)c1	mCPCN-[Host]-HOMO=-6.1eV-LUMO=-2.6eV-Tg=90C-T1=2.80eV-007
+c1ccc(-c2cccc(-n3c4ccccc4c4ccccc43)c2)cc1-c1cccc(-c2cccc(-n3c4ccccc4c4ccccc43)c2)n1	26DCzPPy-[Host]-HOMO=-6.1eV-LUMO=-2.5eV-Tg=N/A-T1=2.71eV-008
+O=S1(=O)c2ccccc2C2(c3ccccc31)c1ccccc1N(c1ccc(-n3c4ccccc4c4ccccc43)cc1)c1ccccc12	CzAcSF-[Host]-HOMO=-5.8eV-LUMO=-2.7eV-Tg=N/A-T1=2.80eV-009
+c1ccc(-n2c3ccccc3c3ccccc32)c(-n2c3ccccc3c3ccccc32)c1	BCzPh-[Host]-HOMO=-5.8eV-LUMO=-2.3eV-Tg=N/A-T1=2.95eV-010
+c1ccc(-n2c3ccccc3c3ccccc32)cc1-c1ccc2c(c1)[nH]c1ccc(-n3c4ccccc4c4ccccc43)cc12	PhCzBCz-[Host]-HOMO=-5.7eV-LUMO=-2.5eV-Tg=N/A-T1=2.82eV-011
+O=P(c1ccccc1)(c1ccccc1)c1ccc([Si](c2ccccc2)(c2ccccc2)c2ccccc2)cc1	TSPO1-[Host]-HOMO=-6.4eV-LUMO=-2.2eV-Tg=117C-T1=3.36eV-012
+#
+# =============================================================================
+# Section 2: Hole Transport Layer Materials (8 molecules)
+# HOMO range: -5.0 to -5.8 eV
+# =============================================================================
+c1ccc(-c2ccc(-N(c3cccc4ccccc34)c3ccc(-N(c4cccc5ccccc45)c4ccccc4)cc3)cc2)cc1	NPB-[HTL]-HOMO=-5.4eV-LUMO=-2.4eV-Tg=98C-013
+CC(C)(C)c1ccc(N(c2ccc(C(C)(C)C)cc2)c2ccc(-c3ccc(N(c4ccc(C(C)(C)C)cc4)c4ccc(C(C)(C)C)cc4)cc3)cc2)cc1	TAPC-[HTL]-HOMO=-5.5eV-LUMO=-2.0eV-Tg=78C-014
+c1ccc(-n2c3ccccc3c3ccccc32)cc1N(c1ccc(-n2c3ccccc3c3ccccc32)cc1)c1ccc(-n2c3ccccc3c3ccccc32)cc1	TCTA-[HTL]-HOMO=-5.7eV-LUMO=-2.4eV-Tg=151C-015
+c1ccc(-N(c2ccc(-c3ccc(-N(c4cccc5ccccc45)c4ccccc4)cc3)cc2)c2cccc3ccccc23)cc1	alpha-NPD-[HTL]-HOMO=-5.4eV-LUMO=-2.3eV-Tg=95C-016
+COc1ccc(N(c2ccc(OC)cc2)c2ccc3c(c2)-c2cc(N(c4ccc(OC)cc4)c4ccc(OC)cc4)ccc2C31c2cc(N(c3ccc(OC)cc3)c3ccc(OC)cc3)ccc2-c2ccc(N(c3ccc(OC)cc3)c3ccc(OC)cc3)cc21)cc1	Spiro-OMeTAD-[HTL]-HOMO=-5.2eV-LUMO=-2.1eV-Tg=125C-017
+Cc1cccc(N(c2cccc(C)c2)c2ccc(-c3ccc(N(c4cccc(C)c4)c4cccc(C)c4)cc3C)c(C)c2)c1	HMTPD-[HTL]-HOMO=-5.5eV-LUMO=-2.3eV-Tg=110C-018
+CCn1c2ccccc2c2cc(-c3cc4c(cc3-n3c5ccccc5c5ccccc53)c3ccccc3n4CC)ccc21	EBCz-[HTL]-HOMO=-5.5eV-LUMO=-2.3eV-Tg=N/A-019
+Cc1cccc(N(c2ccc(N(c3ccc(N(c4cccc(C)c4)c4cccc(C)c4)cc3)c3cccc(C)c3)cc2)c2cccc(C)c2)c1	mMTDATA-[HTL]-HOMO=-5.1eV-LUMO=-1.9eV-Tg=75C-020
+#
+# =============================================================================
+# Section 3: Electron Transport Layer Materials (8 molecules)
+# LUMO range: -2.5 to -3.5 eV
+# =============================================================================
+c1ccc(-c2nc3ccccc3[nH]2)cc1-c1cc(-c2ccc(-c3nc4ccccc4[nH]3)cc2)cc(-c2ccc(-c3nc4ccccc4[nH]3)cc2)c1	TPBi-[ETL]-HOMO=-6.2eV-LUMO=-2.7eV-Tg=124C-021
+c1ccc(-c2ccnc3c(-c4ccccc4)ccc4cccnc2c43)cc1	BPhen-[ETL]-HOMO=-6.4eV-LUMO=-3.0eV-Tg=62C-022
+c1ccc(-c2nnc(-c3ccccn3)o2)cc1-c1ccccn1	Bpy-OXD-[ETL]-HOMO=-6.5eV-LUMO=-2.9eV-Tg=N/A-023
+c1cncc(-c2cccc(-c3cc(-c4cccc(-c5ccccn5)c4)cc(-c4cccc(-c5ccccn5)c4)c3)c2)c1	TmPyPB-[ETL]-HOMO=-6.7eV-LUMO=-2.7eV-Tg=79C-024
+Cc1cc(-c2cc(-c3ccccn3)cc(-c3ccccn3)c2)nc(-c2cc(-c3ccccn3)cc(-c3ccccn3)c2)n1	B3PYMPM-[ETL]-HOMO=-6.6eV-LUMO=-3.2eV-Tg=N/A-025
+c1ccc(-c2nc3ccccc3n2-c2ccc(-c3cc4ccccc4c4cc(-c5ccc6ccccc6c5)c5ccccc5c4c3-c3ccc4ccccc4c3)cc2)cc1	ZADN-[ETL]-HOMO=-5.8eV-LUMO=-2.8eV-Tg=141C-026
+c1ccc2c(-c3ccc4ccccc4c3)ccnc2c1-c1ccc(-c2ccc3ccccc3c2)c2cccnc12	NBphen-[ETL]-HOMO=-6.4eV-LUMO=-3.1eV-Tg=N/A-027
+O=P(c1ccccc1)(c1ccccc1)c1cccc(-c2nc(-c3cccc(P(=O)(c4ccccc4)c4ccccc4)c3)nc(-c3cccc(P(=O)(c4ccccc4)c4ccccc4)c3)n2)c1	PO-T2T-[ETL]-HOMO=-6.8eV-LUMO=-3.0eV-Tg=N/A-028
+#
+# =============================================================================
+# Section 4: Hole Injection Layer Materials (3 molecules)
+# =============================================================================
+N#Cc1c2nc3cc(C#N)c(C#N)nc3c3nc4cc(C#N)c(C#N)nc4c4nc1cc(C#N)c4c23	HAT-CN-[HIL]-HOMO=-9.4eV-LUMO=-5.5eV-Tg=N/A-029
+N#CC(C#N)=c1ccc(=C(C#N)C#N)c(-c2cc(/C(C#N)=C\C#N)ccc2=C(C#N)C#N)c1	F4-TCNQ-[HIL]-HOMO=-8.3eV-LUMO=-5.2eV-Tg=N/A-030
+[Cu]1234N5C6=CC=CC=C6C7=CC=CC=C7N1C1=CC=CC=C1C1=CC=CC=C1N2C1=CC=CC=C1C1=CC=CC=C1N3C1=CC=CC=C1C5=CC=CC=14	CuPc-[HIL]-HOMO=-5.2eV-LUMO=-3.5eV-Tg=N/A-031
+#
+# =============================================================================
+# Section 5: Electron Injection Layer Materials (2 molecules)
+# =============================================================================
+[Li+].Oc1cccc2cccnc12	Liq-[EIL]-HOMO=-5.5eV-LUMO=-2.4eV-Tg=N/A-032
+c1ccc(-c2nc3ccccc3o2)cc1-c1nc2ccccc2o1.[Cs+]	CsBPO-[EIL]-HOMO=-5.8eV-LUMO=-2.6eV-Tg=N/A-033
+#
+# =============================================================================
+# Section 6: Boundary Condition Molecules (2 molecules)
+# =============================================================================
+c1ccc2c(c1)c1ccc3c4ccc5c6ccc7c8ccc9c%10ccc%11c%12ccc(c2c1c1ccc(c3c41)c1ccc(c5c61)c1ccc(c7c81)c1ccc9c(c%101)c1ccc%11c%121)cc1	LargeConjugated-PAH-[Host]-HOMO=-5.2eV-LUMO=-3.0eV-Tg=N/A-MW>1800-034
+c1ccc(B(c2ccccc2)c2ccc(-c3ccc(-c4ccc(B(c5ccccc5)c5ccccc5)cc4)cc3)cc2)cc1	TriarylBorane-BAr3-[ETL]-HOMO=-6.0eV-LUMO=-3.3eV-Tg=N/A-035
+#
+# End of dataset
+# Total molecules: 35
+# Functional layers covered: Host (12), HTL (8), ETL (8), HIL (3), EIL (2), Boundary (2)
+# Cross-references with carbazole.smi: CBP (001=006), SimCP (006=016), TCTA (015=011)
+# HOMO range: -5.0 to -9.4 eV | LUMO range: -1.9 to -5.5 eV

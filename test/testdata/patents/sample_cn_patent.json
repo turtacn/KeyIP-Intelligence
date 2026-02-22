@@ -1,0 +1,907 @@
+{
+  "metadata": {
+    "source": "CNIPA",
+    "format_version": "2.1.0",
+    "extracted_at": "2024-08-01T10:15:30Z",
+    "extraction_method": "cnipa_open_api_v3",
+    "raw_format": "xml_cn_patent_v4",
+    "normalization_pipeline": "etl_v2.3",
+    "checksum": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+    "language": "zh-CN",
+    "translation_available": true
+  },
+  "patent": {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "patent_number": "CN115832410B",
+    "publication_number": "CN115832410A",
+    "application_number": "CN202211634528.7",
+    "title": "一种基于螺芴-咔唑杂化骨架的有机电致发光器件用蓝光主体材料及其制备方法和应用",
+    "title_en": "Blue-light host material based on spirofluorene-carbazole hybrid skeleton for organic electroluminescent device, preparation method and application thereof",
+    "abstract": "本发明属于有机电致发光材料技术领域，具体涉及一种基于螺芴-咔唑杂化骨架的蓝光主体材料及其制备方法和应用。针对现有蓝光主体材料存在三重态能级（T₁）偏低导致能量反向传递、玻璃化转变温度（Tg）不足引起器件工作时薄膜形态劣化、以及载流子传输不平衡造成激子复合区偏移等技术问题，本发明提出了一类以9,9'-螺二芴为核心骨架、在其2位和7位分别引入咔唑基团和芳基取代基的新型杂化分子通式结构。通过螺环结构的刚性空间构型有效抑制分子间π-π堆积，同时利用咔唑基团的高三重态能级特性和芳基取代基的空间位阻效应协同调控分子的光物理性质。所得蓝光主体材料的三重态能级T₁大于2.9eV，玻璃化转变温度Tg大于180℃，以其作为蓝光磷光器件主体材料时，器件最大外量子效率超过22%，在1000cd/m²亮度下效率滚降小于15%，CIE色坐标为(0.14, 0.18)，展现出优异的蓝光发射性能和器件稳定性。",
+    "abstract_en": "The present invention belongs to the technical field of organic electroluminescent materials, and specifically relates to a blue-light host material based on a spirofluorene-carbazole hybrid skeleton, a preparation method and application thereof. Addressing the technical problems of existing blue-light host materials including low triplet energy level (T₁) causing reverse energy transfer, insufficient glass transition temperature (Tg) leading to thin-film morphological degradation during device operation, and unbalanced carrier transport resulting in exciton recombination zone shift, the present invention proposes a novel class of hybrid molecular general formula structures with 9,9'-spirobifluorene as the core skeleton, with carbazolyl groups and aryl substituents introduced at the 2- and 7-positions respectively. The rigid spatial configuration of the spiro ring structure effectively suppresses intermolecular π-π stacking, while the high triplet energy characteristics of carbazolyl groups and the steric hindrance effect of aryl substituents synergistically regulate the photophysical properties of the molecules. The resulting blue-light host materials exhibit triplet energy T₁ greater than 2.9 eV, glass transition temperature Tg greater than 180°C, and when used as host materials for blue phosphorescent devices, the devices achieve maximum external quantum efficiency exceeding 22%, efficiency roll-off less than 15% at 1000 cd/m² luminance, and CIE coordinates of (0.14, 0.18), demonstrating excellent blue emission performance and device stability.",
+    "filing_date": "2022-12-19",
+    "publication_date": "2023-03-21",
+    "grant_date": "2024-01-16",
+    "priority_date": "2022-12-19",
+    "legal_status": "granted",
+    "jurisdiction": "CN",
+    "patent_type": "invention",
+    "assignees": [
+      {
+        "name": "华域光电材料科技有限公司",
+        "name_en": "Huayu Optoelectronic Materials Technology Co., Ltd.",
+        "country": "CN",
+        "type": "corporation",
+        "address": "江苏省苏州市工业园区星湖街328号",
+        "unified_social_credit_code": "913205940XXXXXXXX"
+      },
+      {
+        "name": "东南大学",
+        "name_en": "Southeast University",
+        "country": "CN",
+        "type": "university",
+        "address": "江苏省南京市玄武区四牌楼2号"
+      }
+    ],
+    "inventors": [
+      {"name": "张明远", "name_en": "ZHANG Mingyuan", "country": "CN", "is_corresponding": true},
+      {"name": "李晓峰", "name_en": "LI Xiaofeng", "country": "CN", "is_corresponding": false},
+      {"name": "王思琪", "name_en": "WANG Siqi", "country": "CN", "is_corresponding": false},
+      {"name": "陈建华", "name_en": "CHEN Jianhua", "country": "CN", "is_corresponding": false}
+    ],
+    "ipc_codes": [
+      {"code": "C07D209/86", "version": "2006.01", "classification_level": "main", "description": "含咔唑环系的杂环化合物"},
+      {"code": "C07D405/14", "version": "2006.01", "classification_level": "further", "description": "含两个以上杂环的化合物"},
+      {"code": "C09K11/06", "version": "2006.01", "classification_level": "further", "description": "有机发光材料"},
+      {"code": "H10K85/60", "version": "2023.01", "classification_level": "further", "description": "有机电致发光器件用材料"},
+      {"code": "H10K50/11", "version": "2023.01", "classification_level": "additional", "description": "有机电致发光器件结构"}
+    ],
+    "cpc_codes": [
+      {"code": "C07D209/86", "version": "2024.01"},
+      {"code": "C07D405/14", "version": "2024.01"},
+      {"code": "C09K2211/1011", "version": "2024.01"},
+      {"code": "H10K85/6045", "version": "2024.01"},
+      {"code": "H10K50/115", "version": "2024.01"},
+      {"code": "H10K2101/10", "version": "2024.01"}
+    ],
+    "description": {
+      "technical_field": "本发明属于有机电致发光材料技术领域，具体涉及一种基于螺芴-咔唑杂化骨架的有机电致发光器件用蓝光主体材料、该蓝光主体材料的制备方法以及包含该蓝光主体材料的有机电致发光器件。本发明所述蓝光主体材料特别适用于蓝色磷光有机发光二极管（PhOLED）和蓝色热活化延迟荧光（TADF）有机发光二极管的发光层。",
+      "background_art": "有机发光二极管（OLED）因其自发光、广视角、快速响应、可柔性化等优势，已成为新一代平板显示和固态照明技术的核心。在全彩OLED显示中，蓝光器件的性能一直是制约整体显示品质的关键瓶颈。蓝光主体材料作为发光层的基质，其三重态能级（T₁）、热稳定性（Tg）、载流子传输能力和薄膜形态稳定性直接决定了蓝光器件的效率、色纯度和使用寿命。\n\n现有技术中，咔唑类化合物因其较高的三重态能级和良好的空穴传输能力，被广泛用作蓝光主体材料。例如，CN110028508A公开了一种以咔唑为核心的蓝光主体材料，但其玻璃化转变温度仅为120℃，在长时间工作条件下薄膜容易结晶化，导致器件寿命不足。US10,876,032B2公开了一种含螺芴骨架的OLED主体材料，虽然热稳定性有所改善，但其三重态能级仅为2.6eV，不足以有效限制蓝光磷光掺杂剂（如FIrpic，T₁=2.65eV）的三重态激子能量，导致严重的能量反向传递和效率损失。\n\nKim等人在Advanced Materials（2020, 32, 2003521）中报道了一系列螺芴基蓝光主体材料，通过在螺芴骨架上引入给电子基团调控HOMO能级，实现了较好的载流子平衡，但分子间π-π堆积问题仍未得到有效解决，器件在高亮度下的效率滚降严重。\n\n此外，Park等人在Chemistry of Materials（2021, 33, 5156）中系统研究了咔唑-芴杂化体系的构效关系，指出简单的咔唑-芴线性连接结构虽然具有较高的T₁，但分子刚性不足，导致非辐射衰减通道增加，量子效率偏低。\n\n综上所述，现有蓝光主体材料普遍存在以下技术问题：（1）三重态能级与热稳定性难以兼顾；（2）分子间π-π堆积导致薄膜形态不稳定；（3）载流子传输不平衡造成激子复合区偏移，影响器件效率和寿命。因此，亟需开发一种同时具备高三重态能级、高热稳定性和良好载流子平衡性的新型蓝光主体材料。",
+      "summary_of_invention": {
+        "technical_problem": "本发明所要解决的技术问题是：针对现有蓝光主体材料存在的三重态能级偏低（T₁<2.8eV）导致与蓝光磷光掺杂剂之间能量反向传递严重、玻璃化转变温度不足（Tg<150℃）引起器件长期工作时发光层薄膜形态劣化结晶、以及空穴传输能力与电子传输能力不匹配造成激子复合区偏离发光层中心等技术缺陷，提供一种基于螺芴-咔唑杂化骨架的蓝光主体材料，使其同时具备高三重态能级（T₁>2.9eV）、高玻璃化转变温度（Tg>180℃）和双极性载流子传输特性。",
+        "technical_solution": "为解决上述技术问题，本发明采用如下技术方案：一种有机电致发光器件用蓝光主体材料，具有如通式(I)所示的结构，以9,9'-螺二芴为核心骨架，在螺芴的2位引入芳基取代基Ar₁，在7位引入含氮杂环取代基Ar₂（优选咔唑基），在咔唑基团和芴环上分别引入R₁至R₄取代基进行精细调控。螺环结构的正交空间构型从根本上阻断了两个芴平面之间的共轭延伸，有效抑制分子间π-π堆积作用，确保薄膜的非晶态稳定性和高Tg。咔唑基团的引入为分子提供了高三重态能级贡献和空穴传输通道，而芳基取代基Ar₁则通过调节分子的LUMO能级提供电子传输通道，实现双极性载流子传输。R₁至R₄取代基的引入进一步通过空间位阻效应微调分子的光物理性质和薄膜堆积行为。本发明还提供了上述蓝光主体材料的制备方法，采用Suzuki偶联反应一步构建螺芴-咔唑连接键，工艺简单、产率高、适合工业化生产。本发明进一步提供了包含上述蓝光主体材料的有机电致发光器件。",
+        "beneficial_effects": "与现有技术相比，本发明具有以下有益效果：（1）三重态能级高：所得蓝光主体材料的T₁均大于2.9eV（最高达3.05eV），远高于蓝光磷光掺杂剂FIrpic的T₁（2.65eV），有效避免了能量反向传递；（2）热稳定性优异：玻璃化转变温度Tg均大于180℃（最高达215℃），热分解温度Td均大于420℃，确保器件长期工作稳定性；（3）载流子传输平衡：HOMO能级在-5.8至-6.1eV范围内，LUMO能级在-2.4至-2.8eV范围内，与常用空穴传输层和电子传输层材料的能级匹配良好；（4）器件性能优异：以化合物H-1为主体材料的蓝光磷光器件最大外量子效率达24.3%，在1000cd/m²亮度下效率滚降仅为12%，CIE色坐标为(0.14, 0.17)，T95寿命达850小时；（5）合成简便：采用一步Suzuki偶联反应，总产率大于65%，适合规模化生产。"
+      },
+      "detailed_description": {
+        "synthesis_general": "本发明化合物的通用合成路线如下：在氮气保护下，将2-溴-9,9'-螺二芴（1.0当量）、咔唑硼酸酯衍生物（1.2当量）、四(三苯基膦)钯(0)催化剂（0.03当量）和碳酸钾（3.0当量）加入甲苯/水（体积比4:1）混合溶剂中，加热至回流温度（85-110℃）反应12-24小时。反应结束后，冷却至室温，分液，有机相经无水硫酸镁干燥，旋蒸除去溶剂，粗产物经硅胶柱层析纯化（洗脱剂：石油醚/二氯甲烷=3:1至1:1梯度洗脱），再经升华提纯（温度280-320℃，压力10⁻⁴Pa），得到目标化合物。",
+        "examples": [
+          {
+            "number": 1,
+            "compound_name": "化合物H-1",
+            "smiles": "c1ccc(-c2ccc3c(c2)C2(c4cc(-n5c6ccccc6c6ccccc65)ccc4-c4ccccc42)c2ccccc2-3)cc1",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2-溴-7-苯基-9,9'-螺二芴 (3.0 g, 6.4 mmol)", "9-(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)咔唑 (2.25 g, 7.7 mmol)"],
+                "catalyst": "Pd(PPh₃)₄ (0.22 g, 0.19 mmol)",
+                "base": "K₂CO₃ (2.65 g, 19.2 mmol)",
+                "solvent": "甲苯/水 (40 mL/10 mL)",
+                "temperature": "95°C",
+                "duration": "18 h",
+                "yield": 72.5,
+                "description": "在氮气保护下，将上述原料和催化剂加入100mL三口烧瓶中，加热至95℃搅拌反应18小时。TLC监测反应完成后，冷却至室温，加入50mL水，用二氯甲烷萃取三次（3×30mL），合并有机相，无水硫酸镁干燥，旋蒸浓缩。粗产物经硅胶柱层析纯化（石油醚:二氯甲烷=2:1），得到白色固体2.56g，产率72.5%。再经升华提纯（300℃，10⁻⁴Pa），得到纯品2.31g。"
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (400 MHz, CDCl₃) δ 8.15 (d, J = 7.7 Hz, 2H), 7.92 (d, J = 8.0 Hz, 1H), 7.85 (d, J = 7.8 Hz, 1H), 7.72-7.65 (m, 4H), 7.58 (d, J = 7.5 Hz, 2H), 7.45-7.32 (m, 8H), 7.28-7.18 (m, 5H), 7.12 (t, J = 7.4 Hz, 2H), 6.85 (d, J = 7.6 Hz, 2H), 6.72 (d, J = 7.5 Hz, 2H)",
+              "nmr_13c": "¹³C NMR (100 MHz, CDCl₃) δ 155.8, 149.2, 148.6, 141.5, 140.8, 140.2, 139.5, 137.1, 128.9, 128.4, 127.8, 127.2, 126.5, 125.8, 124.3, 123.6, 122.8, 121.5, 120.9, 120.3, 119.8, 110.2, 66.3",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 547.22 [M]⁺ (calcd for C₄₁H₂₇NO: 547.21)",
+              "elemental_analysis": "Anal. Calcd for C₄₁H₂₇NO: C, 89.91; H, 4.97; N, 2.56. Found: C, 89.78; H, 5.02; N, 2.51"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/mCP (10 nm)/H-1:FIrpic 15wt% (20 nm)/TPBi (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 3.2,
+              "max_luminance": 28500,
+              "max_current_efficiency": 52.8,
+              "max_eqe": 24.3,
+              "cie_coordinates": [0.14, 0.17],
+              "lifetime_t95": 850
+            }
+          },
+          {
+            "number": 2,
+            "compound_name": "化合物H-2",
+            "smiles": "Cc1cc(-n2c3ccccc3c3ccccc32)cc(C)c1-c1ccc2c(c1)C1(c3ccccc3-c3ccccc31)c1ccccc1-2",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2-溴-9,9'-螺二芴 (2.5 g, 5.9 mmol)", "3,6-二甲基-9-(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)咔唑 (2.48 g, 7.1 mmol)"],
+                "catalyst": "Pd(PPh₃)₄ (0.20 g, 0.18 mmol)",
+                "base": "K₂CO₃ (2.45 g, 17.7 mmol)",
+                "solvent": "甲苯/水 (35 mL/9 mL)",
+                "temperature": "100°C",
+                "duration": "16 h",
+                "yield": 68.3,
+                "description": "操作同实施例1，反应温度100℃，反应时间16小时。柱层析纯化（石油醚:二氯甲烷=3:1），得到白色固体2.15g，产率68.3%。升华提纯（295℃，10⁻⁴Pa）。"
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (400 MHz, CDCl₃) δ 8.02 (s, 2H), 7.88 (d, J = 8.1 Hz, 1H), 7.80 (d, J = 7.9 Hz, 1H), 7.68-7.60 (m, 3H), 7.42-7.30 (m, 7H), 7.22-7.15 (m, 4H), 7.08 (d, J = 8.2 Hz, 2H), 6.82 (d, J = 7.6 Hz, 2H), 6.70 (d, J = 7.5 Hz, 2H), 2.52 (s, 6H)",
+              "nmr_13c": "¹³C NMR (100 MHz, CDCl₃) δ 155.5, 149.0, 141.3, 140.5, 139.8, 137.5, 136.2, 128.7, 128.1, 127.5, 126.8, 126.2, 125.5, 124.0, 123.3, 122.5, 121.2, 120.6, 110.5, 66.1, 21.8",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 509.24 [M]⁺ (calcd for C₃₈H₂₇N: 509.21)",
+              "elemental_analysis": "Anal. Calcd for C₃₈H₂₇N: C, 89.56; H, 5.34; N, 2.75. Found: C, 89.41; H, 5.39; N, 2.70"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/mCP (10 nm)/H-2:FIrpic 15wt% (20 nm)/TPBi (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 3.3,
+              "max_luminance": 25800,
+              "max_current_efficiency": 48.5,
+              "max_eqe": 22.1,
+              "cie_coordinates": [0.14, 0.19],
+              "lifetime_t95": 720
+            }
+          },
+          {
+            "number": 3,
+            "compound_name": "化合物H-3",
+            "smiles": "c1ccc(-c2ccc3c(c2)C2(c4cc(-n5c6ccccc6c6cc(C(C)(C)C)ccc65)ccc4-c4ccccc42)c2ccccc2-3)cc1",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2-溴-7-苯基-9,9'-螺二芴 (2.8 g, 6.0 mmol)", "3-叔丁基-9-(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)咔唑 (2.70 g, 7.2 mmol)"],
+                "catalyst": "Pd(PPh₃)₄ (0.21 g, 0.18 mmol)",
+                "base": "K₂CO₃ (2.49 g, 18.0 mmol)",
+                "solvent": "甲苯/水 (36 mL/9 mL)",
+                "temperature": "95°C",
+                "duration": "20 h",
+                "yield": 65.8,
+                "description": "操作同实施例1，反应温度95℃，反应时间20小时。柱层析纯化（石油醚:二氯甲烷=2.5:1），得到白色固体2.38g，产率65.8%。升华提纯（310℃，10⁻⁴Pa）。"
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (400 MHz, CDCl₃) δ 8.22 (d, J = 1.8 Hz, 1H), 8.12 (d, J = 7.7 Hz, 1H), 7.90 (d, J = 8.0 Hz, 1H), 7.83 (d, J = 7.8 Hz, 1H), 7.70-7.62 (m, 4H), 7.56 (dd, J = 8.5, 1.9 Hz, 1H), 7.48-7.30 (m, 8H), 7.26-7.16 (m, 4H), 7.10 (t, J = 7.4 Hz, 1H), 6.84 (d, J = 7.6 Hz, 2H), 6.71 (d, J = 7.5 Hz, 2H), 1.48 (s, 9H)",
+              "nmr_13c": "¹³C NMR (100 MHz, CDCl₃) δ 155.9, 149.3, 148.8, 143.2, 141.6, 140.9, 140.3, 139.6, 137.2, 129.0, 128.5, 127.9, 127.3, 126.6, 125.9, 124.4, 123.7, 122.9, 121.6, 121.0, 120.4, 116.5, 110.3, 66.4, 34.9, 32.1",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 603.28 [M]⁺ (calcd for C₄₅H₃₃NO: 603.26)",
+              "elemental_analysis": "Anal. Calcd for C₄₅H₃₃NO: C, 89.53; H, 5.51; N, 2.32. Found: C, 89.38; H, 5.57; N, 2.28"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/mCP (10 nm)/H-3:FIrpic 15wt% (20 nm)/TPBi (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 3.1,
+              "max_luminance": 30200,
+              "max_current_efficiency": 55.2,
+              "max_eqe": 25.1,
+              "cie_coordinates": [0.14, 0.16],
+              "lifetime_t95": 920
+            }
+          },
+          {
+            "number": 4,
+            "compound_name": "化合物H-4",
+            "smiles": "c1ccc2c(c1)oc1ccccc1c2-c1ccc2c(c1)C1(c3ccccc3-c3ccccc31)c1cc(-n3c4ccccc4c4ccccc43)ccc1-2",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2-溴-7-(二苯并呋喃-4-基)-9,9'-螺二芴 (3.2 g, 5.8 mmol)", "9-(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)咔唑 (2.04 g, 7.0 mmol)"],
+                "catalyst": "Pd(PPh₃)₄ (0.20 g, 0.17 mmol)",
+                "base": "K₂CO₃ (2.40 g, 17.4 mmol)",
+                "solvent": "甲苯/水 (38 mL/10 mL)",
+                "temperature": "100°C",
+                "duration": "22 h",
+                "yield": 61.2,
+                "description": "操作同实施例1，反应温度100℃，反应时间22小时。柱层析纯化（石油醚:二氯甲烷=2:1），得到淡黄色固体2.14g，产率61.2%。升华提纯（315℃，10⁻⁴Pa）。"
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (400 MHz, CDCl₃) δ 8.16 (d, J = 7.7 Hz, 2H), 7.98 (d, J = 7.6 Hz, 1H), 7.93 (d, J = 8.0 Hz, 1H), 7.86 (d, J = 7.8 Hz, 1H), 7.72-7.63 (m, 3H), 7.58-7.48 (m, 3H), 7.44-7.30 (m, 7H), 7.26-7.16 (m, 5H), 7.12 (t, J = 7.4 Hz, 2H), 6.86 (d, J = 7.6 Hz, 2H), 6.74 (d, J = 7.5 Hz, 2H)",
+              "nmr_13c": "¹³C NMR (100 MHz, CDCl₃) δ 156.5, 155.7, 152.3, 149.1, 148.5, 141.4, 140.7, 140.1, 139.4, 137.0, 128.8, 128.3, 127.7, 127.1, 126.4, 125.7, 124.8, 124.2, 123.5, 122.7, 121.8, 121.4, 120.8, 120.2, 112.1, 110.1, 66.2",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 637.22 [M]⁺ (calcd for C₄₇H₂₉NO₂: 637.22)",
+              "elemental_analysis": "Anal. Calcd for C₄₇H₂₉NO₂: C, 88.52; H, 4.58; N, 2.20. Found: C, 88.36; H, 4.63; N, 2.16"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/mCP (10 nm)/H-4:FIrpic 15wt% (20 nm)/TPBi (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 3.4,
+              "max_luminance": 24300,
+              "max_current_efficiency": 46.1,
+              "max_eqe": 21.5,
+              "cie_coordinates": [0.15, 0.20],
+              "lifetime_t95": 680
+            }
+          },
+          {
+            "number": 5,
+            "compound_name": "化合物H-5",
+            "smiles": "c1ccc(-c2ccc3c(c2)C2(c4cc(-n5c6ccccc6c6cc(OC)ccc65)ccc4-c4ccccc42)c2ccccc2-3)cc1",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2-溴-7-苯基-9,9'-螺二芴 (2.6 g, 5.6 mmol)", "3-甲氧基-9-(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)咔唑 (2.36 g, 6.7 mmol)"],
+                "catalyst": "Pd(PPh₃)₄ (0.19 g, 0.17 mmol)",
+                "base": "K₂CO₃ (2.32 g, 16.8 mmol)",
+                "solvent": "甲苯/水 (34 mL/9 mL)",
+                "temperature": "90°C",
+                "duration": "20 h",
+                "yield": 63.7,
+                "description": "操作同实施例1，反应温度90℃，反应时间20小时。柱层析纯化（石油醚:二氯甲烷=2:1），得到白色固体2.06g，产率63.7%。升华提纯（305℃，10⁻⁴Pa）。"
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (400 MHz, CDCl₃) δ 8.10 (d, J = 7.7 Hz, 1H), 7.91 (d, J = 8.0 Hz, 1H), 7.84 (d, J = 7.8 Hz, 1H), 7.71-7.63 (m, 4H), 7.57 (d, J = 2.4 Hz, 1H), 7.46-7.30 (m, 8H), 7.26-7.16 (m, 4H), 7.10 (dd, J = 8.8, 2.4 Hz, 1H), 6.84 (d, J = 7.6 Hz, 2H), 6.71 (d, J = 7.5 Hz, 2H), 3.92 (s, 3H)",
+              "nmr_13c": "¹³C NMR (100 MHz, CDCl₃) δ 155.9, 153.8, 149.3, 148.7, 141.6, 140.9, 140.3, 139.6, 137.2, 134.5, 129.0, 128.5, 127.9, 127.3, 126.6, 125.9, 124.4, 123.7, 122.9, 121.6, 121.0, 115.2, 110.8, 104.5, 66.4, 56.1",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 577.23 [M]⁺ (calcd for C₄₂H₂₉NO₂: 577.22)",
+              "elemental_analysis": "Anal. Calcd for C₄₂H₂₉NO₂: C, 87.33; H, 5.06; N, 2.42. Found: C, 87.18; H, 5.11; N, 2.38"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/mCP (10 nm)/H-5:FIrpic 15wt% (20 nm)/TPBi (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 3.3,
+              "max_luminance": 26100,
+              "max_current_efficiency": 49.8,
+              "max_eqe": 22.8,
+              "cie_coordinates": [0.14, 0.18],
+              "lifetime_t95": 760
+            }
+          },
+          {
+            "number": 6,
+            "compound_name": "化合物H-6",
+            "smiles": "c1ccc2ccccc2c1-c1ccc2c(c1)C1(c3ccccc3-c3ccccc31)c1cc(-n3c4ccccc4c4cc(C)ccc43)ccc1-2",
+            "synthesis_steps": [
+              {
+                "step_number": 1,
+                "reagents": ["2-溴-7-(萘-1-基)-9,9'-螺二芴 (3.1 g, 6.0 mmol)", "3-甲基-9-(4,4,5,5-四甲基-1,3,2-二氧杂硼烷-2-基)咔唑 (2.42 g, 7.2 mmol)"],
+                "catalyst": "Pd(PPh₃)₄ (0.21 g, 0.18 mmol)",
+                "base": "K₂CO₃ (2.49 g, 18.0 mmol)",
+                "solvent": "甲苯/水 (38 mL/10 mL)",
+                "temperature": "95°C",
+                "duration": "18 h",
+                "yield": 66.9,
+                "description": "操作同实施例1，反应温度95℃，反应时间18小时。柱层析纯化（石油醚:二氯甲烷=2.5:1），得到白色固体2.39g，产率66.9%。升华提纯（310℃，10⁻⁴Pa）。"
+              }
+            ],
+            "characterization": {
+              "nmr_1h": "¹H NMR (400 MHz, CDCl₃) δ 8.12 (d, J = 7.7 Hz, 1H), 8.05 (s, 1H), 7.95-7.88 (m, 3H), 7.82 (d, J = 7.8 Hz, 1H), 7.70-7.60 (m, 4H), 7.52-7.42 (m, 3H), 7.38-7.28 (m, 6H), 7.22-7.14 (m, 4H), 7.08 (d, J = 8.2 Hz, 1H), 6.83 (d, J = 7.6 Hz, 2H), 6.70 (d, J = 7.5 Hz, 2H), 2.48 (s, 3H)",
+              "nmr_13c": "¹³C NMR (100 MHz, CDCl₃) δ 155.6, 149.1, 148.6, 141.4, 140.7, 140.1, 139.5, 137.8, 137.1, 134.2, 131.5, 128.8, 128.3, 127.7, 127.1, 126.8, 126.4, 126.0, 125.7, 125.3, 124.2, 123.5, 122.7, 121.4, 120.8, 120.2, 110.3, 66.2, 21.6",
+              "mass_spectrum": "MALDI-TOF MS: m/z = 611.25 [M]⁺ (calcd for C₄₆H₃₁N: 611.24)",
+              "elemental_analysis": "Anal. Calcd for C₄₆H₃₁N: C, 90.32; H, 5.11; N, 2.29. Found: C, 90.17; H, 5.16; N, 2.25"
+            },
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/mCP (10 nm)/H-6:FIrpic 15wt% (20 nm)/TPBi (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 3.2,
+              "max_luminance": 27600,
+              "max_current_efficiency": 51.3,
+              "max_eqe": 23.5,
+              "cie_coordinates": [0.14, 0.18],
+              "lifetime_t95": 810
+            }
+          }
+        ],
+        "comparative_examples": [
+          {
+            "number": 1,
+            "compound_name": "对比例化合物C-1",
+            "smiles": "c1ccc(-n2c3ccccc3c3ccccc32)cc1-c1ccc(-n2c3ccccc3c3ccccc32)cc1",
+            "description": "CBP（4,4'-双(N-咔唑基)-1,1'-联苯），现有技术中常用的蓝光主体材料，不含螺芴骨架",
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/mCP (10 nm)/CBP:FIrpic 15wt% (20 nm)/TPBi (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 3.5,
+              "max_luminance": 18200,
+              "max_current_efficiency": 32.5,
+              "max_eqe": 15.8,
+              "cie_coordinates": [0.15, 0.22],
+              "lifetime_t95": 320
+            },
+            "comparison_notes": "CBP的T₁仅为2.56eV，低于FIrpic的T₁（2.65eV），存在严重的能量反向传递；Tg仅为62℃，热稳定性差"
+          },
+          {
+            "number": 2,
+            "compound_name": "对比例化合物C-2",
+            "smiles": "c1ccc2c(c1)-c1ccccc1C21c2ccccc2-c2ccc(-n3c4ccccc4c4ccccc43)cc21",
+            "description": "9-(4-咔唑基苯基)-9,9'-螺二芴，含螺芴骨架但咔唑基团直接连接在苯基上而非螺芴环上",
+            "device_performance": {
+              "structure": "ITO/HAT-CN (10 nm)/TAPC (40 nm)/mCP (10 nm)/C-2:FIrpic 15wt% (20 nm)/TPBi (40 nm)/LiF (1 nm)/Al (100 nm)",
+              "turn_on_voltage": 3.4,
+              "max_luminance": 21500,
+              "max_current_efficiency": 38.2,
+              "max_eqe": 18.2,
+              "cie_coordinates": [0.15, 0.21],
+              "lifetime_t95": 450
+            },
+            "comparison_notes": "虽然含有螺芴骨架提高了Tg（145℃），但咔唑基团通过苯基间接连接导致共轭延伸，T₁降至2.72eV，仍不够理想"
+          }
+        ],
+        "industrial_applicability": "本发明所述蓝光主体材料的合成原料均为市售可得的化学品，合成路线简短（一步Suzuki偶联反应），总产率大于65%，产物可通过升华提纯获得高纯度（>99.5%）材料，完全满足OLED器件制造对材料纯度的要求。该材料可通过真空蒸镀工艺沉积成膜，与现有OLED生产线完全兼容，具有良好的工业化应用前景。"
+      }
+    },
+    "claims": [
+      {
+        "number": 1,
+        "type": "independent",
+        "depends_on": null,
+        "category": "product",
+        "text": "一种有机电致发光器件用蓝光主体材料，其特征在于，所述蓝光主体材料具有如通式(I)所示的结构：以9,9'-螺二芴为核心骨架，在螺芴的2位连接芳基取代基Ar₁，在螺芴的7位连接含氮杂环取代基Ar₂；其中，Ar₁选自苯基、萘基、联苯基中的一种；Ar₂选自咔唑基、二苯并呋喃基、二苯并噻吩基中的一种；所述咔唑基、二苯并呋喃基或二苯并噻吩基上任选地被R₁和R₂取代，所述螺芴骨架上任选地被R₃和R₄取代；R₁至R₄各自独立地选自氢、C₁-C₆直链或支链烷基、C₁-C₄烷氧基、苯基中的一种；其中R₁和R₂不同时为氢。",
+        "text_en": "A blue-light host material for organic electroluminescent device, characterized in that the blue-light host material has a structure represented by general formula (I): with 9,9'-spirobifluorene as the core skeleton, an aryl substituent Ar₁ connected at the 2-position of the spirofluorene, and a nitrogen-containing heterocyclic substituent Ar₂ connected at the 7-position of the spirofluorene; wherein Ar₁ is selected from one of phenyl, naphthyl, and biphenyl; Ar₂ is selected from one of carbazolyl, dibenzofuranyl, and dibenzothienyl; the carbazolyl, dibenzofuranyl or dibenzothienyl is optionally substituted by R₁ and R₂, and the spirofluorene skeleton is optionally substituted by R₃ and R₄; R₁ to R₄ are each independently selected from one of hydrogen, C₁-C₆ linear or branched alkyl, C₁-C₄ alkoxy, and phenyl; wherein R₁ and R₂ are not simultaneously hydrogen.",
+        "elements": [
+          {"id": "E1-1", "description": "9,9'-螺二芴核心骨架", "is_novel": true, "type": "structural"},
+          {"id": "E1-2", "description": "2位连接Ar₁芳基取代基", "is_novel": false, "type": "structural"},
+          {"id": "E1-3", "description": "7位连接Ar₂含氮杂环取代基", "is_novel": true, "type": "structural"},
+          {"id": "E1-4", "description": "Ar₁选自苯基、萘基、联苯基", "is_novel": false, "type": "substituent"},
+          {"id": "E1-5", "description": "Ar₂选自咔唑基、二苯并呋喃基、二苯并噻吩基", "is_novel": true, "type": "substituent"},
+          {"id": "E1-6", "description": "R₁至R₄各自独立选自氢、C₁-C₆烷基、C₁-C₄烷氧基、苯基", "is_novel": false, "type": "substituent"},
+          {"id": "E1-7", "description": "R₁和R₂不同时为氢的限制条件", "is_novel": true, "type": "constraint"}
+        ]
+      },
+      {
+        "number": 2,
+        "type": "dependent",
+        "depends_on": 1,
+        "category": "product",
+        "text": "根据权利要求1所述的蓝光主体材料，其特征在于，所述Ar₁为苯基。",
+        "text_en": "The blue-light host material according to claim 1, characterized in that Ar₁ is phenyl.",
+        "elements": [
+          {"id": "E2-1", "description": "Ar₁限定为苯基", "is_novel": false, "type": "substituent_narrowing"}
+        ]
+      },
+      {
+        "number": 3,
+        "type": "dependent",
+        "depends_on": 1,
+        "category": "product",
+        "text": "根据权利要求1所述的蓝光主体材料，其特征在于，所述Ar₂为咔唑基。",
+        "text_en": "The blue-light host material according to claim 1, characterized in that Ar₂ is carbazolyl.",
+        "elements": [
+          {"id": "E3-1", "description": "Ar₂限定为咔唑基", "is_novel": false, "type": "substituent_narrowing"}
+        ]
+      },
+      {
+        "number": 4,
+        "type": "dependent",
+        "depends_on": 1,
+        "category": "product",
+        "text": "根据权利要求1所述的蓝光主体材料，其特征在于，R₁至R₄中至少一个选自甲基、乙基或叔丁基。",
+        "text_en": "The blue-light host material according to claim 1, characterized in that at least one of R₁ to R₄ is selected from methyl, ethyl, or tert-butyl.",
+        "elements": [
+          {"id": "E4-1", "description": "R₁-R₄中至少一个为短链烷基", "is_novel": false, "type": "substituent_narrowing"}
+        ]
+      },
+      {
+        "number": 5,
+        "type": "dependent",
+        "depends_on": 1,
+        "category": "product",
+        "text": "根据权利要求1所述的蓝光主体材料，其特征在于，所述蓝光主体材料选自以下具体化合物中的一种：化合物H-1、化合物H-2、化合物H-3、化合物H-4、化合物H-5或化合物H-6。",
+        "text_en": "The blue-light host material according to claim 1, characterized in that the blue-light host material is selected from one of the following specific compounds: Compound H-1, Compound H-2, Compound H-3, Compound H-4, Compound H-5, or Compound H-6.",
+        "elements": [
+          {"id": "E5-1", "description": "限定为6个具体化合物之一", "is_novel": false, "type": "compound_enumeration"}
+        ]
+      },
+      {
+        "number": 6,
+        "type": "independent",
+        "depends_on": null,
+        "category": "method",
+        "text": "一种如权利要求1至5中任一项所述的蓝光主体材料的制备方法，其特征在于，包括以下步骤：步骤一，在惰性气体保护下，将含有卤素取代基的螺二芴衍生物与含有硼酸酯基团的Ar₂杂环衍生物在钯催化剂存在下，以碱为缚酸剂，在有机溶剂中进行Suzuki偶联反应，得到粗产物；步骤二，将步骤一所得粗产物经柱层析纯化，得到纯化产物；步骤三，将纯化产物进行升华提纯，得到所述蓝光主体材料。",
+        "text_en": "A method for preparing the blue-light host material according to any one of claims 1 to 5, characterized in that it comprises the following steps: Step 1, under inert gas protection, subjecting a halogen-substituted spirobifluorene derivative and a boronate ester-containing Ar₂ heterocyclic derivative to Suzuki coupling reaction in the presence of a palladium catalyst, with a base as acid scavenger, in an organic solvent, to obtain a crude product; Step 2, purifying the crude product obtained in Step 1 by column chromatography to obtain a purified product; Step 3, subjecting the purified product to sublimation purification to obtain the blue-light host material.",
+        "elements": [
+          {"id": "E6-1", "description": "惰性气体保护条件", "is_novel": false, "type": "condition"},
+          {"id": "E6-2", "description": "卤代螺二芴与硼酸酯杂环的Suzuki偶联反应", "is_novel": false, "type": "process_step"},
+          {"id": "E6-3", "description": "钯催化剂", "is_novel": false, "type": "reagent"},
+          {"id": "E6-4", "description": "碱为缚酸剂", "is_novel": false, "type": "reagent"},
+          {"id": "E6-5", "description": "柱层析纯化", "is_novel": false, "type": "process_step"},
+          {"id": "E6-6", "description": "升华提纯", "is_novel": false, "type": "process_step"}
+        ]
+      },
+      {
+        "number": 7,
+        "type": "dependent",
+        "depends_on": 6,
+        "category": "method",
+        "text": "根据权利要求6所述的制备方法，其特征在于，步骤一中，所述反应温度为80-120℃，反应时间为12-24小时，所述有机溶剂为甲苯与水的混合溶剂，甲苯与水的体积比为3:1至5:1。",
+        "text_en": "The preparation method according to claim 6, characterized in that in Step 1, the reaction temperature is 80-120°C, the reaction time is 12-24 hours, the organic solvent is a mixed solvent of toluene and water, and the volume ratio of toluene to water is 3:1 to 5:1.",
+        "elements": [
+          {"id": "E7-1", "description": "反应温度80-120℃", "is_novel": false, "type": "parameter"},
+          {"id": "E7-2", "description": "反应时间12-24小时", "is_novel": false, "type": "parameter"},
+          {"id": "E7-3", "description": "甲苯/水混合溶剂体系", "is_novel": false, "type": "condition"},
+          {"id": "E7-4", "description": "甲苯与水体积比3:1至5:1", "is_novel": false, "type": "parameter"}
+        ]
+      },
+      {
+        "number": 8,
+        "type": "dependent",
+        "depends_on": 6,
+        "category": "method",
+        "text": "根据权利要求6所述的制备方法，其特征在于，步骤一中，所述钯催化剂为四(三苯基膦)钯，用量为含卤素取代基的螺二芴衍生物摩尔量的2-5%；所述碱为碳酸钾，用量为含卤素取代基的螺二芴衍生物摩尔量的2.5-3.5倍。",
+        "text_en": "The preparation method according to claim 6, characterized in that in Step 1, the palladium catalyst is tetrakis(triphenylphosphine)palladium(0) in an amount of 2-5 mol% relative to the halogen-substituted spirobifluorene derivative; the base is potassium carbonate in an amount of 2.5-3.5 equivalents relative to the halogen-substituted spirobifluorene derivative.",
+        "elements": [
+          {"id": "E8-1", "description": "催化剂为Pd(PPh₃)₄", "is_novel": false, "type": "reagent"},
+          {"id": "E8-2", "description": "催化剂用量2-5 mol%", "is_novel": false, "type": "parameter"},
+          {"id": "E8-3", "description": "碱为K₂CO₃", "is_novel": false, "type": "reagent"},
+          {"id": "E8-4", "description": "碱用量2.5-3.5当量", "is_novel": false, "type": "parameter"}
+        ]
+      },
+      {
+        "number": 9,
+        "type": "independent",
+        "depends_on": null,
+        "category": "product",
+        "text": "一种有机电致发光器件，其特征在于，包括依次层叠设置的阳极、空穴注入层、空穴传输层、发光层、电子传输层、电子注入层和阴极；所述发光层包含如权利要求1至5中任一项所述的蓝光主体材料作为主体材料，以及磷光掺杂剂或热活化延迟荧光掺杂剂作为发光掺杂剂。",
+        "text_en": "An organic electroluminescent device, characterized in that it comprises an anode, a hole injection layer, a hole transport layer, an emitting layer, an electron transport layer, an electron injection layer, and a cathode stacked in sequence; the emitting layer comprises the blue-light host material according to any one of claims 1 to 5 as a host material, and a phosphorescent dopant or a thermally activated delayed fluorescence dopant as an emitting dopant.",
+        "elements": [
+          {"id": "E9-1", "description": "阳极/HIL/HTL/EML/ETL/EIL/阴极多层器件结构", "is_novel": false, "type": "structural"},
+          {"id": "E9-2", "description": "发光层含权利要求1-5的蓝光主体材料", "is_novel": true, "type": "material_usage"},
+          {"id": "E9-3", "description": "磷光或TADF掺杂剂作为发光掺杂剂", "is_novel": false, "type": "material_usage"}
+        ]
+      },
+      {
+        "number": 10,
+        "type": "dependent",
+        "depends_on": 9,
+        "category": "product",
+        "text": "根据权利要求9所述的有机电致发光器件，其特征在于：所述空穴注入层的材料为HAT-CN，厚度为5-15nm；所述空穴传输层的材料为TAPC，厚度为30-50nm；所述发光层中蓝光主体材料与发光掺杂剂的质量比为100:5至100:25，发光层厚度为15-30nm；所述电子传输层的材料为TPBi，厚度为30-50nm；所述电子注入层的材料为LiF，厚度为0.5-2nm。",
+        "text_en": "The organic electroluminescent device according to claim 9, characterized in that: the hole injection layer material is HAT-CN with a thickness of 5-15 nm; the hole transport layer material is TAPC with a thickness of 30-50 nm; the mass ratio of the blue-light host material to the emitting dopant in the emitting layer is 100:5 to 100:25, and the emitting layer thickness is 15-30 nm; the electron transport layer material is TPBi with a thickness of 30-50 nm; the electron injection layer material is LiF with a thickness of 0.5-2 nm.",
+        "elements": [
+          {"id": "E10-1", "description": "HIL为HAT-CN，厚度5-15nm", "is_novel": false, "type": "parameter"},
+          {"id": "E10-2", "description": "HTL为TAPC，厚度30-50nm", "is_novel": false, "type": "parameter"},
+          {"id": "E10-3", "description": "EML主体:掺杂剂质量比100:5至100:25", "is_novel": false, "type": "parameter"},
+          {"id": "E10-4", "description": "EML厚度15-30nm", "is_novel": false, "type": "parameter"},
+          {"id": "E10-5", "description": "ETL为TPBi，厚度30-50nm", "is_novel": false, "type": "parameter"},
+          {"id": "E10-6", "description": "EIL为LiF，厚度0.5-2nm", "is_novel": false, "type": "parameter"}
+        ]
+      }
+    ],
+    "markush_structures": [
+      {
+        "id": "MK-CN-001",
+        "claim_reference": 1,
+        "core_smarts": "[#6]1([#6]2[#6][#6][#6]([#6]3[#6][#6][#6][#6][#6]3[#7]3[#6][#6][#6][#6][#6]3)[#6][#6]2)([#6]2[#6][#6][#6][#6][#6]2)[#6][#6][#6][#6]1",
+        "core_description": "9,9'-螺二芴核心骨架，2位连接Ar₁芳基，7位连接Ar₂含氮杂环",
+        "variable_groups": [
+          {
+            "position": "Ar1",
+            "attachment_point": "C2-spirofluorene",
+            "options": [
+              {"smiles": "c1ccccc1", "name": "苯基", "name_en": "phenyl"},
+              {"smiles": "c1ccc2ccccc2c1", "name": "萘基", "name_en": "naphthyl"},
+              {"smiles": "c1ccc(-c2ccccc2)cc1", "name": "联苯基", "name_en": "biphenyl"}
+            ]
+          },
+          {
+            "position": "Ar2",
+            "attachment_point": "C7-spirofluorene",
+            "options": [
+              {"smiles": "c1ccc2[nH]c3ccccc3c2c1", "name": "咔唑基", "name_en": "carbazolyl"},
+              {"smiles": "c1ccc2oc3ccccc3c2c1", "name": "二苯并呋喃基", "name_en": "dibenzofuranyl"},
+              {"smiles": "c1ccc2sc3ccccc3c2c1", "name": "二苯并噻吩基", "name_en": "dibenzothienyl"}
+            ]
+          },
+          {
+            "position": "R1",
+            "attachment_point": "C3-Ar2-heterocycle",
+            "options": [
+              {"smiles": "[H]", "name": "氢", "name_en": "hydrogen"},
+              {"smiles": "C", "name": "甲基", "name_en": "methyl"},
+              {"smiles": "CC", "name": "乙基", "name_en": "ethyl"},
+              {"smiles": "C(C)(C)C", "name": "叔丁基", "name_en": "tert-butyl"},
+              {"smiles": "OC", "name": "甲氧基", "name_en": "methoxy"},
+              {"smiles": "c1ccccc1", "name": "苯基", "name_en": "phenyl"}
+            ]
+          },
+          {
+            "position": "R2",
+            "attachment_point": "C6-Ar2-heterocycle",
+            "options_same_as": "R1"
+          },
+          {
+            "position": "R3",
+            "attachment_point": "C3'-spirofluorene",
+            "options_same_as": "R1"
+          },
+          {
+            "position": "R4",
+            "attachment_point": "C6'-spirofluorene",
+            "options_same_as": "R1"
+          }
+        ],
+        "constraints": [
+          "R₁和R₂不同时为氢（权利要求1明确限定）",
+          "当Ar₂为咔唑基时，R₁和R₂中至少一个为C₁-C₆烷基（说明书优选方案）"
+        ],
+        "estimated_compound_count": 3888,
+        "estimation_formula": "3(Ar1) × 3(Ar2) × 6(R1) × 6(R2) × 6(R3) × 6(R4) = 11664 total; minus R1=R2=H cases: 3×3×1×1×6×6 = 324; net = 11664 - 324 = 11340; with Ar2=carbazolyl additional constraint further reduces to ~3888 preferred compounds"
+      }
+    ],
+    "molecules": [
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440101",
+        "compound_label": "H-1",
+        "smiles": "c1ccc(-c2ccc3c(c2)C2(c4cc(-n5c6ccccc6c6ccccc65)ccc4-c4ccccc42)c2ccccc2-3)cc1",
+        "inchi_key": "SPIROFLUORENECARBAZOLE-UHFFFAOYSA-N",
+        "molecular_weight": 547.22,
+        "molecular_formula": "C41H27NO",
+        "location": "实施例1，说明书第[0045]段",
+        "role": "core_compound",
+        "is_in_claims": true,
+        "claim_references": [1, 2, 3, 5],
+        "properties": {
+          "t1_ev": 2.95,
+          "homo_ev": -5.92,
+          "lumo_ev": -2.58,
+          "tg_celsius": 198,
+          "td_celsius": 438
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440102",
+        "compound_label": "H-2",
+        "smiles": "Cc1cc(-n2c3ccccc3c3ccccc32)cc(C)c1-c1ccc2c(c1)C1(c3ccccc3-c3ccccc31)c1ccccc1-2",
+        "inchi_key": "DIMETHYLCZSPIROFLU-UHFFFAOYSA-N",
+        "molecular_weight": 509.24,
+        "molecular_formula": "C38H27N",
+        "location": "实施例2，说明书第[0052]段",
+        "role": "example",
+        "is_in_claims": true,
+        "claim_references": [1, 3, 4, 5],
+        "properties": {
+          "t1_ev": 2.92,
+          "homo_ev": -5.88,
+          "lumo_ev": -2.52,
+          "tg_celsius": 186,
+          "td_celsius": 425
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440103",
+        "compound_label": "H-3",
+        "smiles": "c1ccc(-c2ccc3c(c2)C2(c4cc(-n5c6ccccc6c6cc(C(C)(C)C)ccc65)ccc4-c4ccccc42)c2ccccc2-3)cc1",
+        "inchi_key": "TBUTYLCZSPIROFLU-UHFFFAOYSA-N",
+        "molecular_weight": 603.28,
+        "molecular_formula": "C45H33NO",
+        "location": "实施例3，说明书第[0058]段",
+        "role": "example",
+        "is_in_claims": true,
+        "claim_references": [1, 2, 3, 4, 5],
+        "properties": {
+          "t1_ev": 3.01,
+          "homo_ev": -5.95,
+          "lumo_ev": -2.55,
+          "tg_celsius": 215,
+          "td_celsius": 445
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440104",
+        "compound_label": "H-4",
+        "smiles": "c1ccc2c(c1)oc1ccccc1c2-c1ccc2c(c1)C1(c3ccccc3-c3ccccc31)c1cc(-n3c4ccccc4c4ccccc43)ccc1-2",
+        "inchi_key": "DBFCZSPIROFLU-UHFFFAOYSA-N",
+        "molecular_weight": 637.22,
+        "molecular_formula": "C47H29NO2",
+        "location": "实施例4，说明书第[0064]段",
+        "role": "example",
+        "is_in_claims": true,
+        "claim_references": [1, 5],
+        "properties": {
+          "t1_ev": 2.91,
+          "homo_ev": -6.05,
+          "lumo_ev": -2.72,
+          "tg_celsius": 192,
+          "td_celsius": 432
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440105",
+        "compound_label": "H-5",
+        "smiles": "c1ccc(-c2ccc3c(c2)C2(c4cc(-n5c6ccccc6c6cc(OC)ccc65)ccc4-c4ccccc42)c2ccccc2-3)cc1",
+        "inchi_key": "OMECZSPIROFLU-UHFFFAOYSA-N",
+        "molecular_weight": 577.23,
+        "molecular_formula": "C42H29NO2",
+        "location": "实施例5，说明书第[0070]段",
+        "role": "example",
+        "is_in_claims": true,
+        "claim_references": [1, 2, 3, 5],
+        "properties": {
+          "t1_ev": 2.93,
+          "homo_ev": -5.82,
+          "lumo_ev": -2.48,
+          "tg_celsius": 188,
+          "td_celsius": 420
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440106",
+        "compound_label": "H-6",
+        "smiles": "c1ccc2ccccc2c1-c1ccc2c(c1)C1(c3ccccc3-c3ccccc31)c1cc(-n3c4ccccc4c4cc(C)ccc43)ccc1-2",
+        "inchi_key": "NAPHCZMESFLU-UHFFFAOYSA-N",
+        "molecular_weight": 611.25,
+        "molecular_formula": "C46H31N",
+        "location": "实施例6，说明书第[0076]段",
+        "role": "example",
+        "is_in_claims": true,
+        "claim_references": [1, 4, 5],
+        "properties": {
+          "t1_ev": 2.90,
+          "homo_ev": -5.90,
+          "lumo_ev": -2.60,
+          "tg_celsius": 205,
+          "td_celsius": 440
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440107",
+        "compound_label": "C-1",
+        "smiles": "c1ccc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1-n1c2ccccc2c2ccccc21",
+        "inchi_key": "NNFHUOQYRXZMKL-UHFFFAOYSA-N",
+        "molecular_weight": 484.59,
+        "molecular_formula": "C36H24N2",
+        "location": "对比例1，说明书第[0082]段",
+        "role": "comparative",
+        "is_in_claims": false,
+        "claim_references": [],
+        "properties": {
+          "t1_ev": 2.56,
+          "homo_ev": -6.00,
+          "lumo_ev": -2.90,
+          "tg_celsius": 62,
+          "td_celsius": 380
+        }
+      },
+      {
+        "molecule_id": "550e8400-e29b-41d4-a716-446655440108",
+        "compound_label": "C-2",
+        "smiles": "c1ccc2c(c1)-c1ccccc1C21c2ccccc2-c2ccc(-n3c4ccccc4c4ccccc43)cc21",
+        "inchi_key": "CZPHSPIROFLU-UHFFFAOYSA-N",
+        "molecular_weight": 481.59,
+        "molecular_formula": "C36H23N",
+        "location": "对比例2，说明书第[0086]段",
+        "role": "comparative",
+        "is_in_claims": false,
+        "claim_references": [],
+        "properties": {
+          "t1_ev": 2.72,
+          "homo_ev": -5.85,
+          "lumo_ev": -2.65,
+          "tg_celsius": 145,
+          "td_celsius": 410
+        }
+      }
+    ],
+    "citations": [
+      {
+        "type": "patent",
+        "citation_id": "CN110028508A",
+        "title": "一种咔唑类有机电致发光材料及其制备方法和有机电致发光器件",
+        "jurisdiction": "CN",
+        "filing_date": "2019-04-15",
+        "cited_by": "applicant",
+        "relevance": "background_art",
+        "relevance_description": "公开了咔唑核心蓝光主体材料，但Tg仅120℃"
+      },
+      {
+        "type": "patent",
+        "citation_id": "US10,876,032B2",
+        "title": "Organic light-emitting compounds containing spirofluorene moiety and devices thereof",
+        "jurisdiction": "US",
+        "filing_date": "2018-09-20",
+        "cited_by": "examiner",
+        "relevance": "novelty_assessment",
+        "relevance_description": "公开了螺芴基OLED主体材料，但T₁仅2.6eV，未引入咔唑杂化骨架"
+      },
+      {
+        "type": "non_patent_literature",
+        "citation_id": "NPL-001",
+        "authors": "Kim, S.; Park, J.; Lee, H.; Kim, Y.",
+        "title": "High-efficiency blue phosphorescent OLEDs with spirofluorene-based ambipolar host materials",
+        "journal": "Advanced Materials",
+        "year": 2020,
+        "volume": "32",
+        "issue": "15",
+        "pages": "2003521",
+        "doi": "10.1002/adma.202003521",
+        "cited_by": "applicant",
+        "relevance": "background_art",
+        "relevance_description": "系统研究了螺芴基蓝光主体材料，但未解决π-π堆积问题"
+      },
+      {
+        "type": "non_patent_literature",
+        "citation_id": "NPL-002",
+        "authors": "Park, Y.; Kim, D.; Chen, W.; Zhang, L.",
+        "title": "Structure-property relationships in carbazole-fluorene hybrid systems for blue OLED hosts",
+        "journal": "Chemistry of Materials",
+        "year": 2021,
+        "volume": "33",
+        "issue": "14",
+        "pages": "5156-5168",
+        "doi": "10.1021/acs.chemmater.1c01234",
+        "cited_by": "applicant",
+        "relevance": "background_art",
+        "relevance_description": "研究了咔唑-芴杂化体系构效关系，指出线性连接结构刚性不足"
+      },
+      {
+        "type": "patent",
+        "citation_id": "KR10-2021-0045678A",
+        "title": "유기 발광 소자용 호스트 재료 및 이를 포함하는 유기 발광 소자",
+        "jurisdiction": "KR",
+        "filing_date": "2020-10-12",
+        "cited_by": "examiner",
+        "relevance": "novelty_assessment",
+        "relevance_description": "公开了含螺环结构的OLED主体材料，但骨架类型不同"
+      }
+    ],
+    "prosecution_history": [
+      {
+        "event_type": "filing",
+        "date": "2022-12-19",
+        "description": "发明专利申请提交",
+        "details": {
+          "filing_office": "中国国家知识产权局",
+          "filing_method": "电子申请",
+          "original_claims_count": 12
+        }
+      },
+      {
+        "event_type": "publication",
+        "date": "2023-03-21",
+        "description": "发明专利申请公开（提前公开）",
+        "details": {
+          "publication_type": "A",
+          "publication_number": "CN115832410A"
+        }
+      },
+      {
+        "event_type": "substantive_examination_request",
+        "date": "2023-03-21",
+        "description": "请求实质审查（与公开同日提出）",
+        "details": {
+          "examination_fee_paid": true
+        }
+      },
+      {
+        "event_type": "first_office_action",
+        "date": "2023-07-15",
+        "description": "第一次审查意见通知书",
+        "details": {
+          "objections": [
+            "权利要求1保护范围过宽，Ar₁的选择范围包含联苯基等大体积基团，但说明书中未提供含联苯基取代的实施例数据支持",
+            "权利要求1中R₁至R₄的选择范围过宽，C₁-C₆烷基和苯基的组合数量巨大，实施例数据不足以支持全部通式范围",
+            "对比文献US10,876,032B2已公开螺芴骨架OLED主体材料，权利要求1的新颖性需进一步论证"
+          ],
+          "cited_references": ["CN110028508A", "US10,876,032B2", "KR10-2021-0045678A"],
+          "response_deadline": "2023-11-15"
+        }
+      },
+      {
+        "event_type": "applicant_response",
+        "date": "2023-09-10",
+        "description": "申请人答复第一次审查意见",
+        "details": {
+          "amendments": [
+            "在权利要求1中增加限定条件'R₁和R₂不同时为氢'，缩小保护范围",
+            "删除原权利要求中Ar₁包含'蒽基'和'芘基'的选项",
+            "补充实施例4-6的完整合成数据和器件性能数据",
+            "原权利要求12条缩减为10条"
+          ],
+          "arguments": [
+            "本发明的螺芴-咔唑杂化骨架与US10,876,032B2中的纯螺芴骨架在结构上存在本质区别：本发明在螺芴的7位直接键合咔唑基团形成刚性杂化骨架，而对比文献仅在螺芴上连接简单芳基",
+            "本发明化合物的T₁（>2.9eV）显著高于对比文献（2.6eV），证明咔唑基团的引入对三重态能级的提升具有非显而易见的技术效果",
+            "补充的实施例4-6涵盖了Ar₂为二苯并呋喃基和二苯并噻吩基的情况，充分支持修改后的权利要求范围"
+          ]
+        }
+      },
+      {
+        "event_type": "grant_notification",
+        "date": "2023-12-20",
+        "description": "授予发明专利权通知书",
+        "details": {
+          "granted_claims_count": 10,
+          "examination_duration_months": 12
+        }
+      },
+      {
+        "event_type": "grant",
+        "date": "2024-01-16",
+        "description": "授权公告",
+        "details": {
+          "publication_type": "B",
+          "publication_number": "CN115832410B",
+          "certificate_number": "CN-ZL-2024-XXXXXXX"
+        }
+      }
+    ],
+    "family_id": "FAM-2022-OLED-BH-001",
+    "family_members": [
+      {
+        "jurisdiction": "CN",
+        "patent_number": "CN115832410B",
+        "application_number": "CN202211634528.7",
+        "status": "granted",
+        "grant_date": "2024-01-16"
+      },
+      {
+        "jurisdiction": "US",
+        "application_number": "US18/389,452",
+        "status": "pending",
+        "filing_date": "2023-12-18",
+        "expected_examination_date": "2025-06-01"
+      },
+      {
+        "jurisdiction": "EP",
+        "application_number": "EP23216845.3",
+        "status": "examination",
+        "filing_date": "2023-12-15",
+        "publication_number": "EP4398685A1"
+      },
+      {
+        "jurisdiction": "KR",
+        "application_number": "KR10-2024-0001234",
+        "status": "pending",
+        "filing_date": "2024-01-03"
+      },
+      {
+        "jurisdiction": "JP",
+        "application_number": "JP2023-218456",
+        "status": "pending",
+        "filing_date": "2023-12-20"
+      }
+    ],
+    "annuity_info": {
+      "next_due_date": "2025-12-19",
+      "next_annuity_year": 3,
+      "amount_cny": 900,
+      "currency": "CNY",
+      "grace_period_months": 6,
+      "total_paid_years": 2,
+      "payment_history": [
+        {"year": 1, "amount_cny": 900, "paid_date": "2022-12-19", "status": "paid"},
+        {"year": 2, "amount_cny": 900, "paid_date": "2023-12-15", "status": "paid"}
+      ],
+      "estimated_total_cost_20y_cny": 66000,
+      "fee_schedule_reference": "CNIPA-2024-fee-standard"
+    },
+    "valuation": {
+      "technical_score": 82,
+      "legal_score": 78,
+      "commercial_score": 75,
+      "strategic_score": 88,
+      "overall_score": 80.9,
+      "score_weights": {
+        "technical": 0.2,
+        "legal": 0.2,
+        "commercial": 0.3,
+        "strategic": 0.3
+      },
+      "score_formula": "technical×0.2 + legal×0.2 + commercial×0.3 + strategic×0.3 = 16.4 + 15.6 + 22.5 + 26.4 = 80.9",
+      "tier": "A",
+      "tier_thresholds": {"S": 90, "A": 75, "B": 60, "C": 45, "D": 0},
+      "assessment_date": "2024-06-15",
+      "assessor": "patent_valuation_model_v3.2",
+      "key_strengths": [
+        "核心骨架新颖性高，螺芴-咔唑杂化设计具有创造性",
+        "Markush覆盖范围合理，经审查修改后保护范围适中",
+        "器件性能数据充分，6个实施例+2个对比例形成完整证据链",
+        "同族申请覆盖中美欧日韩五大市场，战略布局完善"
+      ],
+      "key_risks": [
+        "权利要求经审查缩小过范围，原始12条缩减为10条",
+        "同族美国申请尚未授权，存在被驳回风险",
+        "OLED蓝光主体材料领域竞争激烈，存在被规避设计的可能"
+      ],
+      "estimated_market_value_cny": 2800000,
+      "licensing_potential": "high"
+    },
+    "extended_metadata": {
+      "oled_layer": "emitting_layer_host",
+      "emission_color": "blue",
+      "core_skeleton": "spirofluorene-carbazole",
+      "t1_energy_ev": 2.95,
+      "tg_celsius": 186,
+      "best_eqe_percent": 25.1,
+      "best_compound": "H-3",
+      "emission_mechanism_compatibility": ["phosphorescence", "TADF"],
+      "data_quality_score": 0.92,
+      "completeness_score": 0.95,
+      "last_verified": "2024-08-01",
+      "verification_method": "manual_review_plus_automated_validation"
+    },
+    "created_at": "2024-01-20T08:30:00Z",
+    "updated_at": "2024-08-01T14:22:00Z"
+  }
+}
+
+

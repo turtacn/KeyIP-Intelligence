@@ -1,0 +1,1377 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440004",
+  "patent_number": "US11,847,352 B2",
+  "application_number": "US 17/358,421",
+  "kind_code": "B2",
+  "title": "Organic Compound for Light-Emitting Device and Organic Light-Emitting Device Using the Same",
+  "abstract": "Disclosed is an organic compound represented by a general formula (I) comprising a bicarbazole core linked to a substituted aryl or heteroaryl group through a phenylene bridge. In the general formula (I), the bicarbazole core consists of two carbazolyl moieties connected at the 3-position of each carbazolyl unit, wherein one nitrogen atom of the bicarbazole core is substituted with a group selected from phenyl, naphthyl, biphenylyl, and pyridinyl, and the other nitrogen atom is substituted with a group Ar₁ which is a C₆-C₃₀ aryl group or a C₂-C₃₀ heteroaryl group optionally substituted with one to four substituents R₁ through R₄ independently selected from hydrogen, C₁-C₁₂ alkyl, C₆-C₁₈ aryl, and C₂-C₁₈ heteroaryl. The compound exhibits a triplet energy (T₁) of 2.75 eV or higher, a HOMO energy level between -5.6 eV and -6.2 eV, and a glass transition temperature (Tg) of 150°C or higher, making it particularly suitable as a host material in the emitting layer of blue phosphorescent and thermally activated delayed fluorescence (TADF) organic light-emitting devices. Also disclosed are organic light-emitting devices incorporating the compound as a host material in the emitting layer, the devices exhibiting external quantum efficiency (EQE) exceeding 22%, CIE y-coordinate below 0.15, and operational lifetime (LT95) exceeding 500 hours at an initial luminance of 1000 cd/m². A method for fabricating such devices by vacuum thermal evaporation is also provided.",
+  "filing_date": "2021-06-25",
+  "publication_date": "2022-03-03",
+  "grant_date": "2023-12-19",
+  "priority_date": "2020-06-28",
+  "expiration_date": "2041-06-25",
+  "assignee": {
+    "name": "Samsung Display Co., Ltd.",
+    "country": "KR",
+    "type": "corporation",
+    "address": "1 Samsung-ro, Giheung-gu, Yongin-si, Gyeonggi-do, Republic of Korea",
+    "registration_number": "110111-XXXXXXX"
+  },
+  "inventors": [
+    {"name": "Kim, Sung-Hoon", "country": "KR", "city": "Suwon"},
+    {"name": "Lee, Ji-Young", "country": "KR", "city": "Seoul"},
+    {"name": "Tanaka, Hiroshi", "country": "JP", "city": "Yokohama"},
+    {"name": "Chen, Wei", "country": "CN", "city": "Shanghai"}
+  ],
+  "legal_status": {
+    "status": "active",
+    "last_event": "Grant of patent",
+    "last_event_date": "2023-12-19",
+    "maintenance_fee_status": "current",
+    "next_maintenance_due": "2027-06-19",
+    "is_in_force": true
+  },
+  "classification": {
+    "ipc": [
+      {"code": "C07D209/86", "version": "2006.01", "level": "main", "description": "Carbazole and derivatives"},
+      {"code": "C07D405/14", "version": "2006.01", "level": "further", "description": "Heterocyclic compounds containing two or more hetero rings at least one having nitrogen"},
+      {"code": "C09K11/06", "version": "2006.01", "level": "further", "description": "Luminescent organic materials"},
+      {"code": "H10K85/60", "version": "2023.01", "level": "further", "description": "Organic compounds for electroluminescent devices"},
+      {"code": "H10K50/11", "version": "2023.01", "level": "additional", "description": "Organic electroluminescent devices with emitting layers"}
+    ],
+    "cpc": [
+      {"code": "C07D209/86", "version": "2024.02"},
+      {"code": "C07D405/14", "version": "2024.02"},
+      {"code": "C09K2211/1011", "version": "2024.02"},
+      {"code": "C09K2211/1014", "version": "2024.02"},
+      {"code": "H10K85/6572", "version": "2024.02"},
+      {"code": "H10K50/112", "version": "2024.02"},
+      {"code": "H10K2101/20", "version": "2024.02"},
+      {"code": "H10K2101/25", "version": "2024.02"}
+    ],
+    "uspc": [
+      {"code": "428/690", "description": "Electroluminescent devices"},
+      {"code": "546/256", "description": "Carbazoles"}
+    ]
+  },
+  "priority_claims": [
+    {
+      "country": "KR",
+      "application_number": "KR 10-2020-0078945",
+      "filing_date": "2020-06-28",
+      "type": "foreign_priority"
+    }
+  ],
+  "patent_family": {
+    "family_id": "FAM-2020-OLED-HOST-002",
+    "pct_application": {
+      "application_number": "PCT/KR2021/007892",
+      "filing_date": "2021-06-22",
+      "publication_number": "WO2021/261845A1",
+      "publication_date": "2021-12-30"
+    },
+    "family_members": [
+      {
+        "patent_number": "US11,847,352 B2",
+        "country": "US",
+        "status": "granted",
+        "filing_date": "2021-06-25",
+        "grant_date": "2023-12-19"
+      },
+      {
+        "patent_number": "CN113880834B",
+        "country": "CN",
+        "status": "granted",
+        "filing_date": "2021-06-22",
+        "grant_date": "2024-01-15",
+        "cross_reference_file": "sample_cn_patent.json"
+      },
+      {
+        "patent_number": "EP4170714B1",
+        "country": "EP",
+        "status": "granted",
+        "filing_date": "2021-06-22",
+        "grant_date": "2024-06-12",
+        "validated_in": ["DE", "FR", "GB", "NL", "KR"]
+      },
+      {
+        "patent_number": "KR10-2598432B1",
+        "country": "KR",
+        "status": "granted",
+        "filing_date": "2020-06-28",
+        "grant_date": "2023-11-08"
+      },
+      {
+        "patent_number": "JP2023-527891",
+        "country": "JP",
+        "status": "pending",
+        "filing_date": "2021-06-22",
+        "expected_grant_date": "2025-06-01"
+      }
+    ]
+  },
+  "citations": {
+    "backward_citations": [
+      {
+        "patent_number": "US10,256,419 B2",
+        "title": "Bicarbazole compounds for organic electroluminescent devices",
+        "assignee": "Universal Display Corporation",
+        "country": "US",
+        "grant_date": "2019-04-09",
+        "cited_by": "examiner",
+        "relevance_category": "X",
+        "relevance_description": "Highly relevant prior art disclosing bicarbazole host materials for blue OLEDs",
+        "relevant_claims": [1, 2, 6]
+      },
+      {
+        "patent_number": "US10,892,421 B2",
+        "title": "Organic light-emitting device with carbazole-based host material",
+        "assignee": "LG Display Co., Ltd.",
+        "country": "US",
+        "grant_date": "2021-01-12",
+        "cited_by": "examiner",
+        "relevance_category": "Y",
+        "relevance_description": "Discloses carbazole-based host materials with similar device structures",
+        "relevant_claims": [2, 9, 10]
+      },
+      {
+        "patent_number": "EP3845582 B1",
+        "title": "Triazine-based electron transport materials for organic light-emitting devices",
+        "assignee": "Lumitec Advanced Materials GmbH",
+        "country": "EP",
+        "grant_date": "2023-05-10",
+        "cited_by": "applicant",
+        "relevance_category": "A",
+        "relevance_description": "Discloses ETL materials used in combination with host materials in OLED devices; technological background for device architecture",
+        "cross_reference_file": "sample_ep_patent.json"
+      },
+      {
+        "patent_number": "US9,929,350 B2",
+        "title": "Spirofluorene-carbazole compounds for organic electroluminescence",
+        "assignee": "Samsung SDI Co., Ltd.",
+        "country": "US",
+        "grant_date": "2018-03-27",
+        "cited_by": "examiner",
+        "relevance_category": "Y",
+        "relevance_description": "Discloses spirofluorene-carbazole hybrid host materials with high triplet energy",
+        "relevant_claims": [1, 4, 5]
+      },
+      {
+        "patent_number": "WO2019/182285 A1",
+        "title": "Novel organic compound and organic light-emitting device comprising same",
+        "assignee": "SFC Co., Ltd.",
+        "country": "WO",
+        "publication_date": "2019-09-26",
+        "cited_by": "applicant",
+        "relevance_category": "A",
+        "relevance_description": "General background on carbazole-based OLED host materials"
+      },
+      {
+        "type": "non_patent_literature",
+        "citation_id": "NPL-US-001",
+        "authors": "Lee, J.-H.; Chen, C.-H.",
+        "title": "High-efficiency blue organic light-emitting diodes with carbazole-based host materials",
+        "journal": "Advanced Materials",
+        "year": 2019,
+        "volume": "31",
+        "pages": "1901572",
+        "cited_by": "examiner",
+        "relevance_category": "Y",
+        "relevance_description": "Review of carbazole-based host materials for blue OLEDs; establishes state of the art"
+      },
+      {
+        "type": "non_patent_literature",
+        "citation_id": "NPL-US-002",
+        "authors": "Kim, S.-H.; Lee, J.-Y.",
+        "title": "Bicarbazole-based host materials with high triplet energy for blue phosphorescent OLEDs",
+        "journal": "Journal of Materials Chemistry C",
+        "year": 2020,
+        "volume": "8",
+        "pages": "5678-5690",
+        "cited_by": "applicant",
+        "relevance_category": "A",
+        "relevance_description": "Applicant's own prior publication providing background on bicarbazole host design strategy"
+      }
+    ],
+    "forward_citations": [
+      {
+        "patent_number": "US2024/0172581 A1",
+        "title": "Organic compound for display device and display device including the same",
+        "assignee": "Samsung Display Co., Ltd.",
+        "country": "US",
+        "publication_date": "2024-05-30",
+        "citing_claims": [1, 6],
+        "relationship": "continuation_in_part"
+      },
+      {
+        "patent_number": "US2024/0298542 A1",
+        "title": "Host material composition for blue OLED and device thereof",
+        "assignee": "BOE Technology Group Co., Ltd.",
+        "country": "US",
+        "publication_date": "2024-09-05",
+        "citing_claims": [1, 2],
+        "relationship": "independent_citation"
+      },
+      {
+        "patent_number": "KR10-2024-0045678 A",
+        "title": "Organic light-emitting compound with improved lifetime",
+        "assignee": "LG Display Co., Ltd.",
+        "country": "KR",
+        "publication_date": "2024-04-08",
+        "citing_claims": [1],
+        "relationship": "independent_citation"
+      }
+    ]
+  },
+  "claims": [
+    {
+      "claim_number": 1,
+      "claim_type": "independent",
+      "claim_category": "compound",
+      "depends_on": null,
+      "text": "An organic compound represented by Formula (I):\n\n[Formula (I)]\n\nwherein, in Formula (I):\nthe compound comprises a 3,3'-bicarbazole core in which two carbazolyl units are bonded at the 3-position of each carbazolyl unit;\nN₁ of a first carbazolyl unit is bonded to a group Ar₁;\nN₂ of a second carbazolyl unit is bonded to a group Ar₂;\nAr₁ is selected from the group consisting of a substituted or unsubstituted C₆-C₃₀ aryl group and a substituted or unsubstituted C₂-C₃₀ heteroaryl group containing at least one heteroatom selected from N, O, and S;\nAr₂ is selected from the group consisting of phenyl, naphthyl, biphenylyl, and pyridinyl;\neach of R₁, R₂, R₃, and R₄ is independently selected from the group consisting of hydrogen, deuterium, a C₁-C₁₂ linear or branched alkyl group, a C₆-C₁₈ aryl group, a C₂-C₁₈ heteroaryl group, a C₁-C₆ alkoxy group, and a halogen;\nm is an integer from 0 to 4, representing the number of R₁ substituents on Ar₁;\nn is an integer from 0 to 2, representing the number of R₂ substituents on Ar₂;\np is an integer from 0 to 4, representing the number of R₃ substituents on the first carbazolyl unit; and\nq is an integer from 0 to 4, representing the number of R₄ substituents on the second carbazolyl unit.",
+      "elements": [
+        {"element_id": "C1-E1", "description": "3,3'-bicarbazole core structure with two carbazolyl units bonded at 3-position", "type": "structural_limitation"},
+        {"element_id": "C1-E2", "description": "Ar₁ group on N₁: C₆-C₃₀ aryl or C₂-C₃₀ heteroaryl with N/O/S heteroatom", "type": "structural_limitation"},
+        {"element_id": "C1-E3", "description": "Ar₂ group on N₂: phenyl, naphthyl, biphenylyl, or pyridinyl", "type": "structural_limitation"},
+        {"element_id": "C1-E4", "description": "R₁-R₄ substituents independently selected from H, D, C₁-C₁₂ alkyl, C₆-C₁₈ aryl, C₂-C₁₈ heteroaryl, C₁-C₆ alkoxy, halogen", "type": "structural_limitation"},
+        {"element_id": "C1-E5", "description": "Substituent count parameters m (0-4), n (0-2), p (0-4), q (0-4)", "type": "structural_limitation"}
+      ],
+      "markush": {
+        "core_structure_smiles": "c1ccc2c(c1)c(-c1cc3c([nH]c4ccccc14)cc3)cc1[nH]c3ccccc3c21",
+        "core_description": "3,3'-Bicarbazole core with N₁ and N₂ substitution positions",
+        "variable_positions": [
+          {
+            "position": "Ar₁ (on N₁)",
+            "substituent_options": [
+              {"name": "phenyl", "smiles": "c1ccccc1", "category": "aryl"},
+              {"name": "1-naphthyl", "smiles": "c1cccc2ccccc12", "category": "aryl"},
+              {"name": "2-naphthyl", "smiles": "c1ccc2ccccc2c1", "category": "aryl"},
+              {"name": "biphenyl-4-yl", "smiles": "c1ccc(-c2ccccc2)cc1", "category": "aryl"},
+              {"name": "9,9-dimethylfluoren-2-yl", "smiles": "c1ccc2c(c1)C(C)(C)c1ccccc1-2", "category": "aryl"},
+              {"name": "dibenzofuran-4-yl", "smiles": "c1ccc2c(c1)oc1ccccc12", "category": "heteroaryl"},
+              {"name": "dibenzothiophen-4-yl", "smiles": "c1ccc2c(c1)sc1ccccc12", "category": "heteroaryl"},
+              {"name": "pyridin-3-yl", "smiles": "c1cccnc1", "category": "heteroaryl"},
+              {"name": "pyrimidin-5-yl", "smiles": "c1cnc nc1", "category": "heteroaryl"},
+              {"name": "carbazol-9-yl-phenyl", "smiles": "c1ccc(-n2c3ccccc3c3ccccc32)cc1", "category": "aryl_heteroaryl"},
+              {"name": "triphenylene-2-yl", "smiles": "c1ccc2c(c1)c1ccccc1c1ccccc12", "category": "aryl"},
+              {"name": "spirofluoren-2-yl", "smiles": "c1ccc2c(c1)C1(c3ccccc3-2)c2ccccc21", "category": "aryl"}
+            ]
+          },
+          {
+            "position": "Ar₂ (on N₂)",
+            "substituent_options": [
+              {"name": "phenyl", "smiles": "c1ccccc1", "category": "aryl"},
+              {"name": "1-naphthyl", "smiles": "c1cccc2ccccc12", "category": "aryl"},
+              {"name": "2-naphthyl", "smiles": "c1ccc2ccccc2c1", "category": "aryl"},
+              {"name": "biphenyl-4-yl", "smiles": "c1ccc(-c2ccccc2)cc1", "category": "aryl"},
+              {"name": "pyridin-3-yl", "smiles": "c1cccnc1", "category": "heteroaryl"}
+            ]
+          },
+          {
+            "position": "R₁ (on Ar₁)",
+            "substituent_options": [
+              {"name": "hydrogen", "smiles": "[H]", "category": "default"},
+              {"name": "deuterium", "smiles": "[2H]", "category": "isotope"},
+              {"name": "methyl", "smiles": "C", "category": "alkyl"},
+              {"name": "ethyl", "smiles": "CC", "category": "alkyl"},
+              {"name": "isopropyl", "smiles": "C(C)C", "category": "alkyl"},
+              {"name": "tert-butyl", "smiles": "C(C)(C)C", "category": "alkyl"},
+              {"name": "n-hexyl", "smiles": "CCCCCC", "category": "alkyl"},
+              {"name": "phenyl", "smiles": "c1ccccc1", "category": "aryl"},
+              {"name": "4-methylphenyl", "smiles": "c1ccc(C)cc1", "category": "aryl"},
+              {"name": "methoxy", "smiles": "OC", "category": "alkoxy"},
+              {"name": "fluoro", "smiles": "F", "category": "halogen"}
+            ]
+          },
+          {
+            "position": "R₂ (on Ar₂)",
+            "substituent_options_same_as": "R₁"
+          },
+          {
+            "position": "R₃ (on first carbazolyl)",
+            "substituent_options_same_as": "R₁"
+          },
+          {
+            "position": "R₄ (on second carbazolyl)",
+            "substituent_options_same_as": "R₁"
+          }
+        ],
+        "estimated_compound_count": "greater than 10,000",
+        "estimation_notes": "12(Ar₁) × 5(Ar₂) × 11^4(R₁-R₄ combinations) × multiplicity parameters; practical enumeration limited by synthetic accessibility"
+      }
+    },
+    {
+      "claim_number": 2,
+      "claim_type": "independent",
+      "claim_category": "device",
+      "depends_on": null,
+      "text": "An organic light-emitting device comprising:\nan anode;\na cathode disposed opposite to the anode;\nand an organic layer stack disposed between the anode and the cathode, the organic layer stack comprising:\na hole injection layer disposed on the anode;\na hole transport layer disposed on the hole injection layer;\nan emitting layer disposed on the hole transport layer, the emitting layer comprising a host material and a dopant material, wherein the host material comprises the organic compound according to claim 1;\nan electron transport layer disposed on the emitting layer; and\nan electron injection layer disposed between the electron transport layer and the cathode.",
+      "elements": [
+        {"element_id": "C2-E1", "description": "Anode electrode", "type": "structural_limitation"},
+        {"element_id": "C2-E2", "description": "Cathode electrode disposed opposite to anode", "type": "structural_limitation"},
+        {"element_id": "C2-E3", "description": "Organic layer stack between anode and cathode", "type": "structural_limitation"},
+        {"element_id": "C2-E4", "description": "Hole injection layer on anode", "type": "structural_limitation"},
+        {"element_id": "C2-E5", "description": "Hole transport layer on HIL", "type": "structural_limitation"},
+        {"element_id": "C2-E6", "description": "Emitting layer on HTL comprising host + dopant, host = compound of claim 1", "type": "structural_limitation"},
+        {"element_id": "C2-E7", "description": "Electron transport layer on EML", "type": "structural_limitation"},
+        {"element_id": "C2-E8", "description": "Electron injection layer between ETL and cathode", "type": "structural_limitation"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 3,
+      "claim_type": "independent",
+      "claim_category": "method",
+      "depends_on": null,
+      "text": "A method for fabricating an organic light-emitting device, the method comprising:\n(a) providing a substrate having an anode formed thereon;\n(b) forming a hole injection layer on the anode by vacuum thermal evaporation at a deposition rate of 0.5 to 2.0 Å/s;\n(c) forming a hole transport layer on the hole injection layer by vacuum thermal evaporation;\n(d) co-depositing a host material and a dopant material on the hole transport layer to form an emitting layer, wherein the host material comprises the organic compound according to claim 1, the co-deposition is performed at a substrate temperature of 20°C to 80°C, and the emitting layer has a thickness of 10 nm to 60 nm;\n(e) forming an electron transport layer on the emitting layer by vacuum thermal evaporation; and\n(f) forming a cathode on the electron transport layer.",
+      "elements": [
+        {"element_id": "C3-E1", "description": "Providing substrate with anode", "type": "process_step"},
+        {"element_id": "C3-E2", "description": "Forming HIL by vacuum thermal evaporation at 0.5-2.0 Å/s", "type": "process_step"},
+        {"element_id": "C3-E3", "description": "Forming HTL by vacuum thermal evaporation", "type": "process_step"},
+        {"element_id": "C3-E4", "description": "Co-depositing host (compound of claim 1) + dopant to form EML at substrate temp 20-80°C, thickness 10-60 nm", "type": "process_step"},
+        {"element_id": "C3-E5", "description": "Forming ETL by vacuum thermal evaporation", "type": "process_step"},
+        {"element_id": "C3-E6", "description": "Forming cathode on ETL", "type": "process_step"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 4,
+      "claim_type": "dependent",
+      "claim_category": "compound",
+      "depends_on": 1,
+      "text": "The organic compound according to claim 1, wherein Ar₁ is selected from the group consisting of phenyl, 1-naphthyl, 2-naphthyl, biphenyl-4-yl, dibenzofuran-4-yl, and dibenzothiophen-4-yl.",
+      "elements": [
+        {"element_id": "C4-E1", "description": "Ar₁ narrowed to phenyl, 1-naphthyl, 2-naphthyl, biphenyl-4-yl, dibenzofuran-4-yl, dibenzothiophen-4-yl", "type": "structural_limitation"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 5,
+      "claim_type": "dependent",
+      "claim_category": "compound",
+      "depends_on": 1,
+      "text": "The organic compound according to claim 1, wherein Ar₂ is phenyl or pyridin-3-yl.",
+      "elements": [
+        {"element_id": "C5-E1", "description": "Ar₂ narrowed to phenyl or pyridin-3-yl", "type": "structural_limitation"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 6,
+      "claim_type": "dependent",
+      "claim_category": "compound",
+      "depends_on": 1,
+      "text": "The organic compound according to claim 1, wherein R₁, R₂, R₃, and R₄ are each independently selected from the group consisting of hydrogen, methyl, tert-butyl, and phenyl.",
+      "elements": [
+        {"element_id": "C6-E1", "description": "R₁-R₄ narrowed to H, methyl, tert-butyl, phenyl", "type": "structural_limitation"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 7,
+      "claim_type": "dependent",
+      "claim_category": "compound",
+      "depends_on": 1,
+      "text": "The organic compound according to claim 1, wherein the compound has a triplet energy (T₁) of 2.75 eV or higher and a glass transition temperature (Tg) of 150°C or higher.",
+      "elements": [
+        {"element_id": "C7-E1", "description": "T₁ ≥ 2.75 eV", "type": "functional_limitation"},
+        {"element_id": "C7-E2", "description": "Tg ≥ 150°C", "type": "functional_limitation"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 8,
+      "claim_type": "dependent",
+      "claim_category": "compound",
+      "depends_on": 1,
+      "text": "The organic compound according to claim 1, wherein the compound is selected from the group consisting of:\nCompound 1: 9-(dibenzofuran-4-yl)-9'-phenyl-9H,9'H-3,3'-bicarbazole;\nCompound 2: 9-(dibenzothiophen-4-yl)-9'-phenyl-9H,9'H-3,3'-bicarbazole;\nCompound 3: 9-(biphenyl-4-yl)-9'-(pyridin-3-yl)-9H,9'H-3,3'-bicarbazole;\nCompound 4: 9-(2-naphthyl)-9'-phenyl-6-tert-butyl-9H,9'H-3,3'-bicarbazole; and\nCompound 5: 9-phenyl-9'-(9,9-dimethylfluoren-2-yl)-9H,9'H-3,3'-bicarbazole.",
+      "elements": [
+        {"element_id": "C8-E1", "description": "Enumeration of five specific compounds (Compounds 1-5)", "type": "structural_limitation"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 9,
+      "claim_type": "dependent",
+      "claim_category": "device",
+      "depends_on": 2,
+      "text": "The organic light-emitting device according to claim 2, wherein the emitting layer has a thickness of 15 nm to 40 nm.",
+      "elements": [
+        {"element_id": "C9-E1", "description": "EML thickness 15-40 nm", "type": "structural_limitation"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 10,
+      "claim_type": "dependent",
+      "claim_category": "device",
+      "depends_on": 2,
+      "text": "The organic light-emitting device according to claim 2, wherein the dopant material is a blue phosphorescent emitter or a thermally activated delayed fluorescence (TADF) emitter, and the dopant material is present in the emitting layer at a concentration of 5 wt% to 30 wt% based on the total weight of the emitting layer.",
+      "elements": [
+        {"element_id": "C10-E1", "description": "Dopant is blue phosphorescent or TADF emitter", "type": "structural_limitation"},
+        {"element_id": "C10-E2", "description": "Dopant concentration 5-30 wt%", "type": "structural_limitation"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 11,
+      "claim_type": "dependent",
+      "claim_category": "device",
+      "depends_on": 2,
+      "text": "The organic light-emitting device according to claim 2, wherein the hole transport layer comprises at least one material selected from the group consisting of NPB (N,N'-di(1-naphthyl)-N,N'-diphenyl-(1,1'-biphenyl)-4,4'-diamine), TAPC (4,4'-cyclohexylidenebis[N,N-bis(4-methylphenyl)benzenamine]), and TCTA (tris(4-carbazoyl-9-ylphenyl)amine).",
+      "elements": [
+        {"element_id": "C11-E1", "description": "HTL material selected from NPB, TAPC, TCTA", "type": "structural_limitation"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 12,
+      "claim_type": "dependent",
+      "claim_category": "device",
+      "depends_on": 2,
+      "text": "The organic light-emitting device according to claim 2, wherein the electron transport layer comprises a triazine-based compound or a phenanthroline-based compound, and the electron transport layer has a thickness of 20 nm to 60 nm.",
+      "elements": [
+        {"element_id": "C12-E1", "description": "ETL material is triazine-based or phenanthroline-based", "type": "structural_limitation"},
+        {"element_id": "C12-E2", "description": "ETL thickness 20-60 nm", "type": "structural_limitation"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 13,
+      "claim_type": "dependent",
+      "claim_category": "method",
+      "depends_on": 3,
+      "text": "The method according to claim 3, wherein in step (d), the co-deposition is performed at a base pressure of 5×10⁻⁷ Torr or lower and a deposition rate of the host material is 0.5 to 1.5 Å/s.",
+      "elements": [
+        {"element_id": "C13-E1", "description": "Base pressure ≤ 5×10⁻⁷ Torr during EML deposition", "type": "process_step"},
+        {"element_id": "C13-E2", "description": "Host deposition rate 0.5-1.5 Å/s", "type": "process_step"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 14,
+      "claim_type": "dependent",
+      "claim_category": "method",
+      "depends_on": 3,
+      "text": "The method according to claim 3, wherein the emitting layer formed in step (d) has a thickness of 20 nm to 35 nm, and the dopant material is co-deposited at a weight ratio of host material to dopant material of 85:15 to 95:5.",
+      "elements": [
+        {"element_id": "C14-E1", "description": "EML thickness 20-35 nm", "type": "process_step"},
+        {"element_id": "C14-E2", "description": "Host:dopant weight ratio 85:15 to 95:5", "type": "process_step"}
+      ],
+      "markush": null
+    },
+    {
+      "claim_number": 15,
+      "claim_type": "dependent",
+      "claim_category": "method",
+      "depends_on": 3,
+      "text": "The method according to claim 3, further comprising, after step (e) and before step (f), forming an electron injection layer on the electron transport layer by depositing LiF, Liq (8-hydroxyquinolinolato-lithium), or CsF at a thickness of 0.5 nm to 2.0 nm.",
+      "elements": [
+        {"element_id": "C15-E1", "description": "EIL formation step between ETL and cathode", "type": "process_step"},
+        {"element_id": "C15-E2", "description": "EIL material: LiF, Liq, or CsF", "type": "structural_limitation"},
+        {"element_id": "C15-E3", "description": "EIL thickness 0.5-2.0 nm", "type": "process_step"}
+      ],
+      "markush": null
+    }
+  ],
+  "description": {
+    "technical_field": "The present invention relates to organic compounds suitable for use in organic light-emitting devices (OLEDs), and more particularly, to bicarbazole-based compounds having high triplet energy and excellent thermal stability for use as host materials in blue phosphorescent and TADF OLEDs.",
+    "background_summary": "Blue organic light-emitting devices remain the bottleneck in full-color OLED displays due to the difficulty of achieving simultaneously high efficiency, color purity, and long operational lifetime. Host materials for blue emitters require a triplet energy (T₁) above 2.75 eV to confine triplet excitons on the dopant, a balanced charge transport capability, and high morphological stability (Tg > 130°C) to prevent crystallization-induced degradation. Conventional host materials such as CBP (4,4'-bis(N-carbazolyl)-1,1'-biphenyl) suffer from insufficient triplet energy (T₁ = 2.56 eV) and low Tg (62°C), leading to poor device performance in the deep blue region.",
+    "key_paragraphs": [
+      {
+        "paragraph_number": "[0028]",
+        "content": "The 3,3'-bicarbazole core was selected as the central scaffold because the meta-linkage between the two carbazolyl units effectively disrupts π-conjugation, resulting in a high triplet energy while maintaining adequate hole transport capability through the nitrogen lone pairs."
+      },
+      {
+        "paragraph_number": "[0035]",
+        "content": "The introduction of heteroaryl groups such as dibenzofuran-4-yl and dibenzothiophen-4-yl at the N₁ position provides additional steric bulk that raises the glass transition temperature above 150°C without significantly lowering the triplet energy."
+      },
+      {
+        "paragraph_number": "[0052]",
+        "content": "Density functional theory (DFT) calculations at the B3LYP/6-31G(d) level confirmed that the HOMO is primarily localized on the bicarbazole core while the LUMO is distributed over the Ar₁ substituent, enabling independent tuning of hole and electron injection barriers."
+      }
+    ],
+    "examples_summary": "The specification provides 5 synthesis examples (Compounds 1-5) and 2 comparative examples (CBP and mCBP). Each compound was synthesized via Suzuki-Miyaura or Buchwald-Hartwig coupling, purified by column chromatography and sublimation, and characterized by ¹H NMR, ¹³C NMR, MALDI-TOF MS, DSC, TGA, and UV-Vis/PL spectroscopy. OLED devices were fabricated with the structure ITO/HAT-CN(10nm)/TAPC(30nm)/Host:FIrpic 15wt%(25nm)/TmPyPB(40nm)/LiF(1nm)/Al(100nm) and characterized for EQE, current efficiency, power efficiency, CIE coordinates, and operational lifetime (LT95 at 1000 cd/m²).",
+    "figure_descriptions": [
+      {"figure_number": "FIG. 1", "description": "General structural formula (I) of the organic compound of the present invention"},
+      {"figure_number": "FIG. 2", "description": "Schematic cross-sectional view of the organic light-emitting device"},
+      {"figure_number": "FIG. 3A", "description": "UV-Vis absorption and photoluminescence spectra of Compounds 1-5 in toluene solution"},
+      {"figure_number": "FIG. 3B", "description": "Phosphorescence spectra of Compounds 1-5 at 77K in 2-MeTHF glass"},
+      {"figure_number": "FIG. 4", "description": "DSC thermograms of Compounds 1-5 showing glass transition temperatures"},
+      {"figure_number": "FIG. 5", "description": "Current density-voltage-luminance (J-V-L) characteristics of OLED devices"},
+      {"figure_number": "FIG. 6", "description": "External quantum efficiency vs. luminance curves for OLED devices"},
+      {"figure_number": "FIG. 7", "description": "Electroluminescence spectra of OLED devices at 10 mA/cm²"},
+      {"figure_number": "FIG. 8", "description": "Operational lifetime curves (normalized luminance vs. time) at initial luminance of 1000 cd/m²"},
+      {"figure_number": "FIG. 9", "description": "DFT-calculated HOMO and LUMO orbital distributions for Compounds 1-5"}
+    ]
+  },
+  "molecules": [
+    {
+      "molecule_id": "MOL-US-001",
+      "name": "Compound 1",
+      "iupac_name": "9-(dibenzofuran-4-yl)-9'-phenyl-9H,9'H-3,3'-bicarbazole",
+      "smiles": "c1ccc(-n2c3ccccc3c3cc(-c4cc5c(c6ccccc6o5)cc4)ccc32)cc1.c1ccc2c(c1)[nH]c1ccc(-n3c4ccccc4c4ccccc43)cc12",
+      "canonical_smiles": "C1=CC=C(C=C1)N2C3=CC=CC=C3C4=CC(=CC=C42)C5=CC6=C(C=C5)OC7=CC=CC=C76",
+      "inchi": "InChI=1S/C36H22N2O/c1-5-13-25-21(9-1)29-17-23(18-30-22-10-2-6-14-26(22)37(30)19-7-3-4-8-20(19)29)15-16-31(29)38-27-11-3-7-15-24(27)33-28-12-4-8-16-25(28)34(38)32-23/h1-18H",
+      "inchi_key": "BCFGMOOMADDAQU-UHFFFAOYSA-N",
+      "molecular_formula": "C36H22N2O",
+      "molecular_weight": 514.57,
+      "exact_mass": 514.1681,
+      "location_in_patent": "Example 1, Column 18, Lines 5-42; Table 1, Row 1",
+      "role": "host",
+      "synthesis_reference": "Suzuki-Miyaura coupling of 9-phenyl-3-(4,4,5,5-tetramethyl-1,3,2-dioxaborolan-2-yl)-9H-carbazole with 9-(4-bromophenyl)dibenzofuran-4-yl carbazole intermediate. Yield: 62%.",
+      "fingerprints": {
+        "morgan_r2_1024": "A3F8C1D2E5B7094A6F3C8D1E2B50947A3F8C1D2E5B7094A6F3C8D1E2B50947A3F8C1D2E5B7094A6F3C8D1E2B50947A3F8C1D2E5B7094A6F3C8D1E2B50947A3F8C1D2E5B7094A6F3C8D1E2B50947A3F8C1D2E5B7094A6F3C8D1E2B50947A3F8C1D2E5B7094A6F3C8D1E2B50947A3F8C1D2E5B7094A6F3C8D1E2B50947",
+        "morgan_r2_1024_format": "hex_256chars",
+        "maccs_166": "000000000000000000000000000000000000000000",
+        "maccs_166_format": "hex_42chars",
+        "topological_torsion": "E7A2B3C4D5F60189E7A2B3C4D5F60189E7A2B3C4D5F60189E7A2B3C4D5F60189"
+      }
+    },
+    {
+      "molecule_id": "MOL-US-002",
+      "name": "Compound 2",
+      "iupac_name": "9-(dibenzothiophen-4-yl)-9'-phenyl-9H,9'H-3,3'-bicarbazole",
+      "smiles": "c1ccc(-n2c3ccccc3c3cc(-c4cc5c(c6ccccc6s5)cc4)ccc32)cc1",
+      "canonical_smiles": "C1=CC=C(C=C1)N2C3=CC=CC=C3C4=CC(=CC=C42)C5=CC6=C(C=C5)SC7=CC=CC=C76",
+      "inchi": "InChI=1S/C36H22N2S/c1-5-13-25-21(9-1)29-17-23(18-30-22-10-2-6-14-26(22)37(30)19-7-3-4-8-20(19)29)15-16-31(29)38-27-11-3-7-15-24(27)33-28-12-4-8-16-25(28)34(38)32-23/h1-18H",
+      "inchi_key": "DKFGMOOMADDAQU-UHFFFAOYSA-N",
+      "molecular_formula": "C36H22N2S",
+      "molecular_weight": 530.63,
+      "exact_mass": 530.1453,
+      "location_in_patent": "Example 2, Column 19, Lines 10-48; Table 1, Row 2",
+      "role": "host",
+      "synthesis_reference": "Buchwald-Hartwig amination of 3-bromo-9-phenylcarbazole with 4-aminodibenzothiophene followed by ring closure. Yield: 55%.",
+      "fingerprints": {
+        "morgan_r2_1024": "B4E9D2C3F6A8105B7E4D9C2F3A61058B4E9D2C3F6A8105B7E4D9C2F3A61058B4E9D2C3F6A8105B7E4D9C2F3A61058B4E9D2C3F6A8105B7E4D9C2F3A61058B4E9D2C3F6A8105B7E4D9C2F3A61058B4E9D2C3F6A8105B7E4D9C2F3A61058B4E9D2C3F6A8105B7E4D9C2F3A61058B4E9D2C3F6A8105B7E4D9C2F3A61058",
+        "morgan_r2_1024_format": "hex_256chars",
+        "maccs_166": "000000000000100000000000000000000000000001",
+        "maccs_166_format": "hex_42chars",
+        "topological_torsion": "F8B3C4D5E6A7029AF8B3C4D5E6A7029AF8B3C4D5E6A7029AF8B3C4D5E6A7029A"
+      }
+    },
+    {
+      "molecule_id": "MOL-US-003",
+      "name": "Compound 3",
+      "iupac_name": "9-(biphenyl-4-yl)-9'-(pyridin-3-yl)-9H,9'H-3,3'-bicarbazole",
+      "smiles": "c1ccc(-c2ccc(-n3c4ccccc4c4cc(-c5cc6c([nH]c7ccccc76)cc5)ccc43)cc2)cc1",
+      "canonical_smiles": "C1=CC=C(C=C1)C2=CC=C(C=C2)N3C4=CC=CC=C4C5=CC(=CC=C53)C6=CC7=C(C=C6)N(C8=CC=CC=C78)C9=CC=CN=C9",
+      "inchi": "InChI=1S/C41H27N3/c1-5-13-29-21(9-1)33-17-25(18-34-22-10-2-6-14-30(22)42(34)27-15-16-39-27)19-20-35(33)43-31-11-3-7-23-36(31)40-32-12-4-8-24-37(32)41(43)38-26-25/h1-20,25-26H",
+      "inchi_key": "EFGHMOOMADDAQU-UHFFFAOYSA-N",
+      "molecular_formula": "C41H27N3",
+      "molecular_weight": 577.67,
+      "exact_mass": 577.2154,
+      "location_in_patent": "Example 3, Column 20, Lines 15-55; Table 1, Row 3",
+      "role": "host",
+      "synthesis_reference": "Two-step synthesis: (1) Suzuki coupling of 3,3'-dibromo-bicarbazole with biphenyl-4-boronic acid; (2) Buchwald-Hartwig amination with 3-aminopyridine. Overall yield: 48%.",
+      "fingerprints": {
+        "morgan_r2_1024": "C5FA E3D4B7C9216C8FA5E3D4B7C92168C5FAE3D4C5FAE3D4B7C9216C8FAE3D4B7C92168C5FAE3D4B7C9216C8FAE3D4B7C92168C5FAE3D4B7C9216C8FAE3D4B7C92168C5FAE3D4B7C9216C8FAE3D4B7C92168C5FAE3D4B7C9216C8FAE3D4B7C92168C5FAE3D4B7C9216C8FAE3D4B7C92168C5FAE3D4B7C9216C8FAE3D4B7C92168C5FAE3D4B7C9216C8FAE3D4B7C92168",
+        "morgan_r2_1024_format": "hex_256chars",
+        "maccs_166": "000000000000100000100000000000000000000011",
+        "maccs_166_format": "hex_42chars",
+        "topological_torsion": "A9C4D5E6F7B8130BA9C4D5E6F7B8130BA9C4D5E6F7B8130BA9C4D5E6F7B8130B"
+      }
+    },
+    {
+      "molecule_id": "MOL-US-004",
+      "name": "Compound 4",
+      "iupac_name": "9-(2-naphthyl)-9'-phenyl-6-tert-butyl-9H,9'H-3,3'-bicarbazole",
+      "smiles": "CC(C)(C)c1ccc2c(c1)[nH]c1cc(-c3cc4c([nH]c5ccccc54)cc3)c(-n3c4ccccc4c4ccc(cc43)-c3ccc4ccccc4c3)cc12",
+      "canonical_smiles": "CC(C)(C)C1=CC2=C(C=C1)N(C3=CC=CC=C32)C4=CC5=C(C=C4)N(C6=CC=CC=C65)C7=CC8=CC=CC=C8C=C7",
+      "inchi": "InChI=1S/C40H30N2/c1-40(2,3)28-18-19-32-30(20-28)36-24-26(16-17-34(36)42(32)25-14-15-27-12-8-9-13-29(27)25)22-23-33-31-21-11-7-10-27(31)35(41(33)4-5-6)37-26/h4-24H,1-3H3",
+      "inchi_key": "GHIJMOOMADDAQU-UHFFFAOYSA-N",
+      "molecular_formula": "C40H30N2",
+      "molecular_weight": 554.68,
+      "exact_mass": 554.2409,
+      "location_in_patent": "Example 4, Column 21, Lines 20-58; Table 1, Row 4",
+      "role": "host",
+      "synthesis_reference": "Suzuki-Miyaura coupling of 6-tert-butyl-3-bromo-9-phenylcarbazole with 9-(2-naphthyl)-3-(pinacolatoboryl)carbazole. Yield: 58%.",
+      "fingerprints": {
+        "morgan_r2_1024": "D6ABF4E5C8DA327D9ABF4E5C8DA3279D6ABF4E5C8DA327D9ABF4E5C8DA3279D6ABF4E5C8DA327D9ABF4E5C8DA3279D6ABF4E5C8DA327D9ABF4E5C8DA3279D6ABF4E5C8DA327D9ABF4E5C8DA3279D6ABF4E5C8DA327D9ABF4E5C8DA3279D6ABF4E5C8DA327D9ABF4E5C8DA3279D6ABF4E5C8DA327D9ABF4E5C8DA3279",
+        "morgan_r2_1024_format": "hex_256chars",
+        "maccs_166": "000000000000100000000000100000000000000001",
+        "maccs_166_format": "hex_42chars",
+        "topological_torsion": "B0D5E6F7A8C9241CB0D5E6F7A8C9241CB0D5E6F7A8C9241CB0D5E6F7A8C9241C"
+      }
+    },
+    {
+      "molecule_id": "MOL-US-005",
+      "name": "Compound 5",
+      "iupac_name": "9-phenyl-9'-(9,9-dimethylfluoren-2-yl)-9H,9'H-3,3'-bicarbazole",
+      "smiles": "CC1(C)c2ccccc2-c2ccc(-n3c4ccccc4c4cc(-c5cc6c([nH]c7ccccc76)cc5)ccc43)cc21",
+      "canonical_smiles": "CC1(C)C2=CC=CC=C2C3=CC(=CC=C31)N4C5=CC=CC=C5C6=CC(=CC=C64)C7=CC8=C(C=C7)N(C9=CC=CC=C98)C1=CC=CC=C1",
+      "inchi": "InChI=1S/C43H30N2/c1-43(2)35-19-9-7-17-33(35)34-18-8-10-20-36(34)43/h3-20H,1-2H3",
+      "inchi_key": "KLMNMOOMADDAQU-UHFFFAOYSA-N",
+      "molecular_formula": "C43H30N2",
+      "molecular_weight": 590.71,
+      "exact_mass": 590.2409,
+      "location_in_patent": "Example 5, Column 22, Lines 5-45; Table 1, Row 5",
+      "role": "host",
+      "synthesis_reference": "Buchwald-Hartwig amination of 3-bromo-9-phenylcarbazole with 2-amino-9,9-dimethylfluorene, followed by intramolecular cyclization. Yield: 45%.",
+      "fingerprints": {
+        "morgan_r2_1024": "E7BCF5A6D9EB438EA0CF5A6D9EB4380E7BCF5A6D9EB438EA0CF5A6D9EB4380E7BCF5A6D9EB438EA0CF5A6D9EB4380E7BCF5A6D9EB438EA0CF5A6D9EB4380E7BCF5A6D9EB438EA0CF5A6D9EB4380E7BCF5A6D9EB438EA0CF5A6D9EB4380E7BCF5A6D9EB438EA0CF5A6D9EB4380E7BCF5A6D9EB438EA0CF5A6D9EB4380",
+        "morgan_r2_1024_format": "hex_256chars",
+        "maccs_166": "000000000000100000000000000000100000000001",
+        "maccs_166_format": "hex_42chars",
+        "topological_torsion": "C1E6F7A8B9DA352DC1E6F7A8B9DA352DC1E6F7A8B9DA352DC1E6F7A8B9DA352D"
+      }
+    },
+    {
+      "molecule_id": "MOL-US-REF-001",
+      "name": "CBP (Comparative)",
+      "iupac_name": "4,4'-bis(N-carbazolyl)-1,1'-biphenyl",
+      "smiles": "c1ccc(-n2c3ccccc3c3ccccc32)cc1-c1ccc(-n2c3ccccc3c3ccccc32)cc1",
+      "canonical_smiles": "C1=CC=C(C=C1N2C3=CC=CC=C3C4=CC=CC=C42)C5=CC=C(C=C5)N6C7=CC=CC=C7C8=CC=CC=C86",
+      "inchi": "InChI=1S/C36H24N2/c1-5-13-27-23(9-1)31-19-25(20-32-24-10-2-6-14-28(24)37(32)17-7-3-4-8-18(17)31)15-16-26-21-33-29-11-3-7-15-30(29)38(33)22-12-4-8-16-25(22)26/h1-24H",
+      "inchi_key": "VFUDMQLBKNMONU-UHFFFAOYSA-N",
+      "molecular_formula": "C36H24N2",
+      "molecular_weight": 484.59,
+      "exact_mass": 484.1939,
+      "location_in_patent": "Comparative Example 1, Column 23, Lines 10-30; Table 2, Row 1",
+      "role": "host_comparative",
+      "synthesis_reference": "Commercially obtained from Sigma-Aldrich (purity >99.5%, sublimed grade).",
+      "fingerprints": {
+        "morgan_r2_1024": "F8CDA6B7E0FC549FB1DA6B7E0FC54901F8CDA6B7E0FC549FB1DA6B7E0FC54901F8CDA6B7E0FC549FB1DA6B7E0FC54901F8CDA6B7E0FC549FB1DA6B7E0FC54901F8CDA6B7E0FC549FB1DA6B7E0FC54901F8CDA6B7E0FC549FB1DA6B7E0FC54901F8CDA6B7E0FC549FB1DA6B7E0FC54901F8CDA6B7E0FC549FB1DA6B7E0FC54901",
+        "morgan_r2_1024_format": "hex_256chars",
+        "maccs_166": "000000000000000000000000000000000000000001",
+        "maccs_166_format": "hex_42chars",
+        "topological_torsion": "D2F7A8B9C0EB463ED2F7A8B9C0EB463ED2F7A8B9C0EB463ED2F7A8B9C0EB463E"
+      }
+    },
+    {
+      "molecule_id": "MOL-US-REF-002",
+      "name": "mCBP (Comparative)",
+      "iupac_name": "3,3'-bis(N-carbazolyl)-1,1'-biphenyl",
+      "smiles": "c1cc(-n2c3ccccc3c3ccccc32)ccc1-c1ccc(-n2c3ccccc3c3ccccc32)cc1",
+      "canonical_smiles": "C1=CC(=CC=C1C2=CC=C(C=C2)N3C4=CC=CC=C4C5=CC=CC=C53)N6C7=CC=CC=C7C8=CC=CC=C86",
+      "inchi": "InChI=1S/C36H24N2/c1-5-13-27-23(9-1)31-19-25(20-32-24-10-2-6-14-28(24)37(32)17-7-3-4-8-18(17)31)15-16-26-21-33-29-11-3-7-15-30(29)38(33)22-12-4-8-16-25(22)26/h1-24H",
+      "inchi_key": "XFUDMQLBKNMONU-UHFFFAOYSA-N",
+      "molecular_formula": "C36H24N2",
+      "molecular_weight": 484.59,
+      "exact_mass": 484.1939,
+      "location_in_patent": "Comparative Example 2, Column 23, Lines 35-55; Table 2, Row 2",
+      "role": "host_comparative",
+      "synthesis_reference": "Commercially obtained from Lumtec (purity >99%, sublimed grade).",
+      "fingerprints": {
+        "morgan_r2_1024": "A9DEB7C8F1AD650A02EB7C8F1AD65012A9DEB7C8F1AD650A02EB7C8F1AD65012A9DEB7C8F1AD650A02EB7C8F1AD65012A9DEB7C8F1AD650A02EB7C8F1AD65012A9DEB7C8F1AD650A02EB7C8F1AD65012A9DEB7C8F1AD650A02EB7C8F1AD65012A9DEB7C8F1AD650A02EB7C8F1AD65012A9DEB7C8F1AD650A02EB7C8F1AD65012",
+        "morgan_r2_1024_format": "hex_256chars",
+        "maccs_166": "000000000000000000000000000000000000000001",
+        "maccs_166_format": "hex_42chars",
+        "topological_torsion": "E3A8B9C0D1FC574FE3A8B9C0D1FC574FE3A8B9C0D1FC574FE3A8B9C0D1FC574F"
+      }
+    }
+  ],
+  "properties": [
+    {
+      "property_id": "PROP-US-001",
+      "molecule_id": "MOL-US-001",
+      "property_type": "triplet_energy",
+      "value": 2.82,
+      "unit": "eV",
+      "test_conditions": {
+        "solvent": "2-methyltetrahydrofuran",
+        "concentration": "1.0e-5 M",
+        "temperature": "77 K",
+        "measurement_method": "phosphorescence spectroscopy",
+        "excitation_wavelength_nm": 300
+      },
+      "source": "Table 1, Column 5"
+    },
+    {
+      "property_id": "PROP-US-002",
+      "molecule_id": "MOL-US-001",
+      "property_type": "homo_level",
+      "value": -5.85,
+      "unit": "eV",
+      "test_conditions": {
+        "measurement_method": "cyclic voltammetry",
+        "solvent": "dichloromethane",
+        "electrolyte": "0.1 M tetrabutylammonium hexafluorophosphate",
+        "reference_electrode": "Ag/AgCl",
+        "scan_rate_mv_per_s": 100
+      },
+      "source": "Table 1, Column 6"
+    },
+    {
+      "property_id": "PROP-US-003",
+      "molecule_id": "MOL-US-001",
+      "property_type": "lumo_level",
+      "value": -2.48,
+      "unit": "eV",
+      "test_conditions": {
+        "measurement_method": "calculated from HOMO and optical band gap",
+        "optical_bandgap_ev": 3.37
+      },
+      "source": "Table 1, Column 7"
+    },
+    {
+      "property_id": "PROP-US-004",
+      "molecule_id": "MOL-US-001",
+      "property_type": "glass_transition_temperature",
+      "value": 172.0,
+      "unit": "°C",
+      "test_conditions": {
+        "measurement_method": "differential scanning calorimetry (DSC)",
+        "heating_rate_celsius_per_min": 10,
+        "atmosphere": "nitrogen",
+        "scan_cycle": "second heating"
+      },
+      "source": "Table 1, Column 8; FIG. 4"
+    },
+    {
+      "property_id": "PROP-US-005",
+      "molecule_id": "MOL-US-001",
+      "property_type": "decomposition_temperature",
+      "value": 428.0,
+      "unit": "°C",
+      "test_conditions": {
+        "measurement_method": "thermogravimetric analysis (TGA)",
+        "heating_rate_celsius_per_min": 10,
+        "atmosphere": "nitrogen",
+        "weight_loss_criterion_percent": 5
+      },
+      "source": "Table 1, Column 9"
+    },
+    {
+      "property_id": "PROP-US-006",
+      "molecule_id": "MOL-US-001",
+      "property_type": "external_quantum_efficiency",
+      "value": 24.8,
+      "unit": "%",
+      "test_conditions": {
+        "device_structure": "ITO(150nm)/HAT-CN(10nm)/TAPC(30nm)/Compound1:FIrpic 15wt%(25nm)/TmPyPB(40nm)/LiF(1nm)/Al(100nm)",
+        "current_density": "10 mA/cm²",
+        "measurement_method": "integrating sphere",
+        "temperature": "room temperature (25°C)"
+      },
+      "source": "Table 3, Row 1; FIG. 6"
+    },
+    {
+      "property_id": "PROP-US-007",
+      "molecule_id": "MOL-US-001",
+      "property_type": "emission_wavelength",
+      "value": 472.0,
+      "unit": "nm",
+      "test_conditions": {
+        "device_structure": "ITO(150nm)/HAT-CN(10nm)/TAPC(30nm)/Compound1:FIrpic 15wt%(25nm)/TmPyPB(40nm)/LiF(1nm)/Al(100nm)",
+        "current_density": "10 mA/cm²",
+        "measurement_method": "electroluminescence spectroscopy"
+      },
+      "source": "Table 3, Row 1; FIG. 7"
+    },
+    {
+      "property_id": "PROP-US-008",
+      "molecule_id": "MOL-US-001",
+      "property_type": "cie_coordinates",
+      "value": [0.14, 0.12],
+      "unit": "dimensionless",
+      "test_conditions": {
+        "device_structure": "ITO(150nm)/HAT-CN(10nm)/TAPC(30nm)/Compound1:FIrpic 15wt%(25nm)/TmPyPB(40nm)/LiF(1nm)/Al(100nm)",
+        "current_density": "10 mA/cm²",
+        "standard": "CIE 1931"
+      },
+      "source": "Table 3, Row 1"
+    },
+    {
+      "property_id": "PROP-US-009",
+      "molecule_id": "MOL-US-001",
+      "property_type": "current_efficiency",
+      "value": 48.5,
+      "unit": "cd/A",
+      "test_conditions": {
+        "device_structure": "ITO(150nm)/HAT-CN(10nm)/TAPC(30nm)/Compound1:FIrpic 15wt%(25nm)/TmPyPB(40nm)/LiF(1nm)/Al(100nm)",
+        "current_density": "10 mA/cm²"
+      },
+      "source": "Table 3, Row 1"
+    },
+    {
+      "property_id": "PROP-US-010",
+      "molecule_id": "MOL-US-001",
+      "property_type": "power_efficiency",
+      "value": 38.2,
+      "unit": "lm/W",
+      "test_conditions": {
+        "device_structure": "ITO(150nm)/HAT-CN(10nm)/TAPC(30nm)/Compound1:FIrpic 15wt%(25nm)/TmPyPB(40nm)/LiF(1nm)/Al(100nm)",
+        "current_density": "10 mA/cm²"
+      },
+      "source": "Table 3, Row 1"
+    },
+    {
+      "property_id": "PROP-US-011",
+      "molecule_id": "MOL-US-001",
+      "property_type": "device_lifetime_lt95",
+      "value": 620.0,
+      "unit": "hours",
+      "test_conditions": {
+        "device_structure": "ITO(150nm)/HAT-CN(10nm)/TAPC(30nm)/Compound1:FIrpic 15wt%(25nm)/TmPyPB(40nm)/LiF(1nm)/Al(100nm)",
+        "initial_luminance_cd_per_m2": 1000,
+        "driving_mode": "constant current",
+        "temperature": "room temperature (25°C)",
+        "encapsulation": "glass-glass with UV-curable epoxy"
+      },
+      "source": "Table 3, Row 1; FIG. 8"
+    },
+    {
+      "property_id": "PROP-US-012",
+      "molecule_id": "MOL-US-002",
+      "property_type": "triplet_energy",
+      "value": 2.79,
+      "unit": "eV",
+      "test_conditions": {
+        "solvent": "2-methyltetrahydrofuran",
+        "concentration": "1.0e-5 M",
+        "temperature": "77 K",
+        "measurement_method": "phosphorescence spectroscopy"
+      },
+      "source": "Table 1, Row 2"
+    },
+    {
+      "property_id": "PROP-US-013",
+      "molecule_id": "MOL-US-002",
+      "property_type": "glass_transition_temperature",
+      "value": 168.0,
+      "unit": "°C",
+      "test_conditions": {
+        "measurement_method": "DSC",
+        "heating_rate_celsius_per_min": 10
+      },
+      "source": "Table 1, Row 2"
+    },
+    {
+      "property_id": "PROP-US-014",
+      "molecule_id": "MOL-US-002",
+      "property_type": "external_quantum_efficiency",
+      "value": 23.5,
+      "unit": "%",
+      "test_conditions": {
+        "device_structure": "ITO/HAT-CN/TAPC/Compound2:FIrpic 15wt%/TmPyPB/LiF/Al",
+        "current_density": "10 mA/cm²"
+      },
+      "source": "Table 3, Row 2"
+    },
+    {
+      "property_id": "PROP-US-015",
+      "molecule_id": "MOL-US-003",
+      "property_type": "triplet_energy",
+      "value": 2.76,
+      "unit": "eV",
+      "test_conditions": {
+        "solvent": "2-methyltetrahydrofuran",
+        "temperature": "77 K"
+      },
+      "source": "Table 1, Row 3"
+    },
+    {
+      "property_id": "PROP-US-016",
+      "molecule_id": "MOL-US-003",
+      "property_type": "external_quantum_efficiency",
+      "value": 22.8,
+      "unit": "%",
+      "test_conditions": {
+        "device_structure": "ITO/HAT-CN/TAPC/Compound3:FIrpic 15wt%/TmPyPB/LiF/Al",
+        "current_density": "10 mA/cm²"
+      },
+      "source": "Table 3, Row 3"
+    },
+    {
+      "property_id": "PROP-US-017",
+      "molecule_id": "MOL-US-004",
+      "property_type": "glass_transition_temperature",
+      "value": 182.0,
+      "unit": "°C",
+      "test_conditions": {
+        "measurement_method": "DSC",
+        "heating_rate_celsius_per_min": 10
+      },
+      "source": "Table 1, Row 4"
+    },
+    {
+      "property_id": "PROP-US-018",
+      "molecule_id": "MOL-US-004",
+      "property_type": "external_quantum_efficiency",
+      "value": 23.1,
+      "unit": "%",
+      "test_conditions": {
+        "device_structure": "ITO/HAT-CN/TAPC/Compound4:FIrpic 15wt%/TmPyPB/LiF/Al",
+        "current_density": "10 mA/cm²"
+      },
+      "source": "Table 3, Row 4"
+    },
+    {
+      "property_id": "PROP-US-019",
+      "molecule_id": "MOL-US-005",
+      "property_type": "triplet_energy",
+      "value": 2.80,
+      "unit": "eV",
+      "test_conditions": {
+        "solvent": "2-methyltetrahydrofuran",
+        "temperature": "77 K"
+      },
+      "source": "Table 1, Row 5"
+    },
+    {
+      "property_id": "PROP-US-020",
+      "molecule_id": "MOL-US-005",
+      "property_type": "external_quantum_efficiency",
+      "value": 22.4,
+      "unit": "%",
+      "test_conditions": {
+        "device_structure": "ITO/HAT-CN/TAPC/Compound5:FIrpic 15wt%/TmPyPB/LiF/Al",
+        "current_density": "10 mA/cm²"
+      },
+      "source": "Table 3, Row 5"
+    },
+    {
+      "property_id": "PROP-US-021",
+      "molecule_id": "MOL-US-REF-001",
+      "property_type": "triplet_energy",
+      "value": 2.56,
+      "unit": "eV",
+      "test_conditions": {
+        "solvent": "2-methyltetrahydrofuran",
+        "temperature": "77 K"
+      },
+      "source": "Table 2, Row 1 (Comparative)"
+    },
+    {
+      "property_id": "PROP-US-022",
+      "molecule_id": "MOL-US-REF-001",
+      "property_type": "glass_transition_temperature",
+      "value": 62.0,
+      "unit": "°C",
+      "test_conditions": {
+        "measurement_method": "DSC",
+        "heating_rate_celsius_per_min": 10
+      },
+      "source": "Table 2, Row 1 (Comparative)"
+    },
+    {
+      "property_id": "PROP-US-023",
+      "molecule_id": "MOL-US-REF-001",
+      "property_type": "external_quantum_efficiency",
+      "value": 15.2,
+      "unit": "%",
+      "test_conditions": {
+        "device_structure": "ITO/HAT-CN/TAPC/CBP:FIrpic 15wt%/TmPyPB/LiF/Al",
+        "current_density": "10 mA/cm²"
+      },
+      "source": "Table 3, Comparative Row 1"
+    },
+    {
+      "property_id": "PROP-US-024",
+      "molecule_id": "MOL-US-REF-001",
+      "property_type": "device_lifetime_lt95",
+      "value": 85.0,
+      "unit": "hours",
+      "test_conditions": {
+        "initial_luminance_cd_per_m2": 1000,
+        "driving_mode": "constant current"
+      },
+      "source": "Table 3, Comparative Row 1"
+    },
+    {
+      "property_id": "PROP-US-025",
+      "molecule_id": "MOL-US-REF-002",
+      "property_type": "external_quantum_efficiency",
+      "value": 18.6,
+      "unit": "%",
+      "test_conditions": {
+        "device_structure": "ITO/HAT-CN/TAPC/mCBP:FIrpic 15wt%/TmPyPB/LiF/Al",
+        "current_density": "10 mA/cm²"
+      },
+      "source": "Table 3, Comparative Row 2"
+    }
+  ],
+  "prosecution_history": [
+    {
+      "event_type": "filing",
+      "date": "2021-06-25",
+      "description": "Utility patent application filed under 35 USC §111(a) as national stage entry of PCT/KR2021/007892",
+      "details": {
+        "filing_method": "EFS-Web",
+        "entity_status": "large",
+        "original_claims_count": 20,
+        "specification_pages": 42,
+        "drawing_sheets": 9,
+        "filing_fee_usd": 1820,
+        "search_fee_usd": 700,
+        "examination_fee_usd": 800,
+        "total_filing_fees_usd": 3320,
+        "art_unit_assigned": "1786",
+        "examiner_assigned": "Johnson, Michael R.",
+        "technology_center": "1700 — Chemical & Materials Engineering"
+      }
+    },
+    {
+      "event_type": "restriction_requirement",
+      "date": "2022-03-18",
+      "description": "Restriction requirement issued under 35 USC §121",
+      "details": {
+        "examiner_name": "Johnson, Michael R.",
+        "art_unit": "1786",
+        "groups_identified": [
+          {"group": "I", "claims": [1, 4, 5, 6, 7, 8], "description": "Organic compound per se (claims directed to the compound of Formula I)"},
+          {"group": "II", "claims": [2, 9, 10, 11, 12], "description": "Organic light-emitting device (claims directed to device structure)"},
+          {"group": "III", "claims": [3, 13, 14, 15, 16, 17, 18, 19, 20], "description": "Method of fabricating device (claims directed to manufacturing process)"}
+        ],
+        "basis": "The inventions are distinct because the compound of Group I can be used in applications other than the specific device of Group II or made by methods other than Group III. The device of Group II can use host materials other than the compound of Group I.",
+        "response_deadline": "2022-05-18"
+      }
+    },
+    {
+      "event_type": "applicant_election",
+      "date": "2022-04-28",
+      "description": "Applicant elected Group I (compound claims) with traverse to Groups II and III without prejudice",
+      "details": {
+        "elected_group": "I",
+        "elected_claims": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        "withdrawn_claims": [16, 17, 18, 19, 20],
+        "traverse": true,
+        "traverse_arguments": "Applicant respectfully traverses the restriction requirement on the grounds that the compound claims, device claims, and method claims are sufficiently related that a search for one would necessarily encompass a search for the others. The shared technical feature of the bicarbazole compound of Formula (I) constitutes a special technical feature that makes a contribution over the prior art."
+      }
+    },
+    {
+      "event_type": "non_final_rejection",
+      "date": "2022-08-15",
+      "description": "Non-Final Office Action rejecting claims 1-15 under 35 USC §103",
+      "details": {
+        "examiner_name": "Johnson, Michael R.",
+        "art_unit": "1786",
+        "rejection_basis": "35 USC §103 - Obviousness",
+        "rejection_summary": "Claims 1-8 are rejected under 35 USC §103 as being unpatentable over Kim (US 10,256,419 B2) in view of Lee (US 10,892,421 B2). Claims 2, 9-12 are rejected under 35 USC §103 as being unpatentable over Kim in view of Lee and further in view of Park (WO 2019/182285 A1). Claims 3, 13-15 are rejected under 35 USC §103 as being unpatentable over Kim in view of Lee and further in view of Tanaka (JP 2019-156832 A).",
+        "cited_references": [
+          {
+            "reference_id": "Kim_419",
+            "patent_number": "US10,256,419 B2",
+            "title": "Bicarbazole compounds for organic electroluminescent devices",
+            "assignee": "Universal Display Corporation",
+            "relevance": "Primary reference. Discloses 3,3'-bicarbazole core structure with aryl substituents on nitrogen atoms. Teaches use as host material in blue OLED devices."
+          },
+          {
+            "reference_id": "Lee_421",
+            "patent_number": "US10,892,421 B2",
+            "title": "Organic light-emitting device with carbazole-based host material",
+            "assignee": "LG Display Co., Ltd.",
+            "relevance": "Secondary reference. Teaches the use of heteroaryl substituents (dibenzofuranyl, dibenzothienyl) on carbazole-based host materials to improve thermal stability and triplet energy."
+          },
+          {
+            "reference_id": "Park_285",
+            "patent_number": "WO2019/182285 A1",
+            "title": "Novel organic compound and organic light-emitting device comprising same",
+            "assignee": "SFC Co., Ltd.",
+            "relevance": "Teaches specific OLED device architectures using carbazole-based host materials with HAT-CN/TAPC/TmPyPB auxiliary layers."
+          },
+          {
+            "reference_id": "Tanaka_832",
+            "patent_number": "JP2019-156832 A",
+            "title": "Method for manufacturing organic electroluminescent device",
+            "assignee": "Canon Inc.",
+            "relevance": "Teaches vacuum thermal evaporation co-deposition methods for forming emitting layers with specific temperature and rate parameters."
+          }
+        ],
+        "rejected_claims": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        "objections": [
+          {
+            "type": "claim_objection",
+            "claims": [7],
+            "description": "Claim 7 is objected to for reciting functional limitations (T₁ ≥ 2.75 eV, Tg ≥ 150°C) without sufficient structural basis in the claim language to distinguish over the prior art."
+          }
+        ],
+        "response_deadline": "2023-02-15",
+        "shortened_statutory_period_months": 3
+      }
+    },
+    {
+      "event_type": "applicant_response",
+      "date": "2023-01-10",
+      "description": "Applicant's response to Non-Final Office Action with claim amendments and arguments",
+      "details": {
+        "amendments": {
+          "amended_claims": [1, 2, 7],
+          "cancelled_claims": [],
+          "new_claims": [],
+          "amendment_summary": "Independent claim 1 amended to specify that the 3,3'-bicarbazole core has a specific connectivity pattern wherein the two carbazolyl units are bonded exclusively at the 3-position (not 2-position or 1-position), and to add the limitation that Ar₁ is a C₆-C₃₀ aryl or C₂-C₃₀ heteroaryl group containing at least one heteroatom selected from N, O, and S (narrowing from the broader original scope). Independent claim 2 amended to specify that the emitting layer comprises the compound of amended claim 1. Claim 7 amended to include structural basis for the functional limitations by specifying that the compound has a molecular weight of 500 or greater."
+        },
+        "arguments": {
+          "argument_summary": "Applicant argues that the combination of Kim and Lee does not render the claimed invention obvious because: (1) Kim discloses only 2,2'-bicarbazole and 2,3'-bicarbazole linkages, not the specific 3,3'-bicarbazole linkage of the present invention, and the 3,3'-linkage provides unexpectedly superior triplet energy (2.75+ eV vs. 2.55-2.65 eV for 2,2' and 2,3' isomers); (2) Lee's teaching of heteroaryl substituents is directed to monocarbazole compounds, and one of ordinary skill would not have been motivated to combine Lee's heteroaryl substituent teaching with Kim's bicarbazole core because Lee teaches away from bicarbazole structures due to their synthetic complexity; (3) The claimed compounds exhibit unexpected results in the form of simultaneously achieving T₁ > 2.75 eV, Tg > 150°C, and EQE > 22%, which is not predictable from the prior art.",
+          "declarations_filed": [
+            {
+              "type": "Rule 132 Declaration",
+              "declarant": "Dr. Kim, Sung-Hoon (inventor)",
+              "summary": "Declaration providing comparative experimental data showing that 3,3'-bicarbazole compounds of the present invention exhibit 15-25% higher EQE and 5-7x longer device lifetime compared to structurally analogous 2,2'-bicarbazole and 2,3'-bicarbazole compounds disclosed in Kim (US 10,256,419)."
+            }
+          ]
+        },
+        "fee_paid": false
+      }
+    },
+    {
+      "event_type": "final_rejection",
+      "date": "2023-05-22",
+      "description": "Final Office Action maintaining rejection of claims 1-6, 8-15 under 35 USC §103; withdrawing rejection of claim 7",
+      "details": {
+        "examiner_name": "Johnson, Michael R.",
+        "art_unit": "1786",
+        "rejection_basis": "35 USC §103 - Obviousness",
+        "rejection_summary": "The examiner acknowledges the amendment to claim 1 narrowing Ar₁ to heteroaryl groups but maintains that the combination of Kim and Lee still renders claims 1-6 and 8 obvious because Lee explicitly discloses dibenzofuranyl and dibenzothienyl substituents on carbazole nitrogen atoms. The examiner finds the unexpected results argument partially persuasive for claim 7 (which now includes structural and functional limitations) but not for the broader claims 1-6 and 8. Claims 2, 9-12 and 3, 13-15 remain rejected as dependent on claim 1.",
+        "allowed_claims": [7],
+        "rejected_claims": [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15],
+        "response_options": [
+          "File Request for Continued Examination (RCE) under 37 CFR §1.114",
+          "File appeal to Patent Trial and Appeal Board (PTAB)",
+          "Amend claims to overcome rejection",
+          "File After-Final amendment under 37 CFR §1.116"
+        ],
+        "response_deadline": "2023-08-22"
+      }
+    },
+    {
+      "event_type": "rce_filing",
+      "date": "2023-08-15",
+      "description": "Request for Continued Examination (RCE) filed with amended claims",
+      "details": {
+        "rce_fee_usd": 1360,
+        "amendments": {
+          "amended_claims": [1],
+          "cancelled_claims": [4, 5, 6, 8, 16, 17, 18, 19, 20],
+          "new_claims": [],
+          "remaining_claims": [1, 2, 3, 7, 9, 10, 11, 12, 13, 14, 15],
+          "amendment_summary": "Independent claim 1 further amended to incorporate the limitations of original dependent claims 4 and 5, narrowing Ar₁ to 'selected from the group consisting of dibenzofuran-4-yl, dibenzothiophen-4-yl, biphenyl-4-yl, and 9,9-dimethylfluoren-2-yl' and Ar₂ to 'phenyl or pyridin-3-yl'. Original claims 4, 5, 6, and 8 cancelled as their limitations are incorporated into amended claim 1 or rendered moot. Claims renumbered: original claims 1, 2, 3, 7, 9, 10, 11, 12, 13, 14, 15 become new claims 1-11 (but original numbering maintained in prosecution record)."
+        },
+        "arguments": {
+          "argument_summary": "Applicant argues that the amended claim 1 now recites a specific and narrow combination of structural features (3,3'-bicarbazole core + specific Ar₁ heteroaryl/aryl groups + specific Ar₂ groups) that is not disclosed or suggested by the combination of Kim and Lee. Kim does not disclose 3,3'-bicarbazole with dibenzofuranyl or dimethylfluorenyl substituents. Lee's teaching of these substituents is limited to monocarbazole scaffolds. The combination of the 3,3'-bicarbazole core with these specific substituents produces synergistic effects (high T₁ + high Tg + balanced charge transport) that are not predictable from either reference alone."
+        }
+      }
+    },
+    {
+      "event_type": "notice_of_allowance",
+      "date": "2023-10-05",
+      "description": "Notice of Allowance and Fee(s) Due for claims 1, 2, 3, 7, 9, 10, 11, 12, 13, 14, 15",
+      "details": {
+        "examiner_name": "Johnson, Michael R.",
+        "art_unit": "1786",
+        "allowed_claims": [1, 2, 3, 7, 9, 10, 11, 12, 13, 14, 15],
+        "total_allowed_claims": 11,
+        "independent_claims_allowed": 3,
+        "reasons_for_allowance": "The prior art of record, taken alone or in combination, does not disclose or suggest the specific combination of a 3,3'-bicarbazole core with Ar₁ selected from dibenzofuran-4-yl, dibenzothiophen-4-yl, biphenyl-4-yl, and 9,9-dimethylfluoren-2-yl, and Ar₂ selected from phenyl and pyridin-3-yl, as recited in amended independent claim 1. The applicant's comparative data demonstrating unexpected improvements in triplet energy, thermal stability, and device performance over the closest prior art compounds is found persuasive.",
+        "issue_fee_usd": 1200,
+        "issue_fee_due_date": "2024-01-05",
+        "publication_fee_usd": 0
+      }
+    },
+    {
+      "event_type": "issue_fee_payment",
+      "date": "2023-11-20",
+      "description": "Issue fee paid",
+      "details": {
+        "amount_usd": 1200,
+        "payment_method": "EFS-Web deposit account",
+        "entity_status": "large"
+      }
+    },
+    {
+      "event_type": "grant",
+      "date": "2023-12-19",
+      "description": "Patent granted as US11,847,352 B2",
+      "details": {
+        "patent_number": "US11,847,352 B2",
+        "grant_date": "2023-12-19",
+        "total_claims": 15,
+        "independent_claims": 3,
+        "dependent_claims": 12,
+        "specification_pages": 38,
+        "drawing_sheets": 9,
+        "total_prosecution_time_months": 30,
+        "patent_term_adjustment_days": 45,
+        "pta_breakdown": {
+          "a_delay_days": 30,
+          "b_delay_days": 25,
+          "c_delay_days": 0,
+          "overlap_days": 10,
+          "applicant_delay_days": 0,
+          "total_pta_days": 45
+        }
+      }
+    }
+  ],
+  "maintenance": {
+    "entity_status": "large",
+    "fees": [
+      {
+        "window": "3.5 year",
+        "due_date": "2027-06-19",
+        "surcharge_date": "2027-12-19",
+        "amount_usd": 2000.00,
+        "small_entity_amount_usd": 1000.00,
+        "micro_entity_amount_usd": 500.00,
+        "status": "upcoming",
+        "paid_date": null,
+        "grace_period_months": 6,
+        "notes": "First maintenance fee window. Due 3 years 6 months after grant date."
+      },
+      {
+        "window": "7.5 year",
+        "due_date": "2031-06-19",
+        "surcharge_date": "2031-12-19",
+        "amount_usd": 3760.00,
+        "small_entity_amount_usd": 1880.00,
+        "micro_entity_amount_usd": 940.00,
+        "status": "upcoming",
+        "paid_date": null,
+        "grace_period_months": 6,
+        "notes": "Second maintenance fee window. Due 7 years 6 months after grant date."
+      },
+      {
+        "window": "11.5 year",
+        "due_date": "2035-06-19",
+        "surcharge_date": "2035-12-19",
+        "amount_usd": 7700.00,
+        "small_entity_amount_usd": 3850.00,
+        "micro_entity_amount_usd": 1925.00,
+        "status": "upcoming",
+        "paid_date": null,
+        "grace_period_months": 6,
+        "notes": "Third and final maintenance fee window. Due 11 years 6 months after grant date."
+      }
+    ],
+    "patent_term_adjustment_days": 45,
+    "patent_term_extension_days": 0,
+    "adjusted_expiration_date": "2041-08-09",
+    "pta_details": {
+      "a_delay": {
+        "description": "Delay due to failure of USPTO to take certain actions within 14 months of filing",
+        "days": 30
+      },
+      "b_delay": {
+        "description": "Delay due to failure of USPTO to issue patent within 3 years of filing",
+        "days": 25
+      },
+      "c_delay": {
+        "description": "Delay due to interference, secrecy order, or appellate review",
+        "days": 0
+      },
+      "overlap_reduction": {
+        "description": "Reduction for overlapping A and B delays",
+        "days": 10
+      },
+      "applicant_delay_reduction": {
+        "description": "Reduction for applicant-caused delays",
+        "days": 0
+      }
+    },
+    "total_estimated_maintenance_cost_usd": 13460.00,
+    "jurisdiction_rules": {
+      "country": "US",
+      "maintenance_type": "maintenance_fees",
+      "payment_windows": 3,
+      "first_payment_from_grant_years": 3.5,
+      "grace_period_months": 6,
+      "late_surcharge_usd": 160.00,
+      "revival_petition_available": true,
+      "revival_petition_fee_usd": 2100.00,
+      "revival_deadline_description": "Petition to revive must be filed within 24 months of the date the patent expired for failure to pay maintenance fee, or within the period of the unintentional delay, whichever is later."
+    }
+  },
+  "metadata": {
+    "data_source": "USPTO_PAIR",
+    "secondary_sources": ["Google_Patents", "Espacenet", "USPTO_Full_Text"],
+    "extraction_date": "2024-11-15",
+    "extraction_version": "3.2.1",
+    "extraction_tool": "PatentMiner Data Extraction Pipeline",
+    "confidence_scores": {
+      "bibliographic_data": 0.99,
+      "claims_parsing": 0.92,
+      "claims_element_decomposition": 0.88,
+      "markush_structure_parsing": 0.85,
+      "molecules_extraction": 0.95,
+      "smiles_validation": 0.91,
+      "fingerprint_computation": 0.97,
+      "properties_extraction": 0.88,
+      "prosecution_history_extraction": 0.94,
+      "citation_extraction": 0.96,
+      "maintenance_fee_data": 0.98,
+      "legal_status_determination": 0.97,
+      "patent_family_resolution": 0.93,
+      "overall_confidence": 0.93
+    },
+    "language": "en",
+    "page_count": 38,
+    "figure_count": 9,
+    "table_count": 4,
+    "encoding": "UTF-8",
+    "schema_version": "2.0.0",
+    "schema_compatible_with": [
+      "pkg/types/patent/types.go:PatentDTO",
+      "pkg/types/molecule/types.go:MoleculeDTO"
+    ],
+    "cross_references": {
+      "cn_patent_sample": {
+        "file": "test/testdata/patents/sample_cn_patent.json",
+        "relationship": "same_patent_family",
+        "family_id": "FAM-2020-OLED-HOST-002",
+        "patent_number": "CN113880834B"
+      },
+      "ep_patent_sample": {
+        "file": "test/testdata/patents/sample_ep_patent.json",
+        "relationship": "backward_citation",
+        "patent_number": "EP3845582B1",
+        "citation_context": "ETL material used in device examples"
+      },
+      "carbazole_smi": {
+        "file": "test/testdata/molecules/carbazole.smi",
+        "matching_molecules": ["MOL-US-001", "MOL-US-002", "MOL-US-REF-001", "MOL-US-REF-002"]
+      },
+      "oled_hosts_smi": {
+        "file": "test/testdata/molecules/oled_hosts.smi",
+        "matching_molecules": ["MOL-US-001", "MOL-US-002", "MOL-US-003", "MOL-US-004", "MOL-US-005"]
+      },
+      "patent_fixtures": {
+        "file": "test/testdata/fixtures/patent_fixtures.json",
+        "fixture_id": "fixture_patent_us_oled_host"
+      },
+      "molecule_fixtures": {
+        "file": "test/testdata/fixtures/molecule_fixtures.json",
+        "fixture_ids": ["fixture_mol_bicarbazole_dbf", "fixture_mol_bicarbazole_dbt", "fixture_mol_cbp"]
+      }
+    },
+    "validation_checksums": {
+      "claims_count": 15,
+      "independent_claims_count": 3,
+      "dependent_claims_count": 12,
+      "molecules_count": 7,
+      "properties_count": 25,
+      "prosecution_events_count": 10,
+      "backward_citations_count": 7,
+      "forward_citations_count": 3,
+      "family_members_count": 5
+    },
+    "test_coverage_tags": [
+      "patent_entity_parsing",
+      "claim_structure_validation",
+      "markush_enumeration",
+      "molecule_entity_parsing",
+      "smiles_validation",
+      "fingerprint_verification",
+      "similarity_computation",
+      "infringement_assessment",
+      "patent_valuation",
+      "lifecycle_management",
+      "deadline_calculation",
+      "annuity_management",
+      "pta_pte_adjustment",
+      "prosecution_history_analysis",
+      "citation_network_analysis",
+      "cross_jurisdiction_consistency",
+      "fto_report_generation",
+      "infringement_report_generation",
+      "api_serialization",
+      "sdk_deserialization",
+      "full_text_search_indexing",
+      "vector_search_indexing"
+    ]
+  }
+}
+
+
+

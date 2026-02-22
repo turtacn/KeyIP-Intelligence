@@ -1,0 +1,54 @@
+# Carbazole scaffold and derivatives SMILES dataset
+# Generated: 2024-01-15 | Version: 1.0.0
+# Format: <SMILES>\t<MoleculeName>
+# Description: Standardized carbazole-based molecules for OLED host/HTL material testing
+# Total entries: 30 molecules ordered by increasing scaffold complexity
+#
+# Section 1: Basic Carbazole Scaffolds (5 molecules)
+c1ccc2c(c1)[nH]c1ccccc12	Cz-unsubstituted-001
+c1ccc(-n2c3ccccc3c3ccccc32)cc1	Cz-N-phenyl-002
+Cn1c2ccccc2c2ccccc21	Cz-N-methyl-003
+Brc1ccc2[nH]c3ccccc3c2c1	Cz-2-bromo-004
+Brc1ccc2[nH]c3ccc(Br)cc3c2c1	Cz-3,6-dibromo-005
+#
+# Section 2: CBP Series Host Materials (5 molecules)
+c1ccc(-c2ccc(-n3c4ccccc4c4ccccc43)cc2)cc1-n1c2ccccc2c2ccccc21	CBP-unsubstituted-006
+c1ccc(-n2c3ccccc3c3ccccc32)cc1-c1cccc(-n2c3ccccc3c3ccccc32)c1	mCBP-meta-007
+Cc1cc(-n2c3ccccc3c3ccccc32)ccc1-c1ccc(-n2c3ccccc3c3ccccc32)cc1C	CBP-2Me-008
+N#Cc1cc(-n2c3ccccc3c3ccccc32)ccc1-c1ccc(-n2c3ccccc3c3ccccc32)cc1C#N	CBP-2CN-009
+Fc1cc(-n2c3ccccc3c3ccccc32)ccc1-c1ccc(-n2c3ccccc3c3ccccc32)cc1F	CBP-2F-010
+#
+# Section 3: TCTA Series Hole Transport Materials (4 molecules)
+c1ccc(-n2c3ccccc3c3ccccc32)cc1N(c1ccc(-n2c3ccccc3c3ccccc32)cc1)c1ccc(-n2c3ccccc3c3ccccc32)cc1	TCTA-unsubstituted-011
+Cc1ccc(-n2c3ccccc3c3cc(C)ccc32)cc1N(c1ccc(-n2c3ccccc3c3cc(C)ccc32)cc1)c1ccc(-n2c3ccccc3c3cc(C)ccc32)cc1	TCTA-Me-012
+c1ccc(-n2c3ccccc3c3ccccc32)cc1N(c1cccc(-n2c3ccccc3c3ccccc32)c1)c1cccc(-n2c3ccccc3c3ccccc32)c1	mTCTA-meta-013
+COc1ccc(-n2c3ccccc3c3cc(OC)ccc32)cc1N(c1ccc(-n2c3ccccc3c3cc(OC)ccc32)cc1)c1ccc(-n2c3ccccc3c3cc(OC)ccc32)cc1	TCTA-OMe-014
+#
+# Section 4: CzSi Series Silicon-Carbazole Materials (3 molecules)
+CC(C)(C)c1ccc(-n2c3cc([Si](c4ccccc4)(c4ccccc4)c4ccccc4)ccc3c3ccc([Si](c4ccccc4)(c4ccccc4)c4ccccc4)cc32)cc1	CzSi-tBuPh-015
+c1ccc([Si](c2ccccc2)(c2ccccc2)c2cccc(-n3c4ccccc4c4ccccc43)c2)cc1	SimCP-mono-016
+c1ccc([Si](c2ccccc2)(c2cccc(-n3c4ccccc4c4ccccc43)c2)c2cccc(-n3c4ccccc4c4ccccc43)c2)cc1	SimCP2-bis-017
+#
+# Section 5: Indolocarbazole Extended Scaffolds (4 molecules)
+c1ccc2c(c1)[nH]c1c2ccc2c1[nH]c1ccccc12	ICz-32b-018
+c1ccc2c(c1)c1ccccc1[nH]c2-c1c[nH]c2ccccc12	ICz-23a-019
+c1ccc2c(c1)[nH]c1ccc3c4ccccc4[nH]c3c1c2-c1ccc2c(c1)[nH]c1ccccc12	BisICz-fused-020
+Cn1c2ccc3c4ccccc4n(C)c3c2c2ccccc21	ICz-N-diMe-021
+#
+# Section 6: Advanced Carbazole Derivatives for Comprehensive Testing (5 molecules)
+c1ccc(-n2c3ccccc3c3cc(-c4ccc5c(c4)[nH]c4ccccc45)ccc32)cc1	Cz-CzPh-linked-022
+c1ccc(-n2c3ccccc3c3cc(-n4ccc5ccccc54)ccc32)cc1	Cz-NPh-indole-023
+O=C(c1ccc(-n2c3ccccc3c3ccccc32)cc1)c1ccc(-n2c3ccccc3c3ccccc32)cc1	Cz-benzophenone-024
+c1ccc2c(c1)c1ccccc1n2-c1ccc(-n2c3ccccc3c3ccccc32)cc1	Cz-biphenyl-asym-025
+c1ccc(-n2c3ccccc3c3cc(-c4cccc5c4[nH]c4ccccc45)ccc32)cc1-c1ccc(-n2c3ccccc3c3ccccc32)cc1	Cz-ICz-CBP-hybrid-026
+#
+# Section 7: Boundary Condition Molecules (4 molecules)
+c1cc2cc[nH]c2cc1	Cz-fragment-pyrrole-027
+c1ccc(-n2c3ccccc3c3cc(-c4ccc(-n5c6ccccc6c6cc(-c7ccc(-n8c9ccccc9c9cc(-c%10ccc(-n%11c%12ccccc%12c%12ccccc%12%11)cc%10)ccc9%11)cc7)ccc6%11)cc4)ccc32)cc1	Cz-dendrimer-G2-028
+C(c1ccc2c(c1)[nH]c1ccccc12)([C@@H](F)Cl)[C@H](O)c1ccc2c(c1)[nH]c1ccccc12	Cz-chiral-disubst-029
+[13c]1ccc2c(c1)[nH]c1ccc([13CH3])cc12	Cz-13C-labeled-030
+#
+# End of dataset
+# Total molecules: 30
+# Molecular weight range: 117.15 - 2089.52 g/mol
+# Primary scaffolds: carbazole, indolocarbazole, CBP, TCTA, CzSi
