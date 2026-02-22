@@ -54,11 +54,11 @@ const (
 
 // featureTypeFromBIO maps the BIO suffix to FeatureType.
 var featureTypeFromBIO = map[string]FeatureType{
-	"Structural":  FeatureStructural,
-	"Functional":  FeatureFunctional,
-	"Process":     FeatureProcess,
-	"Composition": FeatureComposition,
-	"Parameter":   FeatureParameter,
+	"structural":  FeatureStructural,
+	"functional":  FeatureFunctional,
+	"process":     FeatureProcess,
+	"composition": FeatureComposition,
+	"parameter":   FeatureParameter,
 }
 
 // TransitionalPhraseType enumerates the legal categories of transitional phrases
@@ -119,7 +119,7 @@ func bioTagCategory(tagIdx int) (string, bool) {
 	if len(parts) != 2 {
 		return "", false
 	}
-	return parts[1], true
+	return strings.ToLower(parts[1]), true
 }
 
 // bioTagIsB returns true if the tag is a B- (begin) tag.
