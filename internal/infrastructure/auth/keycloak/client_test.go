@@ -22,12 +22,15 @@ import (
 )
 
 type mockKeycloak struct {
-	server     *httptest.Server
-	privateKey *rsa.PrivateKey
-	publicKey  *rsa.PublicKey
-	kid        string
-	tokenSub   string
-	tokenExp   time.Time
+	server        *httptest.Server
+	privateKey    *rsa.PrivateKey
+	publicKey     *rsa.PublicKey
+	kid           string
+	tokenSub      string
+	tokenExp      time.Time
+	requestCounts map[string]int
+	mu            sync.Mutex
+	delay         time.Duration
 }
 
 func setupTestKeycloak(t *testing.T) (*mockKeycloak, AuthProvider) {
@@ -38,14 +41,24 @@ func setupTestKeycloak(t *testing.T) (*mockKeycloak, AuthProvider) {
 	kid := "test-key-id"
 
 	mk := &mockKeycloak{
-		privateKey: privateKey,
-		publicKey:  publicKey,
-		kid:        kid,
-		tokenSub:   "test-user",
-		tokenExp:   time.Now().Add(1 * time.Hour),
+		privateKey:    privateKey,
+		publicKey:     publicKey,
+		kid:           kid,
+		tokenSub:      "test-user",
+		tokenExp:      time.Now().Add(1 * time.Hour),
+		requestCounts: make(map[string]int),
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mk.mu.Lock()
+		mk.requestCounts[r.URL.Path]++
+		delay := mk.delay
+		mk.mu.Unlock()
+
+		if delay > 0 {
+			time.Sleep(delay)
+		}
+
 		switch {
 		case strings.Contains(r.URL.Path, "/openid-connect/certs"):
 			mk.handleJWKS(w, r)
@@ -210,6 +223,25 @@ func TestNewKeycloakClient_MissingConfig(t *testing.T) {
 	assert.True(t, stdliberrors.Is(err, ErrInvalidConfig))
 }
 
+func TestNewKeycloakClient_JWKSFetchFailure(t *testing.T) {
+	// Start server but make it fail
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	cfg := KeycloakConfig{
+		BaseURL:  server.URL,
+		Realm:    "test-realm",
+		ClientID: "test-client",
+	}
+	_, err := NewKeycloakClient(cfg, logging.NewNopLogger())
+	assert.Error(t, err)
+	// It returns wrapped error, check if it fails during refresh
+	// Implementation: return nil, errors.Wrap(err, ..., "failed to fetch JWKS")
+	assert.Contains(t, err.Error(), "failed to fetch JWKS")
+}
+
 func TestVerifyToken_ValidToken(t *testing.T) {
 	mk, client := setupTestKeycloak(t)
 	defer mk.server.Close()
@@ -298,6 +330,35 @@ func TestGetUserInfo_Success(t *testing.T) {
 	assert.Equal(t, "test-user", userInfo.ID)
 }
 
+func TestGetUserInfo_Timeout(t *testing.T) {
+	mk, client := setupTestKeycloak(t)
+	defer mk.server.Close()
+
+	// Inject delay > timeout
+	// Setup client with very short timeout
+	cfg := KeycloakConfig{
+		BaseURL:        mk.server.URL,
+		Realm:          "test-realm",
+		ClientID:       "test-client",
+		RequestTimeout: 10 * time.Millisecond,
+		RetryAttempts:  0,
+	}
+	// We need a new client but mock server is reused.
+	// But mock server is part of setup.
+	// We can manually create client for this test.
+	client, _ = NewKeycloakClient(cfg, logging.NewNopLogger())
+
+	mk.mu.Lock()
+	mk.delay = 100 * time.Millisecond
+	mk.mu.Unlock()
+
+	_, err := client.GetUserInfo(context.Background(), "valid-token")
+	assert.Error(t, err)
+	// Timeout error
+	// Client returns ErrKeycloakUnavailable on error in doWithRetry if not specific status
+	assert.True(t, stdliberrors.Is(err, ErrKeycloakUnavailable))
+}
+
 func TestIntrospectToken_Active(t *testing.T) {
 	mk, client := setupTestKeycloak(t)
 	defer mk.server.Close()
@@ -334,11 +395,64 @@ func TestGetServiceToken_Success(t *testing.T) {
 	assert.Equal(t, "service-token", token)
 
 	// Second call should hit cache
-	// We can't easily verify cache hit without exposing internal state or mocking http client more deeply
-	// But we can check if it returns same token
 	token2, err := client.GetServiceToken(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, token, token2)
+}
+
+func TestGetServiceToken_CacheHit(t *testing.T) {
+	mk, client := setupTestKeycloak(t)
+	defer mk.server.Close()
+
+	// First call
+	_, err := client.GetServiceToken(context.Background())
+	assert.NoError(t, err)
+
+	// Get count
+	mk.mu.Lock()
+	count1 := mk.requestCounts["/realms/test-realm/protocol/openid-connect/token"]
+	mk.mu.Unlock()
+	assert.GreaterOrEqual(t, count1, 1)
+
+	// Second call
+	_, err = client.GetServiceToken(context.Background())
+	assert.NoError(t, err)
+
+	mk.mu.Lock()
+	count2 := mk.requestCounts["/realms/test-realm/protocol/openid-connect/token"]
+	mk.mu.Unlock()
+
+	// Should be same
+	assert.Equal(t, count1, count2)
+}
+
+func TestGetServiceToken_CacheExpired(t *testing.T) {
+	mk, client := setupTestKeycloak(t)
+	defer mk.server.Close()
+
+	// First call
+	_, err := client.GetServiceToken(context.Background())
+	assert.NoError(t, err)
+
+	// Expire cache manually (white-box test hack or mock time? mock time is hard here)
+	// We can't access internal cache easily without reflection or exposing it.
+	// But `client` is `AuthProvider` interface. Cast it.
+	kc, ok := client.(*keycloakClient)
+	require.True(t, ok)
+
+	kc.serviceTokenCache.setToken("expired", time.Now().Add(-1*time.Hour))
+
+	// Second call
+	_, err = client.GetServiceToken(context.Background())
+	assert.NoError(t, err)
+
+	// Check count
+	mk.mu.Lock()
+	count := mk.requestCounts["/realms/test-realm/protocol/openid-connect/token"]
+	mk.mu.Unlock()
+
+	// Should be 2 calls
+	assert.GreaterOrEqual(t, count, 2)
 }
 
 func TestHealth_Healthy(t *testing.T) {
