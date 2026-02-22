@@ -29,8 +29,9 @@ func (m *mockNERBackend) Predict(ctx context.Context, req *common.PredictRequest
 	}
 	// In a real scenario, this would be unmarshaled JSON ([]interface{}),
 	// but common.DecodeFloat64Matrix also accepts [][]float64 directly.
+	emissionBytes, _ := common.EncodeFloat64Matrix(emission)
 	return &common.PredictResponse{
-		Outputs: map[string]interface{}{"emission": emission},
+		Outputs: map[string][]byte{"emission": emissionBytes},
 	}, nil
 }
 
