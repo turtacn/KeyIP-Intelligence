@@ -26,6 +26,10 @@ const (
 	SourceExaminationGuideline  DocumentSourceType = "ExaminationGuideline"
 	SourceScientificPaper       DocumentSourceType = "ScientificPaper"
 	SourceRegulatory            DocumentSourceType = "Regulatory"
+	SourceStatute               DocumentSourceType = "Statute"
+	SourceMPEP                  DocumentSourceType = "MPEP"       // Alias for ExaminationGuideline? Or distinct.
+	SourceLiterature            DocumentSourceType = "Literature" // Alias for ScientificPaper? Or distinct.
+	SourceOther                 DocumentSourceType = "Other"
 )
 
 // ---------------------------------------------------------------------------

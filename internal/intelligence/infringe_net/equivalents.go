@@ -186,6 +186,11 @@ type EquivalentsAnalyzer interface {
 	Analyze(ctx context.Context, req *EquivalentsRequest) (*EquivalentsResult, error)
 	// AnalyzeElement runs the FWR test on a single element pair.
 	AnalyzeElement(ctx context.Context, queryElement, claimElement *StructuralElement) (*ElementEquivalence, error)
+	ModelVersion() string
+}
+
+func (a *equivalentsAnalyzer) ModelVersion() string {
+	return "equivalents-v1"
 }
 
 // ---------------------------------------------------------------------------

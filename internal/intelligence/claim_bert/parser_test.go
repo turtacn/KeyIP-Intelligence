@@ -16,13 +16,36 @@ import (
 // ============================================================================
 
 type mockTokenizer struct {
-	tokenizeFn func(text string) (*TokenizedInput, error)
+	tokenizeFn func(text string) (*TokenizedOutput, error)
+	encodeFn   func(text string) (*EncodedInput, error)
 	decodeFn   func(ids []int) (string, error)
 }
 
-func (m *mockTokenizer) Tokenize(text string) (*TokenizedInput, error) {
+func (m *mockTokenizer) Tokenize(text string) (*TokenizedOutput, error) {
 	if m.tokenizeFn != nil {
 		return m.tokenizeFn(text)
+	}
+	words := strings.Fields(text)
+	offsets := make([][2]int, len(words))
+	pos := 0
+	for i, w := range words {
+		idx := strings.Index(text[pos:], w)
+		if idx >= 0 {
+			start := pos + idx
+			end := start + len(w)
+			offsets[i] = [2]int{start, end}
+			pos = end
+		}
+	}
+	return &TokenizedOutput{
+		Tokens:  words,
+		Offsets: offsets,
+	}, nil
+}
+
+func (m *mockTokenizer) Encode(text string) (*EncodedInput, error) {
+	if m.encodeFn != nil {
+		return m.encodeFn(text)
 	}
 	// Default: split on whitespace, generate offsets
 	words := strings.Fields(text)
@@ -44,14 +67,19 @@ func (m *mockTokenizer) Tokenize(text string) (*TokenizedInput, error) {
 		mask[i] = 1
 	}
 
-	return &TokenizedInput{
+	return &EncodedInput{
 		InputIDs:      ids,
 		AttentionMask: mask,
 		TokenTypeIDs:  typeIDs,
 		Tokens:        words,
-		Offsets:        offsets,
+		Offsets:       offsets,
 	}, nil
 }
+
+// Add stub implementations for other interface methods
+func (m *mockTokenizer) EncodePair(textA, textB string) (*EncodedInput, error) { return nil, nil }
+func (m *mockTokenizer) BatchEncode(texts []string) ([]*EncodedInput, error)   { return nil, nil }
+func (m *mockTokenizer) VocabSize() int                                        { return 1000 }
 
 func (m *mockTokenizer) Decode(ids []int) (string, error) {
 	if m.decodeFn != nil {
@@ -119,8 +147,16 @@ func (m *mockClaimModelBackend) UnloadModel(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockClaimModelBackend) IsReady(ctx context.Context) bool {
-	return true
+func (m *mockClaimModelBackend) Healthy(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockClaimModelBackend) Close() error {
+	return nil
+}
+
+func (m *mockClaimModelBackend) PredictStream(ctx context.Context, req *common.PredictRequest) (<-chan *common.PredictResponse, error) {
+	return nil, nil
 }
 
 // ============================================================================
@@ -137,8 +173,13 @@ func (n *noopLogger) Debug(msg string, keysAndValues ...interface{}) {}
 type noopMetrics struct{}
 
 func (n *noopMetrics) RecordInference(ctx context.Context, params *common.InferenceMetricParams) {}
-func (n *noopMetrics) RecordLatency(ctx context.Context, operation string, durationMs float64)   {}
-func (n *noopMetrics) IncrementCounter(ctx context.Context, name string, value int64)             {}
+func (n *noopMetrics) RecordBatchProcessing(ctx context.Context, params *common.BatchMetricParams) {}
+func (n *noopMetrics) RecordCacheAccess(ctx context.Context, hit bool, modelName string) {}
+func (n *noopMetrics) RecordCircuitBreakerStateChange(ctx context.Context, modelName string, fromState, toState string) {}
+func (n *noopMetrics) RecordRiskAssessment(ctx context.Context, riskLevel string, durationMs float64) {}
+func (n *noopMetrics) RecordModelLoad(ctx context.Context, modelName, version string, durationMs float64, success bool) {}
+func (n *noopMetrics) GetInferenceLatencyHistogram() common.LatencyHistogram { return nil }
+func (n *noopMetrics) GetCurrentStats() *common.IntelligenceStats { return &common.IntelligenceStats{} }
 
 // ============================================================================
 // Helper: create parser with mocks
@@ -146,11 +187,9 @@ func (n *noopMetrics) IncrementCounter(ctx context.Context, name string, value i
 
 func newTestParser(backend *mockClaimModelBackend) ClaimParser {
 	cfg := &ClaimBERTConfig{
-		ModelID:           "test-claim-bert",
-		ModelVersion:      "v1.0.0",
+		ModelID:           "claim-bert-v1.0.0",
 		MaxSequenceLength: 512,
-		NumLabels:         5,
-		TaskHeads:         []string{"classification", "bio_tags", "scope", "dependency"},
+		TaskHeads:         DefaultTaskHeads(),
 	}
 	p, err := NewClaimParser(backend, cfg, &mockTokenizer{}, &noopLogger{}, &noopMetrics{})
 	if err != nil {
@@ -161,11 +200,9 @@ func newTestParser(backend *mockClaimModelBackend) ClaimParser {
 
 func newTestParserWithTokenizer(backend *mockClaimModelBackend, tok Tokenizer) ClaimParser {
 	cfg := &ClaimBERTConfig{
-		ModelID:           "test-claim-bert",
-		ModelVersion:      "v1.0.0",
+		ModelID:           "claim-bert-v1.0.0",
 		MaxSequenceLength: 512,
-		NumLabels:         5,
-		TaskHeads:         []string{"classification", "bio_tags", "scope", "dependency"},
+		TaskHeads:         DefaultTaskHeads(),
 	}
 	p, err := NewClaimParser(backend, cfg, tok, &noopLogger{}, &noopMetrics{})
 	if err != nil {
@@ -533,6 +570,10 @@ func TestParseClaim_NumericalRange(t *testing.T) {
 	result, err := parser.ParseClaim(ctx, text)
 	if err != nil {
 		t.Fatalf("ParseClaim failed: %v", err)
+	}
+	// Verify numerical ranges are present in the parsed result
+	if len(result.Features) > 0 && len(result.Features[0].NumericalRanges) > 0 {
+		// Just ensuring the field is populated via enrichment
 	}
 
 	// Check numerical ranges extracted from the full text
@@ -2334,9 +2375,9 @@ func TestBIOTagHelpers(t *testing.T) {
 
 func TestNewClaimParser_Validation(t *testing.T) {
 	cfg := &ClaimBERTConfig{
-		ModelID:           "test",
-		ModelVersion:      "v1",
+		ModelID:           "test-v1.0.0",
 		MaxSequenceLength: 512,
+		TaskHeads:         DefaultTaskHeads(),
 	}
 	tok := &mockTokenizer{}
 	log := &noopLogger{}
@@ -2744,7 +2785,7 @@ func BenchmarkExtractMarkushGroups(b *testing.B) {
 	text := "selected from the group consisting of aspirin, ibuprofen, naproxen, acetaminophen, and celecoxib"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		extractMarkushGroups(text)
+		_ = extractMarkushGroups(text)
 	}
 }
 

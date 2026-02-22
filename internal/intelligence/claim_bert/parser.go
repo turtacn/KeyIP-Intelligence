@@ -181,6 +181,9 @@ type NumericalRange struct {
 	UpperBound    *float64 `json:"upper_bound,omitempty"`
 	Unit          string   `json:"unit,omitempty"`
 	IsApproximate bool     `json:"is_approximate"`
+	Min           float64  `json:"min"`   // Normalized min value
+	Max           float64  `json:"max"`   // Normalized max value
+	Width         float64  `json:"width"` // Max - Min
 }
 
 // MarkushGroup represents a Markush-type chemical group in a claim.
@@ -194,14 +197,15 @@ type MarkushGroup struct {
 
 // TechnicalFeature represents a single technical feature extracted from a claim.
 type TechnicalFeature struct {
-	ID               string           `json:"id"`
-	Text             string           `json:"text"`
-	StartOffset      int              `json:"start_offset"`
-	EndOffset        int              `json:"end_offset"`
-	FeatureType      FeatureType      `json:"feature_type"`
-	IsEssential      bool             `json:"is_essential"`
-	ChemicalEntities []string         `json:"chemical_entities,omitempty"`
+	ID               string            `json:"id"`
+	Text             string            `json:"text"`
+	StartOffset      int               `json:"start_offset"`
+	EndOffset        int               `json:"end_offset"`
+	FeatureType      FeatureType       `json:"feature_type"`
+	IsEssential      bool              `json:"is_essential"`
+	ChemicalEntities []string          `json:"chemical_entities,omitempty"`
 	NumericalRanges  []*NumericalRange `json:"numerical_ranges,omitempty"`
+	Embedding        []float32         `json:"embedding,omitempty"` // Added for scope analysis
 }
 
 // ParsedClaim is the fully structured representation of a single patent claim.
@@ -217,6 +221,8 @@ type ParsedClaim struct {
 	ScopeScore         float64                `json:"scope_score"`
 	MarkushGroups      []*MarkushGroup        `json:"markush_groups,omitempty"`
 	Confidence         float64                `json:"confidence"`
+	Category           string                 `json:"category,omitempty"`       // Added for scope analysis
+	NumericalRanges    []*NumericalRange      `json:"numerical_ranges,omitempty"` // Added for scope analysis
 }
 
 // ClaimClassification is the output of claim type classification.
@@ -239,6 +245,7 @@ type ParsedClaimSet struct {
 	DependencyTree    *DependencyTree `json:"dependency_tree"`
 	IndependentClaims []int           `json:"independent_claims"`
 	ClaimCount        int             `json:"claim_count"`
+	PatentID          string          `json:"patent_id,omitempty"` // Added for scope analysis
 }
 
 // ============================================================================
@@ -426,7 +433,7 @@ func (p *claimParserImpl) ParseClaim(ctx context.Context, text string) (*ParsedC
 	}
 
 	// 3. Tokenize
-	tokenized, err := p.tokenizer.Tokenize(cleaned)
+	tokenized, err := p.tokenizer.Encode(cleaned)
 	if err != nil {
 		return nil, fmt.Errorf("tokenization failed: %w", err)
 	}
@@ -441,11 +448,10 @@ func (p *claimParserImpl) ParseClaim(ctx context.Context, text string) (*ParsedC
 	}
 
 	// 5. Decode classification
-	claimType, confidence, probs, err := p.decodeClassification(backendResp)
+	claimType, confidence, _, err := p.decodeClassification(backendResp)
 	if err != nil {
 		p.logger.Warn("classification decode failed, falling back to rule-based", "error", err)
 		claimType, confidence = p.ruleBasedClassification(cleaned)
-		probs = map[ClaimType]float64{claimType: confidence}
 	}
 
 	// 6. Decode BIO tags -> technical features
@@ -594,7 +600,7 @@ func (p *claimParserImpl) ExtractFeatures(ctx context.Context, text string) ([]*
 		cleaned = string(runes[:p.config.MaxSequenceLength])
 	}
 
-	tokenized, err := p.tokenizer.Tokenize(cleaned)
+	tokenized, err := p.tokenizer.Encode(cleaned)
 	if err != nil {
 		return nil, fmt.Errorf("tokenization failed: %w", err)
 	}
@@ -634,7 +640,7 @@ func (p *claimParserImpl) ClassifyClaim(ctx context.Context, text string) (*Clai
 		cleaned = string(runes[:p.config.MaxSequenceLength])
 	}
 
-	tokenized, err := p.tokenizer.Tokenize(cleaned)
+	tokenized, err := p.tokenizer.Encode(cleaned)
 	if err != nil {
 		return nil, fmt.Errorf("tokenization failed: %w", err)
 	}
@@ -727,7 +733,7 @@ func (p *claimParserImpl) AnalyzeDependency(ctx context.Context, claims []string
 // Internal: Model interaction helpers
 // ============================================================================
 
-func (p *claimParserImpl) buildPredictRequest(tokenized *TokenizedInput, taskHeads []string) *common.PredictRequest {
+func (p *claimParserImpl) buildPredictRequest(tokenized *EncodedInput, taskHeads []string) *common.PredictRequest {
 	inputPayload := map[string]interface{}{
 		"input_ids":      tokenized.InputIDs,
 		"attention_mask": tokenized.AttentionMask,
@@ -781,7 +787,7 @@ func (p *claimParserImpl) decodeClassification(resp *common.PredictResponse) (Cl
 	return ct, maxProb, probs, nil
 }
 
-func (p *claimParserImpl) decodeBIOTags(resp *common.PredictResponse, tokenized *TokenizedInput, originalText string) ([]*TechnicalFeature, error) {
+func (p *claimParserImpl) decodeBIOTags(resp *common.PredictResponse, tokenized *EncodedInput, originalText string) ([]*TechnicalFeature, error) {
 	raw, ok := resp.Outputs["bio_tags"]
 	if !ok {
 		return nil, fmt.Errorf("bio_tags output not found")
@@ -877,7 +883,7 @@ type bioSpan struct {
 }
 
 // bioTagsToSpans converts a corrected BIO tag sequence into TechnicalFeature slices.
-func bioTagsToSpans(tags []int, tokenized *TokenizedInput, originalText string) []*TechnicalFeature {
+func bioTagsToSpans(tags []int, tokenized *EncodedInput, originalText string) []*TechnicalFeature {
 	if len(tags) == 0 {
 		return nil
 	}
@@ -968,7 +974,7 @@ func bioTagsToSpans(tags []int, tokenized *TokenizedInput, originalText string) 
 
 // spanToCharOffsets maps a token-level span to character-level offsets using
 // the tokenizer's offset mapping. Falls back to heuristic if offsets are unavailable.
-func spanToCharOffsets(sp bioSpan, tokenized *TokenizedInput, originalText string) (int, int) {
+func spanToCharOffsets(sp bioSpan, tokenized *EncodedInput, originalText string) (int, int) {
 	if len(tokenized.Offsets) > 0 {
 		// Use tokenizer-provided character offsets
 		startIdx := sp.startToken

@@ -25,6 +25,7 @@ type ClaimElementMapper interface {
 	AlignElements(ctx context.Context, moleculeElements []*StructuralElement, claimElements []*ClaimElement) (*ElementAlignment, error)
 	CheckEstoppel(ctx context.Context, alignment *ElementAlignment, history *ProsecutionHistory) (*EstoppelResult, error)
 	ParseProsecutionHistory(ctx context.Context, rawHistory []byte) (*ProsecutionHistory, error)
+	LoadIndependentClaims(ctx context.Context, dependentClaims []*ClaimInput) ([]*ClaimInput, error)
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +84,9 @@ type ClaimInput struct {
 	ClaimText     string    `json:"claim_text"`
 	ClaimType     ClaimType `json:"claim_type"`
 	ParentClaimID string    `json:"parent_claim_id,omitempty"`
+	ParentID      string    `json:"parent_id,omitempty"` // Alias
 	PriorityDate  time.Time `json:"priority_date,omitempty"`
+	PatentID      string    `json:"patent_id,omitempty"` // Added for grouping
 }
 
 // ClaimElement is a single structured element extracted from a claim.
@@ -109,6 +112,20 @@ type MoleculeInput struct {
 	SMILES      string `json:"smiles"`
 	MoleculeID  string `json:"molecule_id,omitempty"`
 	Description string `json:"description,omitempty"`
+	InChI       string `json:"inchi,omitempty"`
+	Fingerprint []byte `json:"fingerprint,omitempty"`
+	Name        string `json:"name,omitempty"`
+}
+
+// Validate checks that at least one molecular representation is present.
+func (m *MoleculeInput) Validate() error {
+	if m == nil {
+		return errors.NewInvalidInputError("molecule input is nil")
+	}
+	if m.SMILES == "" && m.InChI == "" && len(m.Fingerprint) == 0 {
+		return errors.NewInvalidInputError("at least one molecular representation (SMILES, InChI, or fingerprint) is required")
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------

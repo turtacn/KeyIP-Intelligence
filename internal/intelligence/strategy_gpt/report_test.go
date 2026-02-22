@@ -23,6 +23,7 @@ type mockLLMBackend struct {
 }
 
 func (m *mockLLMBackend) Predict(ctx context.Context, req *common.PredictRequest) (*common.PredictResponse, error) {
+	time.Sleep(1 * time.Millisecond) // Ensure non-zero latency
 	m.callCount.Add(1)
 	if m.predictFn != nil {
 		return m.predictFn(ctx, req)
@@ -84,43 +85,69 @@ The product uses a novel catalytic process that differs from the prior art.
 `
 	return &common.PredictResponse{
 		Outputs: map[string][]byte{
-			"text":             []byte(text),
-			"prompt_tokens":    []byte("500"),
+			"text":              []byte(text),
+			"prompt_tokens":     []byte("500"),
 			"completion_tokens": []byte("800"),
-			"total_tokens":     []byte("1300"),
+			"total_tokens":      []byte("1300"),
 		},
 		InferenceTimeMs: 2500,
 	}
 }
 
 type mockPromptMgr struct {
-	buildFn   func(task AnalysisTask, params *PromptParams) (string, error)
+	buildFn   func(ctx context.Context, task AnalysisTask, params *PromptParams) (*BuiltPrompt, error)
 	callCount atomic.Int32
 }
 
-func (m *mockPromptMgr) BuildPrompt(task AnalysisTask, params *PromptParams) (string, error) {
+func (m *mockPromptMgr) BuildPrompt(ctx context.Context, task AnalysisTask, params *PromptParams) (*BuiltPrompt, error) {
 	m.callCount.Add(1)
 	if m.buildFn != nil {
-		return m.buildFn(task, params)
+		return m.buildFn(ctx, task, params)
 	}
-	return fmt.Sprintf("Analyse task=%s", task), nil
+	return &BuiltPrompt{
+		SystemPrompt: "System prompt",
+		UserPrompt:   fmt.Sprintf("Analyse task=%s", task),
+		Messages: []Message{
+			{Role: "system", Content: "System prompt"},
+			{Role: "user", Content: fmt.Sprintf("Analyse task=%s", task)},
+		},
+	}, nil
 }
 
+// Satisfy other interface methods with no-ops or stubs
+func (m *mockPromptMgr) GetSystemPrompt(task AnalysisTask) (string, error) { return "", nil }
+func (m *mockPromptMgr) RenderTemplate(name string, data interface{}) (string, error) { return "", nil }
+func (m *mockPromptMgr) RegisterTemplate(name string, tmpl string) error { return nil }
+func (m *mockPromptMgr) ListTemplates() []TemplateInfo { return nil }
+func (m *mockPromptMgr) EstimateTokenCount(text string) int { return len(text) / 4 }
+
+
 type mockRAG struct {
-	retrieveFn func(ctx context.Context, query string, topK int) ([]*RAGDocument, error)
+	retrieveFn func(ctx context.Context, query *RAGQuery) (*RAGResult, error)
 	callCount  atomic.Int32
 }
 
-func (m *mockRAG) RetrieveAndRerank(ctx context.Context, query string, topK int) ([]*RAGDocument, error) {
+func (m *mockRAG) RetrieveAndRerank(ctx context.Context, query *RAGQuery) (*RAGResult, error) {
 	m.callCount.Add(1)
 	if m.retrieveFn != nil {
-		return m.retrieveFn(ctx, query, topK)
+		return m.retrieveFn(ctx, query)
 	}
-	return []*RAGDocument{
-		{DocumentID: "doc-1", Content: "Patent US12345678 claims...", Score: 0.95, Source: "US12345678"},
-		{DocumentID: "doc-2", Content: "MPEP §2111.03 states...", Score: 0.88, Source: "MPEP §2111.03"},
+	return &RAGResult{
+		Chunks: []*RAGChunk{
+			{ChunkID: "doc-1", Content: "Patent US12345678 claims...", Score: 0.95, Source: SourcePatent, Metadata: map[string]string{"document_id": "US12345678"}},
+			{ChunkID: "doc-2", Content: "MPEP §2111.03 states...", Score: 0.88, Source: SourceMPEP, Metadata: map[string]string{"document_id": "MPEP §2111.03"}},
+		},
+		TotalFound: 2,
 	}, nil
 }
+
+// Satisfy other interface methods
+func (m *mockRAG) Retrieve(ctx context.Context, query *RAGQuery) (*RAGResult, error) { return m.RetrieveAndRerank(ctx, query) }
+func (m *mockRAG) BuildContext(ctx context.Context, result *RAGResult, budget int) (string, error) { return "", nil }
+func (m *mockRAG) IndexDocument(ctx context.Context, doc *Document) error { return nil }
+func (m *mockRAG) IndexBatch(ctx context.Context, docs []*Document) error { return nil }
+func (m *mockRAG) DeleteDocument(ctx context.Context, docID string) error { return nil }
+
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -131,7 +158,7 @@ func newTestReportGenerator(t *testing.T) (ReportGenerator, *mockLLMBackend, *mo
 	backend := &mockLLMBackend{}
 	pm := &mockPromptMgr{}
 	rag := &mockRAG{}
-	cfg := DefaultStrategyGPTConfig()
+	cfg := NewStrategyGPTConfig()
 	gen, err := NewReportGenerator(backend, pm, rag, cfg, nil, nil)
 	if err != nil {
 		t.Fatalf("NewReportGenerator: %v", err)
@@ -144,8 +171,8 @@ func newTestReportGeneratorNoRAG(t *testing.T) (ReportGenerator, *mockLLMBackend
 	backend := &mockLLMBackend{}
 	pm := &mockPromptMgr{}
 	rag := &mockRAG{}
-	cfg := DefaultStrategyGPTConfig()
-	cfg.RAGEnabled = false
+	cfg := NewStrategyGPTConfig()
+	cfg.RAGConfig.Enabled = false
 	gen, err := NewReportGenerator(backend, pm, rag, cfg, nil, nil)
 	if err != nil {
 		t.Fatalf("NewReportGenerator: %v", err)
@@ -156,12 +183,12 @@ func newTestReportGeneratorNoRAG(t *testing.T) (ReportGenerator, *mockLLMBackend
 func ftoRequest(qualityCheck bool) *ReportRequest {
 	return &ReportRequest{
 		Task: TaskFTO,
-		Params: &PromptParams{
+		Params: &ReportGenerationParams{
 			PatentNumbers: []string{"US12345678"},
 			ProductDesc:   "Novel catalytic converter",
 			TechDomain:    "chemical engineering",
 		},
-		OutputFormat: FormatNarrative,
+		OutputFormat: OutputNarrative,
 		QualityCheck: qualityCheck,
 		RequestID:    "test-req-001",
 	}
@@ -257,7 +284,7 @@ func TestGenerateReport_LLMError(t *testing.T) {
 			return nil, fmt.Errorf("LLM internal error")
 		},
 	}
-	gen, _ := NewReportGenerator(backend, &mockPromptMgr{}, nil, nil, nil, nil)
+	gen, _ := NewReportGenerator(backend, &mockPromptMgr{}, &mockRAG{}, nil, nil, nil)
 	_, err := gen.GenerateReport(context.Background(), ftoRequest(false))
 	if err == nil {
 		t.Fatal("expected error from LLM backend")
@@ -278,7 +305,7 @@ func TestGenerateReport_LLMTimeout(t *testing.T) {
 			}
 		},
 	}
-	gen, _ := NewReportGenerator(backend, &mockPromptMgr{}, nil, nil, nil, nil)
+	gen, _ := NewReportGenerator(backend, &mockPromptMgr{}, &mockRAG{}, nil, nil, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	_, err := gen.GenerateReport(ctx, ftoRequest(false))
@@ -418,8 +445,8 @@ func TestGenerateReportStream_ContextCancellation(t *testing.T) {
 			return ch, nil
 		},
 	}
-	cfg := DefaultStrategyGPTConfig()
-	gen, _ := NewReportGenerator(slowBackend, &mockPromptMgr{}, nil, cfg, nil, nil)
+	cfg := NewStrategyGPTConfig()
+	gen, _ := NewReportGenerator(slowBackend, &mockPromptMgr{}, &mockRAG{}, cfg, nil, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
@@ -475,7 +502,7 @@ func TestParseLLMOutput_Structured_Success(t *testing.T) {
 	}
 	jsonBytes, _ := json.Marshal(structured)
 
-	content, err := gen.ParseLLMOutput(string(jsonBytes), FormatStructured)
+	content, err := gen.ParseLLMOutput(string(jsonBytes), OutputStructured)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -503,7 +530,7 @@ func TestParseLLMOutput_Structured_WithCodeFence(t *testing.T) {
 	jsonBytes, _ := json.Marshal(structured)
 	wrapped := fmt.Sprintf("Here is the result:\n```json\n%s\n```\n", string(jsonBytes))
 
-	content, err := gen.ParseLLMOutput(wrapped, FormatStructured)
+	content, err := gen.ParseLLMOutput(wrapped, OutputStructured)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -515,7 +542,7 @@ func TestParseLLMOutput_Structured_WithCodeFence(t *testing.T) {
 func TestParseLLMOutput_Structured_InvalidJSON(t *testing.T) {
 	gen, _, _, _ := newTestReportGenerator(t)
 
-	content, err := gen.ParseLLMOutput("this is not json {{{", FormatStructured)
+	content, err := gen.ParseLLMOutput("this is not json {{{", OutputStructured)
 	// Should degrade, not error
 	if err != nil {
 		t.Fatalf("expected degraded parse, not error: %v", err)
@@ -553,7 +580,7 @@ Claims 1-5 are independent claims.
 
 - Continue development.
 `
-	content, err := gen.ParseLLMOutput(narrative, FormatNarrative)
+	content, err := gen.ParseLLMOutput(narrative, OutputNarrative)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -577,7 +604,7 @@ Some overview text.
 - First conclusion statement.
 - Second conclusion statement.
 `
-	content, err := gen.ParseLLMOutput(narrative, FormatNarrative)
+	content, err := gen.ParseLLMOutput(narrative, OutputNarrative)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -604,7 +631,7 @@ Some analysis.
 - Monitor competitor patents.
 - Consider design-around for claim 3.
 `
-	content, err := gen.ParseLLMOutput(narrative, FormatNarrative)
+	content, err := gen.ParseLLMOutput(narrative, OutputNarrative)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -629,7 +656,7 @@ func TestParseLLMOutput_Bullet_Items(t *testing.T) {
 - Claims 1-3 are broadly drafted.
 - Recommend filing in EP and CN.
 `
-	content, err := gen.ParseLLMOutput(bullet, FormatBullet)
+	content, err := gen.ParseLLMOutput(bullet, OutputBullet)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -649,7 +676,7 @@ func TestParseLLMOutput_CitationExtraction(t *testing.T) {
 
 The product may infringe [Patent US12345678] based on claim 1.
 `
-	content, err := gen.ParseLLMOutput(text, FormatNarrative)
+	content, err := gen.ParseLLMOutput(text, OutputNarrative)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -680,7 +707,7 @@ Patent CN112345678A is relevant prior art.
 Under 35 U.S.C. §103, the combination is obvious.
 [Patent US98765432] was cited during prosecution.
 `
-	content, err := gen.ParseLLMOutput(text, FormatNarrative)
+	content, err := gen.ParseLLMOutput(text, OutputNarrative)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -707,7 +734,7 @@ Under 35 U.S.C. §103, the combination is obvious.
 
 func TestParseLLMOutput_EmptyOutput(t *testing.T) {
 	gen, _, _, _ := newTestReportGenerator(t)
-	_, err := gen.ParseLLMOutput("", FormatNarrative)
+	_, err := gen.ParseLLMOutput("", OutputNarrative)
 	if err != ErrEmptyLLMOutput {
 		t.Errorf("expected ErrEmptyLLMOutput, got %v", err)
 	}
@@ -715,7 +742,7 @@ func TestParseLLMOutput_EmptyOutput(t *testing.T) {
 
 func TestParseLLMOutput_WhitespaceOnly(t *testing.T) {
 	gen, _, _, _ := newTestReportGenerator(t)
-	_, err := gen.ParseLLMOutput("   \n\n  \t  ", FormatNarrative)
+	_, err := gen.ParseLLMOutput("   \n\n  \t  ", OutputNarrative)
 	if err != ErrEmptyLLMOutput {
 		t.Errorf("expected ErrEmptyLLMOutput, got %v", err)
 	}
@@ -860,13 +887,16 @@ func TestValidateReport_NilContent(t *testing.T) {
 
 func TestValidateReport_CitationVerification_AllVerified(t *testing.T) {
 	rag := &mockRAG{
-		retrieveFn: func(ctx context.Context, query string, topK int) ([]*RAGDocument, error) {
-			return []*RAGDocument{
-				{DocumentID: "d1", Content: "match", Score: 0.95, Source: query},
+		retrieveFn: func(ctx context.Context, query *RAGQuery) (*RAGResult, error) {
+			return &RAGResult{
+				Chunks: []*RAGChunk{
+					{ChunkID: "d1", Content: "match", Score: 0.95, Source: SourcePatent},
+				},
+				TotalFound: 1,
 			}, nil
 		},
 	}
-	cfg := DefaultStrategyGPTConfig()
+	cfg := NewStrategyGPTConfig()
 	gen, _ := NewReportGenerator(&mockLLMBackend{}, &mockPromptMgr{}, rag, cfg, nil, nil)
 
 	report := &Report{
@@ -903,18 +933,21 @@ func TestValidateReport_CitationVerification_AllVerified(t *testing.T) {
 func TestValidateReport_CitationVerification_SomeNotFound(t *testing.T) {
 	callIdx := atomic.Int32{}
 	rag := &mockRAG{
-		retrieveFn: func(ctx context.Context, query string, topK int) ([]*RAGDocument, error) {
+		retrieveFn: func(ctx context.Context, query *RAGQuery) (*RAGResult, error) {
 			idx := callIdx.Add(1)
 			if idx == 2 {
 				// Second citation not found
-				return []*RAGDocument{}, nil
+				return &RAGResult{Chunks: []*RAGChunk{}, TotalFound: 0}, nil
 			}
-			return []*RAGDocument{
-				{DocumentID: "d1", Content: "match", Score: 0.95, Source: query},
+			return &RAGResult{
+				Chunks: []*RAGChunk{
+					{ChunkID: "d1", Content: "match", Score: 0.95, Source: SourcePatent},
+				},
+				TotalFound: 1,
 			}, nil
 		},
 	}
-	cfg := DefaultStrategyGPTConfig()
+	cfg := NewStrategyGPTConfig()
 	gen, _ := NewReportGenerator(&mockLLMBackend{}, &mockPromptMgr{}, rag, cfg, nil, nil)
 
 	report := &Report{
@@ -1134,7 +1167,7 @@ Some overview.
 - Potential claim scope expansion in reexamination.
 - Design-around feasibility is limited.
 `
-	content, err := gen.ParseLLMOutput(narrative, FormatNarrative)
+	content, err := gen.ParseLLMOutput(narrative, OutputNarrative)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1227,7 +1260,7 @@ Some analysis text.
 - File continuation application for claims 4-6.
 - Monitor competitor C prosecution history.
 `
-	content, err := gen.ParseLLMOutput(narrative, FormatNarrative)
+	content, err := gen.ParseLLMOutput(narrative, OutputNarrative)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1262,8 +1295,8 @@ func TestGenerateReport_EmptyLLMOutput(t *testing.T) {
 			}, nil
 		},
 	}
-	cfg := DefaultStrategyGPTConfig()
-	cfg.RAGEnabled = false
+	cfg := NewStrategyGPTConfig()
+	cfg.RAGConfig.Enabled = false
 	gen, _ := NewReportGenerator(backend, &mockPromptMgr{}, nil, cfg, nil, nil)
 
 	_, err := gen.GenerateReport(context.Background(), ftoRequest(false))
@@ -1296,22 +1329,7 @@ func TestNewReportGenerator_NilConfig_UsesDefaults(t *testing.T) {
 	}
 }
 
-func TestOutputFormat_String(t *testing.T) {
-	tests := []struct {
-		f        OutputFormat
-		expected string
-	}{
-		{FormatStructured, "structured"},
-		{FormatNarrative, "narrative"},
-		{FormatBullet, "bullet"},
-		{OutputFormat(99), "unknown"},
-	}
-	for _, tt := range tests {
-		if got := tt.f.String(); got != tt.expected {
-			t.Errorf("OutputFormat(%d).String() = %s, want %s", tt.f, got, tt.expected)
-		}
-	}
-}
+// TestOutputFormat_String is covered in prompt_test.go
 
 func TestExportFormat_String(t *testing.T) {
 	tests := []struct {
@@ -1336,7 +1354,7 @@ func TestParseLLMOutput_Narrative_NoHeadings_Degrades(t *testing.T) {
 
 	plain := "This is just a plain text paragraph without any markdown headings. It should degrade gracefully to a single section."
 
-	content, err := gen.ParseLLMOutput(plain, FormatNarrative)
+	content, err := gen.ParseLLMOutput(plain, OutputNarrative)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1355,7 +1373,7 @@ func TestParseLLMOutput_Bullet_Empty(t *testing.T) {
 	gen, _, _, _ := newTestReportGenerator(t)
 
 	// Only whitespace lines — no actual bullet items
-	content, err := gen.ParseLLMOutput("   \n   \n   ", FormatBullet)
+	content, err := gen.ParseLLMOutput("   \n   \n   ", OutputBullet)
 	if err != ErrEmptyLLMOutput {
 		t.Errorf("expected ErrEmptyLLMOutput for whitespace-only bullet input, got err=%v content=%+v", err, content)
 	}
@@ -1367,7 +1385,7 @@ func TestParseLLMOutput_Structured_WrappedInCodeFence_Generic(t *testing.T) {
 	inner := `{"title":"Wrapped","executive_summary":"Test"}`
 	wrapped := "```\n" + inner + "\n```"
 
-	content, err := gen.ParseLLMOutput(wrapped, FormatStructured)
+	content, err := gen.ParseLLMOutput(wrapped, OutputStructured)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1632,11 +1650,11 @@ func TestDecodeIntFromBytes(t *testing.T) {
 }
 
 func TestDefaultStrategyGPTConfig(t *testing.T) {
-	cfg := DefaultStrategyGPTConfig()
+	cfg := NewStrategyGPTConfig()
 	if cfg.ModelID == "" {
 		t.Error("expected non-empty ModelID")
 	}
-	if cfg.RAGTopK <= 0 {
+	if cfg.RAGConfig.TopK <= 0 {
 		t.Error("expected positive RAGTopK")
 	}
 	if cfg.MaxOutputTokens <= 0 {
@@ -1649,5 +1667,3 @@ func TestDefaultStrategyGPTConfig(t *testing.T) {
 		t.Error("expected positive TimeoutMs")
 	}
 }
-
-//Personal.AI order the ending

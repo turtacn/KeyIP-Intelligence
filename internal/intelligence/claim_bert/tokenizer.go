@@ -48,6 +48,7 @@ type EncodedInput struct {
 	Offsets        [][2]int `json:"offsets"`
 	OverflowTokens []int    `json:"overflow_tokens"`
 	NumTruncated   int      `json:"num_truncated"`
+	Tokens         []string `json:"tokens"` // Added for BIO tagging alignment
 }
 
 // ---------------------------------------------------------------------------
@@ -345,6 +346,7 @@ func (t *WordPieceTokenizer) Encode(text string) (*EncodedInput, error) {
 		typeIDs = appendN(typeIDs, 0, padLen)
 		for i := 0; i < padLen; i++ {
 			seqOffsets = append(seqOffsets, [2]int{-1, -1})
+			seqTokens = append(seqTokens, t.padToken)
 		}
 	}
 
@@ -355,6 +357,7 @@ func (t *WordPieceTokenizer) Encode(text string) (*EncodedInput, error) {
 		Offsets:        seqOffsets,
 		OverflowTokens: overflowIDs,
 		NumTruncated:   truncated,
+		Tokens:         seqTokens,
 	}, nil
 }
 

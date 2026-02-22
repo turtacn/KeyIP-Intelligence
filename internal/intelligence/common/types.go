@@ -16,6 +16,7 @@ const (
 	FormatJSON     InputFormat = iota
 	FormatProtobuf
 	FormatNumpy
+	FormatText
 )
 
 func (f InputFormat) String() string {
@@ -26,6 +27,8 @@ func (f InputFormat) String() string {
 		return "Protobuf"
 	case FormatNumpy:
 		return "Numpy"
+	case FormatText:
+		return "Text"
 	default:
 		return "Unknown"
 	}

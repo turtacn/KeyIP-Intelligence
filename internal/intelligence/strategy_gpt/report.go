@@ -11,43 +11,29 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-
-	"github.com/google/uuid"
 )
 
 // ---------------------------------------------------------------------------
-// Enumerations
+// Sentinel errors
 // ---------------------------------------------------------------------------
 
-// OutputFormat controls how the LLM is instructed to format its response.
-type OutputFormat int
-
-const (
-	FormatStructured OutputFormat = iota // JSON
-	FormatNarrative                      // prose with Markdown headings
-	FormatBullet                         // bullet-point lists
+var (
+	ErrEmptyLLMOutput             = fmt.Errorf("empty LLM output")
+	ErrExportFormatNotImplemented = fmt.Errorf("export format not implemented")
 )
 
-func (f OutputFormat) String() string {
-	switch f {
-	case FormatStructured:
-		return "structured"
-	case FormatNarrative:
-		return "narrative"
-	case FormatBullet:
-		return "bullet"
-	default:
-		return "unknown"
-	}
-}
+// ---------------------------------------------------------------------------
+// Request / Response types
+// ---------------------------------------------------------------------------
 
 // ExportFormat controls the file format of the exported report.
 type ExportFormat int
 
 const (
-	ExportJSON     ExportFormat = iota
+	ExportJSON ExportFormat = iota
 	ExportMarkdown
 	ExportPDF
 	ExportDOCX
@@ -68,63 +54,49 @@ func (f ExportFormat) String() string {
 	}
 }
 
-// DocumentSourceType classifies a citation source.
-type DocumentSourceType string
-
-const (
-	SourcePatent     DocumentSourceType = "patent"
-	SourceStatute    DocumentSourceType = "statute"
-	SourceCaseLaw    DocumentSourceType = "case_law"
-	SourceMPEP       DocumentSourceType = "mpep"
-	SourceLiterature DocumentSourceType = "literature"
-	SourceOther      DocumentSourceType = "other"
-)
-
-// ---------------------------------------------------------------------------
-// Sentinel errors
-// ---------------------------------------------------------------------------
-
-var (
-	ErrEmptyLLMOutput              = fmt.Errorf("empty LLM output")
-	ErrExportFormatNotImplemented  = fmt.Errorf("export format not implemented")
-)
-
-// ---------------------------------------------------------------------------
-// Request / Response types
-// ---------------------------------------------------------------------------
+// ReportGenerationParams holds the simplified input parameters for a report request.
+// These are mapped to the richer PromptParams used by the prompt engine.
+type ReportGenerationParams struct {
+	PatentNumbers []string               `json:"patent_numbers,omitempty"`
+	ClaimTexts    []string               `json:"claim_texts,omitempty"`
+	ProductDesc   string                 `json:"product_desc,omitempty"`
+	TechDomain    string                 `json:"tech_domain,omitempty"`
+	Jurisdiction  string                 `json:"jurisdiction,omitempty"`
+	CustomFields  map[string]interface{} `json:"custom_fields,omitempty"`
+}
 
 // ReportRequest is the input for report generation.
 type ReportRequest struct {
-	Task          AnalysisTask   `json:"task"`
-	Params        *PromptParams  `json:"params"`
-	OutputFormat  OutputFormat   `json:"output_format"`
-	ExportFormats []ExportFormat `json:"export_formats,omitempty"`
-	QualityCheck  bool           `json:"quality_check"`
-	RequestID     string         `json:"request_id"`
+	Task          AnalysisTask            `json:"task"`
+	Params        *ReportGenerationParams `json:"params"`
+	OutputFormat  OutputFormat            `json:"output_format"`
+	ExportFormats []ExportFormat          `json:"export_formats,omitempty"`
+	QualityCheck  bool                    `json:"quality_check"`
+	RequestID     string                  `json:"request_id"`
 }
 
 // Report is the top-level output of the report generator.
 type Report struct {
-	ReportID    string              `json:"report_id"`
-	Task        AnalysisTask        `json:"task"`
-	Content     *ReportContent      `json:"content"`
-	Metadata    *ReportMetadata     `json:"metadata"`
-	Validation  *ReportValidation   `json:"validation,omitempty"`
-	GeneratedAt time.Time           `json:"generated_at"`
-	LatencyMs   int64               `json:"latency_ms"`
-	TokensUsed  *TokenUsage         `json:"tokens_used"`
+	ReportID    string            `json:"report_id"`
+	Task        AnalysisTask      `json:"task"`
+	Content     *ReportContent    `json:"content"`
+	Metadata    *ReportMetadata   `json:"metadata"`
+	Validation  *ReportValidation `json:"validation,omitempty"`
+	GeneratedAt time.Time         `json:"generated_at"`
+	LatencyMs   int64             `json:"latency_ms"`
+	TokensUsed  *TokenUsage       `json:"tokens_used"`
 }
 
 // ReportContent holds the structured body of the report.
 type ReportContent struct {
-	Title            string              `json:"title"`
-	ExecutiveSummary string              `json:"executive_summary"`
-	Sections         []*ReportSection    `json:"sections"`
-	Conclusions      []*Conclusion       `json:"conclusions"`
-	Recommendations  []*Recommendation   `json:"recommendations"`
-	RiskAssessment   *RiskAssessment     `json:"risk_assessment,omitempty"`
-	Citations        []*Citation         `json:"citations"`
-	RawOutput        string              `json:"raw_output,omitempty"`
+	Title            string            `json:"title"`
+	ExecutiveSummary string            `json:"executive_summary"`
+	Sections         []*ReportSection  `json:"sections"`
+	Conclusions      []*Conclusion     `json:"conclusions"`
+	Recommendations  []*Recommendation `json:"recommendations"`
+	RiskAssessment   *RiskAssessment   `json:"risk_assessment,omitempty"`
+	Citations        []*Citation       `json:"citations"`
+	RawOutput        string            `json:"raw_output,omitempty"`
 }
 
 // ReportSection is a recursive section structure.
@@ -269,75 +241,12 @@ type ReportGenerator interface {
 }
 
 // ---------------------------------------------------------------------------
-// RAGEngine interface (expected from rag.go)
-// ---------------------------------------------------------------------------
-
-// RAGEngine is the retrieval-augmented generation engine.
-type RAGEngine interface {
-	RetrieveAndRerank(ctx context.Context, query string, topK int) ([]*RAGDocument, error)
-}
-
-// RAGDocument is a single document returned by the RAG engine.
-type RAGDocument struct {
-	DocumentID string  `json:"document_id"`
-	Content    string  `json:"content"`
-	Score      float64 `json:"score"`
-	Source     string  `json:"source"`
-	SourceType string  `json:"source_type"`
-}
-
-// ---------------------------------------------------------------------------
-// PromptManager interface (expected from prompt.go)
-// ---------------------------------------------------------------------------
-
-// PromptManager builds prompts for the LLM.
-type PromptManager interface {
-	BuildPrompt(task AnalysisTask, params *PromptParams) (string, error)
-}
-
-// PromptParams carries all parameters needed to build a prompt.
-type PromptParams struct {
-	PatentNumbers   []string               `json:"patent_numbers,omitempty"`
-	ClaimTexts      []string               `json:"claim_texts,omitempty"`
-	ProductDesc     string                 `json:"product_desc,omitempty"`
-	TechDomain      string                 `json:"tech_domain,omitempty"`
-	Jurisdiction    string                 `json:"jurisdiction,omitempty"`
-	RAGContext      string                 `json:"rag_context,omitempty"`
-	OutputFormat    OutputFormat           `json:"output_format"`
-	CustomFields    map[string]interface{} `json:"custom_fields,omitempty"`
-}
-
-// AnalysisTask enumerates the types of strategic analysis.
-type AnalysisTask string
-
-const (
-	TaskFTO              AnalysisTask = "fto"
-	TaskInfringement     AnalysisTask = "infringement"
-	TaskValidity         AnalysisTask = "validity"
-	TaskLandscape        AnalysisTask = "landscape"
-	TaskPortfolioReview  AnalysisTask = "portfolio_review"
-	TaskClaimConstruction AnalysisTask = "claim_construction"
-)
-
-// ---------------------------------------------------------------------------
-// ModelBackend interface (LLM inference)
-// ---------------------------------------------------------------------------
-
-// ModelBackend abstracts the LLM serving layer.
-type ModelBackend interface {
-	Predict(ctx context.Context, req *common.PredictRequest) (*common.PredictResponse, error)
-	PredictStream(ctx context.Context, req *common.PredictRequest) (<-chan *common.PredictResponse, error)
-	Healthy(ctx context.Context) error
-	Close() error
-}
-
-// ---------------------------------------------------------------------------
 // Implementation
 // ---------------------------------------------------------------------------
 
 // reportGeneratorImpl is the concrete ReportGenerator.
 type reportGeneratorImpl struct {
-	modelBackend  ModelBackend
+	modelBackend  common.ModelBackend
 	promptManager PromptManager
 	ragEngine     RAGEngine
 	config        *StrategyGPTConfig
@@ -345,33 +254,9 @@ type reportGeneratorImpl struct {
 	logger        common.Logger
 }
 
-// StrategyGPTConfig holds configuration for the StrategyGPT subsystem.
-type StrategyGPTConfig struct {
-	ModelID        string  `json:"model_id" yaml:"model_id"`
-	ModelVersion   string  `json:"model_version" yaml:"model_version"`
-	RAGEnabled     bool    `json:"rag_enabled" yaml:"rag_enabled"`
-	RAGTopK        int     `json:"rag_top_k" yaml:"rag_top_k"`
-	MaxOutputTokens int   `json:"max_output_tokens" yaml:"max_output_tokens"`
-	Temperature    float64 `json:"temperature" yaml:"temperature"`
-	TimeoutMs      int64   `json:"timeout_ms" yaml:"timeout_ms"`
-}
-
-// DefaultStrategyGPTConfig returns sensible defaults.
-func DefaultStrategyGPTConfig() *StrategyGPTConfig {
-	return &StrategyGPTConfig{
-		ModelID:         "strategy-gpt-v1",
-		ModelVersion:    "1.0.0",
-		RAGEnabled:      true,
-		RAGTopK:         10,
-		MaxOutputTokens: 4096,
-		Temperature:     0.3,
-		TimeoutMs:       60000,
-	}
-}
-
 // NewReportGenerator creates a new ReportGenerator.
 func NewReportGenerator(
-	backend ModelBackend,
+	backend common.ModelBackend,
 	promptMgr PromptManager,
 	rag RAGEngine,
 	cfg *StrategyGPTConfig,
@@ -385,7 +270,7 @@ func NewReportGenerator(
 		return nil, errors.NewInvalidInputError("prompt manager is required")
 	}
 	if cfg == nil {
-		cfg = DefaultStrategyGPTConfig()
+		cfg = NewStrategyGPTConfig()
 	}
 	if metrics == nil {
 		metrics = common.NewNoopIntelligenceMetrics()
@@ -414,39 +299,38 @@ func (g *reportGeneratorImpl) GenerateReport(ctx context.Context, req *ReportReq
 	start := time.Now()
 	reportID := uuid.New().String()
 
-	params := req.Params
-	if params == nil {
-		params = &PromptParams{}
-	}
-	params.OutputFormat = req.OutputFormat
-
-	ragDocCount := 0
-
-	// Step 1: RAG retrieval (if enabled)
-	if g.config.RAGEnabled && g.ragEngine != nil {
+	// 1. Prepare RAG query (if enabled)
+	var ragChunks []*RAGChunk
+	if g.config.RAGConfig.Enabled && g.ragEngine != nil {
 		ragQuery := g.buildRAGQuery(req)
-		docs, err := g.ragEngine.RetrieveAndRerank(ctx, ragQuery, g.config.RAGTopK)
+		ragResult, err := g.ragEngine.RetrieveAndRerank(ctx, ragQuery)
 		if err != nil {
 			g.logger.Warn("RAG retrieval failed, proceeding without context", "error", err)
-		} else {
-			params.RAGContext = g.formatRAGContext(docs)
-			ragDocCount = len(docs)
+		} else if ragResult != nil {
+			ragChunks = ragResult.Chunks
 		}
 	}
 
-	// Step 2: Build prompt
-	prompt, err := g.promptManager.BuildPrompt(req.Task, params)
+	// 2. Map request params to PromptParams
+	promptParams := g.mapToPromptParams(req, ragChunks)
+
+	// 3. Build prompt
+	builtPrompt, err := g.promptManager.BuildPrompt(ctx, req.Task, promptParams)
 	if err != nil {
 		return nil, fmt.Errorf("building prompt: %w", err)
 	}
 
-	// Step 3: LLM prediction
+	// 4. LLM prediction
+	// Combine system and user prompts into a single input if backend expects text.
+	// Or use a structured chat input if backend supports it. For now, assume simple text concatenation.
+	fullPrompt := fmt.Sprintf("%s\n\n%s", builtPrompt.SystemPrompt, builtPrompt.UserPrompt)
+
 	backendReq := &common.PredictRequest{
 		ModelName:   g.config.ModelID,
-		InputData:   []byte(prompt),
+		InputData:   []byte(fullPrompt),
 		InputFormat: common.FormatText,
 		Metadata: map[string]string{
-			"task":       string(req.Task),
+			"task":       req.Task.String(),
 			"request_id": req.RequestID,
 		},
 	}
@@ -456,39 +340,39 @@ func (g *reportGeneratorImpl) GenerateReport(ctx context.Context, req *ReportReq
 		return nil, fmt.Errorf("LLM prediction: %w", err)
 	}
 
-	rawOutput := string(backendResp.Outputs["text"])
-	if rawOutput == "" {
-		if v, ok := backendResp.Outputs["output"]; ok {
-			rawOutput = string(v)
-		}
+	rawOutput := ""
+	if v, ok := backendResp.Outputs["text"]; ok {
+		rawOutput = string(v)
+	} else if v, ok := backendResp.Outputs["output"]; ok {
+		rawOutput = string(v)
 	}
 
-	// Step 4: Parse LLM output
+	// 5. Parse LLM output
 	content, err := g.ParseLLMOutput(rawOutput, req.OutputFormat)
 	if err != nil {
 		return nil, fmt.Errorf("parsing LLM output: %w", err)
 	}
 
-	// Step 5: Token usage
+	// 6. Token usage
 	tokenUsage := extractTokenUsage(backendResp)
 
-	// Step 6: Assemble report
+	// 7. Assemble report
 	report := &Report{
 		ReportID:    reportID,
 		Task:        req.Task,
 		Content:     content,
 		Metadata: &ReportMetadata{
 			ModelID:      g.config.ModelID,
-			ModelVersion: g.config.ModelVersion,
-			RAGEnabled:   g.config.RAGEnabled && g.ragEngine != nil,
-			RAGDocCount:  ragDocCount,
+			ModelVersion: g.config.ModelID, // simplified
+			RAGEnabled:   g.config.RAGConfig.Enabled && g.ragEngine != nil,
+			RAGDocCount:  len(ragChunks),
 		},
 		GeneratedAt: time.Now(),
 		LatencyMs:   time.Since(start).Milliseconds(),
 		TokensUsed:  tokenUsage,
 	}
 
-	// Step 7: Quality check (if requested)
+	// 8. Quality check (if requested)
 	if req.QualityCheck {
 		validation, vErr := g.ValidateReport(report)
 		if vErr != nil {
@@ -498,11 +382,11 @@ func (g *reportGeneratorImpl) GenerateReport(ctx context.Context, req *ReportReq
 		}
 	}
 
-	// Step 8: Metrics
+	// 9. Metrics
 	g.metrics.RecordInference(ctx, &common.InferenceMetricParams{
 		ModelName:    g.config.ModelID,
-		ModelVersion: g.config.ModelVersion,
-		TaskType:     string(req.Task),
+		ModelVersion: "v1",
+		TaskType:     req.Task.String(),
 		DurationMs:   float64(report.LatencyMs),
 		Success:      true,
 		BatchSize:    1,
@@ -520,35 +404,33 @@ func (g *reportGeneratorImpl) GenerateReportStream(ctx context.Context, req *Rep
 		return nil, errors.NewInvalidInputError("request is required")
 	}
 
-	params := req.Params
-	if params == nil {
-		params = &PromptParams{}
-	}
-	params.OutputFormat = req.OutputFormat
-
 	// RAG retrieval
-	if g.config.RAGEnabled && g.ragEngine != nil {
+	var ragChunks []*RAGChunk
+	if g.config.RAGConfig.Enabled && g.ragEngine != nil {
 		ragQuery := g.buildRAGQuery(req)
-		docs, err := g.ragEngine.RetrieveAndRerank(ctx, ragQuery, g.config.RAGTopK)
+		ragResult, err := g.ragEngine.RetrieveAndRerank(ctx, ragQuery)
 		if err != nil {
 			g.logger.Warn("RAG retrieval failed in stream mode", "error", err)
-		} else {
-			params.RAGContext = g.formatRAGContext(docs)
+		} else if ragResult != nil {
+			ragChunks = ragResult.Chunks
 		}
 	}
 
 	// Build prompt
-	prompt, err := g.promptManager.BuildPrompt(req.Task, params)
+	promptParams := g.mapToPromptParams(req, ragChunks)
+	builtPrompt, err := g.promptManager.BuildPrompt(ctx, req.Task, promptParams)
 	if err != nil {
 		return nil, fmt.Errorf("building prompt: %w", err)
 	}
 
+	fullPrompt := fmt.Sprintf("%s\n\n%s", builtPrompt.SystemPrompt, builtPrompt.UserPrompt)
+
 	backendReq := &common.PredictRequest{
 		ModelName:   g.config.ModelID,
-		InputData:   []byte(prompt),
+		InputData:   []byte(fullPrompt),
 		InputFormat: common.FormatText,
 		Metadata: map[string]string{
-			"task":       string(req.Task),
+			"task":       req.Task.String(),
 			"request_id": req.RequestID,
 			"stream":     "true",
 		},
@@ -574,9 +456,9 @@ func (g *reportGeneratorImpl) GenerateReportStream(ctx context.Context, req *Rep
 			select {
 			case <-ctx.Done():
 				outCh <- &ReportChunk{
-					ChunkIndex: chunkIdx,
-					Content:    "",
-					IsComplete: true,
+					ChunkIndex:  chunkIdx,
+					Content:     "",
+					IsComplete:  true,
 					SectionHint: currentHint,
 				}
 				return
@@ -602,12 +484,13 @@ func (g *reportGeneratorImpl) GenerateReportStream(ctx context.Context, req *Rep
 					return
 				}
 
-				text := string(resp.Outputs["text"])
-				if text == "" {
-					if v, ok2 := resp.Outputs["output"]; ok2 {
-						text = string(v)
-					}
+				text := ""
+				if v, ok := resp.Outputs["text"]; ok {
+					text = string(v)
+				} else if v, ok := resp.Outputs["output"]; ok {
+					text = string(v)
 				}
+
 				buf.WriteString(text)
 
 				// Detect section boundaries (double newline or heading markers)
@@ -634,6 +517,84 @@ func (g *reportGeneratorImpl) GenerateReportStream(ctx context.Context, req *Rep
 }
 
 // ---------------------------------------------------------------------------
+// Helpers for Params Mapping
+// ---------------------------------------------------------------------------
+
+func (g *reportGeneratorImpl) mapToPromptParams(req *ReportRequest, ragChunks []*RAGChunk) *PromptParams {
+	p := req.Params
+	if p == nil {
+		p = &ReportGenerationParams{}
+	}
+
+	// Map simplified params to rich PromptParams.
+	// This uses placeholders for complex objects not provided in the simplified request.
+	pp := &PromptParams{
+		Task:         req.Task,
+		UserQuery:    p.ProductDesc, // Use product description as the main query/context
+		OutputFormat: req.OutputFormat,
+		RAGContext:   ragChunks,
+		DetailLevel:  DetailStandard, // Default
+		Language:     "en",           // Default
+	}
+
+	if len(p.Jurisdiction) > 0 {
+		pp.JurisdictionFocus = []string{p.Jurisdiction}
+	}
+
+	// Populate patents if numbers provided (stub logic, ideally would fetch details)
+	if len(p.PatentNumbers) > 0 {
+		for _, num := range p.PatentNumbers {
+			pp.RelevantPatents = append(pp.RelevantPatents, &PatentContext{
+				PatentNumber: num,
+				// Details would be fetched from DB in a real scenario
+			})
+		}
+	}
+
+	// Populate claims
+	if len(p.ClaimTexts) > 0 {
+		for i, txt := range p.ClaimTexts {
+			pp.ClaimAnalysis = append(pp.ClaimAnalysis, &ClaimAnalysisContext{
+				ClaimNumber: i + 1,
+				ClaimText:   txt,
+				ClaimType:   "Unknown",
+			})
+		}
+	}
+
+	// Populate molecule info if ProductDesc looks like a chemical name/SMILES
+	// Simple heuristic: if short and no spaces, might be SMILES/Name
+	if len(p.ProductDesc) < 100 && !strings.Contains(p.ProductDesc, " ") {
+		pp.TargetMolecule = &MoleculeContext{
+			Name: p.ProductDesc,
+		}
+	} else {
+		// Treat as generic description
+		pp.UserQuery = p.ProductDesc
+	}
+
+	return pp
+}
+
+func (g *reportGeneratorImpl) buildRAGQuery(req *ReportRequest) *RAGQuery {
+	if req.Params == nil {
+		return &RAGQuery{
+			QueryText: req.Task.String(), // Fallback
+			TopK:      g.config.RAGConfig.TopK,
+		}
+	}
+
+	text := fmt.Sprintf("%s %s %s", req.Task, req.Params.ProductDesc, req.Params.TechDomain)
+	return &RAGQuery{
+		QueryText: text,
+		TopK:      g.config.RAGConfig.TopK,
+		Filters: &RAGFilters{
+			Jurisdictions: []string{req.Params.Jurisdiction},
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
 // ParseLLMOutput — convert raw LLM text into structured ReportContent
 // ---------------------------------------------------------------------------
 
@@ -647,11 +608,11 @@ func (g *reportGeneratorImpl) ParseLLMOutput(raw string, format OutputFormat) (*
 	var err error
 
 	switch format {
-	case FormatStructured:
+	case OutputStructured:
 		content, err = parseStructuredOutput(raw)
-	case FormatNarrative:
+	case OutputNarrative:
 		content, err = parseNarrativeOutput(raw)
-	case FormatBullet:
+	case OutputBullet:
 		content, err = parseBulletOutput(raw)
 	default:
 		content, err = parseNarrativeOutput(raw)
@@ -778,40 +739,6 @@ func (g *reportGeneratorImpl) ExportReport(report *Report, format ExportFormat) 
 }
 
 // ---------------------------------------------------------------------------
-// Internal: RAG helpers
-// ---------------------------------------------------------------------------
-
-func (g *reportGeneratorImpl) buildRAGQuery(req *ReportRequest) string {
-	var parts []string
-	parts = append(parts, string(req.Task))
-	if req.Params != nil {
-		if req.Params.ProductDesc != "" {
-			parts = append(parts, req.Params.ProductDesc)
-		}
-		if req.Params.TechDomain != "" {
-			parts = append(parts, req.Params.TechDomain)
-		}
-		for _, pn := range req.Params.PatentNumbers {
-			parts = append(parts, pn)
-		}
-	}
-	return strings.Join(parts, " ")
-}
-
-func (g *reportGeneratorImpl) formatRAGContext(docs []*RAGDocument) string {
-	if len(docs) == 0 {
-		return ""
-	}
-	var sb strings.Builder
-	sb.WriteString("--- Retrieved Context ---\n")
-	for i, d := range docs {
-		sb.WriteString(fmt.Sprintf("[%d] Source: %s (score: %.3f)\n%s\n\n", i+1, d.Source, d.Score, d.Content))
-	}
-	sb.WriteString("--- End Context ---\n")
-	return sb.String()
-}
-
-// ---------------------------------------------------------------------------
 // Internal: Parsing helpers
 // ---------------------------------------------------------------------------
 
@@ -842,11 +769,11 @@ func parseStructuredOutput(raw string) (*ReportContent, error) {
 
 // Heading patterns for narrative parsing
 var (
-	headingRegex      = regexp.MustCompile(`(?m)^#{1,3}\s+(.+)$`)
-	conclusionRegex   = regexp.MustCompile(`(?i)(conclusion|结论|findings|发现)`)
-	recommendRegex    = regexp.MustCompile(`(?i)(recommendation|建议|action\s*items?|行动)`)
-	summaryRegex      = regexp.MustCompile(`(?i)(executive\s*summary|摘要|概述|overview)`)
-	riskRegex         = regexp.MustCompile(`(?i)(risk\s*assessment|风险评估|risk\s*analysis)`)
+	headingRegex    = regexp.MustCompile(`(?m)^#{1,3}\s+(.+)$`)
+	conclusionRegex = regexp.MustCompile(`(?i)(conclusion|结论|findings|发现)`)
+	recommendRegex  = regexp.MustCompile(`(?i)(recommendation|建议|action\s*items?|行动)`)
+	summaryRegex    = regexp.MustCompile(`(?i)(executive\s*summary|摘要|概述|overview)`)
+	riskRegex       = regexp.MustCompile(`(?i)(risk\s*assessment|风险评估|risk\s*analysis)`)
 )
 
 func parseNarrativeOutput(raw string) (*ReportContent, error) {
@@ -1237,13 +1164,18 @@ func (g *reportGeneratorImpl) verifySingleCitation(cit *Citation) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	docs, err := g.ragEngine.RetrieveAndRerank(ctx, cit.Source, 1)
-	if err != nil || len(docs) == 0 {
+	ragQuery := &RAGQuery{
+		QueryText: cit.Source,
+		TopK:      1,
+	}
+
+	result, err := g.ragEngine.RetrieveAndRerank(ctx, ragQuery)
+	if err != nil || result == nil || len(result.Chunks) == 0 {
 		return false
 	}
 
 	// Consider verified if the top result has a high enough score
-	return docs[0].Score >= 0.7
+	return result.Chunks[0].Score >= 0.7
 }
 
 // ---------------------------------------------------------------------------
@@ -1479,5 +1411,3 @@ func splitParagraphs(text string) []string {
 	}
 	return result
 }
-
-//Personal.AI order the ending
