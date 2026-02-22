@@ -98,29 +98,29 @@ type ShareRequest struct {
 // Validate checks the share request for correctness.
 func (r *ShareRequest) Validate() error {
 	if strings.TrimSpace(r.WorkspaceID) == "" {
-		return pkgerrors.NewValidation("workspace_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "workspace_id is required")
 	}
 	if strings.TrimSpace(r.CreatedBy) == "" {
-		return pkgerrors.NewValidation("created_by is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "created_by is required")
 	}
 	if !r.Permission.IsValid() {
-		return pkgerrors.NewValidation(fmt.Sprintf("invalid permission: %s", r.Permission))
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, fmt.Sprintf("invalid permission: %s", r.Permission))
 	}
 	switch r.Duration {
 	case ShareDurationPermanent, ShareDuration7Days, ShareDuration30Days:
 		// valid preset
 	case ShareDurationCustom:
 		if r.CustomExpiry == nil {
-			return pkgerrors.NewValidation("custom_expiry is required when duration is custom")
+			return pkgerrors.New(pkgerrors.ErrCodeValidation, "custom_expiry is required when duration is custom")
 		}
 		if r.CustomExpiry.Before(time.Now()) {
-			return pkgerrors.NewValidation("custom_expiry must be in the future")
+			return pkgerrors.New(pkgerrors.ErrCodeValidation, "custom_expiry must be in the future")
 		}
 	default:
-		return pkgerrors.NewValidation(fmt.Sprintf("invalid duration: %s", r.Duration))
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, fmt.Sprintf("invalid duration: %s", r.Duration))
 	}
 	if r.MaxAccessCount < 0 {
-		return pkgerrors.NewValidation("max_access_count must be non-negative")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "max_access_count must be non-negative")
 	}
 	return nil
 }
@@ -216,7 +216,7 @@ type SharingServiceConfig struct {
 }
 
 type sharingServiceImpl struct {
-	domainService collabdomain.Service
+	domainService collabdomain.CollaborationService
 	workspaceRepo collabdomain.WorkspaceRepository
 	shareRepo     ShareRepository
 	cache         Cache
@@ -226,7 +226,7 @@ type sharingServiceImpl struct {
 
 // NewSharingService constructs a SharingService with all required dependencies.
 func NewSharingService(
-	domainService collabdomain.Service,
+	domainService collabdomain.CollaborationService,
 	workspaceRepo collabdomain.WorkspaceRepository,
 	shareRepo ShareRepository,
 	cache Cache,
@@ -255,23 +255,32 @@ func NewSharingService(
 // Share creates a new share link for a workspace resource.
 func (s *sharingServiceImpl) Share(ctx context.Context, req *ShareRequest) (*ShareResponse, error) {
 	if req == nil {
-		return nil, pkgerrors.NewValidation("share request must not be nil")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "share request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
 
 	// Verify workspace exists
-	ws, err := s.workspaceRepo.GetByID(ctx, req.WorkspaceID)
+	ws, err := s.workspaceRepo.FindByID(ctx, req.WorkspaceID)
 	if err != nil {
-		s.logger.Error("failed to fetch workspace", "workspace_id", req.WorkspaceID, "error", err)
-		return nil, pkgerrors.NewNotFound(fmt.Sprintf("workspace %s not found", req.WorkspaceID))
+		s.logger.Error("failed to fetch workspace",
+			logging.String("workspace_id", req.WorkspaceID),
+			logging.Err(err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeNotFound, fmt.Sprintf("workspace %s not found", req.WorkspaceID))
 	}
 
 	// Verify caller has permission to share
-	if err := s.domainService.CheckPermission(ctx, req.CreatedBy, ws.ID, collabdomain.ActionShare); err != nil {
-		s.logger.Warn("permission denied for share", "user", req.CreatedBy, "workspace", ws.ID)
-		return nil, pkgerrors.NewPermissionDenied("insufficient permission to share this workspace")
+	allowed, _, err := s.domainService.CheckMemberAccess(ctx, req.WorkspaceID, req.CreatedBy, collabdomain.ResourceWorkspace, collabdomain.ActionShare)
+	if err != nil {
+		s.logger.Error("failed to check permission", logging.Err(err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to check permission")
+	}
+	if !allowed {
+		s.logger.Warn("permission denied for share",
+			logging.String("user", req.CreatedBy),
+			logging.String("workspace", ws.ID))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeForbidden, "insufficient permission to share this workspace")
 	}
 
 	// Calculate expiry
@@ -293,14 +302,14 @@ func (s *sharingServiceImpl) Share(ctx context.Context, req *ShareRequest) (*Sha
 	now := time.Now().UTC()
 
 	// Generate signed token
-	token, err := s.generateToken(shareID, req.WorkspaceID, req.Permission, expiresAt)
+	token, err := s.generateToken(string(shareID), req.WorkspaceID, req.Permission, expiresAt)
 	if err != nil {
-		s.logger.Error("failed to generate share token", "error", err)
-		return nil, pkgerrors.NewInternal("failed to generate share token")
+		s.logger.Error("failed to generate share token", logging.Err(err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to generate share token")
 	}
 
 	record := &ShareRecord{
-		ID:             shareID,
+		ID:             string(shareID),
 		WorkspaceID:    req.WorkspaceID,
 		Token:          token,
 		Permission:     req.Permission,
@@ -315,16 +324,21 @@ func (s *sharingServiceImpl) Share(ctx context.Context, req *ShareRequest) (*Sha
 	}
 
 	if err := s.shareRepo.Create(ctx, record); err != nil {
-		s.logger.Error("failed to persist share record", "share_id", shareID, "error", err)
-		return nil, pkgerrors.NewInternal("failed to create share")
+		s.logger.Error("failed to persist share record",
+			logging.String("share_id", string(shareID)),
+			logging.Err(err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to create share")
 	}
 
 	link := fmt.Sprintf("%s/share/%s", s.config.BaseDomain, token)
 
-	s.logger.Info("share created", "share_id", shareID, "workspace_id", req.WorkspaceID, "permission", req.Permission)
+	s.logger.Info("share created",
+		logging.String("share_id", string(shareID)),
+		logging.String("workspace_id", req.WorkspaceID),
+		logging.String("permission", string(req.Permission)))
 
 	return &ShareResponse{
-		ShareID:    shareID,
+		ShareID:    string(shareID),
 		Token:      token,
 		Link:       link,
 		ExpiresAt:  expiresAt,
@@ -336,34 +350,40 @@ func (s *sharingServiceImpl) Share(ctx context.Context, req *ShareRequest) (*Sha
 // Revoke invalidates an existing share. The operation is idempotent.
 func (s *sharingServiceImpl) Revoke(ctx context.Context, shareID string, revokedBy string) error {
 	if strings.TrimSpace(shareID) == "" {
-		return pkgerrors.NewValidation("share_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "share_id is required")
 	}
 	if strings.TrimSpace(revokedBy) == "" {
-		return pkgerrors.NewValidation("revoked_by is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "revoked_by is required")
 	}
 
 	record, err := s.shareRepo.GetByID(ctx, shareID)
 	if err != nil {
-		return pkgerrors.NewNotFound(fmt.Sprintf("share %s not found", shareID))
+		return pkgerrors.New(pkgerrors.ErrCodeNotFound, fmt.Sprintf("share %s not found", shareID))
 	}
 
 	// Idempotent: already revoked is not an error
 	if record.Revoked {
-		s.logger.Info("share already revoked", "share_id", shareID)
+		s.logger.Info("share already revoked", logging.String("share_id", shareID))
 		return nil
 	}
 
 	// Verify permission to revoke
-	if err := s.domainService.CheckPermission(ctx, revokedBy, record.WorkspaceID, collabdomain.ActionShare); err != nil {
-		return pkgerrors.NewPermissionDenied("insufficient permission to revoke this share")
+	allowed, _, err := s.domainService.CheckMemberAccess(ctx, record.WorkspaceID, revokedBy, collabdomain.ResourceWorkspace, collabdomain.ActionShare)
+	if err != nil {
+		return pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to check permission")
+	}
+	if !allowed {
+		return pkgerrors.New(pkgerrors.ErrCodeForbidden, "insufficient permission to revoke this share")
 	}
 
 	record.Revoked = true
 	record.UpdatedAt = time.Now().UTC()
 
 	if err := s.shareRepo.Update(ctx, record); err != nil {
-		s.logger.Error("failed to update share record", "share_id", shareID, "error", err)
-		return pkgerrors.NewInternal("failed to revoke share")
+		s.logger.Error("failed to update share record",
+			logging.String("share_id", shareID),
+			logging.Err(err))
+		return pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to revoke share")
 	}
 
 	// Invalidate cache
@@ -372,14 +392,16 @@ func (s *sharingServiceImpl) Revoke(ctx context.Context, shareID string, revoked
 	tokenCacheKey := s.tokenCacheKey(record.Token)
 	_ = s.cache.Delete(ctx, tokenCacheKey)
 
-	s.logger.Info("share revoked", "share_id", shareID, "revoked_by", revokedBy)
+	s.logger.Info("share revoked",
+		logging.String("share_id", shareID),
+		logging.String("revoked_by", revokedBy))
 	return nil
 }
 
 // ListShares returns share records for a workspace with optional pagination.
 func (s *sharingServiceImpl) ListShares(ctx context.Context, workspaceID string, opts ...ListSharesOption) ([]*ShareRecord, int, error) {
 	if strings.TrimSpace(workspaceID) == "" {
-		return nil, 0, pkgerrors.NewValidation("workspace_id is required")
+		return nil, 0, pkgerrors.New(pkgerrors.ErrCodeValidation, "workspace_id is required")
 	}
 
 	cfg := &listSharesConfig{
@@ -402,8 +424,10 @@ func (s *sharingServiceImpl) ListShares(ctx context.Context, workspaceID string,
 
 	records, total, err := s.shareRepo.ListByWorkspace(ctx, workspaceID, cfg.IncludeRevoked, cfg.Pagination)
 	if err != nil {
-		s.logger.Error("failed to list shares", "workspace_id", workspaceID, "error", err)
-		return nil, 0, pkgerrors.NewInternal("failed to list shares")
+		s.logger.Error("failed to list shares",
+			logging.String("workspace_id", workspaceID),
+			logging.Err(err))
+		return nil, 0, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to list shares")
 	}
 
 	return records, total, nil
@@ -412,7 +436,7 @@ func (s *sharingServiceImpl) ListShares(ctx context.Context, workspaceID string,
 // GetShareLink returns the full share URL for a given share ID, with caching.
 func (s *sharingServiceImpl) GetShareLink(ctx context.Context, shareID string) (string, error) {
 	if strings.TrimSpace(shareID) == "" {
-		return "", pkgerrors.NewValidation("share_id is required")
+		return "", pkgerrors.New(pkgerrors.ErrCodeValidation, "share_id is required")
 	}
 
 	cacheKey := s.shareLinkCacheKey(shareID)
@@ -423,15 +447,15 @@ func (s *sharingServiceImpl) GetShareLink(ctx context.Context, shareID string) (
 
 	record, err := s.shareRepo.GetByID(ctx, shareID)
 	if err != nil {
-		return "", pkgerrors.NewNotFound(fmt.Sprintf("share %s not found", shareID))
+		return "", pkgerrors.New(pkgerrors.ErrCodeNotFound, fmt.Sprintf("share %s not found", shareID))
 	}
 
 	if record.Revoked {
-		return "", pkgerrors.NewValidation("share has been revoked")
+		return "", pkgerrors.New(pkgerrors.ErrCodeValidation, "share has been revoked")
 	}
 
 	if record.ExpiresAt != nil && record.ExpiresAt.Before(time.Now()) {
-		return "", pkgerrors.NewValidation("share has expired")
+		return "", pkgerrors.New(pkgerrors.ErrCodeValidation, "share has expired")
 	}
 
 	link := fmt.Sprintf("%s/share/%s", s.config.BaseDomain, record.Token)
@@ -444,7 +468,7 @@ func (s *sharingServiceImpl) GetShareLink(ctx context.Context, shareID string) (
 // ValidateShareToken verifies a share token and returns the associated metadata.
 func (s *sharingServiceImpl) ValidateShareToken(ctx context.Context, token string) (*ShareInfo, error) {
 	if strings.TrimSpace(token) == "" {
-		return nil, pkgerrors.NewValidation("token is required")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "token is required")
 	}
 
 	// Check cache first
@@ -462,25 +486,25 @@ func (s *sharingServiceImpl) ValidateShareToken(ctx context.Context, token strin
 	// Parse and verify token signature
 	payload, err := s.verifyToken(token)
 	if err != nil {
-		return nil, pkgerrors.NewValidation(fmt.Sprintf("invalid share token: %v", err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, fmt.Sprintf("invalid share token: %v", err))
 	}
 
 	// Fetch record from repository for authoritative state
 	record, err := s.shareRepo.GetByToken(ctx, token)
 	if err != nil {
-		return nil, pkgerrors.NewNotFound("share not found for the given token")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeNotFound, "share not found for the given token")
 	}
 
 	if record.Revoked {
-		return nil, pkgerrors.NewValidation("share has been revoked")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "share has been revoked")
 	}
 
 	if record.ExpiresAt != nil && record.ExpiresAt.Before(time.Now()) {
-		return nil, pkgerrors.NewValidation("share has expired")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "share has expired")
 	}
 
 	if record.MaxAccessCount > 0 && record.AccessCount >= record.MaxAccessCount {
-		return nil, pkgerrors.NewValidation("share access limit reached")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "share access limit reached")
 	}
 
 	// Increment access count

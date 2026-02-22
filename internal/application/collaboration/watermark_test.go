@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
@@ -70,11 +71,15 @@ func (m *mockWatermarkRepo) Update(ctx context.Context, record *WatermarkRecord)
 
 type mockWatermarkLogger struct{}
 
-func (m *mockWatermarkLogger) Debug(msg string, keysAndValues ...interface{}) {}
-func (m *mockWatermarkLogger) Info(msg string, keysAndValues ...interface{})  {}
-func (m *mockWatermarkLogger) Warn(msg string, keysAndValues ...interface{})  {}
-func (m *mockWatermarkLogger) Error(msg string, keysAndValues ...interface{}) {}
-func (m *mockWatermarkLogger) With(keysAndValues ...interface{}) interface{}  { return m }
+func (m *mockWatermarkLogger) Debug(msg string, fields ...logging.Field) {}
+func (m *mockWatermarkLogger) Info(msg string, fields ...logging.Field)  {}
+func (m *mockWatermarkLogger) Warn(msg string, fields ...logging.Field)  {}
+func (m *mockWatermarkLogger) Error(msg string, fields ...logging.Field) {}
+func (m *mockWatermarkLogger) Fatal(msg string, fields ...logging.Field) {}
+func (m *mockWatermarkLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockWatermarkLogger) WithContext(ctx context.Context) logging.Logger { return m }
+func (m *mockWatermarkLogger) WithError(err error) logging.Logger { return m }
+func (m *mockWatermarkLogger) Sync() error { return nil }
 
 func newTestWatermarkService(repo *mockWatermarkRepo) WatermarkService {
 	if repo == nil {

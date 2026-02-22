@@ -44,51 +44,87 @@ import (
 	"time"
 
 	collabdomain "github.com/turtacn/KeyIP-Intelligence/internal/domain/collaboration"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // --- Mock implementations ---
 
 type mockCollabDomainService struct {
-	checkPermissionFn func(ctx context.Context, userID, workspaceID string, action collabdomain.Action) error
+	checkMemberAccessFn func(ctx context.Context, workspaceID, userID string, resource collabdomain.ResourceType, action collabdomain.Action) (bool, string, error)
 }
 
-func (m *mockCollabDomainService) CheckPermission(ctx context.Context, userID, workspaceID string, action collabdomain.Action) error {
-	if m.checkPermissionFn != nil {
-		return m.checkPermissionFn(ctx, userID, workspaceID, action)
+func (m *mockCollabDomainService) CheckMemberAccess(ctx context.Context, workspaceID, userID string, resource collabdomain.ResourceType, action collabdomain.Action) (bool, string, error) {
+	if m.checkMemberAccessFn != nil {
+		return m.checkMemberAccessFn(ctx, workspaceID, userID, resource, action)
 	}
-	return nil
+	return true, "", nil
 }
 
-func (m *mockCollabDomainService) CreateWorkspace(ctx context.Context, ws *collabdomain.Workspace) error {
+// Stubs for other methods of CollaborationService
+func (m *mockCollabDomainService) CreateWorkspace(ctx context.Context, name, ownerID string) (*collabdomain.Workspace, error) {
+	return &collabdomain.Workspace{ID: "ws-1", Name: name, OwnerID: ownerID}, nil
+}
+func (m *mockCollabDomainService) InviteMember(ctx context.Context, workspaceID, inviterID, inviteeUserID string, role collabdomain.Role) (*collabdomain.MemberPermission, error) {
+	return nil, nil
+}
+func (m *mockCollabDomainService) AcceptInvitation(ctx context.Context, memberID, userID string) error {
 	return nil
 }
-
-func (m *mockCollabDomainService) AddMember(ctx context.Context, workspaceID, userID string, role collabdomain.Role) error {
+func (m *mockCollabDomainService) RemoveMember(ctx context.Context, workspaceID, removerID, targetUserID string) error {
 	return nil
 }
-
-func (m *mockCollabDomainService) RemoveMember(ctx context.Context, workspaceID, userID string) error {
+func (m *mockCollabDomainService) ChangeMemberRole(ctx context.Context, workspaceID, changerID, targetUserID string, newRole collabdomain.Role) error {
 	return nil
+}
+func (m *mockCollabDomainService) GetWorkspaceMembers(ctx context.Context, workspaceID, requesterID string) ([]*collabdomain.MemberPermission, error) {
+	return nil, nil
+}
+func (m *mockCollabDomainService) GetUserWorkspaces(ctx context.Context, userID string) ([]*collabdomain.WorkspaceSummary, error) {
+	return nil, nil
+}
+func (m *mockCollabDomainService) TransferOwnership(ctx context.Context, workspaceID, currentOwnerID, newOwnerID string) error {
+	return nil
+}
+func (m *mockCollabDomainService) UpdateWorkspace(ctx context.Context, workspaceID, requesterID, name, description string) error {
+	return nil
+}
+func (m *mockCollabDomainService) DeleteWorkspace(ctx context.Context, workspaceID, requesterID string) error {
+	return nil
+}
+func (m *mockCollabDomainService) GrantCustomPermission(ctx context.Context, workspaceID, granterID, targetUserID string, perm *collabdomain.Permission) error {
+	return nil
+}
+func (m *mockCollabDomainService) RevokeCustomPermission(ctx context.Context, workspaceID, revokerID, targetUserID string, resource collabdomain.ResourceType, action collabdomain.Action) error {
+	return nil
+}
+func (m *mockCollabDomainService) GetWorkspaceActivity(ctx context.Context, workspaceID string, limit int) ([]*collabdomain.ActivityRecord, error) {
+	return nil, nil
 }
 
 type mockWorkspaceRepo struct {
-	getByIDFn func(ctx context.Context, id string) (*collabdomain.Workspace, error)
+	findByIDFn func(ctx context.Context, id string) (*collabdomain.Workspace, error)
 }
 
-func (m *mockWorkspaceRepo) GetByID(ctx context.Context, id string) (*collabdomain.Workspace, error) {
-	if m.getByIDFn != nil {
-		return m.getByIDFn(ctx, id)
+func (m *mockWorkspaceRepo) FindByID(ctx context.Context, id string) (*collabdomain.Workspace, error) {
+	if m.findByIDFn != nil {
+		return m.findByIDFn(ctx, id)
 	}
 	return &collabdomain.Workspace{ID: id, Name: "test-ws"}, nil
 }
 
-func (m *mockWorkspaceRepo) Create(ctx context.Context, ws *collabdomain.Workspace) error { return nil }
-func (m *mockWorkspaceRepo) Update(ctx context.Context, ws *collabdomain.Workspace) error { return nil }
-func (m *mockWorkspaceRepo) Delete(ctx context.Context, id string) error                  { return nil }
-func (m *mockWorkspaceRepo) ListByUser(ctx context.Context, userID string, p commontypes.Pagination) ([]*collabdomain.Workspace, int, error) {
-	return nil, 0, nil
+func (m *mockWorkspaceRepo) Save(ctx context.Context, ws *collabdomain.Workspace) error { return nil }
+func (m *mockWorkspaceRepo) Delete(ctx context.Context, id string) error                { return nil }
+func (m *mockWorkspaceRepo) FindByOwnerID(ctx context.Context, ownerID string) ([]*collabdomain.Workspace, error) {
+	return nil, nil
 }
+func (m *mockWorkspaceRepo) FindByMemberID(ctx context.Context, userID string) ([]*collabdomain.Workspace, error) {
+	return nil, nil
+}
+func (m *mockWorkspaceRepo) FindBySlug(ctx context.Context, slug string) (*collabdomain.Workspace, error) {
+	return nil, nil
+}
+func (m *mockWorkspaceRepo) Count(ctx context.Context, ownerID string) (int64, error) { return 0, nil }
 
 type mockShareRepo struct {
 	createFn              func(ctx context.Context, record *ShareRecord) error
@@ -181,11 +217,15 @@ func (m *mockCache) Delete(ctx context.Context, key string) error {
 
 type mockSharingLogger struct{}
 
-func (m *mockSharingLogger) Debug(msg string, keysAndValues ...interface{}) {}
-func (m *mockSharingLogger) Info(msg string, keysAndValues ...interface{})  {}
-func (m *mockSharingLogger) Warn(msg string, keysAndValues ...interface{})  {}
-func (m *mockSharingLogger) Error(msg string, keysAndValues ...interface{}) {}
-func (m *mockSharingLogger) With(keysAndValues ...interface{}) interface{}  { return m }
+func (m *mockSharingLogger) Debug(msg string, fields ...logging.Field) {}
+func (m *mockSharingLogger) Info(msg string, fields ...logging.Field)  {}
+func (m *mockSharingLogger) Warn(msg string, fields ...logging.Field)  {}
+func (m *mockSharingLogger) Error(msg string, fields ...logging.Field) {}
+func (m *mockSharingLogger) Fatal(msg string, fields ...logging.Field) {}
+func (m *mockSharingLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockSharingLogger) WithContext(ctx context.Context) logging.Logger { return m }
+func (m *mockSharingLogger) WithError(err error) logging.Logger { return m }
+func (m *mockSharingLogger) Sync() error { return nil }
 
 func newTestSharingService(
 	domainSvc *mockCollabDomainService,
@@ -388,7 +428,7 @@ func TestShare_NilRequest(t *testing.T) {
 
 func TestShare_WorkspaceNotFound(t *testing.T) {
 	wsRepo := &mockWorkspaceRepo{
-		getByIDFn: func(ctx context.Context, id string) (*collabdomain.Workspace, error) {
+		findByIDFn: func(ctx context.Context, id string) (*collabdomain.Workspace, error) {
 			return nil, errors.New("not found")
 		},
 	}
@@ -406,8 +446,8 @@ func TestShare_WorkspaceNotFound(t *testing.T) {
 
 func TestShare_PermissionDenied(t *testing.T) {
 	domainSvc := &mockCollabDomainService{
-		checkPermissionFn: func(ctx context.Context, userID, workspaceID string, action collabdomain.Action) error {
-			return errors.New("permission denied")
+		checkMemberAccessFn: func(ctx context.Context, workspaceID, userID string, resource collabdomain.ResourceType, action collabdomain.Action) (bool, string, error) {
+			return false, "denied", nil
 		},
 	}
 	svc := newTestSharingService(domainSvc, nil, nil, nil)
@@ -511,8 +551,8 @@ func TestRevoke_PermissionDenied(t *testing.T) {
 		},
 	}
 	domainSvc := &mockCollabDomainService{
-		checkPermissionFn: func(ctx context.Context, userID, workspaceID string, action collabdomain.Action) error {
-			return errors.New("permission denied")
+		checkMemberAccessFn: func(ctx context.Context, workspaceID, userID string, resource collabdomain.ResourceType, action collabdomain.Action) (bool, string, error) {
+			return false, "denied", nil
 		},
 	}
 	svc := newTestSharingService(domainSvc, nil, shareRepo, nil)
@@ -807,7 +847,6 @@ func TestValidateShareToken_AccessLimitReached(t *testing.T) {
 
 func TestValidateShareToken_CacheHit(t *testing.T) {
 	cache := newMockCache()
-	svc := newTestSharingService(nil, nil, nil, cache)
 
 	// We need a valid token to pass signature verification, so we create one first
 	var capturedRecord *ShareRecord
@@ -918,4 +957,3 @@ func TestSharePermission_IsValid(t *testing.T) {
 }
 
 //Personal.AI order the ending
-

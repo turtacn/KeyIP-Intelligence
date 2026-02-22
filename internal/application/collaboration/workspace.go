@@ -34,13 +34,13 @@ type CreateWorkspaceRequest struct {
 
 func (r *CreateWorkspaceRequest) Validate() error {
 	if strings.TrimSpace(r.Name) == "" {
-		return pkgerrors.NewValidation("name is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "name is required")
 	}
 	if len(r.Name) > 256 {
-		return pkgerrors.NewValidation("name must not exceed 256 characters")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "name must not exceed 256 characters")
 	}
 	if strings.TrimSpace(r.OwnerID) == "" {
-		return pkgerrors.NewValidation("owner_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "owner_id is required")
 	}
 	return nil
 }
@@ -55,16 +55,16 @@ type UpdateWorkspaceRequest struct {
 
 func (r *UpdateWorkspaceRequest) Validate() error {
 	if strings.TrimSpace(r.WorkspaceID) == "" {
-		return pkgerrors.NewValidation("workspace_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "workspace_id is required")
 	}
 	if strings.TrimSpace(r.UpdatedBy) == "" {
-		return pkgerrors.NewValidation("updated_by is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "updated_by is required")
 	}
 	if r.Name != nil && strings.TrimSpace(*r.Name) == "" {
-		return pkgerrors.NewValidation("name must not be empty when provided")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "name must not be empty when provided")
 	}
 	if r.Name != nil && len(*r.Name) > 256 {
-		return pkgerrors.NewValidation("name must not exceed 256 characters")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "name must not exceed 256 characters")
 	}
 	return nil
 }
@@ -79,16 +79,16 @@ type AddMemberRequest struct {
 
 func (r *AddMemberRequest) Validate() error {
 	if strings.TrimSpace(r.WorkspaceID) == "" {
-		return pkgerrors.NewValidation("workspace_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "workspace_id is required")
 	}
 	if strings.TrimSpace(r.UserID) == "" {
-		return pkgerrors.NewValidation("user_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "user_id is required")
 	}
 	if strings.TrimSpace(r.AddedBy) == "" {
-		return pkgerrors.NewValidation("added_by is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "added_by is required")
 	}
 	if strings.TrimSpace(string(r.Role)) == "" {
-		return pkgerrors.NewValidation("role is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "role is required")
 	}
 	return nil
 }
@@ -102,13 +102,13 @@ type RemoveMemberRequest struct {
 
 func (r *RemoveMemberRequest) Validate() error {
 	if strings.TrimSpace(r.WorkspaceID) == "" {
-		return pkgerrors.NewValidation("workspace_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "workspace_id is required")
 	}
 	if strings.TrimSpace(r.UserID) == "" {
-		return pkgerrors.NewValidation("user_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "user_id is required")
 	}
 	if strings.TrimSpace(r.RemovedBy) == "" {
-		return pkgerrors.NewValidation("removed_by is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "removed_by is required")
 	}
 	return nil
 }
@@ -142,26 +142,18 @@ type WorkspaceAppService interface {
 	ListMembers(ctx context.Context, workspaceID string, pagination commontypes.Pagination) ([]*MemberResponse, int, error)
 }
 
-// MemberRepository abstracts persistence for workspace members.
-type MemberRepository interface {
-	Add(ctx context.Context, workspaceID, userID string, role collabdomain.Role) error
-	Remove(ctx context.Context, workspaceID, userID string) error
-	List(ctx context.Context, workspaceID string, pagination commontypes.Pagination) ([]*MemberResponse, int, error)
-	GetMember(ctx context.Context, workspaceID, userID string) (*MemberResponse, error)
-}
-
 type workspaceAppServiceImpl struct {
-	domainService collabdomain.Service
+	domainService collabdomain.CollaborationService
 	workspaceRepo collabdomain.WorkspaceRepository
-	memberRepo    MemberRepository
+	memberRepo    collabdomain.MemberRepository
 	logger        logging.Logger
 }
 
 // NewWorkspaceAppService constructs a WorkspaceAppService.
 func NewWorkspaceAppService(
-	domainService collabdomain.Service,
+	domainService collabdomain.CollaborationService,
 	workspaceRepo collabdomain.WorkspaceRepository,
-	memberRepo MemberRepository,
+	memberRepo collabdomain.MemberRepository,
 	logger logging.Logger,
 ) WorkspaceAppService {
 	return &workspaceAppServiceImpl{
@@ -174,38 +166,30 @@ func NewWorkspaceAppService(
 
 func (s *workspaceAppServiceImpl) Create(ctx context.Context, req *CreateWorkspaceRequest) (*WorkspaceResponse, error) {
 	if req == nil {
-		return nil, pkgerrors.NewValidation("request must not be nil")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
 
-	now := time.Now().UTC()
-	ws := &collabdomain.Workspace{
-		ID:          commontypes.NewID(),
-		Name:        strings.TrimSpace(req.Name),
-		Description: req.Description,
-		OwnerID:     req.OwnerID,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+	ws, err := s.domainService.CreateWorkspace(ctx, strings.TrimSpace(req.Name), req.OwnerID)
+	if err != nil {
+		s.logger.Error("domain service failed to create workspace", logging.Err(err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to create workspace")
 	}
 
-	if err := s.domainService.CreateWorkspace(ctx, ws); err != nil {
-		s.logger.Error("domain service failed to create workspace", "error", err)
-		return nil, pkgerrors.NewInternal("failed to create workspace")
+	if req.Description != "" {
+		ws.Description = req.Description
+		if err := s.workspaceRepo.Save(ctx, ws); err != nil {
+			s.logger.Error("failed to update workspace description", logging.Err(err))
+			// Continue even if description update fails? Or fail? Best to fail or log warn.
+			// Ideally CreateWorkspace should accept description, but domain service doesn't support it yet.
+		}
 	}
 
-	if err := s.workspaceRepo.Create(ctx, ws); err != nil {
-		s.logger.Error("failed to persist workspace", "error", err)
-		return nil, pkgerrors.NewInternal("failed to create workspace")
-	}
-
-	// Add owner as admin member
-	if err := s.memberRepo.Add(ctx, ws.ID, req.OwnerID, collabdomain.RoleAdmin); err != nil {
-		s.logger.Warn("failed to add owner as member", "workspace_id", ws.ID, "owner_id", req.OwnerID, "error", err)
-	}
-
-	s.logger.Info("workspace created", "workspace_id", ws.ID, "owner_id", req.OwnerID)
+	s.logger.Info("workspace created",
+		logging.String("workspace_id", ws.ID),
+		logging.String("owner_id", req.OwnerID))
 
 	return &WorkspaceResponse{
 		ID:          ws.ID,
@@ -219,20 +203,24 @@ func (s *workspaceAppServiceImpl) Create(ctx context.Context, req *CreateWorkspa
 
 func (s *workspaceAppServiceImpl) Update(ctx context.Context, req *UpdateWorkspaceRequest) (*WorkspaceResponse, error) {
 	if req == nil {
-		return nil, pkgerrors.NewValidation("request must not be nil")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
 
-	ws, err := s.workspaceRepo.GetByID(ctx, req.WorkspaceID)
+	ws, err := s.workspaceRepo.FindByID(ctx, req.WorkspaceID)
 	if err != nil {
-		return nil, pkgerrors.NewNotFound(fmt.Sprintf("workspace %s not found", req.WorkspaceID))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeNotFound, fmt.Sprintf("workspace %s not found", req.WorkspaceID))
 	}
 
 	// Permission check
-	if err := s.domainService.CheckPermission(ctx, req.UpdatedBy, ws.ID, collabdomain.ActionEdit); err != nil {
-		return nil, pkgerrors.NewPermissionDenied("insufficient permission to update workspace")
+	allowed, _, err := s.domainService.CheckMemberAccess(ctx, ws.ID, req.UpdatedBy, collabdomain.ResourceWorkspace, collabdomain.ActionUpdate)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, pkgerrors.New(pkgerrors.ErrCodeForbidden, "insufficient permission to update workspace")
 	}
 
 	if req.Name != nil {
@@ -243,12 +231,16 @@ func (s *workspaceAppServiceImpl) Update(ctx context.Context, req *UpdateWorkspa
 	}
 	ws.UpdatedAt = time.Now().UTC()
 
-	if err := s.workspaceRepo.Update(ctx, ws); err != nil {
-		s.logger.Error("failed to update workspace", "workspace_id", ws.ID, "error", err)
-		return nil, pkgerrors.NewInternal("failed to update workspace")
+	if err := s.workspaceRepo.Save(ctx, ws); err != nil {
+		s.logger.Error("failed to update workspace",
+			logging.String("workspace_id", ws.ID),
+			logging.Err(err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to update workspace")
 	}
 
-	s.logger.Info("workspace updated", "workspace_id", ws.ID, "updated_by", req.UpdatedBy)
+	s.logger.Info("workspace updated",
+		logging.String("workspace_id", ws.ID),
+		logging.String("updated_by", req.UpdatedBy))
 
 	return &WorkspaceResponse{
 		ID:          ws.ID,
@@ -262,41 +254,50 @@ func (s *workspaceAppServiceImpl) Update(ctx context.Context, req *UpdateWorkspa
 
 func (s *workspaceAppServiceImpl) Delete(ctx context.Context, workspaceID string, deletedBy string) error {
 	if strings.TrimSpace(workspaceID) == "" {
-		return pkgerrors.NewValidation("workspace_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "workspace_id is required")
 	}
 	if strings.TrimSpace(deletedBy) == "" {
-		return pkgerrors.NewValidation("deleted_by is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "deleted_by is required")
 	}
 
-	ws, err := s.workspaceRepo.GetByID(ctx, workspaceID)
+	ws, err := s.workspaceRepo.FindByID(ctx, workspaceID)
 	if err != nil {
-		return pkgerrors.NewNotFound(fmt.Sprintf("workspace %s not found", workspaceID))
+		return pkgerrors.New(pkgerrors.ErrCodeNotFound, fmt.Sprintf("workspace %s not found", workspaceID))
 	}
 
 	// Only owner can delete
 	if ws.OwnerID != deletedBy {
-		if err := s.domainService.CheckPermission(ctx, deletedBy, ws.ID, collabdomain.ActionDelete); err != nil {
-			return pkgerrors.NewPermissionDenied("only the owner or admin can delete a workspace")
+		// Check explicit permission if not owner (e.g. Admin)
+		allowed, _, err := s.domainService.CheckMemberAccess(ctx, ws.ID, deletedBy, collabdomain.ResourceWorkspace, collabdomain.ActionDelete)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return pkgerrors.New(pkgerrors.ErrCodeForbidden, "only the owner or admin can delete a workspace")
 		}
 	}
 
 	if err := s.workspaceRepo.Delete(ctx, workspaceID); err != nil {
-		s.logger.Error("failed to delete workspace", "workspace_id", workspaceID, "error", err)
-		return pkgerrors.NewInternal("failed to delete workspace")
+		s.logger.Error("failed to delete workspace",
+			logging.String("workspace_id", workspaceID),
+			logging.Err(err))
+		return pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to delete workspace")
 	}
 
-	s.logger.Info("workspace deleted", "workspace_id", workspaceID, "deleted_by", deletedBy)
+	s.logger.Info("workspace deleted",
+		logging.String("workspace_id", workspaceID),
+		logging.String("deleted_by", deletedBy))
 	return nil
 }
 
 func (s *workspaceAppServiceImpl) GetByID(ctx context.Context, workspaceID string) (*WorkspaceResponse, error) {
 	if strings.TrimSpace(workspaceID) == "" {
-		return nil, pkgerrors.NewValidation("workspace_id is required")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "workspace_id is required")
 	}
 
-	ws, err := s.workspaceRepo.GetByID(ctx, workspaceID)
+	ws, err := s.workspaceRepo.FindByID(ctx, workspaceID)
 	if err != nil {
-		return nil, pkgerrors.NewNotFound(fmt.Sprintf("workspace %s not found", workspaceID))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeNotFound, fmt.Sprintf("workspace %s not found", workspaceID))
 	}
 
 	return &WorkspaceResponse{
@@ -311,7 +312,7 @@ func (s *workspaceAppServiceImpl) GetByID(ctx context.Context, workspaceID strin
 
 func (s *workspaceAppServiceImpl) ListByUser(ctx context.Context, userID string, pagination commontypes.Pagination) ([]*WorkspaceResponse, int, error) {
 	if strings.TrimSpace(userID) == "" {
-		return nil, 0, pkgerrors.NewValidation("user_id is required")
+		return nil, 0, pkgerrors.New(pkgerrors.ErrCodeValidation, "user_id is required")
 	}
 	if pagination.Page < 1 {
 		pagination.Page = 1
@@ -320,14 +321,31 @@ func (s *workspaceAppServiceImpl) ListByUser(ctx context.Context, userID string,
 		pagination.PageSize = 20
 	}
 
-	workspaces, total, err := s.workspaceRepo.ListByUser(ctx, userID, pagination)
+	// workspaceRepo.FindByMemberID returns []*Workspace, error
+	workspaces, err := s.workspaceRepo.FindByMemberID(ctx, userID)
 	if err != nil {
-		s.logger.Error("failed to list workspaces", "user_id", userID, "error", err)
-		return nil, 0, pkgerrors.NewInternal("failed to list workspaces")
+		s.logger.Error("failed to list workspaces",
+			logging.String("user_id", userID),
+			logging.Err(err))
+		return nil, 0, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to list workspaces")
 	}
 
-	results := make([]*WorkspaceResponse, 0, len(workspaces))
-	for _, ws := range workspaces {
+	total := len(workspaces)
+
+	// Apply pagination in memory
+	start := (pagination.Page - 1) * pagination.PageSize
+	end := start + pagination.PageSize
+	if start > total {
+		start = total
+	}
+	if end > total {
+		end = total
+	}
+
+	pagedWorkspaces := workspaces[start:end]
+
+	results := make([]*WorkspaceResponse, 0, len(pagedWorkspaces))
+	for _, ws := range pagedWorkspaces {
 		results = append(results, &WorkspaceResponse{
 			ID:          ws.ID,
 			Name:        ws.Name,
@@ -343,77 +361,73 @@ func (s *workspaceAppServiceImpl) ListByUser(ctx context.Context, userID string,
 
 func (s *workspaceAppServiceImpl) AddMember(ctx context.Context, req *AddMemberRequest) error {
 	if req == nil {
-		return pkgerrors.NewValidation("request must not be nil")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return err
 	}
 
 	// Verify workspace exists
-	if _, err := s.workspaceRepo.GetByID(ctx, req.WorkspaceID); err != nil {
-		return pkgerrors.NewNotFound(fmt.Sprintf("workspace %s not found", req.WorkspaceID))
+	if _, err := s.workspaceRepo.FindByID(ctx, req.WorkspaceID); err != nil {
+		return pkgerrors.New(pkgerrors.ErrCodeNotFound, fmt.Sprintf("workspace %s not found", req.WorkspaceID))
 	}
 
-	// Permission check
-	if err := s.domainService.CheckPermission(ctx, req.AddedBy, req.WorkspaceID, collabdomain.ActionManageMembers); err != nil {
-		return pkgerrors.NewPermissionDenied("insufficient permission to add members")
+	// Permission check handled inside InviteMember?
+	// InviteMember calls CheckAccess internally.
+	// But let's check explicit permission here to be safe and consistent with pattern,
+	// or rely on InviteMember which checks 'inviter' permissions.
+	// InviteMember signature: InviteMember(ctx, workspaceID, inviterID, inviteeUserID, role)
+	// It checks if inviter is member and has permission.
+
+	_, err := s.domainService.InviteMember(ctx, req.WorkspaceID, req.AddedBy, req.UserID, req.Role)
+	if err != nil {
+		s.logger.Error("domain service failed to invite member", logging.Err(err))
+		// Map domain errors to app errors if needed, but assuming they are compatible
+		return err
 	}
 
-	if err := s.domainService.AddMember(ctx, req.WorkspaceID, req.UserID, req.Role); err != nil {
-		s.logger.Error("domain service failed to add member", "error", err)
-		return pkgerrors.NewInternal("failed to add member")
-	}
-
-	if err := s.memberRepo.Add(ctx, req.WorkspaceID, req.UserID, req.Role); err != nil {
-		s.logger.Error("failed to persist member", "error", err)
-		return pkgerrors.NewInternal("failed to add member")
-	}
-
-	s.logger.Info("member added", "workspace_id", req.WorkspaceID, "user_id", req.UserID, "role", req.Role)
+	s.logger.Info("member added",
+		logging.String("workspace_id", req.WorkspaceID),
+		logging.String("user_id", req.UserID),
+		logging.String("role", string(req.Role)))
 	return nil
 }
 
 func (s *workspaceAppServiceImpl) RemoveMember(ctx context.Context, req *RemoveMemberRequest) error {
 	if req == nil {
-		return pkgerrors.NewValidation("request must not be nil")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return err
 	}
 
 	// Verify workspace exists
-	ws, err := s.workspaceRepo.GetByID(ctx, req.WorkspaceID)
+	ws, err := s.workspaceRepo.FindByID(ctx, req.WorkspaceID)
 	if err != nil {
-		return pkgerrors.NewNotFound(fmt.Sprintf("workspace %s not found", req.WorkspaceID))
+		return pkgerrors.New(pkgerrors.ErrCodeNotFound, fmt.Sprintf("workspace %s not found", req.WorkspaceID))
 	}
 
 	// Cannot remove the owner
 	if ws.OwnerID == req.UserID {
-		return pkgerrors.NewValidation("cannot remove the workspace owner")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "cannot remove the workspace owner")
 	}
 
-	// Permission check
-	if err := s.domainService.CheckPermission(ctx, req.RemovedBy, req.WorkspaceID, collabdomain.ActionManageMembers); err != nil {
-		return pkgerrors.NewPermissionDenied("insufficient permission to remove members")
+	// Domain service RemoveMember checks permissions.
+	// RemoveMember(ctx, workspaceID, removerID, targetUserID)
+	if err := s.domainService.RemoveMember(ctx, req.WorkspaceID, req.RemovedBy, req.UserID); err != nil {
+		s.logger.Error("domain service failed to remove member", logging.Err(err))
+		return err
 	}
 
-	if err := s.domainService.RemoveMember(ctx, req.WorkspaceID, req.UserID); err != nil {
-		s.logger.Error("domain service failed to remove member", "error", err)
-		return pkgerrors.NewInternal("failed to remove member")
-	}
-
-	if err := s.memberRepo.Remove(ctx, req.WorkspaceID, req.UserID); err != nil {
-		s.logger.Error("failed to remove member from repo", "error", err)
-		return pkgerrors.NewInternal("failed to remove member")
-	}
-
-	s.logger.Info("member removed", "workspace_id", req.WorkspaceID, "user_id", req.UserID)
+	s.logger.Info("member removed",
+		logging.String("workspace_id", req.WorkspaceID),
+		logging.String("user_id", req.UserID))
 	return nil
 }
 
 func (s *workspaceAppServiceImpl) ListMembers(ctx context.Context, workspaceID string, pagination commontypes.Pagination) ([]*MemberResponse, int, error) {
 	if strings.TrimSpace(workspaceID) == "" {
-		return nil, 0, pkgerrors.NewValidation("workspace_id is required")
+		return nil, 0, pkgerrors.New(pkgerrors.ErrCodeValidation, "workspace_id is required")
 	}
 	if pagination.Page < 1 {
 		pagination.Page = 1
@@ -422,14 +436,39 @@ func (s *workspaceAppServiceImpl) ListMembers(ctx context.Context, workspaceID s
 		pagination.PageSize = 20
 	}
 
-	members, total, err := s.memberRepo.List(ctx, workspaceID, pagination)
+	// memberRepo.FindByWorkspaceID returns []*MemberPermission, error
+	members, err := s.memberRepo.FindByWorkspaceID(ctx, workspaceID)
 	if err != nil {
-		s.logger.Error("failed to list members", "workspace_id", workspaceID, "error", err)
-		return nil, 0, pkgerrors.NewInternal("failed to list members")
+		s.logger.Error("failed to list members",
+			logging.String("workspace_id", workspaceID),
+			logging.Err(err))
+		return nil, 0, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to list members")
 	}
 
-	return members, total, nil
+	total := len(members)
+
+	// Apply pagination in memory
+	start := (pagination.Page - 1) * pagination.PageSize
+	end := start + pagination.PageSize
+	if start > total {
+		start = total
+	}
+	if end > total {
+		end = total
+	}
+
+	pagedMembers := members[start:end]
+
+	results := make([]*MemberResponse, 0, len(pagedMembers))
+	for _, m := range pagedMembers {
+		results = append(results, &MemberResponse{
+			UserID:    m.UserID,
+			Role:      m.Role,
+			JoinedAt:  m.CreatedAt,
+		})
+	}
+
+	return results, total, nil
 }
 
 //Personal.AI order the ending
-

@@ -78,13 +78,13 @@ type GenerateWatermarkRequest struct {
 
 func (r *GenerateWatermarkRequest) Validate() error {
 	if strings.TrimSpace(r.DocumentID) == "" {
-		return pkgerrors.NewValidation("document_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "document_id is required")
 	}
 	if strings.TrimSpace(r.CreatedBy) == "" {
-		return pkgerrors.NewValidation("created_by is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "created_by is required")
 	}
 	if !r.Type.IsValid() {
-		return pkgerrors.NewValidation(fmt.Sprintf("invalid watermark type: %s", r.Type))
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, fmt.Sprintf("invalid watermark type: %s", r.Type))
 	}
 	return nil
 }
@@ -107,16 +107,16 @@ type EmbedWatermarkRequest struct {
 
 func (r *EmbedWatermarkRequest) Validate() error {
 	if strings.TrimSpace(r.WatermarkID) == "" {
-		return pkgerrors.NewValidation("watermark_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "watermark_id is required")
 	}
 	if strings.TrimSpace(r.DocumentID) == "" {
-		return pkgerrors.NewValidation("document_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "document_id is required")
 	}
 	if len(r.Content) == 0 {
-		return pkgerrors.NewValidation("content must not be empty")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "content must not be empty")
 	}
 	if strings.TrimSpace(r.EmbeddedBy) == "" {
-		return pkgerrors.NewValidation("embedded_by is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "embedded_by is required")
 	}
 	return nil
 }
@@ -138,10 +138,10 @@ type VerifyWatermarkRequest struct {
 
 func (r *VerifyWatermarkRequest) Validate() error {
 	if strings.TrimSpace(r.DocumentID) == "" {
-		return pkgerrors.NewValidation("document_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "document_id is required")
 	}
 	if len(r.Content) == 0 {
-		return pkgerrors.NewValidation("content must not be empty")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "content must not be empty")
 	}
 	return nil
 }
@@ -165,10 +165,10 @@ type ExtractWatermarkRequest struct {
 
 func (r *ExtractWatermarkRequest) Validate() error {
 	if strings.TrimSpace(r.DocumentID) == "" {
-		return pkgerrors.NewValidation("document_id is required")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "document_id is required")
 	}
 	if len(r.Content) == 0 {
-		return pkgerrors.NewValidation("content must not be empty")
+		return pkgerrors.New(pkgerrors.ErrCodeValidation, "content must not be empty")
 	}
 	return nil
 }
@@ -218,7 +218,7 @@ func NewWatermarkService(repo WatermarkRepository, logger logging.Logger) Waterm
 // Generate creates watermark metadata and a unique fingerprint for a document.
 func (s *watermarkServiceImpl) Generate(ctx context.Context, req *GenerateWatermarkRequest) (*GenerateWatermarkResponse, error) {
 	if req == nil {
-		return nil, pkgerrors.NewValidation("request must not be nil")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -226,14 +226,15 @@ func (s *watermarkServiceImpl) Generate(ctx context.Context, req *GenerateWaterm
 
 	now := time.Now().UTC()
 	watermarkID := commontypes.NewID()
+	strWatermarkID := string(watermarkID)
 
 	// Generate fingerprint from document ID + creator + timestamp + random ID
-	fingerprintInput := fmt.Sprintf("%s:%s:%s:%d", watermarkID, req.DocumentID, req.CreatedBy, now.UnixNano())
+	fingerprintInput := fmt.Sprintf("%s:%s:%s:%d", strWatermarkID, req.DocumentID, req.CreatedBy, now.UnixNano())
 	hash := sha256.Sum256([]byte(fingerprintInput))
 	fingerprint := hex.EncodeToString(hash[:16])
 
 	record := &WatermarkRecord{
-		ID:          watermarkID,
+		ID:          strWatermarkID,
 		DocumentID:  req.DocumentID,
 		Type:        req.Type,
 		Status:      WatermarkStatusPending,
@@ -245,14 +246,17 @@ func (s *watermarkServiceImpl) Generate(ctx context.Context, req *GenerateWaterm
 	}
 
 	if err := s.repo.Create(ctx, record); err != nil {
-		s.logger.Error("failed to create watermark record", "error", err)
-		return nil, pkgerrors.NewInternal("failed to generate watermark")
+		s.logger.Error("failed to create watermark record", logging.Err(err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to generate watermark")
 	}
 
-	s.logger.Info("watermark generated", "watermark_id", watermarkID, "document_id", req.DocumentID, "type", req.Type)
+	s.logger.Info("watermark generated",
+		logging.String("watermark_id", strWatermarkID),
+		logging.String("document_id", req.DocumentID),
+		logging.String("type", string(req.Type)))
 
 	return &GenerateWatermarkResponse{
-		WatermarkID: watermarkID,
+		WatermarkID: strWatermarkID,
 		Fingerprint: fingerprint,
 		Type:        req.Type,
 		CreatedAt:   now,
@@ -262,7 +266,7 @@ func (s *watermarkServiceImpl) Generate(ctx context.Context, req *GenerateWaterm
 // Embed marks a watermark as embedded into a document and records the content hash.
 func (s *watermarkServiceImpl) Embed(ctx context.Context, req *EmbedWatermarkRequest) (*EmbedWatermarkResponse, error) {
 	if req == nil {
-		return nil, pkgerrors.NewValidation("request must not be nil")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -270,15 +274,15 @@ func (s *watermarkServiceImpl) Embed(ctx context.Context, req *EmbedWatermarkReq
 
 	record, err := s.repo.GetByID(ctx, req.WatermarkID)
 	if err != nil {
-		return nil, pkgerrors.NewNotFound(fmt.Sprintf("watermark %s not found", req.WatermarkID))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeNotFound, fmt.Sprintf("watermark %s not found", req.WatermarkID))
 	}
 
 	if record.DocumentID != req.DocumentID {
-		return nil, pkgerrors.NewValidation("watermark does not belong to the specified document")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "watermark does not belong to the specified document")
 	}
 
 	if record.Status == WatermarkStatusEmbedded {
-		s.logger.Info("watermark already embedded", "watermark_id", req.WatermarkID)
+		s.logger.Info("watermark already embedded", logging.String("watermark_id", req.WatermarkID))
 	}
 
 	now := time.Now().UTC()
@@ -295,11 +299,15 @@ func (s *watermarkServiceImpl) Embed(ctx context.Context, req *EmbedWatermarkReq
 	record.Metadata["embedded_by"] = req.EmbeddedBy
 
 	if err := s.repo.Update(ctx, record); err != nil {
-		s.logger.Error("failed to update watermark record", "watermark_id", req.WatermarkID, "error", err)
-		return nil, pkgerrors.NewInternal("failed to embed watermark")
+		s.logger.Error("failed to update watermark record",
+			logging.String("watermark_id", req.WatermarkID),
+			logging.Err(err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to embed watermark")
 	}
 
-	s.logger.Info("watermark embedded", "watermark_id", req.WatermarkID, "document_id", req.DocumentID)
+	s.logger.Info("watermark embedded",
+		logging.String("watermark_id", req.WatermarkID),
+		logging.String("document_id", req.DocumentID))
 
 	return &EmbedWatermarkResponse{
 		WatermarkID: req.WatermarkID,
@@ -312,7 +320,7 @@ func (s *watermarkServiceImpl) Embed(ctx context.Context, req *EmbedWatermarkReq
 // Verify checks whether a document contains a valid watermark by matching fingerprints.
 func (s *watermarkServiceImpl) Verify(ctx context.Context, req *VerifyWatermarkRequest) (*VerifyWatermarkResponse, error) {
 	if req == nil {
-		return nil, pkgerrors.NewValidation("request must not be nil")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -323,8 +331,10 @@ func (s *watermarkServiceImpl) Verify(ctx context.Context, req *VerifyWatermarkR
 	// List all watermarks for this document
 	records, _, err := s.repo.ListByDocument(ctx, req.DocumentID, commontypes.Pagination{Page: 1, PageSize: 100})
 	if err != nil {
-		s.logger.Error("failed to list watermarks for verification", "document_id", req.DocumentID, "error", err)
-		return nil, pkgerrors.NewInternal("failed to verify watermark")
+		s.logger.Error("failed to list watermarks for verification",
+			logging.String("document_id", req.DocumentID),
+			logging.Err(err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to verify watermark")
 	}
 
 	contentHash := sha256.Sum256(req.Content)
@@ -342,7 +352,9 @@ func (s *watermarkServiceImpl) Verify(ctx context.Context, req *VerifyWatermarkR
 			record.UpdatedAt = now
 			_ = s.repo.Update(ctx, record)
 
-			s.logger.Info("watermark verified", "watermark_id", record.ID, "document_id", req.DocumentID)
+			s.logger.Info("watermark verified",
+				logging.String("watermark_id", record.ID),
+				logging.String("document_id", req.DocumentID))
 
 			return &VerifyWatermarkResponse{
 				DocumentID:  req.DocumentID,
@@ -366,7 +378,7 @@ func (s *watermarkServiceImpl) Verify(ctx context.Context, req *VerifyWatermarkR
 // Extract attempts to retrieve watermark information from a document for traceability.
 func (s *watermarkServiceImpl) Extract(ctx context.Context, req *ExtractWatermarkRequest) (*ExtractWatermarkResponse, error) {
 	if req == nil {
-		return nil, pkgerrors.NewValidation("request must not be nil")
+		return nil, pkgerrors.New(pkgerrors.ErrCodeValidation, "request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -379,14 +391,18 @@ func (s *watermarkServiceImpl) Extract(ctx context.Context, req *ExtractWatermar
 
 	records, _, err := s.repo.ListByDocument(ctx, req.DocumentID, commontypes.Pagination{Page: 1, PageSize: 100})
 	if err != nil {
-		s.logger.Error("failed to list watermarks for extraction", "document_id", req.DocumentID, "error", err)
-		return nil, pkgerrors.NewInternal("failed to extract watermark")
+		s.logger.Error("failed to list watermarks for extraction",
+			logging.String("document_id", req.DocumentID),
+			logging.Err(err))
+		return nil, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to extract watermark")
 	}
 
 	for _, record := range records {
 		storedHash, ok := record.Metadata["content_hash"]
 		if ok && storedHash == contentHashHex {
-			s.logger.Info("watermark extracted", "watermark_id", record.ID, "document_id", req.DocumentID)
+			s.logger.Info("watermark extracted",
+				logging.String("watermark_id", record.ID),
+				logging.String("document_id", req.DocumentID))
 			return &ExtractWatermarkResponse{
 				DocumentID:  req.DocumentID,
 				Found:       true,
@@ -409,7 +425,7 @@ func (s *watermarkServiceImpl) Extract(ctx context.Context, req *ExtractWatermar
 // ListByDocument returns all watermark records associated with a document.
 func (s *watermarkServiceImpl) ListByDocument(ctx context.Context, documentID string, pagination commontypes.Pagination) ([]*WatermarkRecord, int, error) {
 	if strings.TrimSpace(documentID) == "" {
-		return nil, 0, pkgerrors.NewValidation("document_id is required")
+		return nil, 0, pkgerrors.New(pkgerrors.ErrCodeValidation, "document_id is required")
 	}
 	if pagination.Page < 1 {
 		pagination.Page = 1
@@ -420,8 +436,10 @@ func (s *watermarkServiceImpl) ListByDocument(ctx context.Context, documentID st
 
 	records, total, err := s.repo.ListByDocument(ctx, documentID, pagination)
 	if err != nil {
-		s.logger.Error("failed to list watermarks", "document_id", documentID, "error", err)
-		return nil, 0, pkgerrors.NewInternal("failed to list watermarks")
+		s.logger.Error("failed to list watermarks",
+			logging.String("document_id", documentID),
+			logging.Err(err))
+		return nil, 0, pkgerrors.New(pkgerrors.ErrCodeInternal, "failed to list watermarks")
 	}
 
 	return records, total, nil
