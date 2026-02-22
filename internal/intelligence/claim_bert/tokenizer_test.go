@@ -1163,5 +1163,4 @@ func TestTokenize_PatentClaimText(t *testing.T) {
 	}
 }
 
-//Personal.AI order the ending
 

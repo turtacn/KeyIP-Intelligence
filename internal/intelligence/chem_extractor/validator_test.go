@@ -12,7 +12,7 @@ import (
 func makeRawEntity(text string, entityType ChemicalEntityType, confidence float64, ctxText string) *RawChemicalEntity {
 	return &RawChemicalEntity{
 		Text:       text,
-		Type:       entityType,
+		EntityType: entityType,
 		Confidence: confidence,
 		Context:    ctxText,
 		StartPos:   0,
@@ -1134,5 +1134,4 @@ func containsSubstring(s, sub string) bool {
 	return false
 }
 
-//Personal.AI order the ending
 

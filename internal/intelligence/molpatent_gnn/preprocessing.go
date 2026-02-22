@@ -103,25 +103,26 @@ var smilesPattern = regexp.MustCompile(
 	`^[A-Za-z0-9@+\-\[\]()=#$:/\\.%]+$`,
 )
 
-// balancedBrackets checks that [ ] and ( ) are balanced.
+// balancedBrackets checks that [ ] and ( ) are balanced and correctly nested.
 func balancedBrackets(s string) bool {
-	var sq, paren int
+	var stack []rune
 	for _, ch := range s {
 		switch ch {
-		case '[':
-			sq++
+		case '[', '(':
+			stack = append(stack, ch)
 		case ']':
-			sq--
-		case '(':
-			paren++
+			if len(stack) == 0 || stack[len(stack)-1] != '[' {
+				return false
+			}
+			stack = stack[:len(stack)-1]
 		case ')':
-			paren--
-		}
-		if sq < 0 || paren < 0 {
-			return false
+			if len(stack) == 0 || stack[len(stack)-1] != '(' {
+				return false
+			}
+			stack = stack[:len(stack)-1]
 		}
 	}
-	return sq == 0 && paren == 0
+	return len(stack) == 0
 }
 
 // ---------------------------------------------------------------------------
@@ -164,10 +165,10 @@ func (p *gnnPreprocessorImpl) ValidateSMILES(smiles string) error {
 // In production this would delegate to RDKit; here we do a simplified
 // normalisation (lowercase aromatic atoms, strip whitespace).
 func (p *gnnPreprocessorImpl) Canonicalize(smiles string) (string, error) {
-	if err := p.ValidateSMILES(smiles); err != nil {
+	canonical := strings.TrimSpace(smiles)
+	if err := p.ValidateSMILES(canonical); err != nil {
 		return "", err
 	}
-	canonical := strings.TrimSpace(smiles)
 	return canonical, nil
 }
 
@@ -697,5 +698,4 @@ func computeGlobalFeatures(atoms []parsedAtom, bonds []parsedBond) []float32 {
 	}
 }
 
-//Personal.AI order the ending
 

@@ -497,6 +497,9 @@ func TestParseOrganicAtom_Bromine(t *testing.T) {
 	if sym != "Br" {
 		t.Errorf("expected 'Br', got %q", sym)
 	}
+	if aromatic {
+		t.Error("Br should not be aromatic")
+	}
 	if advance != 2 {
 		t.Errorf("expected advance 2, got %d", advance)
 	}
@@ -668,5 +671,4 @@ func TestLookupAtomicNumber_Unknown(t *testing.T) {
 	}
 }
 
-//Personal.AI order the ending
 

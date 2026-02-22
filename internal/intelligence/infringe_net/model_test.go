@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"
 )
 
 // =========================================================================
@@ -19,15 +21,36 @@ import (
 
 type mockModelRegistry struct{}
 
-func (m *mockModelRegistry) GetModel(ctx context.Context, modelID, version string) (interface{}, error) {
-	return nil, nil
-}
-func (m *mockModelRegistry) RegisterModel(ctx context.Context, modelID, version string, meta interface{}) error {
+func (m *mockModelRegistry) Register(ctx context.Context, meta *common.ModelMetadata) error {
 	return nil
 }
-func (m *mockModelRegistry) ListModels(ctx context.Context) ([]string, error) {
-	return []string{"infringe-net-local-v1"}, nil
+func (m *mockModelRegistry) Unregister(ctx context.Context, modelID string, version string) error { return nil }
+func (m *mockModelRegistry) GetModel(ctx context.Context, modelID string) (*common.RegisteredModel, error) {
+	return nil, nil
 }
+func (m *mockModelRegistry) GetModelVersion(ctx context.Context, modelID string, version string) (*common.RegisteredModel, error) {
+	return nil, nil
+}
+func (m *mockModelRegistry) ListModels(ctx context.Context) ([]*common.RegisteredModel, error) {
+	return []*common.RegisteredModel{{ModelID: "infringe-net-local-v1"}}, nil
+}
+func (m *mockModelRegistry) ListVersions(ctx context.Context, modelID string) ([]*common.ModelVersion, error) {
+	return nil, nil
+}
+func (m *mockModelRegistry) SetActiveVersion(ctx context.Context, modelID string, version string) error {
+	return nil
+}
+func (m *mockModelRegistry) Rollback(ctx context.Context, modelID string) error { return nil }
+func (m *mockModelRegistry) ConfigureABTest(ctx context.Context, config *common.ABTestConfig) error {
+	return nil
+}
+func (m *mockModelRegistry) ResolveModel(ctx context.Context, modelID string, requestID string) (*common.RegisteredModel, error) {
+	return nil, nil
+}
+func (m *mockModelRegistry) HealthCheck(ctx context.Context) (*common.RegistryHealth, error) {
+	return nil, nil
+}
+func (m *mockModelRegistry) Close() error { return nil }
 
 // --- mockMoleculeValidator ---
 
@@ -741,7 +764,6 @@ func TestLocalModel_ConcurrentInference(t *testing.T) {
 }
 
 func TestLocalModel_InferenceTimeout(t *testing.T) {
-	m := newTestLocalModel(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 	defer cancel()
 	time.Sleep(2 * time.Millisecond) // ensure context is expired
@@ -1601,7 +1623,5 @@ var _ InfringeModel = (*remoteInfringeModel)(nil)
 var _ SMARTSMatcher = (*mockSMARTSMatcher)(nil)
 var _ MoleculeValidator = (*mockMoleculeValidator)(nil)
 var _ ServingClient = (*mockServingClient)(nil)
-
-//Personal.AI order the ending
 
 

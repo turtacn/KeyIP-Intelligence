@@ -89,6 +89,7 @@ type RawChemicalEntity struct {
 	EndPos     int                `json:"end_pos"`
 	Confidence float64            `json:"confidence"`
 	Source     string             `json:"source,omitempty"`
+	Context    string             `json:"context,omitempty"`
 }
 
 // ResolvedChemicalEntity is the fully (or partially) resolved chemical entity.
@@ -912,4 +913,3 @@ func extractStructureConstraints(text string) []string {
 	return constraints
 }
 
-//Personal.AI order the ending

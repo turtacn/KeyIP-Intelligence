@@ -420,6 +420,12 @@ var (
 	ErrInvalidPagination = New(ErrCodeValidation, "invalid pagination parameters")
 	ErrInvalidDateRange  = New(ErrCodeValidation, "invalid date range: from must be before or equal to to")
 	ErrInvalidSortOrder  = New(ErrCodeValidation, "invalid sort order")
+	ErrParsingFailed     = New(ErrCodeValidation, "parsing failed")
+	ErrInvalidMolecule   = New(ErrCodeMoleculeInvalidFormat, "invalid molecule")
 )
+
+func NewParsingError(message string) *AppError {
+	return New(ErrCodeValidation, message)
+}
 
 //Personal.AI order the ending

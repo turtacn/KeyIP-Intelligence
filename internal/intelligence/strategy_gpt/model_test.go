@@ -1,6 +1,7 @@
 package strategy_gpt
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,32 +15,29 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockModelRegistry struct {
-	registered []common.ModelDescriptor
+	registered []*common.ModelMetadata
 	err        error
 }
 
-func (m *mockModelRegistry) Register(desc common.ModelDescriptor) error {
+func (m *mockModelRegistry) Register(ctx context.Context, meta *common.ModelMetadata) error {
 	if m.err != nil {
 		return m.err
 	}
-	m.registered = append(m.registered, desc)
+	m.registered = append(m.registered, meta)
 	return nil
 }
 
-func (m *mockModelRegistry) Unregister(modelID string) error { return nil }
-
-func (m *mockModelRegistry) Get(modelID string) (*common.ModelDescriptor, error) {
-	for _, d := range m.registered {
-		if d.ModelID == modelID {
-			return &d, nil
-		}
-	}
-	return nil, fmt.Errorf("not found")
-}
-
-func (m *mockModelRegistry) List() ([]common.ModelDescriptor, error) {
-	return m.registered, nil
-}
+func (m *mockModelRegistry) Unregister(ctx context.Context, modelID string, version string) error { return nil }
+func (m *mockModelRegistry) GetModel(ctx context.Context, modelID string) (*common.RegisteredModel, error) { return nil, nil }
+func (m *mockModelRegistry) GetModelVersion(ctx context.Context, modelID string, version string) (*common.RegisteredModel, error) { return nil, nil }
+func (m *mockModelRegistry) ListModels(ctx context.Context) ([]*common.RegisteredModel, error) { return nil, nil }
+func (m *mockModelRegistry) ListVersions(ctx context.Context, modelID string) ([]*common.ModelVersion, error) { return nil, nil }
+func (m *mockModelRegistry) SetActiveVersion(ctx context.Context, modelID string, version string) error { return nil }
+func (m *mockModelRegistry) Rollback(ctx context.Context, modelID string) error { return nil }
+func (m *mockModelRegistry) ConfigureABTest(ctx context.Context, config *common.ABTestConfig) error { return nil }
+func (m *mockModelRegistry) ResolveModel(ctx context.Context, modelID string, requestID string) (*common.RegisteredModel, error) { return nil, nil }
+func (m *mockModelRegistry) HealthCheck(ctx context.Context) (*common.RegistryHealth, error) { return nil, nil }
+func (m *mockModelRegistry) Close() error { return nil }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -441,6 +439,9 @@ func TestRAGConfig_Defaults(t *testing.T) {
 	if rc.TopK != 10 {
 		t.Errorf("TopK = %d, want 10", rc.TopK)
 	}
+	if rc.DefaultTopK != 10 {
+		t.Errorf("DefaultTopK = %d, want 10", rc.DefaultTopK)
+	}
 	if rc.SimilarityThreshold != 0.70 {
 		t.Errorf("SimilarityThreshold = %f, want 0.70", rc.SimilarityThreshold)
 	}
@@ -450,11 +451,20 @@ func TestRAGConfig_Defaults(t *testing.T) {
 	if rc.ChunkOverlap != 64 {
 		t.Errorf("ChunkOverlap = %d, want 64", rc.ChunkOverlap)
 	}
+	if rc.MaxContextTokens != 4096 {
+		t.Errorf("MaxContextTokens = %d, want 4096", rc.MaxContextTokens)
+	}
+	if rc.IndexBatchSize != 32 {
+		t.Errorf("IndexBatchSize = %d, want 32", rc.IndexBatchSize)
+	}
 	if !rc.RerankerEnabled {
 		t.Error("RerankerEnabled should be true by default")
 	}
 	if rc.RerankerTopK != 5 {
 		t.Errorf("RerankerTopK = %d, want 5", rc.RerankerTopK)
+	}
+	if rc.RerankerMultiplier != 3 {
+		t.Errorf("RerankerMultiplier = %d, want 3", rc.RerankerMultiplier)
 	}
 }
 
@@ -603,7 +613,7 @@ func TestStrategyGPTConfig_ModelDescriptor(t *testing.T) {
 	if desc.ModelType != common.ModelTypeLLM {
 		t.Errorf("ModelType = %s, want %s", desc.ModelType, common.ModelTypeLLM)
 	}
-	if desc.BackendType != string(cfg.BackendType) {
+	if desc.BackendType != common.BackendType(cfg.BackendType) {
 		t.Errorf("BackendType = %s, want %s", desc.BackendType, cfg.BackendType)
 	}
 	if desc.Endpoint != cfg.ModelPath {
@@ -660,7 +670,7 @@ func TestStrategyGPTConfig_ModelDescriptor_AllBackends(t *testing.T) {
 		cfg := validConfig(t)
 		cfg.BackendType = bt
 		desc := cfg.ModelDescriptor()
-		if desc.BackendType != string(bt) {
+		if desc.BackendType != common.BackendType(bt) {
 			t.Errorf("BackendType = %s, want %s", desc.BackendType, bt)
 		}
 	}
@@ -726,5 +736,4 @@ func TestStrategyGPTConfig_Validate_PresencePenaltyBoundary(t *testing.T) {
 	}
 }
 
-//Personal.AI order the ending
 

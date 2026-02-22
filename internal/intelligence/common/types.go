@@ -194,3 +194,55 @@ func toFloat64(v interface{}) (float64, error) {
 		return 0, fmt.Errorf("cannot convert %T to float64", v)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Model Descriptor types (for registration)
+// ---------------------------------------------------------------------------
+
+// SchemaField describes a single input/output field.
+type SchemaField struct {
+	Name        string `json:"name"`
+	DataType    string `json:"data_type"`
+	Shape       []int  `json:"shape"`
+	Description string `json:"description,omitempty"`
+}
+
+// IOSchema describes the input or output schema of a model.
+type IOSchema struct {
+	Fields []SchemaField `json:"fields"`
+}
+
+// BackendType identifies the inference backend.
+type BackendType string
+
+const (
+	BackendTriton     BackendType = "triton"
+	BackendTorchServe BackendType = "torchserve"
+	BackendONNX       BackendType = "onnx"
+	BackendVLLM       BackendType = "vllm"
+	BackendHTTP       BackendType = "http"
+	BackendOpenAI     BackendType = "openai"
+)
+
+// ModelType identifies the kind of model.
+type ModelType string
+
+const (
+	ModelTypeLLM  ModelType = "llm"
+	ModelTypeGNN  ModelType = "gnn"
+	ModelTypeBERT ModelType = "bert"
+)
+
+// ModelDescriptor is a rich description of a model for registration.
+type ModelDescriptor struct {
+	ModelID      string            `json:"model_id"`
+	ModelVersion string            `json:"model_version"`
+	ModelType    ModelType         `json:"model_type"`
+	Framework    string            `json:"framework"`
+	BackendType  BackendType       `json:"backend_type"`
+	Endpoint     string            `json:"endpoint,omitempty"` // For HTTP/VLLM backends
+	InputSchema  IOSchema          `json:"input_schema,omitempty"`
+	OutputSchema IOSchema          `json:"output_schema,omitempty"`
+	Capabilities []string          `json:"capabilities,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+}

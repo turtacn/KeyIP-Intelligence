@@ -1,6 +1,7 @@
 package strategy_gpt
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -80,11 +81,15 @@ type RAGConfig struct {
 	Enabled              bool    `json:"enabled" yaml:"enabled"`
 	VectorStoreEndpoint  string  `json:"vector_store_endpoint" yaml:"vector_store_endpoint"`
 	TopK                 int     `json:"top_k" yaml:"top_k"`
+	DefaultTopK          int     `json:"default_top_k" yaml:"default_top_k"`
 	SimilarityThreshold  float64 `json:"similarity_threshold" yaml:"similarity_threshold"`
 	ChunkSize            int     `json:"chunk_size" yaml:"chunk_size"`
 	ChunkOverlap         int     `json:"chunk_overlap" yaml:"chunk_overlap"`
+	MaxContextTokens     int     `json:"max_context_tokens" yaml:"max_context_tokens"`
+	IndexBatchSize       int     `json:"index_batch_size" yaml:"index_batch_size"`
 	RerankerEnabled      bool    `json:"reranker_enabled" yaml:"reranker_enabled"`
 	RerankerTopK         int     `json:"reranker_top_k" yaml:"reranker_top_k"`
+	RerankerMultiplier   int     `json:"reranker_multiplier" yaml:"reranker_multiplier"`
 }
 
 // DefaultRAGConfig returns sensible RAG defaults for patent domain retrieval.
@@ -93,11 +98,15 @@ func DefaultRAGConfig() RAGConfig {
 		Enabled:             true,
 		VectorStoreEndpoint: "",
 		TopK:                10,
+		DefaultTopK:         10,
 		SimilarityThreshold: 0.70,
 		ChunkSize:           512,
 		ChunkOverlap:        64,
+		MaxContextTokens:    4096,
+		IndexBatchSize:      32,
 		RerankerEnabled:     true,
 		RerankerTopK:        5,
+		RerankerMultiplier:  3,
 	}
 }
 
@@ -105,6 +114,9 @@ func DefaultRAGConfig() RAGConfig {
 func (r *RAGConfig) Validate() error {
 	if r.TopK <= 0 {
 		return errors.NewInvalidInputError("rag top_k must be > 0")
+	}
+	if r.DefaultTopK <= 0 {
+		r.DefaultTopK = r.TopK
 	}
 	if r.SimilarityThreshold < 0 || r.SimilarityThreshold > 1.0 {
 		return errors.NewInvalidInputError("rag similarity_threshold must be in [0, 1.0]")
@@ -277,7 +289,7 @@ func (c *StrategyGPTConfig) ModelDescriptor() common.ModelDescriptor {
 	return common.ModelDescriptor{
 		ModelID:      c.ModelID,
 		ModelType:    common.ModelTypeLLM,
-		BackendType:  string(c.BackendType),
+		BackendType:  common.BackendType(c.BackendType),
 		Endpoint:     c.ModelPath,
 		Capabilities: caps,
 		Metadata: map[string]string{
@@ -297,7 +309,16 @@ func (c *StrategyGPTConfig) RegisterToRegistry(registry common.ModelRegistry) er
 		return errors.NewInvalidInputError("registry is required")
 	}
 	desc := c.ModelDescriptor()
-	return registry.Register(desc)
+
+	meta := &common.ModelMetadata{
+		ModelID:      desc.ModelID,
+		Name:         desc.ModelID,
+		Version:      desc.ModelVersion,
+		ArtifactPath: c.ModelPath,
+		Framework:    desc.Framework,
+		Labels:       desc.Metadata,
+	}
+
+	return registry.Register(context.Background(), meta)
 }
 
-//Personal.AI order the ending

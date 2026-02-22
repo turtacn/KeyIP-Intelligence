@@ -116,11 +116,6 @@ func TestGNNModelManager_Load_AlreadyReady(t *testing.T) {
 }
 
 func TestGNNModelManager_Load_BackendUnhealthy(t *testing.T) {
-	backend := &mockModelBackend{
-		predictFn: func(ctx context.Context, req *common.PredictRequest) (*common.PredictResponse, error) {
-			return nil, fmt.Errorf("unhealthy")
-		},
-	}
 	// Override Healthy
 	unhealthyBackend := &unhealthyMockBackend{}
 	cfg := DefaultGNNModelConfig()
@@ -244,4 +239,29 @@ func TestReadoutType_Values(t *testing.T) {
 	}
 }
 
-//Personal.AI order the ending
+// ---------------------------------------------------------------------------
+// Mock Backend Definition
+// ---------------------------------------------------------------------------
+
+type mockModelBackend struct {
+	predictFn func(ctx context.Context, req *common.PredictRequest) (*common.PredictResponse, error)
+}
+
+func (m *mockModelBackend) Predict(ctx context.Context, req *common.PredictRequest) (*common.PredictResponse, error) {
+	if m.predictFn != nil {
+		return m.predictFn(ctx, req)
+	}
+	return &common.PredictResponse{Outputs: map[string][]byte{"out": []byte("{}")}}, nil
+}
+
+func (m *mockModelBackend) PredictStream(ctx context.Context, req *common.PredictRequest) (<-chan *common.PredictResponse, error) {
+	return nil, nil
+}
+
+func (m *mockModelBackend) Healthy(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockModelBackend) Close() error {
+	return nil
+}

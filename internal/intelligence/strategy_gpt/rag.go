@@ -58,18 +58,6 @@ type RAGQuery struct {
 	SourceTypes         []DocumentSourceType `json:"source_types,omitempty"`
 }
 
-// RAGChunk is a single retrieved document fragment.
-type RAGChunk struct {
-	ChunkID       string             `json:"chunk_id"`
-	DocumentID    string             `json:"document_id"`
-	Content       string             `json:"content"`
-	Score         float64            `json:"score"`
-	RerankerScore float64            `json:"reranker_score"`
-	Source        DocumentSourceType `json:"source"`
-	Metadata      map[string]string  `json:"metadata,omitempty"`
-	TokenCount    int                `json:"token_count"`
-}
-
 // RAGResult is the output of a retrieval call.
 type RAGResult struct {
 	Chunks          []*RAGChunk `json:"chunks"`
@@ -120,34 +108,7 @@ type RerankResult struct {
 }
 
 // ---------------------------------------------------------------------------
-// RAGConfig
-// ---------------------------------------------------------------------------
-
-// RAGConfig holds tuning parameters for the RAG engine.
-type RAGConfig struct {
-	DefaultTopK       int     `json:"default_top_k" yaml:"default_top_k"`
-	RerankerTopK      int     `json:"reranker_top_k" yaml:"reranker_top_k"`
-	RerankerMultiplier int    `json:"reranker_multiplier" yaml:"reranker_multiplier"`
-	DefaultThreshold  float64 `json:"default_threshold" yaml:"default_threshold"`
-	ChunkSize         int     `json:"chunk_size" yaml:"chunk_size"`
-	ChunkOverlap      int     `json:"chunk_overlap" yaml:"chunk_overlap"`
-	MaxContextTokens  int     `json:"max_context_tokens" yaml:"max_context_tokens"`
-	IndexBatchSize    int     `json:"index_batch_size" yaml:"index_batch_size"`
-}
-
-// DefaultRAGConfig returns production-ready defaults.
-func DefaultRAGConfig() RAGConfig {
-	return RAGConfig{
-		DefaultTopK:        10,
-		RerankerTopK:       5,
-		RerankerMultiplier: 3,
-		DefaultThreshold:   0.55,
-		ChunkSize:          512,
-		ChunkOverlap:       64,
-		MaxContextTokens:   4096,
-		IndexBatchSize:     32,
-	}
-}
+// RAGConfig (moved to model.go to avoid redeclaration)
 
 // ---------------------------------------------------------------------------
 // Dependency interfaces
@@ -294,7 +255,7 @@ func (r *ragEngineImpl) Retrieve(ctx context.Context, query *RAGQuery) (*RAGResu
 	// 5. Threshold filtering.
 	threshold := query.SimilarityThreshold
 	if threshold <= 0 {
-		threshold = r.config.DefaultThreshold
+		threshold = r.config.SimilarityThreshold
 	}
 
 	var chunks []*RAGChunk
@@ -462,7 +423,7 @@ func (r *ragEngineImpl) BuildContext(ctx context.Context, result *RAGResult, bud
 			// Try to fit a truncated version.
 			remaining := budget - usedTokens
 			if remaining > 20 { // minimum useful size
-				truncated := truncateToTokens(entry, remaining)
+				truncated := truncateTextToTokens(entry, remaining)
 				builder.WriteString(truncated)
 			}
 			break
@@ -948,7 +909,7 @@ func estimateTokens(text string) int {
 	return int(math.Ceil(float64(byteCount) / 4.0))
 }
 
-func truncateToTokens(text string, maxTokens int) string {
+func truncateTextToTokens(text string, maxTokens int) string {
 	runes := []rune(text)
 	// Rough: take proportional slice.
 	totalTokens := estimateTokens(text)
@@ -1120,5 +1081,4 @@ func (n *noopRAGMetrics) RecordRerankLatency(ctx context.Context, durationMs flo
 func (n *noopRAGMetrics) RecordIndexLatency(ctx context.Context, durationMs float64)                    {}
 func (n *noopRAGMetrics) RecordChunkCount(ctx context.Context, count int)                               {}
 
-//Personal.AI order the ending
 

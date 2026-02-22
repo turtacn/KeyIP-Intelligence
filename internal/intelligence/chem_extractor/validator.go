@@ -214,7 +214,7 @@ func (v *entityValidatorImpl) Validate(ctx context.Context, entity *RawChemicalE
 		Entity:             entity,
 		IsValid:            true,
 		AdjustedConfidence: entity.Confidence,
-		AdjustedType:       entity.Type,
+		AdjustedType:       entity.EntityType,
 		Issues:             []string{},
 		Corrections:        map[string]string{},
 	}
@@ -634,8 +634,14 @@ func (v *entityValidatorImpl) validateIUPACName(result *ValidationResult, text s
 func containsIUPACSuffix(text string) bool {
 	lower := strings.ToLower(text)
 	for _, suffix := range iupacSuffixes {
-		if strings.Contains(lower, suffix) {
-			return true
+		if strings.HasPrefix(suffix, "-") {
+			if strings.HasSuffix(lower, suffix[1:]) {
+				return true
+			}
+		} else {
+			if strings.Contains(lower, suffix) {
+				return true
+			}
 		}
 	}
 	return false
@@ -820,5 +826,4 @@ func clampConfidence(c float64) float64 {
 	return math.Max(0.0, math.Min(1.0, c))
 }
 
-//Personal.AI order the ending
 

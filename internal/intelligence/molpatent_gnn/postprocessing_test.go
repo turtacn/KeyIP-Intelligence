@@ -728,4 +728,3 @@ func TestIntegration_EmbedThenClassify(t *testing.T) {
 	}
 }
 
-//Personal.AI order the ending

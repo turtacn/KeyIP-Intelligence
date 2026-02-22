@@ -12,7 +12,7 @@ import (
 // Mock: InfringeModel
 // =========================================================================
 
-type mockInfringeModel struct {
+type mockEquivalentsModel struct {
 	funcScores map[string]float64 // key = "queryID|claimID"
 	wayScores  map[string]float64
 	resScores  map[string]float64
@@ -26,8 +26,8 @@ type mockInfringeModel struct {
 	resErr  error
 }
 
-func newMockModel() *mockInfringeModel {
-	return &mockInfringeModel{
+func newMockModel() *mockEquivalentsModel {
+	return &mockEquivalentsModel{
 		funcScores: make(map[string]float64),
 		wayScores:  make(map[string]float64),
 		resScores:  make(map[string]float64),
@@ -38,7 +38,7 @@ func pairKey(a, b *StructuralElement) string {
 	return a.ElementID + "|" + b.ElementID
 }
 
-func (m *mockInfringeModel) ComputeFunctionSimilarity(_ context.Context, a, b *StructuralElement) (float64, error) {
+func (m *mockEquivalentsModel) ComputeFunctionSimilarity(_ context.Context, a, b *StructuralElement) (float64, error) {
 	m.funcCalls.Add(1)
 	if m.funcErr != nil {
 		return 0, m.funcErr
@@ -49,7 +49,7 @@ func (m *mockInfringeModel) ComputeFunctionSimilarity(_ context.Context, a, b *S
 	return 0.8, nil // default high
 }
 
-func (m *mockInfringeModel) ComputeWaySimilarity(_ context.Context, a, b *StructuralElement) (float64, error) {
+func (m *mockEquivalentsModel) ComputeWaySimilarity(_ context.Context, a, b *StructuralElement) (float64, error) {
 	m.wayCalls.Add(1)
 	if m.wayErr != nil {
 		return 0, m.wayErr
@@ -60,7 +60,7 @@ func (m *mockInfringeModel) ComputeWaySimilarity(_ context.Context, a, b *Struct
 	return 0.75, nil
 }
 
-func (m *mockInfringeModel) ComputeResultSimilarity(_ context.Context, a, b *StructuralElement) (float64, error) {
+func (m *mockEquivalentsModel) ComputeResultSimilarity(_ context.Context, a, b *StructuralElement) (float64, error) {
 	m.resCalls.Add(1)
 	if m.resErr != nil {
 		return 0, m.resErr
@@ -70,17 +70,6 @@ func (m *mockInfringeModel) ComputeResultSimilarity(_ context.Context, a, b *Str
 	}
 	return 0.70, nil
 }
-
-// =========================================================================
-// Mock: Logger
-// =========================================================================
-
-type mockLogger struct{}
-
-func (mockLogger) Info(string, ...interface{})  {}
-func (mockLogger) Warn(string, ...interface{})  {}
-func (mockLogger) Debug(string, ...interface{}) {}
-func (mockLogger) Error(string, ...interface{}) {}
 
 // =========================================================================
 // Helpers
@@ -116,7 +105,7 @@ func makeElementWithSMILES(id string, et ElementType, desc, smiles string) *Stru
 
 func TestNewEquivalentsAnalyzer_Success(t *testing.T) {
 	model := newMockModel()
-	a, err := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, err := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -126,7 +115,7 @@ func TestNewEquivalentsAnalyzer_Success(t *testing.T) {
 }
 
 func TestNewEquivalentsAnalyzer_NilModel(t *testing.T) {
-	_, err := NewEquivalentsAnalyzer(nil, &mockLogger{})
+	_, err := NewEquivalentsAnalyzer(nil, &mockEquivalentsLogger{})
 	if err == nil {
 		t.Fatal("expected error for nil model")
 	}
@@ -149,13 +138,13 @@ func TestNewEquivalentsAnalyzer_NilLogger(t *testing.T) {
 
 func TestAnalyzeElement_AllPass(t *testing.T) {
 	model := newMockModel()
-	q := makeElement("q1", Substituent, "phenyl group")
-	c := makeElement("c1", Substituent, "naphthyl group")
+	q := makeElement("q1", ElementTypeSubstituent, "phenyl group")
+	c := makeElement("c1", ElementTypeSubstituent, "naphthyl group")
 	model.funcScores[pairKey(q, c)] = 0.85
 	model.wayScores[pairKey(q, c)] = 0.78
 	model.resScores[pairKey(q, c)] = 0.72
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	eq, err := a.AnalyzeElement(context.Background(), q, c)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -187,11 +176,11 @@ func TestAnalyzeElement_AllPass(t *testing.T) {
 
 func TestAnalyzeElement_FunctionFail_ShortCircuit(t *testing.T) {
 	model := newMockModel()
-	q := makeElement("q1", Substituent, "alkyl chain")
-	c := makeElement("c1", Substituent, "aromatic ring")
+	q := makeElement("q1", ElementTypeSubstituent, "alkyl chain")
+	c := makeElement("c1", ElementTypeSubstituent, "aromatic ring")
 	model.funcScores[pairKey(q, c)] = 0.40 // below default 0.7
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	eq, err := a.AnalyzeElement(context.Background(), q, c)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -218,12 +207,12 @@ func TestAnalyzeElement_FunctionFail_ShortCircuit(t *testing.T) {
 
 func TestAnalyzeElement_WayFail_ShortCircuit(t *testing.T) {
 	model := newMockModel()
-	q := makeElement("q1", FunctionalGroup, "electron donor")
-	c := makeElement("c1", FunctionalGroup, "electron donor variant")
+	q := makeElement("q1", ElementTypeFunctionalGroup, "electron donor")
+	c := makeElement("c1", ElementTypeFunctionalGroup, "electron donor variant")
 	model.funcScores[pairKey(q, c)] = 0.90 // passes
 	model.wayScores[pairKey(q, c)] = 0.30  // fails (below 0.6)
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	eq, err := a.AnalyzeElement(context.Background(), q, c)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -247,13 +236,13 @@ func TestAnalyzeElement_WayFail_ShortCircuit(t *testing.T) {
 
 func TestAnalyzeElement_ResultFail(t *testing.T) {
 	model := newMockModel()
-	q := makeElement("q1", CoreScaffold, "carbazole core")
-	c := makeElement("c1", CoreScaffold, "fluorene core")
+	q := makeElement("q1", ElementTypeCoreScaffold, "carbazole core")
+	c := makeElement("c1", ElementTypeCoreScaffold, "fluorene core")
 	model.funcScores[pairKey(q, c)] = 0.88
 	model.wayScores[pairKey(q, c)] = 0.72
 	model.resScores[pairKey(q, c)] = 0.50 // fails (below 0.65)
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	eq, err := a.AnalyzeElement(context.Background(), q, c)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -276,13 +265,13 @@ func TestAnalyzeElement_ResultFail(t *testing.T) {
 func TestAnalyzeElement_BoundaryScores(t *testing.T) {
 	// Scores exactly at threshold should PASS.
 	model := newMockModel()
-	q := makeElement("q1", Substituent, "methyl")
-	c := makeElement("c1", Substituent, "ethyl")
+	q := makeElement("q1", ElementTypeSubstituent, "methyl")
+	c := makeElement("c1", ElementTypeSubstituent, "ethyl")
 	model.funcScores[pairKey(q, c)] = 0.70 // == threshold
 	model.wayScores[pairKey(q, c)] = 0.60  // == threshold
 	model.resScores[pairKey(q, c)] = 0.65  // == threshold
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	eq, err := a.AnalyzeElement(context.Background(), q, c)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -293,8 +282,8 @@ func TestAnalyzeElement_BoundaryScores(t *testing.T) {
 }
 
 func TestAnalyzeElement_BelowBoundary(t *testing.T) {
-	q := makeElement("q1", Substituent, "methyl")
-	c := makeElement("c1", Substituent, "ethyl")
+	q := makeElement("q1", ElementTypeSubstituent, "methyl")
+	c := makeElement("c1", ElementTypeSubstituent, "ethyl")
 
 	// Just below each threshold.
 	tests := []struct {
@@ -314,7 +303,7 @@ func TestAnalyzeElement_BelowBoundary(t *testing.T) {
 			m.wayScores[pairKey(q, c)] = tt.w
 			m.resScores[pairKey(q, c)] = tt.r
 
-			a, _ := NewEquivalentsAnalyzer(m, &mockLogger{})
+			a, _ := NewEquivalentsAnalyzer(m, &mockEquivalentsLogger{})
 			eq, err := a.AnalyzeElement(context.Background(), q, c)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -328,13 +317,13 @@ func TestAnalyzeElement_BelowBoundary(t *testing.T) {
 
 func TestAnalyzeElement_Reasoning(t *testing.T) {
 	model := newMockModel()
-	q := makeElement("q1", Substituent, "tert-butyl group")
-	c := makeElement("c1", Substituent, "isopropyl group")
+	q := makeElement("q1", ElementTypeSubstituent, "tert-butyl group")
+	c := makeElement("c1", ElementTypeSubstituent, "isopropyl group")
 	model.funcScores[pairKey(q, c)] = 0.90
 	model.wayScores[pairKey(q, c)] = 0.80
 	model.resScores[pairKey(q, c)] = 0.75
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	eq, _ := a.AnalyzeElement(context.Background(), q, c)
 
 	if eq.Reasoning == "" {
@@ -355,13 +344,13 @@ func TestAnalyzeElement_Reasoning(t *testing.T) {
 
 func TestAnalyzeElement_NilElements(t *testing.T) {
 	model := newMockModel()
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 
-	_, err := a.AnalyzeElement(context.Background(), nil, makeElement("c1", Substituent, "x"))
+	_, err := a.AnalyzeElement(context.Background(), nil, makeElement("c1", ElementTypeSubstituent, "x"))
 	if err == nil {
 		t.Error("expected error for nil query element")
 	}
-	_, err = a.AnalyzeElement(context.Background(), makeElement("q1", Substituent, "x"), nil)
+	_, err = a.AnalyzeElement(context.Background(), makeElement("q1", ElementTypeSubstituent, "x"), nil)
 	if err == nil {
 		t.Error("expected error for nil claim element")
 	}
@@ -375,17 +364,17 @@ func TestAnalyze_AllElementsEquivalent(t *testing.T) {
 	model := newMockModel()
 	// All pairs return high scores by default (0.8, 0.75, 0.70).
 	query := []*StructuralElement{
-		makeElement("q1", CoreScaffold, "carbazole scaffold"),
-		makeElement("q2", Substituent, "phenyl group"),
-		makeElement("q3", FunctionalGroup, "amine donor"),
+		makeElement("q1", ElementTypeCoreScaffold, "carbazole scaffold"),
+		makeElement("q2", ElementTypeSubstituent, "phenyl group"),
+		makeElement("q3", ElementTypeFunctionalGroup, "amine donor"),
 	}
 	claim := []*StructuralElement{
-		makeElement("c1", CoreScaffold, "carbazole scaffold variant"),
-		makeElement("c2", Substituent, "phenyl group variant"),
-		makeElement("c3", FunctionalGroup, "amine donor variant"),
+		makeElement("c1", ElementTypeCoreScaffold, "carbazole scaffold variant"),
+		makeElement("c2", ElementTypeSubstituent, "phenyl group variant"),
+		makeElement("c3", ElementTypeFunctionalGroup, "amine donor variant"),
 	}
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	res, err := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule: query,
 		ClaimElements: claim,
@@ -410,16 +399,16 @@ func TestAnalyze_AllElementsEquivalent(t *testing.T) {
 
 func TestAnalyze_NoElementsEquivalent(t *testing.T) {
 	model := newMockModel()
-	q1 := makeElement("q1", CoreScaffold, "anthracene")
-	c1 := makeElement("c1", CoreScaffold, "pyrene")
-	q2 := makeElement("q2", Substituent, "methyl")
-	c2 := makeElement("c2", Substituent, "trifluoromethyl")
+	q1 := makeElement("q1", ElementTypeCoreScaffold, "anthracene")
+	c1 := makeElement("c1", ElementTypeCoreScaffold, "pyrene")
+	q2 := makeElement("q2", ElementTypeSubstituent, "methyl")
+	c2 := makeElement("c2", ElementTypeSubstituent, "trifluoromethyl")
 
 	// All function scores below threshold.
 	model.funcScores[pairKey(q1, c1)] = 0.30
 	model.funcScores[pairKey(q2, c2)] = 0.25
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	res, err := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule: []*StructuralElement{q1, q2},
 		ClaimElements: []*StructuralElement{c1, c2},
@@ -438,10 +427,10 @@ func TestAnalyze_NoElementsEquivalent(t *testing.T) {
 
 func TestAnalyze_PartialEquivalence(t *testing.T) {
 	model := newMockModel()
-	q1 := makeElement("q1", Substituent, "phenyl")
-	c1 := makeElement("c1", Substituent, "naphthyl")
-	q2 := makeElement("q2", Substituent, "methyl")
-	c2 := makeElement("c2", Substituent, "trifluoromethyl")
+	q1 := makeElement("q1", ElementTypeSubstituent, "phenyl")
+	c1 := makeElement("c1", ElementTypeSubstituent, "naphthyl")
+	q2 := makeElement("q2", ElementTypeSubstituent, "methyl")
+	c2 := makeElement("c2", ElementTypeSubstituent, "trifluoromethyl")
 
 	// q1-c1 passes all three.
 	model.funcScores[pairKey(q1, c1)] = 0.85
@@ -451,7 +440,7 @@ func TestAnalyze_PartialEquivalence(t *testing.T) {
 	// q2-c2 fails function.
 	model.funcScores[pairKey(q2, c2)] = 0.30
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	res, err := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule: []*StructuralElement{q1, q2},
 		ClaimElements: []*StructuralElement{c1, c2},
@@ -465,7 +454,7 @@ func TestAnalyze_PartialEquivalence(t *testing.T) {
 	if res.TotalElementCount != 2 {
 		t.Errorf("expected 2 total elements, got %d", res.TotalElementCount)
 	}
-	// Both are Substituent (weight 0.8 each), 1 of 2 equivalent => 0.5.
+	// Both are ElementTypeSubstituent (weight 0.8 each), 1 of 2 equivalent => 0.5.
 	inDelta(t, 0.5, res.OverallEquivalenceScore, 0.01, "OverallEquivalenceScore")
 }
 
@@ -473,17 +462,17 @@ func TestAnalyze_ScaffoldWeightDominance(t *testing.T) {
 	model := newMockModel()
 
 	// Case A: scaffold equivalent, substituent not.
-	qScaff := makeElement("qs", CoreScaffold, "carbazole")
-	cScaff := makeElement("cs", CoreScaffold, "carbazole variant")
-	qSub := makeElement("qsub", Substituent, "methyl")
-	cSub := makeElement("csub", Substituent, "trifluoromethyl")
+	qScaff := makeElement("qs", ElementTypeCoreScaffold, "carbazole")
+	cScaff := makeElement("cs", ElementTypeCoreScaffold, "carbazole variant")
+	qSub := makeElement("qsub", ElementTypeSubstituent, "methyl")
+	cSub := makeElement("csub", ElementTypeSubstituent, "trifluoromethyl")
 
 	model.funcScores[pairKey(qScaff, cScaff)] = 0.90
 	model.wayScores[pairKey(qScaff, cScaff)] = 0.80
 	model.resScores[pairKey(qScaff, cScaff)] = 0.75
 	model.funcScores[pairKey(qSub, cSub)] = 0.30 // fails
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	resA, _ := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule: []*StructuralElement{qScaff, qSub},
 		ClaimElements: []*StructuralElement{cScaff, cSub},
@@ -496,7 +485,7 @@ func TestAnalyze_ScaffoldWeightDominance(t *testing.T) {
 	model2.wayScores[pairKey(qSub, cSub)] = 0.80
 	model2.resScores[pairKey(qSub, cSub)] = 0.75
 
-	a2, _ := NewEquivalentsAnalyzer(model2, &mockLogger{})
+	a2, _ := NewEquivalentsAnalyzer(model2, &mockEquivalentsLogger{})
 	resB, _ := a2.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule: []*StructuralElement{qScaff, qSub},
 		ClaimElements: []*StructuralElement{cScaff, cSub},
@@ -516,14 +505,14 @@ func TestAnalyze_ScaffoldWeightDominance(t *testing.T) {
 	inDelta(t, 0.8/(2.0+0.8), resB.OverallEquivalenceScore, 0.01, "CaseB score")
 }
 
-func TestAnalyze_SubstituentLeniency(t *testing.T) {
-	// Substituent weight (0.8) is lower than FunctionalGroup (1.0), so
+func TestAnalyze_ElementTypeSubstituentLeniency(t *testing.T) {
+	// ElementTypeSubstituent weight (0.8) is lower than ElementTypeFunctionalGroup (1.0), so
 	// a failing substituent hurts the overall score less.
 	model := newMockModel()
-	qFG := makeElement("qfg", FunctionalGroup, "amine")
-	cFG := makeElement("cfg", FunctionalGroup, "amine variant")
-	qSub := makeElement("qsub", Substituent, "methyl")
-	cSub := makeElement("csub", Substituent, "ethyl")
+	qFG := makeElement("qfg", ElementTypeFunctionalGroup, "amine")
+	cFG := makeElement("cfg", ElementTypeFunctionalGroup, "amine variant")
+	qSub := makeElement("qsub", ElementTypeSubstituent, "methyl")
+	cSub := makeElement("csub", ElementTypeSubstituent, "ethyl")
 
 	// FG passes, Sub fails.
 	model.funcScores[pairKey(qFG, cFG)] = 0.90
@@ -531,7 +520,7 @@ func TestAnalyze_SubstituentLeniency(t *testing.T) {
 	model.resScores[pairKey(qFG, cFG)] = 0.75
 	model.funcScores[pairKey(qSub, cSub)] = 0.30
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	res, _ := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule: []*StructuralElement{qFG, qSub},
 		ClaimElements: []*StructuralElement{cFG, cSub},
@@ -544,11 +533,11 @@ func TestAnalyze_SubstituentLeniency(t *testing.T) {
 
 func TestAnalyze_ElementAlignment(t *testing.T) {
 	model := newMockModel()
-	// Query has CoreScaffold + Substituent; Claim has Substituent + CoreScaffold (reversed order).
-	qScaff := makeElement("qs", CoreScaffold, "fluorene core")
-	qSub := makeElement("qsub", Substituent, "phenyl arm")
-	cSub := makeElement("csub", Substituent, "phenyl arm variant")
-	cScaff := makeElement("cs", CoreScaffold, "fluorene core variant")
+	// Query has ElementTypeCoreScaffold + ElementTypeSubstituent; Claim has ElementTypeSubstituent + ElementTypeCoreScaffold (reversed order).
+	qScaff := makeElement("qs", ElementTypeCoreScaffold, "fluorene core")
+	qSub := makeElement("qsub", ElementTypeSubstituent, "phenyl arm")
+	cSub := makeElement("csub", ElementTypeSubstituent, "phenyl arm variant")
+	cScaff := makeElement("cs", ElementTypeCoreScaffold, "fluorene core variant")
 
 	// Same-type pairs should be matched.
 	model.funcScores[pairKey(qScaff, cScaff)] = 0.92
@@ -562,7 +551,7 @@ func TestAnalyze_ElementAlignment(t *testing.T) {
 	model.funcScores[pairKey(qScaff, cSub)] = 0.10
 	model.funcScores[pairKey(qSub, cScaff)] = 0.10
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	res, err := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule: []*StructuralElement{qScaff, qSub},
 		ClaimElements: []*StructuralElement{cSub, cScaff}, // deliberately reversed
@@ -577,8 +566,8 @@ func TestAnalyze_ElementAlignment(t *testing.T) {
 
 func TestAnalyze_ProsecutionHistoryEstoppel(t *testing.T) {
 	model := newMockModel()
-	qSub := makeElementWithSMILES("qsub", Substituent, "naphthyl substituent", "c1ccc2ccccc2c1")
-	cSub := makeElement("csub", Substituent, "aromatic substituent")
+	qSub := makeElementWithSMILES("qsub", ElementTypeSubstituent, "naphthyl substituent", "c1ccc2ccccc2c1")
+	cSub := makeElement("csub", ElementTypeSubstituent, "aromatic substituent")
 
 	// Would normally pass.
 	model.funcScores[pairKey(qSub, cSub)] = 0.90
@@ -589,12 +578,12 @@ func TestAnalyze_ProsecutionHistoryEstoppel(t *testing.T) {
 		{
 			EventType:      "amendment",
 			AbandonedScope: "naphthyl",
-			AbandonedType:  Substituent,
+			AbandonedType:  ElementTypeSubstituent,
 			Reason:         "applicant narrowed claim to exclude naphthyl substituents",
 		},
 	}
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	res, err := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule:      []*StructuralElement{qSub},
 		ClaimElements:      []*StructuralElement{cSub},
@@ -616,10 +605,10 @@ func TestAnalyze_ProsecutionHistoryEstoppel(t *testing.T) {
 
 func TestAnalyze_EmptyQueryElements(t *testing.T) {
 	model := newMockModel()
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	_, err := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule: []*StructuralElement{},
-		ClaimElements: []*StructuralElement{makeElement("c1", Substituent, "x")},
+		ClaimElements: []*StructuralElement{makeElement("c1", ElementTypeSubstituent, "x")},
 	})
 	if err == nil {
 		t.Fatal("expected error for empty query elements")
@@ -628,9 +617,9 @@ func TestAnalyze_EmptyQueryElements(t *testing.T) {
 
 func TestAnalyze_EmptyClaimElements(t *testing.T) {
 	model := newMockModel()
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	_, err := a.Analyze(context.Background(), &EquivalentsRequest{
-		QueryMolecule: []*StructuralElement{makeElement("q1", Substituent, "x")},
+		QueryMolecule: []*StructuralElement{makeElement("q1", ElementTypeSubstituent, "x")},
 		ClaimElements: []*StructuralElement{},
 	})
 	if err == nil {
@@ -640,7 +629,7 @@ func TestAnalyze_EmptyClaimElements(t *testing.T) {
 
 func TestAnalyze_NilRequest(t *testing.T) {
 	model := newMockModel()
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	_, err := a.Analyze(context.Background(), nil)
 	if err == nil {
 		t.Fatal("expected error for nil request")
@@ -651,16 +640,16 @@ func TestAnalyze_MismatchedElementCounts(t *testing.T) {
 	model := newMockModel()
 	// 3 query elements, 2 claim elements.
 	query := []*StructuralElement{
-		makeElement("q1", CoreScaffold, "scaffold A"),
-		makeElement("q2", Substituent, "sub A"),
-		makeElement("q3", FunctionalGroup, "fg A"),
+		makeElement("q1", ElementTypeCoreScaffold, "scaffold A"),
+		makeElement("q2", ElementTypeSubstituent, "sub A"),
+		makeElement("q3", ElementTypeFunctionalGroup, "fg A"),
 	}
 	claim := []*StructuralElement{
-		makeElement("c1", CoreScaffold, "scaffold B"),
-		makeElement("c2", Substituent, "sub B"),
+		makeElement("c1", ElementTypeCoreScaffold, "scaffold B"),
+		makeElement("c2", ElementTypeSubstituent, "sub B"),
 	}
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	res, err := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule: query,
 		ClaimElements: claim,
@@ -680,8 +669,8 @@ func TestAnalyze_MismatchedElementCounts(t *testing.T) {
 
 func TestEquivalentsOption_CustomThresholds(t *testing.T) {
 	model := newMockModel()
-	q := makeElement("q1", Substituent, "phenyl")
-	c := makeElement("c1", Substituent, "naphthyl")
+	q := makeElement("q1", ElementTypeSubstituent, "phenyl")
+	c := makeElement("c1", ElementTypeSubstituent, "naphthyl")
 
 	// Scores that pass default thresholds but fail custom higher thresholds.
 	model.funcScores[pairKey(q, c)] = 0.75
@@ -689,14 +678,14 @@ func TestEquivalentsOption_CustomThresholds(t *testing.T) {
 	model.resScores[pairKey(q, c)] = 0.68
 
 	// Default thresholds: should pass.
-	aDefault, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	aDefault, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	eqDefault, _ := aDefault.AnalyzeElement(context.Background(), q, c)
 	if !eqDefault.IsEquivalent {
 		t.Error("expected pass with default thresholds")
 	}
 
 	// Custom higher thresholds: should fail.
-	aCustom, _ := NewEquivalentsAnalyzer(model, &mockLogger{},
+	aCustom, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{},
 		WithFunctionThreshold(0.80),
 		WithWayThreshold(0.70),
 		WithResultThreshold(0.75),
@@ -709,10 +698,10 @@ func TestEquivalentsOption_CustomThresholds(t *testing.T) {
 
 func TestEquivalentsOption_CustomScaffoldWeight(t *testing.T) {
 	model := newMockModel()
-	qScaff := makeElement("qs", CoreScaffold, "carbazole")
-	cScaff := makeElement("cs", CoreScaffold, "carbazole variant")
-	qSub := makeElement("qsub", Substituent, "phenyl")
-	cSub := makeElement("csub", Substituent, "trifluoromethyl")
+	qScaff := makeElement("qs", ElementTypeCoreScaffold, "carbazole")
+	cScaff := makeElement("cs", ElementTypeCoreScaffold, "carbazole variant")
+	qSub := makeElement("qsub", ElementTypeSubstituent, "phenyl")
+	cSub := makeElement("csub", ElementTypeSubstituent, "trifluoromethyl")
 
 	// Scaffold passes, substituent fails.
 	model.funcScores[pairKey(qScaff, cScaff)] = 0.90
@@ -721,14 +710,14 @@ func TestEquivalentsOption_CustomScaffoldWeight(t *testing.T) {
 	model.funcScores[pairKey(qSub, cSub)] = 0.30
 
 	// Default scaffold weight = 2.0 => score = 2.0/(2.0+0.8) ≈ 0.714
-	aDefault, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	aDefault, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	resDefault, _ := aDefault.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule: []*StructuralElement{qScaff, qSub},
 		ClaimElements: []*StructuralElement{cScaff, cSub},
 	})
 
 	// Custom scaffold weight = 5.0 => score = 5.0/(5.0+0.8) ≈ 0.862
-	aHeavy, _ := NewEquivalentsAnalyzer(model, &mockLogger{},
+	aHeavy, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{},
 		WithScaffoldWeight(5.0),
 	)
 	resHeavy, _ := aHeavy.Analyze(context.Background(), &EquivalentsRequest{
@@ -756,11 +745,11 @@ func TestElementType_String(t *testing.T) {
 		et   ElementType
 		want string
 	}{
-		{CoreScaffold, "CoreScaffold"},
-		{Substituent, "Substituent"},
-		{FunctionalGroup, "FunctionalGroup"},
-		{LinkagePattern, "LinkagePattern"},
-		{ElectronicProperty, "ElectronicProperty"},
+		{ElementTypeCoreScaffold, "CoreScaffold"},
+		{ElementTypeSubstituent, "Substituent"},
+		{ElementTypeFunctionalGroup, "FunctionalGroup"},
+		{ElementTypeLinker, "Linker"},
+		{ElementTypeElectronicProperty, "ElectronicProperty"},
 	}
 	for _, tt := range tests {
 		got := tt.et.String()
@@ -783,11 +772,12 @@ func TestElementType_String_Unknown(t *testing.T) {
 
 func TestElementType_AllValues(t *testing.T) {
 	expected := []ElementType{
-		CoreScaffold,
-		Substituent,
-		FunctionalGroup,
-		LinkagePattern,
-		ElectronicProperty,
+		ElementTypeCoreScaffold,
+		ElementTypeSubstituent,
+		ElementTypeFunctionalGroup,
+		ElementTypeLinker,
+		ElementTypeBackbone,
+		ElementTypeElectronicProperty,
 	}
 	if len(allElementTypes) != len(expected) {
 		t.Fatalf("expected %d element types, got %d", len(expected), len(allElementTypes))
@@ -811,10 +801,10 @@ func TestElementType_AllValues(t *testing.T) {
 func TestAnalyzeElement_ModelFunctionError(t *testing.T) {
 	model := newMockModel()
 	model.funcErr = fmt.Errorf("GPU OOM")
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	_, err := a.AnalyzeElement(context.Background(),
-		makeElement("q1", Substituent, "x"),
-		makeElement("c1", Substituent, "y"),
+		makeElement("q1", ElementTypeSubstituent, "x"),
+		makeElement("c1", ElementTypeSubstituent, "y"),
 	)
 	if err == nil {
 		t.Fatal("expected error when model returns error")
@@ -827,11 +817,11 @@ func TestAnalyzeElement_ModelFunctionError(t *testing.T) {
 func TestAnalyzeElement_ModelWayError(t *testing.T) {
 	model := newMockModel()
 	model.wayErr = fmt.Errorf("timeout")
-	q := makeElement("q1", Substituent, "x")
-	c := makeElement("c1", Substituent, "y")
+	q := makeElement("q1", ElementTypeSubstituent, "x")
+	c := makeElement("c1", ElementTypeSubstituent, "y")
 	model.funcScores[pairKey(q, c)] = 0.90
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	_, err := a.AnalyzeElement(context.Background(), q, c)
 	if err == nil {
 		t.Fatal("expected error when way model returns error")
@@ -844,12 +834,12 @@ func TestAnalyzeElement_ModelWayError(t *testing.T) {
 func TestAnalyzeElement_ModelResultError(t *testing.T) {
 	model := newMockModel()
 	model.resErr = fmt.Errorf("connection refused")
-	q := makeElement("q1", Substituent, "x")
-	c := makeElement("c1", Substituent, "y")
+	q := makeElement("q1", ElementTypeSubstituent, "x")
+	c := makeElement("c1", ElementTypeSubstituent, "y")
 	model.funcScores[pairKey(q, c)] = 0.90
 	model.wayScores[pairKey(q, c)] = 0.80
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	_, err := a.AnalyzeElement(context.Background(), q, c)
 	if err == nil {
 		t.Fatal("expected error when result model returns error")
@@ -865,8 +855,8 @@ func TestAnalyzeElement_ModelResultError(t *testing.T) {
 
 func TestAnalyze_ProsecutionHistoryEstoppel_SMILESMatch(t *testing.T) {
 	model := newMockModel()
-	qSub := makeElementWithSMILES("qsub", Substituent, "some aromatic", "c1ccc2ccccc2c1")
-	cSub := makeElement("csub", Substituent, "aromatic group")
+	qSub := makeElementWithSMILES("qsub", ElementTypeSubstituent, "some aromatic", "c1ccc2ccccc2c1")
+	cSub := makeElement("csub", ElementTypeSubstituent, "aromatic group")
 
 	model.funcScores[pairKey(qSub, cSub)] = 0.95
 	model.wayScores[pairKey(qSub, cSub)] = 0.90
@@ -877,12 +867,12 @@ func TestAnalyze_ProsecutionHistoryEstoppel_SMILESMatch(t *testing.T) {
 			EventType:       "restriction",
 			AbandonedScope:  "fused bicyclic",
 			AbandonedSMILES: "c1ccc2ccccc2c1",
-			AbandonedType:   Substituent,
+			AbandonedType:   ElementTypeSubstituent,
 			Reason:          "restricted to monocyclic aromatics only",
 		},
 	}
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	res, err := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule:      []*StructuralElement{qSub},
 		ClaimElements:      []*StructuralElement{cSub},
@@ -908,24 +898,24 @@ func TestAnalyze_ProsecutionHistoryEstoppel_SMILESMatch(t *testing.T) {
 
 func TestAnalyze_ProsecutionHistoryEstoppel_TypeMismatch(t *testing.T) {
 	model := newMockModel()
-	qScaff := makeElementWithSMILES("qs", CoreScaffold, "naphthyl scaffold", "c1ccc2ccccc2c1")
-	cScaff := makeElement("cs", CoreScaffold, "aromatic scaffold")
+	qScaff := makeElementWithSMILES("qs", ElementTypeCoreScaffold, "naphthyl scaffold", "c1ccc2ccccc2c1")
+	cScaff := makeElement("cs", ElementTypeCoreScaffold, "aromatic scaffold")
 
 	model.funcScores[pairKey(qScaff, cScaff)] = 0.90
 	model.wayScores[pairKey(qScaff, cScaff)] = 0.80
 	model.resScores[pairKey(qScaff, cScaff)] = 0.75
 
-	// Estoppel targets Substituent, not CoreScaffold.
+	// Estoppel targets ElementTypeSubstituent, not ElementTypeCoreScaffold.
 	history := []*ProsecutionHistoryEntry{
 		{
 			EventType:      "amendment",
 			AbandonedScope: "naphthyl",
-			AbandonedType:  Substituent, // different type
+			AbandonedType:  ElementTypeSubstituent, // different type
 			Reason:         "narrowed substituent scope",
 		},
 	}
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	res, err := a.Analyze(context.Background(), &EquivalentsRequest{
 		QueryMolecule:      []*StructuralElement{qScaff},
 		ClaimElements:      []*StructuralElement{cScaff},
@@ -1012,13 +1002,13 @@ func searchSubstring(s, sub string) bool {
 
 func BenchmarkAnalyzeElement_AllPass(b *testing.B) {
 	model := newMockModel()
-	q := makeElement("q1", Substituent, "phenyl group")
-	c := makeElement("c1", Substituent, "naphthyl group")
+	q := makeElement("q1", ElementTypeSubstituent, "phenyl group")
+	c := makeElement("c1", ElementTypeSubstituent, "naphthyl group")
 	model.funcScores[pairKey(q, c)] = 0.85
 	model.wayScores[pairKey(q, c)] = 0.78
 	model.resScores[pairKey(q, c)] = 0.72
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -1031,14 +1021,14 @@ func BenchmarkAnalyze_TenElements(b *testing.B) {
 	model := newMockModel()
 	query := make([]*StructuralElement, 10)
 	claim := make([]*StructuralElement, 10)
-	types := []ElementType{CoreScaffold, Substituent, Substituent, FunctionalGroup, FunctionalGroup,
-		LinkagePattern, ElectronicProperty, Substituent, Substituent, FunctionalGroup}
+	types := []ElementType{ElementTypeCoreScaffold, ElementTypeSubstituent, ElementTypeSubstituent, ElementTypeFunctionalGroup, ElementTypeFunctionalGroup,
+		ElementTypeLinker, ElementTypeElectronicProperty, ElementTypeSubstituent, ElementTypeSubstituent, ElementTypeFunctionalGroup}
 	for i := 0; i < 10; i++ {
 		query[i] = makeElement(fmt.Sprintf("q%d", i), types[i], fmt.Sprintf("query element %d", i))
 		claim[i] = makeElement(fmt.Sprintf("c%d", i), types[i], fmt.Sprintf("claim element %d", i))
 	}
 
-	a, _ := NewEquivalentsAnalyzer(model, &mockLogger{})
+	a, _ := NewEquivalentsAnalyzer(model, &mockEquivalentsLogger{})
 	ctx := context.Background()
 	req := &EquivalentsRequest{QueryMolecule: query, ClaimElements: claim}
 
@@ -1048,5 +1038,14 @@ func BenchmarkAnalyze_TenElements(b *testing.B) {
 	}
 }
 
-//Personal.AI order the ending
+// =========================================================================
+// Mock: Logger
+// =========================================================================
+
+type mockEquivalentsLogger struct{}
+
+func (l *mockEquivalentsLogger) Info(msg string, keysAndValues ...interface{})  {}
+func (l *mockEquivalentsLogger) Warn(msg string, keysAndValues ...interface{})  {}
+func (l *mockEquivalentsLogger) Error(msg string, keysAndValues ...interface{}) {}
+func (l *mockEquivalentsLogger) Debug(msg string, keysAndValues ...interface{}) {}
 

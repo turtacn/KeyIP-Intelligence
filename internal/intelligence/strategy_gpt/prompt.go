@@ -153,10 +153,14 @@ type PriorArtContext struct {
 
 // RAGChunk carries a single RAG retrieval result.
 type RAGChunk struct {
-	Text       string            `json:"text"`
-	Source     string            `json:"source"`
-	Score      float64           `json:"score"`
-	Metadata   map[string]string `json:"metadata,omitempty"`
+	ChunkID       string             `json:"chunk_id"`
+	DocumentID    string             `json:"document_id"`
+	Content       string             `json:"content"`
+	Score         float64            `json:"score"`
+	RerankerScore float64            `json:"reranker_score"`
+	Source        DocumentSourceType `json:"source"`
+	Metadata      map[string]string  `json:"metadata,omitempty"`
+	TokenCount    int                `json:"token_count"`
 }
 
 // ---------------------------------------------------------------------------
@@ -657,7 +661,7 @@ func (pm *promptManagerImpl) buildRAGSection(chunks []*RAGChunk) promptSection {
 	}
 	var b strings.Builder
 	for i, c := range chunks {
-		b.WriteString(fmt.Sprintf("[%d] (score=%.3f, source=%s)\n%s\n\n", i+1, c.Score, c.Source, c.Text))
+		b.WriteString(fmt.Sprintf("[%d] (score=%.3f, source=%s)\n%s\n\n", i+1, c.Score, c.Source, c.Content))
 	}
 	text := b.String()
 	return promptSection{label: "Retrieved Context (RAG)", text: text, tokens: pm.EstimateTokenCount(text)}
@@ -975,4 +979,3 @@ func templateFormatList(items []string) string {
 	return b.String()
 }
 
-//Personal.AI order the ending

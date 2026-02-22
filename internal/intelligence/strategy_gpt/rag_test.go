@@ -1351,9 +1351,9 @@ func TestSplitSentences_Empty(t *testing.T) {
 	}
 }
 
-func TestTruncateToTokens(t *testing.T) {
+func TestTruncateTextToTokens(t *testing.T) {
 	text := "This is a long sentence. It has multiple parts. And it keeps going on and on."
-	truncated := truncateToTokens(text, 5)
+	truncated := truncateTextToTokens(text, 5)
 	if len(truncated) >= len(text) {
 		t.Error("expected truncation to produce shorter text")
 	}
@@ -1362,9 +1362,9 @@ func TestTruncateToTokens(t *testing.T) {
 	}
 }
 
-func TestTruncateToTokens_ShortText(t *testing.T) {
+func TestTruncateTextToTokens_ShortText(t *testing.T) {
 	text := "Short."
-	truncated := truncateToTokens(text, 1000)
+	truncated := truncateTextToTokens(text, 1000)
 	if truncated != text {
 		t.Errorf("expected no truncation, got %q", truncated)
 	}
@@ -1701,6 +1701,5 @@ func BenchmarkBuildContext(b *testing.B) {
 	}
 }
 
-//Personal.AI order the ending
 
 

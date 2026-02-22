@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"math"
 	"testing"
 	"time"
 )
@@ -115,14 +114,23 @@ func (m *mockStructureAnalyzer) MatchSMARTS(ctx context.Context, smiles, smarts 
 // Mock: InfringeModel
 // ---------------------------------------------------------------------------
 
-type mockInfringeModel struct{}
+type mockMapperInfringeModel struct{}
 
-func (m *mockInfringeModel) Predict(ctx context.Context, req *InfringePredictRequest) (*InfringePredictResponse, error) {
-	return &InfringePredictResponse{Score: 0.5}, nil
+func (m *mockMapperInfringeModel) PredictLiteralInfringement(ctx context.Context, req *LiteralPredictionRequest) (*LiteralPredictionResult, error) {
+	return nil, nil
 }
-
-func (m *mockInfringeModel) Healthy(ctx context.Context) error { return nil }
-func (m *mockInfringeModel) Close() error                      { return nil }
+func (m *mockMapperInfringeModel) ComputeStructuralSimilarity(ctx context.Context, smiles1, smiles2 string) (float64, error) {
+	return 0, nil
+}
+func (m *mockMapperInfringeModel) PredictPropertyImpact(ctx context.Context, req *PropertyImpactRequest) (*PropertyImpactResult, error) {
+	return nil, nil
+}
+func (m *mockMapperInfringeModel) EmbedStructure(ctx context.Context, smiles string) ([]float64, error) {
+	return nil, nil
+}
+func (m *mockMapperInfringeModel) ModelInfo() *ModelMetadata { return nil }
+func (m *mockMapperInfringeModel) Healthy(ctx context.Context) error { return nil }
+func (m *mockMapperInfringeModel) Close() error                      { return nil }
 
 // ---------------------------------------------------------------------------
 // Mock: Logger
@@ -199,13 +207,6 @@ func setupDefaultAnalyzer() *mockStructureAnalyzer {
 	return analyzer
 }
 
-func assertInDelta(t *testing.T, expected, actual, delta float64, msg string) {
-	t.Helper()
-	if math.Abs(expected-actual) > delta {
-		t.Errorf("%s: expected %f ± %f, got %f", msg, expected, delta, actual)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Tests: NewClaimElementMapper
 // ---------------------------------------------------------------------------
@@ -214,7 +215,7 @@ func TestNewClaimElementMapper_Success(t *testing.T) {
 	mapper, err := NewClaimElementMapper(
 		newMockNLPParser(),
 		newMockStructureAnalyzer(),
-		&mockInfringeModel{},
+		&mockMapperInfringeModel{},
 		&mockMapperLogger{},
 	)
 	if err != nil {
@@ -1272,6 +1273,3 @@ func TestHungarianMaximize_SingleElement(t *testing.T) {
 		t.Errorf("expected [0], got %v", assignment)
 	}
 }
-
-//Personal.AI order the ending
-

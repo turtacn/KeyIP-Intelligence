@@ -378,7 +378,8 @@ func looksLikeSMILES(s string) bool {
 	if len(s) < 2 {
 		return false
 	}
-	smilesChars := "cCnNoOsSpPFClBrI=#@+\\/-[]()123456789%"
+	// Added H (hydrogen), r (Br), l (Cl, Al)
+	smilesChars := "cCnNoOsSpPFClBrIHhrl=#@+\\/-[]()123456789%"
 	nonSMILES := 0
 	for _, ch := range s {
 		if !strings.ContainsRune(smilesChars, ch) {
@@ -935,6 +936,4 @@ func (l *noopLogger) Info(msg string, keysAndValues ...interface{})  {}
 func (l *noopLogger) Warn(msg string, keysAndValues ...interface{})  {}
 func (l *noopLogger) Error(msg string, keysAndValues ...interface{}) {}
 func (l *noopLogger) Debug(msg string, keysAndValues ...interface{}) {}
-
-//Personal.AI order the ending
 

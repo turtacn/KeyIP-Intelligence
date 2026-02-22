@@ -1,6 +1,7 @@
 package claim_bert
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -13,32 +14,45 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockRegistry struct {
-	registered []common.ModelDescriptor
+	registered []*common.ModelMetadata
 	err        error
 }
 
-func (r *mockRegistry) Register(desc common.ModelDescriptor) error {
+func (r *mockRegistry) Register(ctx context.Context, meta *common.ModelMetadata) error {
 	if r.err != nil {
 		return r.err
 	}
-	r.registered = append(r.registered, desc)
+	r.registered = append(r.registered, meta)
 	return nil
 }
 
-func (r *mockRegistry) Lookup(modelID string) (*common.ModelDescriptor, error) {
-	for _, d := range r.registered {
-		if d.ModelID == modelID {
-			return &d, nil
-		}
-	}
-	return nil, fmt.Errorf("not found")
+func (r *mockRegistry) Unregister(ctx context.Context, modelID string, version string) error { return nil }
+func (r *mockRegistry) GetModel(ctx context.Context, modelID string) (*common.RegisteredModel, error) {
+	return nil, nil
 }
-
-func (r *mockRegistry) List() ([]common.ModelDescriptor, error) {
-	return r.registered, nil
+func (r *mockRegistry) GetModelVersion(ctx context.Context, modelID string, version string) (*common.RegisteredModel, error) {
+	return nil, nil
 }
-
-func (r *mockRegistry) Unregister(modelID string) error { return nil }
+func (r *mockRegistry) ListModels(ctx context.Context) ([]*common.RegisteredModel, error) {
+	return nil, nil
+}
+func (r *mockRegistry) ListVersions(ctx context.Context, modelID string) ([]*common.ModelVersion, error) {
+	return nil, nil
+}
+func (r *mockRegistry) SetActiveVersion(ctx context.Context, modelID string, version string) error {
+	return nil
+}
+func (r *mockRegistry) Rollback(ctx context.Context, modelID string) error { return nil }
+func (r *mockRegistry) ConfigureABTest(ctx context.Context, config *common.ABTestConfig) error {
+	return nil
+}
+func (r *mockRegistry) ResolveModel(ctx context.Context, modelID string, requestID string) (*common.RegisteredModel, error) {
+	return nil, nil
+}
+func (r *mockRegistry) HealthCheck(ctx context.Context) (*common.RegistryHealth, error) {
+	return nil, nil
+}
+func (r *mockRegistry) Close() error { return nil }
 
 // ---------------------------------------------------------------------------
 // TestNewClaimBERTConfig_Defaults
@@ -523,13 +537,11 @@ func TestClaimBERTConfig_RegisterToRegistry_Success(t *testing.T) {
 	if len(reg.registered) != 1 {
 		t.Fatalf("expected 1 registered model, got %d", len(reg.registered))
 	}
-	desc := reg.registered[0]
-	if desc.ModelID != cfg.ModelID {
-		t.Errorf("registered ModelID: want %s, got %s", cfg.ModelID, desc.ModelID)
+	meta := reg.registered[0]
+	if meta.ModelID != cfg.ModelID {
+		t.Errorf("registered ModelID: want %s, got %s", cfg.ModelID, meta.ModelID)
 	}
-	if desc.ModelType != "claim-bert" {
-		t.Errorf("registered ModelType: want claim-bert, got %s", desc.ModelType)
-	}
+	// ModelType check removed as it is not in ModelMetadata
 }
 
 // ---------------------------------------------------------------------------
@@ -593,8 +605,8 @@ func TestClaimBERTConfig_ModelDescriptor(t *testing.T) {
 	if desc.ModelVersion != "1.0.0" {
 		t.Errorf("ModelVersion: want 1.0.0, got %s", desc.ModelVersion)
 	}
-	if desc.ModelType != "claim-bert" {
-		t.Errorf("ModelType: want claim-bert, got %s", desc.ModelType)
+	if desc.ModelType != common.ModelTypeBERT {
+		t.Errorf("ModelType: want %s, got %s", common.ModelTypeBERT, desc.ModelType)
 	}
 	if desc.Framework != "pytorch" {
 		t.Errorf("Framework: want pytorch, got %s", desc.Framework)
@@ -823,4 +835,3 @@ func TestClaimBERTConfig_Validate_MinimalValidConfig(t *testing.T) {
 	}
 }
 
-//Personal.AI order the ending

@@ -18,35 +18,45 @@ import (
 type ElementType int
 
 const (
-	// CoreScaffold is the central ring system or backbone that determines
+	// ElementTypeCoreScaffold is the central ring system or backbone that determines
 	// the fundamental optoelectronic character of an OLED material.
-	CoreScaffold ElementType = iota
-	// Substituent is a peripheral group attached to the scaffold that fine-
+	ElementTypeCoreScaffold ElementType = iota
+	// ElementTypeSubstituent is a peripheral group attached to the scaffold that fine-
 	// tunes solubility, morphology, or emission wavelength.
-	Substituent
-	// FunctionalGroup is a chemically reactive moiety such as -OH, -NH2,
+	ElementTypeSubstituent
+	// ElementTypeFunctionalGroup is a chemically reactive moiety such as -OH, -NH2,
 	// -COOH that participates in specific interactions.
-	FunctionalGroup
-	// LinkagePattern describes how fragments are connected (e.g. ortho vs
+	ElementTypeFunctionalGroup
+	// ElementTypeLinker describes how fragments are connected (e.g. ortho vs
 	// para substitution, spiro junction, fused ring).
-	LinkagePattern
-	// ElectronicProperty captures an abstract electronic descriptor such as
+	ElementTypeLinker
+	// ElementTypeBackbone represents a polymeric or oligomeric backbone.
+	ElementTypeBackbone
+	// ElementTypeElectronicProperty captures an abstract electronic descriptor such as
 	// HOMO/LUMO gap, charge-transfer character, or spin-orbit coupling.
-	ElectronicProperty
+	ElementTypeElectronicProperty
+	// ElementTypeUnknown represents an unclassified element type.
+	ElementTypeUnknown
+	// Aliases for compatibility if needed (deprecated)
+	LinkagePattern = ElementTypeLinker
 )
 
 // String returns a human-readable label for the ElementType.
 func (et ElementType) String() string {
 	switch et {
-	case CoreScaffold:
+	case ElementTypeUnknown:
+		return "Unknown"
+	case ElementTypeCoreScaffold:
 		return "CoreScaffold"
-	case Substituent:
+	case ElementTypeSubstituent:
 		return "Substituent"
-	case FunctionalGroup:
+	case ElementTypeFunctionalGroup:
 		return "FunctionalGroup"
-	case LinkagePattern:
-		return "LinkagePattern"
-	case ElectronicProperty:
+	case ElementTypeLinker:
+		return "Linker"
+	case ElementTypeBackbone:
+		return "Backbone"
+	case ElementTypeElectronicProperty:
 		return "ElectronicProperty"
 	default:
 		return fmt.Sprintf("ElementType(%d)", int(et))
@@ -55,11 +65,12 @@ func (et ElementType) String() string {
 
 // allElementTypes is the canonical list used for iteration and validation.
 var allElementTypes = []ElementType{
-	CoreScaffold,
-	Substituent,
-	FunctionalGroup,
-	LinkagePattern,
-	ElectronicProperty,
+	ElementTypeCoreScaffold,
+	ElementTypeSubstituent,
+	ElementTypeFunctionalGroup,
+	ElementTypeLinker,
+	ElementTypeBackbone,
+	ElementTypeElectronicProperty,
 }
 
 // ---------------------------------------------------------------------------
@@ -75,6 +86,10 @@ type StructuralElement struct {
 	ElementType    ElementType       `json:"element_type"`
 	Description    string            `json:"description"`
 	SMILESFragment string            `json:"smiles_fragment,omitempty"`
+	SMILES         string            `json:"smiles,omitempty"` // Alias for SMILESFragment or full SMILES
+	Role           string            `json:"role,omitempty"`
+	Position       string            `json:"position,omitempty"`
+	Weight         float64           `json:"weight,omitempty"`
 	Properties     map[string]string `json:"properties,omitempty"`
 }
 
@@ -130,12 +145,12 @@ type ElementEquivalence struct {
 }
 
 // ---------------------------------------------------------------------------
-// InfringeModel — dependency interface
+// EquivalentsModel — dependency interface
 // ---------------------------------------------------------------------------
 
-// InfringeModel abstracts the neural model used for structural similarity
+// EquivalentsModel abstracts the neural model used for structural similarity
 // scoring within the infringement analysis pipeline.
-type InfringeModel interface {
+type EquivalentsModel interface {
 	// ComputeFunctionSimilarity scores how similar two elements are in the
 	// functional role they play inside their respective molecules.
 	ComputeFunctionSimilarity(ctx context.Context, a, b *StructuralElement) (float64, error)
@@ -158,13 +173,6 @@ type Logger interface {
 	Debug(msg string, keysAndValues ...interface{})
 	Error(msg string, keysAndValues ...interface{})
 }
-
-type noopLogger struct{}
-
-func (noopLogger) Info(string, ...interface{})  {}
-func (noopLogger) Warn(string, ...interface{})  {}
-func (noopLogger) Debug(string, ...interface{}) {}
-func (noopLogger) Error(string, ...interface{}) {}
 
 // ---------------------------------------------------------------------------
 // EquivalentsAnalyzer interface
@@ -245,18 +253,18 @@ func WithScaffoldWeight(w float64) EquivalentsOption {
 // ---------------------------------------------------------------------------
 
 type equivalentsAnalyzer struct {
-	model  InfringeModel
+	model  EquivalentsModel
 	logger Logger
 	cfg    *equivalentsConfig
 }
 
 // NewEquivalentsAnalyzer constructs an EquivalentsAnalyzer.
-func NewEquivalentsAnalyzer(model InfringeModel, logger Logger, opts ...EquivalentsOption) (EquivalentsAnalyzer, error) {
+func NewEquivalentsAnalyzer(model EquivalentsModel, logger Logger, opts ...EquivalentsOption) (EquivalentsAnalyzer, error) {
 	if model == nil {
-		return nil, errors.NewInvalidInputError("InfringeModel is required")
+		return nil, errors.NewInvalidInputError("EquivalentsModel is required")
 	}
 	if logger == nil {
-		logger = noopLogger{}
+		logger = &noopLogger{} // Assuming noopLogger is defined in mapper.go or similar
 	}
 	cfg := defaultEquivalentsConfig()
 	for _, o := range opts {
@@ -680,15 +688,15 @@ func (a *equivalentsAnalyzer) computeOverallScore(results []*ElementEquivalence,
 
 func (a *equivalentsAnalyzer) elementWeight(et ElementType) float64 {
 	switch et {
-	case CoreScaffold:
+	case ElementTypeCoreScaffold:
 		return a.cfg.scaffoldWeight
-	case Substituent:
+	case ElementTypeSubstituent:
 		return 0.8
-	case FunctionalGroup:
+	case ElementTypeFunctionalGroup:
 		return 1.0
-	case LinkagePattern:
+	case ElementTypeLinker: // Was LinkagePattern
 		return 1.0
-	case ElectronicProperty:
+	case ElementTypeElectronicProperty:
 		return 1.0
 	default:
 		return 1.0
@@ -748,4 +756,3 @@ func determineFailedStep(eq *ElementEquivalence) string {
 	return "unknown"
 }
 
-//Personal.AI order the ending

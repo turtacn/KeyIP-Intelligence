@@ -98,14 +98,14 @@ func sampleClaims() []*ClaimAnalysisContext {
 func sampleRAGChunks() []*RAGChunk {
 	return []*RAGChunk{
 		{
-			Text:   "COX-2 selective inhibitors have been extensively studied for their anti-inflammatory properties with reduced gastrointestinal side effects compared to non-selective NSAIDs.",
-			Source: "review_2023.pdf",
-			Score:  0.92,
+			Content: "COX-2 selective inhibitors have been extensively studied for their anti-inflammatory properties with reduced gastrointestinal side effects compared to non-selective NSAIDs.",
+			Source:  SourceScientificPaper,
+			Score:   0.92,
 		},
 		{
-			Text:   "The Markush structure in patent claims allows broad coverage of chemical compound families through variable group definitions.",
-			Source: "patent_law_guide.pdf",
-			Score:  0.85,
+			Content: "The Markush structure in patent claims allows broad coverage of chemical compound families through variable group definitions.",
+			Source:  SourcePatent,
+			Score:   0.85,
 		},
 	}
 }
@@ -115,9 +115,9 @@ func longRAGChunks(n int) []*RAGChunk {
 	longText := strings.Repeat("This is a very long RAG chunk containing detailed technical information about pharmaceutical compounds and their patent implications. ", 20)
 	for i := 0; i < n; i++ {
 		chunks[i] = &RAGChunk{
-			Text:   longText,
-			Source: "large_doc.pdf",
-			Score:  0.80,
+			Content: longText,
+			Source:  SourceScientificPaper,
+			Score:   0.80,
 		}
 	}
 	return chunks
@@ -1262,4 +1262,3 @@ func TestIsCJK(t *testing.T) {
 	}
 }
 
-//Personal.AI order the ending

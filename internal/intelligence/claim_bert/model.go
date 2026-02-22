@@ -1,6 +1,7 @@
 package claim_bert
 
 import (
+	"context"
 	"fmt"
 	"math/bits"
 	"strings"
@@ -422,7 +423,7 @@ func (c *ClaimBERTConfig) ModelDescriptor() common.ModelDescriptor {
 	return common.ModelDescriptor{
 		ModelID:      c.ModelID,
 		ModelVersion: version,
-		ModelType:    "claim-bert",
+		ModelType:    common.ModelTypeBERT,
 		Framework:    "pytorch",
 		BackendType:  c.BackendType,
 		InputSchema:  inputSchema,
@@ -449,7 +450,17 @@ func (c *ClaimBERTConfig) RegisterToRegistry(registry common.ModelRegistry) erro
 		return fmt.Errorf("config validation failed: %w", err)
 	}
 	desc := c.ModelDescriptor()
-	if err := registry.Register(desc); err != nil {
+
+	meta := &common.ModelMetadata{
+		ModelID:      desc.ModelID,
+		Name:         desc.ModelID, // Use ID as name
+		Version:      desc.ModelVersion,
+		ArtifactPath: c.ModelPath,
+		Framework:    desc.Framework,
+		Labels:       desc.Metadata,
+	}
+
+	if err := registry.Register(context.Background(), meta); err != nil {
 		return fmt.Errorf("registry registration failed: %w", err)
 	}
 	return nil
@@ -500,4 +511,3 @@ func isPowerOfTwo(n int) bool {
 	return bits.OnesCount(uint(n)) == 1
 }
 
-//Personal.AI order the ending
