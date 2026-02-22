@@ -7,6 +7,7 @@ package common
 import (
 	"container/heap"
 	"context"
+	stdliberrors "errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -17,6 +18,16 @@ import (
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+)
+
+// ---------------------------------------------------------------------------
+// Sentinel Errors
+// ---------------------------------------------------------------------------
+
+var (
+	ErrShutdown     = stdliberrors.New("batch processor is shutting down")
+	ErrBackpressure = stdliberrors.New("backpressure threshold exceeded")
+	ErrCircuitOpen  = stdliberrors.New("circuit breaker is open")
 )
 
 // ---------------------------------------------------------------------------
@@ -59,27 +70,27 @@ type ProcessFunc[T, R any] func(ctx context.Context, item T) (R, error)
 // PrioritizedItem wraps an item with a priority value.
 // Higher Priority values are processed first.
 type PrioritizedItem[T any] struct {
-Item     T   `json:"item"`
-Priority int `json:"priority"`
+	Item     T   `json:"item"`
+	Priority int `json:"priority"`
 }
 
 // ItemResult holds the outcome of processing a single item within a batch.
 type ItemResult[R any] struct {
-Index      int        `json:"index"`
-Result     R          `json:"result"`
-Error      error      `json:"error,omitempty"`
-DurationMs float64    `json:"duration_ms"`
-Status     ItemStatus `json:"status"`
+	Index      int        `json:"index"`
+	Result     R          `json:"result"`
+	Error      error      `json:"error,omitempty"`
+	DurationMs float64    `json:"duration_ms"`
+	Status     ItemStatus `json:"status"`
 }
 
 // BatchResult aggregates the outcomes of an entire batch processing run.
 type BatchResult[R any] struct {
-Results          []*ItemResult[R] `json:"results"`
-TotalCount       int              `json:"total_count"`
-SuccessCount     int              `json:"success_count"`
-FailureCount     int              `json:"failure_count"`
-TotalDurationMs  float64          `json:"total_duration_ms"`
-AvgItemDurationMs float64         `json:"avg_item_duration_ms"`
+	Results           []*ItemResult[R] `json:"results"`
+	TotalCount        int              `json:"total_count"`
+	SuccessCount      int              `json:"success_count"`
+	FailureCount      int              `json:"failure_count"`
+	TotalDurationMs   float64          `json:"total_duration_ms"`
+	AvgItemDurationMs float64          `json:"avg_item_duration_ms"`
 }
 
 // ---------------------------------------------------------------------------
@@ -88,17 +99,17 @@ AvgItemDurationMs float64         `json:"avg_item_duration_ms"`
 
 // BatchProcessor defines the contract for a generic batch processing engine.
 type BatchProcessor[T, R any] interface {
-// Process executes fn for every item in items, respecting concurrency
-// limits, timeouts, circuit-breaker and back-pressure policies.
-Process(ctx context.Context, items []T, fn ProcessFunc[T, R]) (*BatchResult[R], error)
+	// Process executes fn for every item in items, respecting concurrency
+	// limits, timeouts, circuit-breaker and back-pressure policies.
+	Process(ctx context.Context, items []T, fn ProcessFunc[T, R]) (*BatchResult[R], error)
 
-// ProcessWithPriority is identical to Process but items carry an explicit
-// priority — higher-priority items are scheduled first.
-ProcessWithPriority(ctx context.Context, items []PrioritizedItem[T], fn ProcessFunc[T, R]) (*BatchResult[R], error)
+	// ProcessWithPriority is identical to Process but items carry an explicit
+	// priority — higher-priority items are scheduled first.
+	ProcessWithPriority(ctx context.Context, items []PrioritizedItem[T], fn ProcessFunc[T, R]) (*BatchResult[R], error)
 
-// Shutdown gracefully drains in-flight work. After Shutdown returns (or
-// ctx expires) no new batches are accepted.
-Shutdown(ctx context.Context) error
+	// Shutdown gracefully drains in-flight work. After Shutdown returns (or
+	// ctx expires) no new batches are accepted.
+	Shutdown(ctx context.Context) error
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +135,7 @@ func shouldRetry(err error, policy *RetryPolicy) bool {
 		return true
 	}
 	for _, re := range policy.RetryableErrors {
-		if errors.Is(err, re) {
+		if stdliberrors.Is(err, re) {
 			return true
 		}
 	}
@@ -394,20 +405,20 @@ func WithBatchLogger(l Logger) BatchOption {
 // ---------------------------------------------------------------------------
 
 type batchProcessor[T, R any] struct {
-cfg     *batchConfig
-cb      *circuitBreaker
-metrics IntelligenceMetrics
-logger  Logger
+	cfg     *batchConfig
+	cb      *circuitBreaker
+	metrics IntelligenceMetrics
+	logger  Logger
 
-// shutdown coordination
-shutdownMu   sync.Mutex
-shutdownOnce sync.Once
-shutdownCh   chan struct{}
-isShutdown   atomic.Bool
-activeWg     sync.WaitGroup
+	// shutdown coordination
+	shutdownMu   sync.Mutex
+	shutdownOnce sync.Once
+	shutdownCh   chan struct{}
+	isShutdown   atomic.Bool
+	activeWg     sync.WaitGroup
 
-// back-pressure: number of items currently queued or in-flight
-pendingCount atomic.Int64
+	// back-pressure: number of items currently queued or in-flight
+	pendingCount atomic.Int64
 }
 
 // NewBatchProcessor creates a new BatchProcessor with the supplied options.
@@ -422,23 +433,16 @@ func NewBatchProcessor[T, R any](opts ...BatchOption) BatchProcessor[T, R] {
 	if cfg.logger == nil {
 		cfg.logger = NewNoopLogger()
 	}
-	if cfg.backpressureThreshold <= 0 {
-		cfg.backpressureThreshold = cfg.maxConcurrency * 10
-		if cfg.backpressureThreshold <= 0 {
-			cfg.backpressureThreshold = 0 // truly disabled
-		}
-	}
-
 	bp := &batchProcessor[T, R]{
-cfg:     cfg,
-metrics: cfg.metrics,
-logger:  cfg.logger,
-shutdownCh: make(chan struct{}),
-}
-if cfg.cbThreshold > 0 && cfg.cbDuration > 0 {
-bp.cb = newCircuitBreaker(cfg.cbThreshold, cfg.cbDuration, cfg.logger, cfg.metrics)
-}
-return bp
+		cfg:        cfg,
+		metrics:    cfg.metrics,
+		logger:     cfg.logger,
+		shutdownCh: make(chan struct{}),
+	}
+	if cfg.cbThreshold > 0 && cfg.cbDuration > 0 {
+		bp.cb = newCircuitBreaker(cfg.cbThreshold, cfg.cbDuration, cfg.logger, cfg.metrics)
+	}
+	return bp
 }
 
 // ---------------------------------------------------------------------------
@@ -446,21 +450,21 @@ return bp
 // ---------------------------------------------------------------------------
 
 func (bp *batchProcessor[T, R]) Process(
-ctx context.Context,
-items []T,
-fn ProcessFunc[T, R],
+	ctx context.Context,
+	items []T,
+	fn ProcessFunc[T, R],
 ) (*BatchResult[R], error) {
 	if fn == nil {
 		return nil, errors.NewInvalidInputError("process function must not be nil")
 	}
 	if bp.isShutdown.Load() {
-		return nil, errors.ErrShutdown
+		return nil, ErrShutdown
 	}
 	n := len(items)
 	if n == 0 {
 		return &BatchResult[R]{
-		Results:     []*ItemResult[R]{},
-		TotalCount:  0,
+			Results:    []*ItemResult[R]{},
+			TotalCount: 0,
 		}, nil
 	}
 
@@ -468,7 +472,7 @@ fn ProcessFunc[T, R],
 	if bp.cfg.backpressureThreshold > 0 {
 		current := bp.pendingCount.Load()
 		if current+int64(n) > int64(bp.cfg.backpressureThreshold) {
-			return nil, errors.ErrBackpressure
+			return nil, ErrBackpressure
 		}
 	}
 	bp.pendingCount.Add(int64(n))
@@ -501,17 +505,10 @@ fn ProcessFunc[T, R],
 				defer func() { <-sem }()
 			case <-batchCtx.Done():
 				resultCh <- &ItemResult[R]{
-			Index:  idx,
-				Error:  batchCtx.Err(),
+					Index:  idx,
+					Error:  batchCtx.Err(),
 					Status: classifyCtxError(batchCtx.Err()),
-			}
-				return
-			case <-bp.shutdownCh:
-				resultCh <- &ItemResult[R]{
-			Index:  idx,
-				Error:  errors.ErrShutdown,
-					Status: ItemStatusCancelled,
-			}
+				}
 				return
 			}
 
@@ -542,11 +539,11 @@ fn ProcessFunc[T, R],
 
 	// Record metrics.
 	bp.metrics.RecordBatchProcessing(ctx, &BatchMetricParams{
-		ModelName:    "batch-processor",
-		TotalItems:   br.TotalCount,
-		SuccessItems: br.SuccessCount,
-		FailedItems:  br.FailureCount,
-		DurationMs:   br.TotalDurationMs,
+		BatchName:       "batch-processor",
+		TotalItems:      br.TotalCount,
+		SuccessItems:    br.SuccessCount,
+		FailedItems:     br.FailureCount,
+		TotalDurationMs: br.TotalDurationMs,
 	})
 
 	return br, nil
@@ -557,21 +554,21 @@ fn ProcessFunc[T, R],
 // ---------------------------------------------------------------------------
 
 func (bp *batchProcessor[T, R]) ProcessWithPriority(
-ctx context.Context,
-items []PrioritizedItem[T],
-fn ProcessFunc[T, R],
+	ctx context.Context,
+	items []PrioritizedItem[T],
+	fn ProcessFunc[T, R],
 ) (*BatchResult[R], error) {
 	if fn == nil {
 		return nil, errors.NewInvalidInputError("process function must not be nil")
 	}
 	if bp.isShutdown.Load() {
-		return nil, errors.ErrShutdown
+		return nil, ErrShutdown
 	}
 	n := len(items)
 	if n == 0 {
 		return &BatchResult[R]{
-		Results:    []*ItemResult[R]{},
-		TotalCount: 0,
+			Results:    []*ItemResult[R]{},
+			TotalCount: 0,
 		}, nil
 	}
 
@@ -579,7 +576,7 @@ fn ProcessFunc[T, R],
 	if bp.cfg.backpressureThreshold > 0 {
 		current := bp.pendingCount.Load()
 		if current+int64(n) > int64(bp.cfg.backpressureThreshold) {
-			return nil, errors.ErrBackpressure
+			return nil, ErrBackpressure
 		}
 	}
 	bp.pendingCount.Add(int64(n))
@@ -596,10 +593,10 @@ fn ProcessFunc[T, R],
 	pq := make(priorityQueue[T], n)
 	for i, pi := range items {
 		pq[i] = &pqItem[T]{
-		value:         pi.Item,
+			value:         pi.Item,
 			originalIndex: i,
-				priority:      pi.Priority,
-				heapIndex:     i,
+			priority:      pi.Priority,
+			heapIndex:     i,
 		}
 	}
 	heap.Init(&pq)
@@ -623,33 +620,17 @@ fn ProcessFunc[T, R],
 			// Push remaining items as cancelled.
 			wg.Done()
 			resultCh <- &ItemResult[R]{
-		Index:  it.originalIndex,
-			Error:  batchCtx.Err(),
+				Index:  it.originalIndex,
+				Error:  batchCtx.Err(),
 				Status: classifyCtxError(batchCtx.Err()),
-		}
+			}
 			// Drain remaining.
 			for pq.Len() > 0 {
 				rem := heap.Pop(&pq).(*pqItem[T])
 				resultCh <- &ItemResult[R]{
-				Index:  rem.originalIndex,
+					Index:  rem.originalIndex,
 					Error:  batchCtx.Err(),
-						Status: classifyCtxError(batchCtx.Err()),
-				}
-			}
-			goto collect
-		case <-bp.shutdownCh:
-			wg.Done()
-			resultCh <- &ItemResult[R]{
-		Index:  it.originalIndex,
-			Error:  errors.ErrShutdown,
-				Status: ItemStatusCancelled,
-		}
-			for pq.Len() > 0 {
-				rem := heap.Pop(&pq).(*pqItem[T])
-				resultCh <- &ItemResult[R]{
-				Index:  rem.originalIndex,
-					Error:  errors.ErrShutdown,
-						Status: ItemStatusCancelled,
+					Status: classifyCtxError(batchCtx.Err()),
 				}
 			}
 			goto collect
@@ -682,11 +663,11 @@ collect:
 	br := bp.buildBatchResult(results, totalDuration)
 
 	bp.metrics.RecordBatchProcessing(ctx, &BatchMetricParams{
-		ModelName:    "batch-processor",
-		TotalItems:   br.TotalCount,
-		SuccessItems: br.SuccessCount,
-		FailedItems:  br.FailureCount,
-		DurationMs:   br.TotalDurationMs,
+		BatchName:       "batch-processor",
+		TotalItems:      br.TotalCount,
+		SuccessItems:    br.SuccessCount,
+		FailedItems:     br.FailureCount,
+		TotalDurationMs: br.TotalDurationMs,
 	})
 
 	return br, nil
@@ -722,20 +703,20 @@ func (bp *batchProcessor[T, R]) Shutdown(ctx context.Context) error {
 // ---------------------------------------------------------------------------
 
 func (bp *batchProcessor[T, R]) processOneItem(
-batchCtx context.Context,
-idx int,
-item T,
-fn ProcessFunc[T, R],
+	batchCtx context.Context,
+	idx int,
+	item T,
+	fn ProcessFunc[T, R],
 ) *ItemResult[R] {
 	itemStart := time.Now()
 
 	// Circuit-breaker gate.
 	if bp.cb != nil && !bp.cb.allow() {
 		return &ItemResult[R]{
-		Index:      idx,
-			Error:      errors.ErrCircuitOpen,
-				Status:     ItemStatusFailed,
-				DurationMs: float64(time.Since(itemStart).Microseconds()) / 1000.0,
+			Index:      idx,
+			Error:      ErrCircuitOpen,
+			Status:     ItemStatusFailed,
+			DurationMs: float64(time.Since(itemStart).Microseconds()) / 1000.0,
 		}
 	}
 
@@ -753,11 +734,11 @@ fn ProcessFunc[T, R],
 				select {
 				case <-batchCtx.Done():
 					return &ItemResult[R]{
-				Index:      idx,
-					Error:      batchCtx.Err(),
+						Index:      idx,
+						Error:      batchCtx.Err(),
 						Status:     classifyCtxError(batchCtx.Err()),
 						DurationMs: msSince(itemStart),
-				}
+					}
 				case <-time.After(delay):
 				}
 			}
@@ -773,7 +754,7 @@ fn ProcessFunc[T, R],
 				bp.cb.recordSuccess()
 			}
 			return &ItemResult[R]{
-			Index:      idx,
+				Index:      idx,
 				Result:     result,
 					Status:     ItemStatusSuccess,
 					DurationMs: msSince(itemStart),
@@ -799,10 +780,10 @@ fn ProcessFunc[T, R],
 	}
 
 	return &ItemResult[R]{
-	Index:      idx,
+		Index:      idx,
 		Error:      lastErr,
-			Status:     status,
-			DurationMs: msSince(itemStart),
+		Status:     status,
+		DurationMs: msSince(itemStart),
 	}
 }
 
@@ -811,10 +792,10 @@ fn ProcessFunc[T, R],
 // ---------------------------------------------------------------------------
 
 type pqItem[T any] struct {
-value         T
-originalIndex int
-priority      int
-heapIndex     int
+	value         T
+	originalIndex int
+	priority      int
+	heapIndex     int
 }
 
 type priorityQueue[T any] []*pqItem[T]
@@ -853,13 +834,13 @@ func (pq *priorityQueue[T]) Pop() any {
 // ---------------------------------------------------------------------------
 
 func (bp *batchProcessor[T, R]) buildBatchResult(
-results []*ItemResult[R],
-totalDuration time.Duration,
+	results []*ItemResult[R],
+	totalDuration time.Duration,
 ) *BatchResult[R] {
 	br := &BatchResult[R]{
-	Results:         results,
+		Results:         results,
 		TotalCount:      len(results),
-			TotalDurationMs: float64(totalDuration.Microseconds()) / 1000.0,
+		TotalDurationMs: float64(totalDuration.Microseconds()) / 1000.0,
 	}
 	var sumItemMs float64
 	for _, r := range results {
@@ -895,10 +876,10 @@ func classifyError(batchCtx context.Context, err error) ItemStatus {
 	if err == nil {
 		return ItemStatusSuccess
 	}
-	if err == context.DeadlineExceeded || errors.Is(err, context.DeadlineExceeded) {
+	if err == context.DeadlineExceeded || stdliberrors.Is(err, context.DeadlineExceeded) {
 		return ItemStatusTimeout
 	}
-	if err == context.Canceled || errors.Is(err, context.Canceled) {
+	if err == context.Canceled || stdliberrors.Is(err, context.Canceled) {
 		return ItemStatusCancelled
 	}
 	// Check if the batch context itself expired.

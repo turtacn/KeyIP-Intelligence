@@ -1680,7 +1680,7 @@ func TestServingOption_ConnectionPoolSize(t *testing.T) {
 
 func TestServingOption_HealthCheckInterval(t *testing.T) {
 	o := defaultServingOptions()
-	WithHealthCheckInterval(30 * time.Second)(o)
+	WithServingHealthCheckInterval(30 * time.Second)(o)
 	if o.healthCheckInterval != 30*time.Second {
 		t.Errorf("expected 30s, got %v", o.healthCheckInterval)
 	}
@@ -1742,7 +1742,7 @@ func TestServingOption_Defaults(t *testing.T) {
 
 func TestClose_GracefulShutdown(t *testing.T) {
 	c, _ := NewGRPCServingClient([]string{"localhost:8500"},
-		WithHealthCheckInterval(50*time.Millisecond),
+		WithServingHealthCheckInterval(50*time.Millisecond),
 	)
 
 	// Start a predict in background
@@ -1832,7 +1832,7 @@ func TestConcurrent_MultiplePredict(t *testing.T) {
 
 func TestConcurrent_PredictDuringHealthCheck(t *testing.T) {
 	c, _ := NewGRPCServingClient([]string{"localhost:8500"},
-		WithHealthCheckInterval(10*time.Millisecond),
+		WithServingHealthCheckInterval(10*time.Millisecond),
 	)
 	defer c.Close()
 
@@ -2514,7 +2514,7 @@ func TestGRPC_WithAllOptions(t *testing.T) {
 		WithMaxRetries(3),
 		WithLoadBalancerStrategy("weighted"),
 		WithConnectionPoolSize(20),
-		WithHealthCheckInterval(30*time.Second),
+		WithServingHealthCheckInterval(30*time.Second),
 		WithServingLogger(logger),
 		WithServingMetrics(metrics),
 		WithInterceptors(

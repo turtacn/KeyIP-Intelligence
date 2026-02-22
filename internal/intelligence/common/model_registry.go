@@ -200,8 +200,8 @@ func defaultRegistryOptions() *registryOptions {
 	}
 }
 
-// WithHealthCheckInterval sets the periodic health-check interval.
-func WithHealthCheckInterval(d time.Duration) RegistryOption {
+// WithRegistryHealthCheckInterval sets the periodic health-check interval.
+func WithRegistryHealthCheckInterval(d time.Duration) RegistryOption {
 	return func(o *registryOptions) {
 		if d > 0 {
 			o.healthCheckInterval = d
@@ -394,7 +394,7 @@ func (r *modelRegistry) Register(ctx context.Context, meta *ModelMetadata) error
 		return errors.NewInvalidInputError("artifact_path is required")
 	}
 	if !isValidSemver(meta.Version) {
-		return errors.NewInvalidVersionError(meta.Version)
+		return errors.NewInvalidInputError(fmt.Sprintf("invalid version: %s", meta.Version))
 	}
 
 	// Validate artifact integrity
@@ -410,7 +410,7 @@ func (r *modelRegistry) Register(ctx context.Context, meta *ModelMetadata) error
 	defer entry.mu.Unlock()
 
 	if _, exists := entry.versions[meta.Version]; exists {
-		return errors.NewVersionAlreadyExistsError(meta.ModelID, meta.Version)
+		return errors.ErrConflict("model version", fmt.Sprintf("%s:%s", meta.ModelID, meta.Version))
 	}
 
 	ve := &versionEntry{
@@ -456,7 +456,7 @@ func (r *modelRegistry) Unregister(ctx context.Context, modelID string, version 
 
 	raw, ok := r.models.Load(modelID)
 	if !ok {
-		return errors.NewNotFoundError("model", modelID)
+		return errors.ErrNotFound("model", modelID)
 	}
 	entry := raw.(*modelEntry)
 
@@ -465,7 +465,7 @@ func (r *modelRegistry) Unregister(ctx context.Context, modelID string, version 
 
 	ve, exists := entry.versions[version]
 	if !exists {
-		return errors.NewNotFoundError("version", version)
+		return errors.ErrNotFound("version", version)
 	}
 
 	// Cannot unregister the active version
@@ -498,13 +498,13 @@ func (r *modelRegistry) GetModel(ctx context.Context, modelID string) (*Register
 
 	raw, ok := r.models.Load(modelID)
 	if !ok {
-		return nil, errors.NewNotFoundError("model", modelID)
+		return nil, errors.ErrNotFound("model", modelID)
 	}
 	entry := raw.(*modelEntry)
 
 	activeVer := entry.getActiveVersion()
 	if activeVer == "" {
-		return nil, errors.NewNoActiveVersionError(modelID)
+		return nil, errors.ErrNotFound("active version for model", modelID)
 	}
 
 	entry.mu.RLock()
@@ -512,7 +512,7 @@ func (r *modelRegistry) GetModel(ctx context.Context, modelID string) (*Register
 
 	ve, exists := entry.versions[activeVer]
 	if !exists {
-		return nil, errors.NewNotFoundError("version", activeVer)
+		return nil, errors.ErrNotFound("version", activeVer)
 	}
 
 	ve.markUsed()
@@ -531,7 +531,7 @@ func (r *modelRegistry) GetModelVersion(ctx context.Context, modelID string, ver
 
 	raw, ok := r.models.Load(modelID)
 	if !ok {
-		return nil, errors.NewNotFoundError("model", modelID)
+		return nil, errors.ErrNotFound("model", modelID)
 	}
 	entry := raw.(*modelEntry)
 
@@ -540,7 +540,7 @@ func (r *modelRegistry) GetModelVersion(ctx context.Context, modelID string, ver
 
 	ve, exists := entry.versions[version]
 	if !exists {
-		return nil, errors.NewNotFoundError("version", version)
+		return nil, errors.ErrNotFound("version", version)
 	}
 
 	return r.buildRegisteredModel(modelID, entry, ve), nil
@@ -608,7 +608,7 @@ func (r *modelRegistry) ListVersions(ctx context.Context, modelID string) ([]*Mo
 
 	raw, ok := r.models.Load(modelID)
 	if !ok {
-		return nil, errors.NewNotFoundError("model", modelID)
+		return nil, errors.ErrNotFound("model", modelID)
 	}
 	entry := raw.(*modelEntry)
 
@@ -640,7 +640,7 @@ func (r *modelRegistry) SetActiveVersion(ctx context.Context, modelID string, ve
 
 	raw, ok := r.models.Load(modelID)
 	if !ok {
-		return errors.NewNotFoundError("model", modelID)
+		return errors.ErrNotFound("model", modelID)
 	}
 	entry := raw.(*modelEntry)
 
@@ -655,11 +655,11 @@ func (r *modelRegistry) SetActiveVersion(ctx context.Context, modelID string, ve
 
 	ve, exists := entry.versions[version]
 	if !exists {
-		return errors.NewNotFoundError("version", version)
+		return errors.ErrNotFound("version", version)
 	}
 
 	if ve.info.Status == VersionStatusDeprecated {
-		return errors.NewVersionDeprecatedError(modelID, version)
+		return errors.NewInvalidInputError(fmt.Sprintf("version %s of model %s is deprecated", version, modelID))
 	}
 
 	if ve.info.Status == VersionStatusFailed {
@@ -723,7 +723,7 @@ func (r *modelRegistry) Rollback(ctx context.Context, modelID string) error {
 
 	raw, ok := r.models.Load(modelID)
 	if !ok {
-		return errors.NewNotFoundError("model", modelID)
+		return errors.ErrNotFound("model", modelID)
 	}
 	entry := raw.(*modelEntry)
 
@@ -732,7 +732,7 @@ func (r *modelRegistry) Rollback(ctx context.Context, modelID string) error {
 	entry.mu.RUnlock()
 
 	if prev == "" {
-		return errors.NewNoPreviousVersionError(modelID)
+		return errors.ErrNotFound("previous version for model", modelID)
 	}
 
 	return r.SetActiveVersion(ctx, modelID, prev)
@@ -752,7 +752,7 @@ func (r *modelRegistry) ConfigureABTest(ctx context.Context, config *ABTestConfi
 
 	raw, ok := r.models.Load(config.ModelID)
 	if !ok {
-		return errors.NewNotFoundError("model", config.ModelID)
+		return errors.ErrNotFound("model", config.ModelID)
 	}
 	entry := raw.(*modelEntry)
 
@@ -766,7 +766,7 @@ func (r *modelRegistry) ConfigureABTest(ctx context.Context, config *ABTestConfi
 	}
 
 	if len(config.Variants) == 0 {
-		return errors.NewInvalidABTestConfigError("at least one variant is required")
+		return errors.NewInvalidInputError("at least one variant is required")
 	}
 
 	totalWeight := 0
@@ -774,18 +774,18 @@ func (r *modelRegistry) ConfigureABTest(ctx context.Context, config *ABTestConfi
 	for _, v := range config.Variants {
 		if _, exists := entry.versions[v.Version]; !exists {
 			entry.mu.RUnlock()
-			return errors.NewNotFoundError("version", v.Version)
+			return errors.ErrNotFound("version", v.Version)
 		}
 		if v.TrafficWeight < 0 {
 			entry.mu.RUnlock()
-			return errors.NewInvalidABTestConfigError("traffic weight must be non-negative")
+			return errors.NewInvalidInputError("traffic weight must be non-negative")
 		}
 		totalWeight += v.TrafficWeight
 	}
 	entry.mu.RUnlock()
 
 	if totalWeight != 100 {
-		return errors.NewInvalidABTestConfigError(
+		return errors.NewInvalidInputError(
 			fmt.Sprintf("traffic weights must sum to 100, got %d", totalWeight))
 	}
 
@@ -814,7 +814,7 @@ func (r *modelRegistry) ResolveModel(ctx context.Context, modelID string, reques
 
 	raw, ok := r.models.Load(modelID)
 	if !ok {
-		return nil, errors.NewNotFoundError("model", modelID)
+		return nil, errors.ErrNotFound("model", modelID)
 	}
 	entry := raw.(*modelEntry)
 
@@ -840,14 +840,14 @@ func (r *modelRegistry) ResolveModel(ctx context.Context, modelID string, reques
 		resolvedVersion = entry.getActiveVersion()
 	}
 	if resolvedVersion == "" {
-		return nil, errors.NewNoActiveVersionError(modelID)
+		return nil, errors.ErrNotFound("active version for model", modelID)
 	}
 
 	entry.mu.RLock()
 	ve, exists := entry.versions[resolvedVersion]
 	if !exists {
 		entry.mu.RUnlock()
-		return nil, errors.NewNotFoundError("version", resolvedVersion)
+		return nil, errors.ErrNotFound("version", resolvedVersion)
 	}
 	ve.markUsed()
 	rm := r.buildRegisteredModel(modelID, entry, ve)

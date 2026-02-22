@@ -7,12 +7,40 @@ import (
 )
 
 // ---------------------------------------------------------------------------
+// InputFormat enum
+// ---------------------------------------------------------------------------
+
+type InputFormat int
+
+const (
+	FormatJSON     InputFormat = iota
+	FormatProtobuf
+	FormatNumpy
+)
+
+func (f InputFormat) String() string {
+	switch f {
+	case FormatJSON:
+		return "JSON"
+	case FormatProtobuf:
+		return "Protobuf"
+	case FormatNumpy:
+		return "Numpy"
+	default:
+		return "Unknown"
+	}
+}
+
+// ---------------------------------------------------------------------------
 // ModelBackend interface
 // ---------------------------------------------------------------------------
 
 // ModelBackend defines the interface for invoking AI models (Triton, ONNX, etc).
 type ModelBackend interface {
 	Predict(ctx context.Context, req *PredictRequest) (*PredictResponse, error)
+	PredictStream(ctx context.Context, req *PredictRequest) (<-chan *PredictResponse, error)
+	Healthy(ctx context.Context) error
+	Close() error
 }
 
 // ---------------------------------------------------------------------------
@@ -46,21 +74,38 @@ func NewNoopLogger() Logger {
 
 // PredictRequest carries the input payload for model inference.
 type PredictRequest struct {
-	ModelName   string            `json:"model_name"`
-	InputData   []byte            `json:"input_data"`
-	InputFormat string            `json:"input_format"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	ModelName    string            `json:"model_name"`
+	ModelVersion string            `json:"model_version,omitempty"`
+	InputName    string            `json:"input_name,omitempty"`
+	InputData    []byte            `json:"input_data"`
+	InputFormat  InputFormat       `json:"input_format"`
+	OutputNames  []string          `json:"output_names,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+}
+
+// Validate checks if the request is valid.
+func (r *PredictRequest) Validate() error {
+	if r == nil {
+		return fmt.Errorf("%w: nil request", ErrInvalidInput)
+	}
+	if r.ModelName == "" {
+		return fmt.Errorf("%w: model_name is required", ErrInvalidInput)
+	}
+	if len(r.InputData) == 0 {
+		return fmt.Errorf("%w: input_data is required", ErrInvalidInput)
+	}
+	return nil
 }
 
 // PredictResponse carries the raw outputs from model inference.
 type PredictResponse struct {
-	Outputs map[string]interface{} `json:"outputs"`
+	ModelName       string            `json:"model_name"`
+	ModelVersion    string            `json:"model_version"`
+	Outputs         map[string][]byte `json:"outputs"`
+	OutputFormat    InputFormat       `json:"output_format"`
+	InferenceTimeMs int64             `json:"inference_time_ms"`
+	Metadata        map[string]string `json:"metadata,omitempty"`
 }
-
-// Format constants.
-const (
-	FormatJSON = "JSON"
-)
 
 // ---------------------------------------------------------------------------
 // Helper functions
@@ -140,5 +185,3 @@ func toFloat64(v interface{}) (float64, error) {
 		return 0, fmt.Errorf("cannot convert %T to float64", v)
 	}
 }
-
-//Personal.AI order the ending

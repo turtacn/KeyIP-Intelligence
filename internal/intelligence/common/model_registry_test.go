@@ -122,13 +122,13 @@ func newTestModelMetadata(modelID, version string) *ModelMetadata {
 	}
 }
 
-func newTestRegistry(t *testing.T) (ModelRegistry, *mockModelLoader, *mockRegistryMetrics) {
+func newRegistryTestHelper(t *testing.T) (ModelRegistry, *mockModelLoader, *mockRegistryMetrics) {
 	t.Helper()
 	loader := newMockModelLoader()
 	metrics := &mockRegistryMetrics{}
 	reg, err := NewModelRegistry(loader, metrics, NewNoopLogger(),
-		WithHealthCheckInterval(1*time.Hour), // disable periodic checks in tests
-		WithUnloadDelay(0),                   // immediate unload for test speed
+		WithRegistryHealthCheckInterval(1*time.Hour), // disable periodic checks in tests
+		WithUnloadDelay(0),                           // immediate unload for test speed
 		WithMaxLoadedVersions(3),
 	)
 	if err != nil {
@@ -179,7 +179,7 @@ func TestNewModelRegistry_NilLoader(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRegister_Success(t *testing.T) {
-	reg, loader, _ := newTestRegistry(t)
+	reg, loader, _ := newRegistryTestHelper(t)
 	meta := newTestModelMetadata("gnn-v1", "1.0.0")
 	err := reg.Register(context.Background(), meta)
 	if err != nil {
@@ -202,7 +202,7 @@ func TestRegister_Success(t *testing.T) {
 }
 
 func TestRegister_DuplicateVersion(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	meta := newTestModelMetadata("gnn-v1", "1.0.0")
@@ -213,7 +213,7 @@ func TestRegister_DuplicateVersion(t *testing.T) {
 }
 
 func TestRegister_InvalidSemver(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	meta := newTestModelMetadata("gnn-v1", "abc")
 	err := reg.Register(context.Background(), meta)
 	if err == nil {
@@ -222,7 +222,7 @@ func TestRegister_InvalidSemver(t *testing.T) {
 }
 
 func TestRegister_ValidSemver_Variants(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	validVersions := []string{
 		"1.0.0",
 		"1.0.0-beta.1",
@@ -242,7 +242,7 @@ func TestRegister_ValidationFailure(t *testing.T) {
 	loader := newMockModelLoader()
 	loader.validateErr = fmt.Errorf("checksum mismatch")
 	reg, err := NewModelRegistry(loader, nil, nil,
-		WithHealthCheckInterval(1*time.Hour),
+		WithRegistryHealthCheckInterval(1*time.Hour),
 	)
 	if err != nil {
 		t.Fatalf("NewModelRegistry: %v", err)
@@ -257,7 +257,7 @@ func TestRegister_ValidationFailure(t *testing.T) {
 }
 
 func TestRegister_EmptyModelID(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	meta := newTestModelMetadata("", "1.0.0")
 	meta.ModelID = ""
 	err := reg.Register(context.Background(), meta)
@@ -267,7 +267,7 @@ func TestRegister_EmptyModelID(t *testing.T) {
 }
 
 func TestRegister_EmptyArtifactPath(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	meta := newTestModelMetadata("gnn-v1", "1.0.0")
 	meta.ArtifactPath = ""
 	err := reg.Register(context.Background(), meta)
@@ -281,7 +281,7 @@ func TestRegister_EmptyArtifactPath(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestGetModel_ActiveVersion(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	model, err := reg.GetModel(context.Background(), "gnn-v1")
@@ -297,7 +297,7 @@ func TestGetModel_ActiveVersion(t *testing.T) {
 }
 
 func TestGetModel_NotRegistered(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	_, err := reg.GetModel(context.Background(), "nonexistent")
 	if err == nil {
 		t.Fatal("expected error for unregistered model")
@@ -305,7 +305,7 @@ func TestGetModel_NotRegistered(t *testing.T) {
 }
 
 func TestGetModel_NoActiveVersion(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	_, err := reg.GetModel(context.Background(), "gnn-v1")
@@ -319,7 +319,7 @@ func TestGetModel_NoActiveVersion(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestGetModelVersion_Exists(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	model, err := reg.GetModelVersion(context.Background(), "gnn-v1", "1.0.0")
@@ -332,7 +332,7 @@ func TestGetModelVersion_Exists(t *testing.T) {
 }
 
 func TestGetModelVersion_NotExists(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	_, err := reg.GetModelVersion(context.Background(), "gnn-v1", "2.0.0")
@@ -346,7 +346,7 @@ func TestGetModelVersion_NotExists(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListModels_Empty(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	models, err := reg.ListModels(context.Background())
 	if err != nil {
 		t.Fatalf("ListModels: %v", err)
@@ -357,7 +357,7 @@ func TestListModels_Empty(t *testing.T) {
 }
 
 func TestListModels_Multiple(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "model-a", "1.0.0")
 	activateTestModel(t, reg, "model-b", "2.0.0")
 	activateTestModel(t, reg, "model-c", "1.0.0")
@@ -380,7 +380,7 @@ func TestListModels_Multiple(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListVersions_Multiple(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "1.1.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
@@ -399,7 +399,7 @@ func TestListVersions_Multiple(t *testing.T) {
 }
 
 func TestListVersions_ModelNotFound(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	_, err := reg.ListVersions(context.Background(), "nonexistent")
 	if err == nil {
 		t.Fatal("expected error for nonexistent model")
@@ -411,7 +411,7 @@ func TestListVersions_ModelNotFound(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSetActiveVersion_Success(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 
@@ -432,7 +432,7 @@ func TestSetActiveVersion_Success(t *testing.T) {
 }
 
 func TestSetActiveVersion_PreviousVersionRecorded(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 
@@ -447,7 +447,7 @@ func TestSetActiveVersion_PreviousVersionRecorded(t *testing.T) {
 }
 
 func TestSetActiveVersion_AutoLoad(t *testing.T) {
-	reg, loader, _ := newTestRegistry(t)
+	reg, loader, _ := newRegistryTestHelper(t)
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	// Version is REGISTERED, SetActiveVersion should auto-load
@@ -468,7 +468,7 @@ func TestSetActiveVersion_LoadFailure(t *testing.T) {
 	loader := newMockModelLoader()
 	loader.loadErr = fmt.Errorf("disk full")
 	reg, err := NewModelRegistry(loader, nil, nil,
-		WithHealthCheckInterval(1*time.Hour),
+		WithRegistryHealthCheckInterval(1*time.Hour),
 	)
 	if err != nil {
 		t.Fatalf("NewModelRegistry: %v", err)
@@ -490,7 +490,7 @@ func TestSetActiveVersion_LoadFailure(t *testing.T) {
 }
 
 func TestSetActiveVersion_VersionNotFound(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	err := reg.SetActiveVersion(context.Background(), "gnn-v1", "9.9.9")
@@ -500,7 +500,7 @@ func TestSetActiveVersion_VersionNotFound(t *testing.T) {
 }
 
 func TestSetActiveVersion_DeprecatedVersion(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	// Manually deprecate via internal access (in production this would be an API)
@@ -517,7 +517,7 @@ func TestSetActiveVersion_DeprecatedVersion(t *testing.T) {
 }
 
 func TestSetActiveVersion_SameVersion(t *testing.T) {
-	reg, loader, _ := newTestRegistry(t)
+	reg, loader, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	loadsBefore := loader.getLoadCalls()
@@ -535,7 +535,7 @@ func TestSetActiveVersion_SameVersion(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRollback_Success(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 	_ = reg.SetActiveVersion(context.Background(), "gnn-v1", "2.0.0")
@@ -551,7 +551,7 @@ func TestRollback_Success(t *testing.T) {
 }
 
 func TestRollback_NoPreviousVersion(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	err := reg.Rollback(context.Background(), "gnn-v1")
@@ -561,7 +561,7 @@ func TestRollback_NoPreviousVersion(t *testing.T) {
 }
 
 func TestRollback_PreviousVersionUnloaded(t *testing.T) {
-	reg, loader, _ := newTestRegistry(t)
+	reg, loader, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 	_ = reg.SetActiveVersion(context.Background(), "gnn-v1", "2.0.0")
@@ -590,7 +590,7 @@ func TestRollback_PreviousVersionUnloaded(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfigureABTest_Success(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 	_ = reg.SetActiveVersion(context.Background(), "gnn-v1", "2.0.0")
@@ -611,7 +611,7 @@ func TestConfigureABTest_Success(t *testing.T) {
 }
 
 func TestConfigureABTest_InvalidWeights(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 	_ = reg.SetActiveVersion(context.Background(), "gnn-v1", "2.0.0")
@@ -631,7 +631,7 @@ func TestConfigureABTest_InvalidWeights(t *testing.T) {
 }
 
 func TestConfigureABTest_ZeroVariants(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	cfg := &ABTestConfig{
@@ -646,7 +646,7 @@ func TestConfigureABTest_ZeroVariants(t *testing.T) {
 }
 
 func TestConfigureABTest_VersionNotFound(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	cfg := &ABTestConfig{
@@ -664,7 +664,7 @@ func TestConfigureABTest_VersionNotFound(t *testing.T) {
 }
 
 func TestConfigureABTest_Disable(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 	_ = reg.SetActiveVersion(context.Background(), "gnn-v1", "2.0.0")
@@ -704,7 +704,7 @@ func TestConfigureABTest_Disable(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestResolveModel_NoABTest(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	model, err := reg.ResolveModel(context.Background(), "gnn-v1", "any-request-id")
@@ -717,7 +717,7 @@ func TestResolveModel_NoABTest(t *testing.T) {
 }
 
 func TestResolveModel_ABTest_DeterministicRouting(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 	_ = reg.SetActiveVersion(context.Background(), "gnn-v1", "2.0.0")
@@ -751,7 +751,7 @@ func TestResolveModel_ABTest_DeterministicRouting(t *testing.T) {
 }
 
 func TestResolveModel_ABTest_TrafficDistribution(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 	_ = reg.SetActiveVersion(context.Background(), "gnn-v1", "2.0.0")
@@ -792,7 +792,7 @@ func TestResolveModel_ABTest_TrafficDistribution(t *testing.T) {
 }
 
 func TestResolveModel_ABTest_Expired(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 	_ = reg.SetActiveVersion(context.Background(), "gnn-v1", "2.0.0")
@@ -820,7 +820,7 @@ func TestResolveModel_ABTest_Expired(t *testing.T) {
 }
 
 func TestResolveModel_ABTest_NotStarted(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 	registerTestModel(t, reg, "gnn-v1", "2.0.0")
 	_ = reg.SetActiveVersion(context.Background(), "gnn-v1", "2.0.0")
@@ -851,7 +851,7 @@ func TestResolveModel_ABTest_NotStarted(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHealthCheck_AllHealthy(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "model-a", "1.0.0")
 	activateTestModel(t, reg, "model-b", "1.0.0")
 
@@ -871,7 +871,7 @@ func TestHealthCheck_AllHealthy(t *testing.T) {
 }
 
 func TestHealthCheck_SomeFailed(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "model-a", "1.0.0")
 	activateTestModel(t, reg, "model-b", "1.0.0")
 
@@ -895,7 +895,7 @@ func TestHealthCheck_SomeFailed(t *testing.T) {
 }
 
 func TestHealthCheck_NoModels(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	health, err := reg.HealthCheck(context.Background())
 	if err != nil {
 		t.Fatalf("HealthCheck: %v", err)
@@ -910,7 +910,7 @@ func TestHealthCheck_NoModels(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConcurrent_RegisterAndResolve(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	activateTestModel(t, reg, "gnn-v1", "1.0.0")
 
 	var wg sync.WaitGroup
@@ -951,7 +951,7 @@ func TestConcurrent_RegisterAndResolve(t *testing.T) {
 }
 
 func TestConcurrent_SetActiveAndGetModel(t *testing.T) {
-	reg, _, _ := newTestRegistry(t)
+	reg, _, _ := newRegistryTestHelper(t)
 	// Pre-register multiple versions
 	versions := []string{"1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"}
 	for _, v := range versions {
@@ -1009,7 +1009,7 @@ func TestDelayedUnload(t *testing.T) {
 	loader := newMockModelLoader()
 	metrics := &mockRegistryMetrics{}
 	reg, err := NewModelRegistry(loader, metrics, NewNoopLogger(),
-		WithHealthCheckInterval(1*time.Hour),
+		WithRegistryHealthCheckInterval(1*time.Hour),
 		WithUnloadDelay(200*time.Millisecond), // short delay for testing
 		WithMaxLoadedVersions(10),
 	)
@@ -1059,7 +1059,7 @@ func TestDelayedUnload(t *testing.T) {
 func TestMaxLoadedVersions(t *testing.T) {
 	loader := newMockModelLoader()
 	reg, err := NewModelRegistry(loader, nil, NewNoopLogger(),
-		WithHealthCheckInterval(1*time.Hour),
+		WithRegistryHealthCheckInterval(1*time.Hour),
 		WithUnloadDelay(0),
 		WithMaxLoadedVersions(2), // only 2 loaded at a time
 	)
@@ -1094,7 +1094,7 @@ func TestMaxLoadedVersions(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestMetrics_RegisterRecorded(t *testing.T) {
-	reg, _, metrics := newTestRegistry(t)
+	reg, _, metrics := newRegistryTestHelper(t)
 	before := metrics.modelLoadCount.Load()
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 	after := metrics.modelLoadCount.Load()
@@ -1104,7 +1104,7 @@ func TestMetrics_RegisterRecorded(t *testing.T) {
 }
 
 func TestMetrics_SetActiveRecorded(t *testing.T) {
-	reg, _, metrics := newTestRegistry(t)
+	reg, _, metrics := newRegistryTestHelper(t)
 	registerTestModel(t, reg, "gnn-v1", "1.0.0")
 	before := metrics.modelLoadCount.Load()
 	_ = reg.SetActiveVersion(context.Background(), "gnn-v1", "1.0.0")

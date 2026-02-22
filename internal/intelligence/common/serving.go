@@ -35,67 +35,6 @@ var (
 )
 
 // -------------------------------------------------------------------------
-// InputFormat enum
-// -------------------------------------------------------------------------
-
-type InputFormat int
-
-const (
-	FormatJSON     InputFormat = iota
-	FormatProtobuf
-	FormatNumpy
-)
-
-func (f InputFormat) String() string {
-	switch f {
-	case FormatJSON:
-		return "JSON"
-	case FormatProtobuf:
-		return "Protobuf"
-	case FormatNumpy:
-		return "Numpy"
-	default:
-		return "Unknown"
-	}
-}
-
-// -------------------------------------------------------------------------
-// Request / Response
-// -------------------------------------------------------------------------
-
-type PredictRequest struct {
-	ModelName    string            `json:"model_name"`
-	ModelVersion string            `json:"model_version,omitempty"`
-	InputName    string            `json:"input_name,omitempty"`
-	InputData    []byte            `json:"input_data"`
-	InputFormat  InputFormat       `json:"input_format"`
-	OutputNames  []string          `json:"output_names,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty"`
-}
-
-func (r *PredictRequest) Validate() error {
-	if r == nil {
-		return fmt.Errorf("%w: nil request", ErrInvalidInput)
-	}
-	if r.ModelName == "" {
-		return fmt.Errorf("%w: model_name is required", ErrInvalidInput)
-	}
-	if len(r.InputData) == 0 {
-		return fmt.Errorf("%w: input_data is required", ErrInvalidInput)
-	}
-	return nil
-}
-
-type PredictResponse struct {
-	ModelName       string            `json:"model_name"`
-	ModelVersion    string            `json:"model_version"`
-	Outputs         map[string][]byte `json:"outputs"`
-	OutputFormat    InputFormat       `json:"output_format"`
-	InferenceTimeMs int64             `json:"inference_time_ms"`
-	Metadata        map[string]string `json:"metadata,omitempty"`
-}
-
-// -------------------------------------------------------------------------
 // Model status
 // -------------------------------------------------------------------------
 
@@ -132,17 +71,6 @@ type ServingClient interface {
 	StreamPredict(ctx context.Context, req *PredictRequest) (<-chan *PredictResponse, error)
 	GetModelStatus(ctx context.Context, modelName string) (*ServingModelStatus, error)
 	ListServingModels(ctx context.Context) ([]*ServingModelStatus, error)
-	Healthy(ctx context.Context) error
-	Close() error
-}
-
-// -------------------------------------------------------------------------
-// ModelBackend – thin adapter used by inference engines
-// -------------------------------------------------------------------------
-
-type ModelBackend interface {
-	Predict(ctx context.Context, req *PredictRequest) (*PredictResponse, error)
-	PredictStream(ctx context.Context, req *PredictRequest) (<-chan *PredictResponse, error)
 	Healthy(ctx context.Context) error
 	Close() error
 }
@@ -538,7 +466,7 @@ func WithServingLogger(l Logger) ServingOption {
 	return func(o *servingOptions) { o.logger = l }
 }
 
-func WithHealthCheckInterval(d time.Duration) ServingOption {
+func WithServingHealthCheckInterval(d time.Duration) ServingOption {
 	return func(o *servingOptions) { o.healthCheckInterval = d }
 }
 
@@ -808,7 +736,7 @@ func isRetryableGRPCError(err error) bool {
 	if err == nil {
 		return false
 	}
-	msg := err.Error()
+	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "unavailable") ||
 		strings.Contains(msg, "deadline exceeded") ||
 		strings.Contains(msg, "connection refused")
@@ -1439,4 +1367,3 @@ var (
 var _ = math.MaxFloat64
 
 //Personal.AI order the ending
-
