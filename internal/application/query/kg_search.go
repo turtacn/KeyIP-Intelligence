@@ -341,7 +341,7 @@ func (s *kgSearchServiceImpl) SearchEntities(ctx context.Context, req *EntitySea
 	entities, total, facets, err := s.repo.QueryNodes(ctx, req)
 	if err != nil {
 		s.logger.Error(ctx, "Failed to query nodes from knowledge graph", "error", err, "entityType", req.EntityType)
-		return nil, errors.Wrap(err, "graph query failed")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "graph query failed")
 	}
 
 	resp := &EntitySearchResponse{
@@ -373,7 +373,7 @@ func (s *kgSearchServiceImpl) TraverseRelations(ctx context.Context, req *Relati
 	nodes, edges, meta, err := s.repo.Traverse(ctx, req)
 	if err != nil {
 		s.logger.Error(ctx, "Graph traversal execution failed", "error", err, "startNode", req.StartNodeID)
-		return nil, errors.Wrap(err, "graph traversal failure")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "graph traversal failure")
 	}
 
 	// 去重与环检测：基于真实工程场景，无论仓储层是否处理，服务编排层必须保证防御性
@@ -428,7 +428,7 @@ func (s *kgSearchServiceImpl) FindPaths(ctx context.Context, req *PathFindReques
 
 	if err != nil {
 		s.logger.Error(ctx, "Path finding execution failed", "error", err, "source", req.SourceID, "target", req.TargetID)
-		return nil, errors.Wrap(err, "path finding failure")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "path finding failure")
 	}
 
 	if len(paths) == 0 {
@@ -469,7 +469,7 @@ func (s *kgSearchServiceImpl) AggregateByDimension(ctx context.Context, req *Agg
 	buckets, total, err := s.repo.Aggregate(ctx, req)
 	if err != nil {
 		s.logger.Error(ctx, "Graph aggregation failed", "error", err, "dimension", req.Dimension)
-		return nil, errors.Wrap(err, "aggregation failure")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "aggregation failure")
 	}
 
 	// 排序与 TopN 截断
@@ -594,7 +594,7 @@ func (s *kgSearchServiceImpl) HybridSearch(ctx context.Context, req *HybridSearc
 	// 容错降级判断
 	if textErr != nil && vecErr != nil && graphErr != nil {
 		s.logger.Error(ctx, "All hybrid search branches failed")
-		return nil, errors.NewInternalError("All hybrid search branches failed")
+		return nil, errors.NewInternal("All hybrid search branches failed")
 	}
 
 	// 合并实体池

@@ -270,7 +270,7 @@ func (s *infringementReportServiceImpl) Generate(ctx context.Context, req *Infri
 
 	if err := s.metaRepo.Create(ctx, meta); err != nil {
 		s.logger.Error(ctx, "Failed to create report metadata", "error", err)
-		return nil, errors.Wrap(err, "metadata creation failed")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "metadata creation failed")
 	}
 
 	if isAsync {
@@ -343,7 +343,7 @@ func (s *infringementReportServiceImpl) executeReportPipeline(ctx context.Contex
 	}
 
 	if len(ownedClaims) == 0 {
-		return errors.NewError(errors.ErrInvalidState, "no valid owned patents successfully parsed")
+		return errors.New(errors.ErrCodeConflict, "no valid owned patents successfully parsed")
 	}
 
 	_ = s.cache.Set(ctx, "inf_status:"+reportID, ReportStatusInfo{ReportID: reportID, Status: StatusProcessing, ProgressPct: 30}, 24*time.Hour)
@@ -372,7 +372,7 @@ func (s *infringementReportServiceImpl) executeReportPipeline(ctx context.Contex
 	}
 
 	if len(targetSmilesMap) == 0 {
-		return errors.NewError(errors.ErrInvalidState, "no valid suspected molecules extracted")
+		return errors.New(errors.ErrCodeConflict, "no valid suspected molecules extracted")
 	}
 
 	meta.SuspectedTargetCount = len(targetSmilesMap)
@@ -496,13 +496,13 @@ func (s *infringementReportServiceImpl) executeReportPipeline(ctx context.Contex
 
 	renderedBytes, err := s.templater.Render(ctx, "infringement_template", reportData, targetFormat)
 	if err != nil {
-		return errors.Wrap(err, "template rendering failed")
+		return errors.Wrap(err, errors.ErrCodeInternal, "template rendering failed")
 	}
 
 	storageKey := fmt.Sprintf("reports/infringement/%s.%s", reportID, string(targetFormat))
 	err = s.storage.Save(ctx, storageKey, renderedBytes, "application/octet-stream")
 	if err != nil {
-		return errors.Wrap(err, "storage save failed")
+		return errors.Wrap(err, errors.ErrCodeInternal, "storage save failed")
 	}
 
 	// Finalize status
@@ -546,7 +546,7 @@ func (s *infringementReportServiceImpl) GetStatus(ctx context.Context, reportID 
 
 	meta, err := s.metaRepo.Get(ctx, reportID)
 	if err != nil {
-		return nil, errors.Wrap(err, "report not found")
+		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "report not found")
 	}
 
 	progress := 0
@@ -563,16 +563,16 @@ func (s *infringementReportServiceImpl) GetStatus(ctx context.Context, reportID 
 func (s *infringementReportServiceImpl) GetReport(ctx context.Context, reportID string, format ReportFormat) (io.ReadCloser, error) {
 	meta, err := s.metaRepo.Get(ctx, reportID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get report metadata")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to get report metadata")
 	}
 	if meta.Status != StatusCompleted {
-		return nil, errors.NewError(errors.ErrInvalidState, "report not completed")
+		return nil, errors.New(errors.ErrCodeConflict, "report not completed")
 	}
 
 	key := fmt.Sprintf("reports/infringement/%s.%s", reportID, string(format))
 	stream, err := s.storage.GetStream(ctx, key)
 	if err != nil {
-		return nil, errors.Wrap(err, "stream retrieval failed")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "stream retrieval failed")
 	}
 	return stream, nil
 }
@@ -583,7 +583,7 @@ func (s *infringementReportServiceImpl) ListReports(ctx context.Context, filter 
 	}
 	items, total, err := s.metaRepo.List(ctx, filter, page)
 	if err != nil {
-		return nil, errors.Wrap(err, "listing failed")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "listing failed")
 	}
 
 	return &common.PaginatedResult[InfringementReportSummary]{
@@ -597,10 +597,10 @@ func (s *infringementReportServiceImpl) ListReports(ctx context.Context, filter 
 func (s *infringementReportServiceImpl) DeleteReport(ctx context.Context, reportID string) error {
 	_, err := s.metaRepo.Get(ctx, reportID)
 	if err != nil {
-		return errors.Wrap(err, "report not found")
+		return errors.Wrap(err, errors.ErrCodeNotFound, "report not found")
 	}
 	if err := s.metaRepo.Delete(ctx, reportID); err != nil {
-		return errors.Wrap(err, "db delete failed")
+		return errors.Wrap(err, errors.ErrCodeInternal, "db delete failed")
 	}
 	go func(bgCtx context.Context, id string) {
 		_ = s.storage.Delete(bgCtx, fmt.Sprintf("reports/infringement/%s.PDF", id))

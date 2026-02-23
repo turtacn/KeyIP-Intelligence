@@ -270,7 +270,7 @@ func (s *nlQueryServiceImpl) Query(ctx context.Context, req *NLQueryRequest) (*N
 	// Step 0: Prompt Injection Check
 	if s.checkPromptInjection(req.Question) {
 		s.metrics.IncCounter("nl_query_prompt_injection", map[string]string{"user": req.UserContext.UserID})
-		return nil, errors.NewError(errors.ErrInvalidParameter, "Detect invalid query patterns. Please rephrase your question.")
+		return nil, errors.New(errors.ErrCodeBadRequest, "Detect invalid query patterns. Please rephrase your question.")
 	}
 
 	convID := req.ConversationID
@@ -284,7 +284,7 @@ func (s *nlQueryServiceImpl) Query(ctx context.Context, req *NLQueryRequest) (*N
 	// Step 1: Intent Classification
 	intent, intentConf, err := s.stepIntentClassification(ctx, req.Question, req.Language, history)
 	if err != nil {
-		return nil, errors.Wrap(err, "intent classification failed")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "intent classification failed")
 	}
 
 	// Step 2: Entity Recognition & Normalization
@@ -299,7 +299,7 @@ func (s *nlQueryServiceImpl) Query(ctx context.Context, req *NLQueryRequest) (*N
 	// Step 3: Query Generation (Logical & Transparent)
 	structuredQuery, queryType, err := s.buildStructuredQuery(*intent, resolvedEntities)
 	if err != nil {
-		return nil, errors.Wrap(err, "structured query generation failed")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "structured query generation failed")
 	}
 
 	generatedCypher, _ := s.llm.GenerateCypher(ctx, *intent) // Used for transparency
@@ -312,14 +312,14 @@ func (s *nlQueryServiceImpl) Query(ctx context.Context, req *NLQueryRequest) (*N
 	if execErr != nil {
 		s.logger.Error(ctx, "Query execution failed", "error", execErr, "intent", intent.IntentType)
 		// Retry logic for transient errors could be implemented here
-		return nil, errors.Wrap(execErr, "query execution failed")
+		return nil, errors.Wrap(execErr, errors.ErrCodeInternal, "query execution failed")
 	}
 
 	// Step 5: Answer Generation
 	truncatedResults := s.truncateResults(execResult, MaxResultsForLLM)
 	answer, err := s.stepAnswerGeneration(ctx, req.Question, *intent, truncatedResults, req.Language, unresolved)
 	if err != nil {
-		return nil, errors.Wrap(err, "answer generation failed")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "answer generation failed")
 	}
 
 	if intentConf < 0.5 {
@@ -462,13 +462,13 @@ func (s *nlQueryServiceImpl) stepIntentClassification(ctx context.Context, quest
 		s.logger.Warn(ctx, "Intent classification failed, retrying with lower temperature", "error", err)
 		resStr, err = s.llm.InferIntent(ctx, prompt, 0.1)
 		if err != nil {
-			return nil, 0, errors.NewInternalError("LLM intent inference failed after retry")
+			return nil, 0, errors.NewInternal("LLM intent inference failed after retry")
 		}
 	}
 
 	var intent QueryIntent
 	if err := json.Unmarshal([]byte(resStr), &intent); err != nil {
-		return nil, 0, errors.Wrap(err, "failed to parse intent JSON")
+		return nil, 0, errors.Wrap(err, errors.ErrCodeInternal, "failed to parse intent JSON")
 	}
 
 	confidence := 0.9

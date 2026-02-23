@@ -52,6 +52,17 @@ type PortfolioService interface {
 	GetOverlapAnalysis(ctx context.Context, portfolioID1, portfolioID2 string) (*OverlapResult, error)
 }
 
+// Service is an alias for PortfolioService for backward compatibility.
+type Service = PortfolioService
+
+// PortfolioDomainService is an alias for PortfolioService.
+type PortfolioDomainService = PortfolioService
+
+// ValuationDomainService defines the valuation domain service interface.
+type ValuationDomainService interface {
+	CalculateHealthScore(ctx context.Context, portfolioID string) (*HealthScore, error)
+}
+
 type portfolioServiceImpl struct {
 	repo PortfolioRepository
 }

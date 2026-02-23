@@ -143,6 +143,12 @@ type PaginationResult struct {
 	TotalPages int `json:"total_pages"`
 }
 
+// PaginatedResult is a generic wrapper for paginated data with pagination metadata.
+type PaginatedResult[T any] struct {
+	Items      []T              `json:"items"`
+	Pagination PaginationResult `json:"pagination"`
+}
+
 // PageResponse is a generic wrapper for paginated results.
 type PageResponse[T any] struct {
 	Items      []T `json:"items"`
@@ -187,6 +193,9 @@ type DateRange struct {
 	From Timestamp `json:"from"`
 	To   Timestamp `json:"to"`
 }
+
+// TimeRange is an alias for DateRange for backward compatibility.
+type TimeRange = DateRange
 
 // Validate checks if the date range is valid.
 func (dr DateRange) Validate() error {

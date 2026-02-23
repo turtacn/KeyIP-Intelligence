@@ -179,7 +179,7 @@ type SimilaritySearchService interface {
 	Search(ctx context.Context, smiles string, jurisdictions []string, competitors []string, limit int) ([]string, error) // Returns slice of Patent IDs
 }
 
-type TemplateEngine interface {
+type FTOTemplateRenderer interface {
 	Render(ctx context.Context, templateName string, data interface{}, format ReportFormat) ([]byte, error)
 }
 
@@ -231,7 +231,7 @@ type ftoReportServiceImpl struct {
 	molSvc     MoleculeService
 	patentRepo PatentRepository
 	simSearch  SimilaritySearchService
-	templater  TemplateEngine
+	templater  FTOTemplateRenderer
 	storage    StorageRepository
 	metaRepo   FTOReportMetadataRepo
 	cache      Cache
@@ -247,7 +247,7 @@ func NewFTOReportService(
 	molSvc MoleculeService,
 	patentRepo PatentRepository,
 	simSearch SimilaritySearchService,
-	templater TemplateEngine,
+	templater FTOTemplateRenderer,
 	storage StorageRepository,
 	metaRepo FTOReportMetadataRepo,
 	cache Cache,
@@ -327,7 +327,7 @@ func (s *ftoReportServiceImpl) Generate(ctx context.Context, req *FTOReportReque
 
 	if err := s.metaRepo.Create(ctx, meta); err != nil {
 		s.logger.Error(ctx, "Failed to create report metadata", "error", err)
-		return nil, errors.Wrap(err, "metadata creation failed")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "metadata creation failed")
 	}
 
 	if isAsync {
@@ -393,7 +393,9 @@ func (s *ftoReportServiceImpl) executePipelineWithProgress(ctx context.Context, 
 
 		res := ftoAnalysisResult{
 			MoleculeName: molInput.Name,
-			if molInput.Name == "" { res.MoleculeName = fmt.Sprintf("Target Molecule %d", i+1) }
+		}
+		if molInput.Name == "" {
+			res.MoleculeName = fmt.Sprintf("Target Molecule %d", i+1)
 		}
 
 		smiles, _, err := s.molSvc.ValidateAndNormalize(ctx, molInput.Format, molInput.Value)
@@ -422,7 +424,7 @@ func (s *ftoReportServiceImpl) executePipelineWithProgress(ctx context.Context, 
 		for _, patID := range candidatePatents {
 			// Check context cancellation
 			if ctx.Err() != nil {
-				return errors.Wrap(ctx.Err(), "pipeline aborted")
+				return errors.Wrap(ctx.Err(), errors.ErrCodeTimeout, "pipeline aborted")
 			}
 
 			var claimData interface{}
@@ -434,14 +436,14 @@ func (s *ftoReportServiceImpl) executePipelineWithProgress(ctx context.Context, 
 				}
 			}
 
-			assessment, err := s.assessor.Assess(ctx, smiles, claimData, string(req.AnalysisDepth))
+			_, err = s.assessor.Assess(ctx, smiles, claimData, string(req.AnalysisDepth))
 			if err != nil {
 				s.logger.Warn(ctx, "Assessment failed", "patent", patID, "err", err)
 				continue
 			}
 
 			// Abstract mock logic for assessment result handling
-			// In reality, type assert `assessment` to strong types
+			// In reality, type assert assessment to strong types
 			riskLevel := "Low"
 			// mock risk distribution based on ID for simulation
 			if len(patID)%3 == 0 { riskLevel = "High" } else if len(patID)%2 == 0 { riskLevel = "Medium" }
@@ -479,14 +481,14 @@ func (s *ftoReportServiceImpl) executePipelineWithProgress(ctx context.Context, 
 
 	renderedBytes, err := s.templater.Render(ctx, "fto_standard_template", reportData, targetFormat)
 	if err != nil {
-		return errors.Wrap(err, "template rendering failed")
+		return errors.Wrap(err, errors.ErrCodeInternal, "template rendering failed")
 	}
 
 	// Step 6: Store Report
 	storageKey := fmt.Sprintf("reports/fto/%s.%s", reportID, string(targetFormat))
 	err = s.storage.Save(ctx, storageKey, renderedBytes, "application/pdf")
 	if err != nil {
-		return errors.Wrap(err, "failed to save report to storage")
+		return errors.Wrap(err, errors.ErrCodeInternal, "failed to save report to storage")
 	}
 
 	// Finalize status
@@ -512,7 +514,7 @@ func (s *ftoReportServiceImpl) GetStatus(ctx context.Context, reportID string) (
 	// Cache miss, fallback to DB
 	meta, err := s.metaRepo.Get(ctx, reportID)
 	if err != nil {
-		return nil, errors.Wrap(err, "report not found")
+		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "report not found")
 	}
 
 	progress := 0
@@ -537,16 +539,16 @@ func (s *ftoReportServiceImpl) GetReport(ctx context.Context, reportID string, f
 	// Verify completion
 	meta, err := s.metaRepo.Get(ctx, reportID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to retrieve report metadata")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to retrieve report metadata")
 	}
 	if meta.Status != StatusCompleted {
-		return nil, errors.NewError(errors.ErrInvalidState, "report is not completed")
+		return nil, errors.New(errors.ErrCodeConflict, "report is not completed")
 	}
 
 	storageKey := fmt.Sprintf("reports/fto/%s.%s", reportID, string(format))
 	stream, err := s.storage.GetStream(ctx, storageKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch report stream")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to fetch report stream")
 	}
 
 	return stream, nil
@@ -554,22 +556,30 @@ func (s *ftoReportServiceImpl) GetReport(ctx context.Context, reportID string, f
 
 func (s *ftoReportServiceImpl) ListReports(ctx context.Context, filter *FTOReportFilter, page *common.Pagination) (*common.PaginatedResult[FTOReportSummary], error) {
 	if page == nil {
-		page = &common.Pagination{Page: 1, Size: 20}
+		page = &common.Pagination{Page: 1, PageSize: 20}
 	}
-	if page.Size > 100 {
-		page.Size = 100
+	if page.PageSize > 100 {
+		page.PageSize = 100
 	}
 
 	items, total, err := s.metaRepo.List(ctx, filter, page)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list reports")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to list reports")
+	}
+
+	totalPages := int(total) / page.PageSize
+	if int(total)%page.PageSize > 0 {
+		totalPages++
 	}
 
 	return &common.PaginatedResult[FTOReportSummary]{
-	Data:       items,
-		TotalCount: total,
+		Items: items,
+		Pagination: common.PaginationResult{
 			Page:       page.Page,
-			Size:       page.Size,
+			PageSize:   page.PageSize,
+			Total:      int(total),
+			TotalPages: totalPages,
+		},
 	}, nil
 }
 
@@ -581,13 +591,13 @@ func (s *ftoReportServiceImpl) DeleteReport(ctx context.Context, reportID string
 	// Check existence
 	_, err := s.metaRepo.Get(ctx, reportID)
 	if err != nil {
-		return errors.Wrap(err, "report not found")
+		return errors.Wrap(err, errors.ErrCodeNotFound, "report not found")
 	}
 
 	// Soft delete in DB
 	err = s.metaRepo.Delete(ctx, reportID)
 	if err != nil {
-		return errors.Wrap(err, "failed to delete report metadata")
+		return errors.Wrap(err, errors.ErrCodeInternal, "failed to delete report metadata")
 	}
 
 	// Async cleanup of storage objects

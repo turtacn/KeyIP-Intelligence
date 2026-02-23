@@ -32,6 +32,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/uuid"
+
 	domainmol "github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
@@ -298,6 +300,7 @@ type ConstellationService interface {
 
 type constellationServiceImpl struct {
 	portfolioSvc   domainportfolio.Service
+	portfolioRepo  domainportfolio.PortfolioRepository
 	moleculeSvc    domainmol.Service
 	patentRepo     domainpatent.Repository
 	moleculeRepo   domainmol.Repository
@@ -309,14 +312,15 @@ type constellationServiceImpl struct {
 
 // ConstellationServiceConfig holds configuration for constructing the service.
 type ConstellationServiceConfig struct {
-	PortfolioService   domainportfolio.Service
-	MoleculeService    domainmol.Service
-	PatentRepository   domainpatent.Repository
-	MoleculeRepository domainmol.Repository
-	GNNInference       molpatent_gnn.InferenceEngine
-	Logger             logging.Logger
-	Cache              ConstellationCache
-	CacheTTL           time.Duration
+	PortfolioService    domainportfolio.Service
+	PortfolioRepository domainportfolio.PortfolioRepository
+	MoleculeService     domainmol.Service
+	PatentRepository    domainpatent.Repository
+	MoleculeRepository  domainmol.Repository
+	GNNInference        molpatent_gnn.InferenceEngine
+	Logger              logging.Logger
+	Cache               ConstellationCache
+	CacheTTL            time.Duration
 }
 
 // NewConstellationService constructs a ConstellationService with all required dependencies.
@@ -348,6 +352,7 @@ func NewConstellationService(cfg ConstellationServiceConfig) (ConstellationServi
 
 	return &constellationServiceImpl{
 		portfolioSvc:   cfg.PortfolioService,
+		portfolioRepo:  cfg.PortfolioRepository,
 		moleculeSvc:    cfg.MoleculeService,
 		patentRepo:     cfg.PatentRepository,
 		moleculeRepo:   cfg.MoleculeRepository,
@@ -383,9 +388,13 @@ func (s *constellationServiceImpl) GenerateConstellation(ctx context.Context, re
 	s.logger.Info(ctx, "generating constellation", "portfolio_id", req.PortfolioID)
 
 	// Step 1: Load portfolio and its patents.
-	portfolio, err := s.portfolioSvc.GetByID(ctx, req.PortfolioID)
+	portfolioID, err := uuid.Parse(req.PortfolioID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load portfolio")
+		return nil, errors.NewInvalidParameterError("invalid portfolio ID format")
+	}
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "failed to load portfolio")
 	}
 	if portfolio == nil {
 		return nil, errors.NewNotFound("portfolio", req.PortfolioID)
@@ -482,9 +491,13 @@ func (s *constellationServiceImpl) GetTechDomainDistribution(ctx context.Context
 		}
 	}
 
-	portfolio, err := s.portfolioSvc.GetByID(ctx, portfolioID)
+	portfolioUUID, err := uuid.Parse(portfolioID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load portfolio")
+		return nil, errors.NewInvalidParameterError("invalid portfolio ID format")
+	}
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "failed to load portfolio")
 	}
 	if portfolio == nil {
 		return nil, errors.NewNotFound("portfolio", portfolioID)
@@ -492,7 +505,7 @@ func (s *constellationServiceImpl) GetTechDomainDistribution(ctx context.Context
 
 	patents, err := s.patentRepo.FindByPortfolioID(ctx, portfolioID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load patents for domain distribution")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to load patents for domain distribution")
 	}
 
 	// Aggregate by technology domain.

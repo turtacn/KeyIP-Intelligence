@@ -207,6 +207,10 @@ func NewInvalidInputError(message string) *AppError {
 	return ErrBadRequest(message)
 }
 
+func NewInvalidParameterError(message string) *AppError {
+	return ErrBadRequest(message)
+}
+
 func NewValidation(message string, args ...interface{}) *AppError {
 	if len(args) > 0 {
 		// If additional args are provided, treat the first one as context/field if string

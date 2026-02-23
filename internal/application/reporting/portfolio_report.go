@@ -176,7 +176,13 @@ type ValuationDomainService interface {
 	EvaluatePortfolio(ctx context.Context, portfolioID string) ([]interface{}, error)
 }
 
-// Reuse PatentRepository, MoleculeRepository, TemplateEngine, StorageRepository, Cache, Logger from previous
+// MoleculeRepository defines the minimal interface needed for molecule data access.
+type MoleculeRepository interface {
+	GetByID(ctx context.Context, id string) (interface{}, error)
+	ListByIDs(ctx context.Context, ids []string) ([]interface{}, error)
+}
+
+// Reuse PatentRepository, TemplateEngine, StorageRepository, Cache, Logger from previous
 type PortfolioReportMetadataRepo interface {
 	Create(ctx context.Context, meta *ReportMeta) error
 	UpdateStatus(ctx context.Context, reportID string, status ReportStatus, urls map[ExportFormat]string) error
