@@ -13,6 +13,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 type postgresLifecycleRepo struct {
@@ -438,6 +439,23 @@ func (r *postgresLifecycleRepo) GetCriticalDeadlines(ctx context.Context, limit 
 
 // Event
 
+func (r *postgresLifecycleRepo) DeleteEvent(ctx context.Context, id string) error {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return errors.NewValidationOp("delete_event", "invalid event id")
+	}
+	query := `DELETE FROM patent_lifecycle_events WHERE id = $1`
+	res, err := r.executor().ExecContext(ctx, query, uid)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to delete event")
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return errors.New(errors.ErrCodeNotFound, "event not found")
+	}
+	return nil
+}
+
 func (r *postgresLifecycleRepo) CreateEvent(ctx context.Context, event *lifecycle.LifecycleEvent) error {
 	query := `
 		INSERT INTO patent_lifecycle_events (
@@ -659,6 +677,23 @@ func (r *postgresLifecycleRepo) GetPortfolioCostSummary(ctx context.Context, por
 	return summary, nil
 }
 
+func (r *postgresLifecycleRepo) DeactivateSubscription(ctx context.Context, subscriptionID string) error {
+	uid, err := uuid.Parse(subscriptionID)
+	if err != nil {
+		return errors.NewValidationOp("deactivate_subscription", "invalid subscription id")
+	}
+	query := `UPDATE patent_monitor_subscriptions SET is_active = false, updated_at = NOW() WHERE id = $1`
+	res, err := r.executor().ExecContext(ctx, query, uid)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to deactivate subscription")
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return errors.New(errors.ErrCodeNotFound, "subscription not found")
+	}
+	return nil
+}
+
 // Dashboard
 
 func (r *postgresLifecycleRepo) GetLifecycleDashboard(ctx context.Context, orgID uuid.UUID) (*lifecycle.DashboardStats, error) {
@@ -738,6 +773,57 @@ func (r *postgresLifecycleRepo) GetLifecycleDashboard(ctx context.Context, orgID
 	}
 
 	return stats, nil
+}
+
+// Payment
+
+func (r *postgresLifecycleRepo) SavePayment(ctx context.Context, payment *lifecycle.PaymentRecord) (*lifecycle.PaymentRecord, error) {
+	// Stub implementation
+	return payment, nil
+}
+
+func (r *postgresLifecycleRepo) QueryPayments(ctx context.Context, query *lifecycle.PaymentQuery) ([]lifecycle.PaymentRecord, int64, error) {
+	// Stub implementation
+	return []lifecycle.PaymentRecord{}, 0, nil
+}
+
+// Legal Status
+
+func (r *postgresLifecycleRepo) GetByPatentID(ctx context.Context, patentID string) (*lifecycle.LegalStatusEntity, error) {
+	// Stub implementation
+	return &lifecycle.LegalStatusEntity{}, nil
+}
+
+func (r *postgresLifecycleRepo) UpdateStatus(ctx context.Context, patentID string, status string, effectiveDate time.Time) error {
+	// Stub implementation
+	return nil
+}
+
+func (r *postgresLifecycleRepo) SaveSubscription(ctx context.Context, sub *lifecycle.SubscriptionEntity) error {
+	// Stub implementation
+	return nil
+}
+
+func (r *postgresLifecycleRepo) GetStatusHistory(ctx context.Context, patentID string, pagination *commontypes.Pagination, from, to *time.Time) ([]*lifecycle.StatusHistoryEntity, error) {
+	// Stub implementation
+	return []*lifecycle.StatusHistoryEntity{}, nil
+}
+
+// Custom Event
+
+func (r *postgresLifecycleRepo) SaveCustomEvent(ctx context.Context, event *lifecycle.CustomEvent) error {
+	// Stub implementation
+	return nil
+}
+
+func (r *postgresLifecycleRepo) GetCustomEvents(ctx context.Context, patentIDs []string, start, end time.Time) ([]lifecycle.CustomEvent, error) {
+	// Stub implementation
+	return []lifecycle.CustomEvent{}, nil
+}
+
+func (r *postgresLifecycleRepo) UpdateEventStatus(ctx context.Context, eventID string, status string) error {
+	// Stub implementation
+	return nil
 }
 
 // Transaction

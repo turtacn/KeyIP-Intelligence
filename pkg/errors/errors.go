@@ -450,15 +450,15 @@ func NewParsingError(message string) *AppError {
 	return New(ErrCodeValidation, message)
 }
 
-func NewValidation(operation string, message string) *AppError {
+func NewValidationOp(operation string, message string) *AppError {
 	return New(ErrCodeValidation, message).WithDetails("operation", operation)
 }
 
-func NewNotFound(operation string, message string) *AppError {
+func NewNotFoundOp(operation string, message string) *AppError {
 	return New(ErrCodeNotFound, message).WithDetails("operation", operation)
 }
 
-func NewInternal(operation string, message string) *AppError {
+func NewInternalOp(operation string, message string) *AppError {
 	return New(ErrCodeInternal, message).WithDetails("operation", operation)
 }
 

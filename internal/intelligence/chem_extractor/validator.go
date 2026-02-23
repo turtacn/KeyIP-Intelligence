@@ -11,16 +11,6 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Interface
-// ---------------------------------------------------------------------------
-
-// EntityValidator validates raw chemical entities extracted by NER.
-type EntityValidator interface {
-	Validate(ctx context.Context, entity *RawChemicalEntity) (*ValidationResult, error)
-	ValidateBatch(ctx context.Context, entities []*RawChemicalEntity) ([]*ValidationResult, error)
-}
-
-// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -177,8 +167,6 @@ var (
 	reMarkushVar         = regexp.MustCompile(`^(?:R\d*|R'\d*|R''\d*|X|Y|Z|Ar|Het|Alk|Hal|Q|W|M|L)$`)
 	reInChIPrefix        = regexp.MustCompile(`^InChI=`)
 	reInChILayer         = regexp.MustCompile(`/[a-z]`)
-	reSMILESRingDigit    = regexp.MustCompile(`[^%](\d)`)
-	reSMILESRingPercent  = regexp.MustCompile(`%(\d{2})`)
 )
 
 // ---------------------------------------------------------------------------
@@ -219,19 +207,18 @@ func (v *entityValidatorImpl) Validate(ctx context.Context, entity *RawChemicalE
 		Corrections:        map[string]string{},
 	}
 
-	text := strings.TrimSpace(entity.Text)
+		text := strings.TrimSpace(entity.Text)
 	if text == "" {
 		result.IsValid = false
-		result.Issues = append(result.Issues, "empty entity text")
-		result.AdjustedConfidence = 0
+		result.Issues = append(result.Issues, "empty text")
+		result.AdjustedConfidence = 0.0
 		return result, nil
 	}
 
-	// ---- Blacklist check ----
+		// ---- Blacklist check ----
 	if v.isBlacklisted(text) {
 		result.IsValid = false
-		result.Issues = append(result.Issues, fmt.Sprintf("blacklisted term: %q", text))
-		result.AdjustedConfidence = 0
+		result.Issues = append(result.Issues, "entity is blacklisted")
 		return result, nil
 	}
 
@@ -266,26 +253,8 @@ func (v *entityValidatorImpl) Validate(ctx context.Context, entity *RawChemicalE
 	// ---- Context validation (cross-type) ----
 	v.validateContext(result, entity.Context)
 
-	// ---- Clamp confidence to [0, 1] ----
 	result.AdjustedConfidence = clampConfidence(result.AdjustedConfidence)
-
 	return result, nil
-}
-
-// ValidateBatch validates a slice of entities.
-func (v *entityValidatorImpl) ValidateBatch(ctx context.Context, entities []*RawChemicalEntity) ([]*ValidationResult, error) {
-	if len(entities) == 0 {
-		return []*ValidationResult{}, nil
-	}
-	results := make([]*ValidationResult, len(entities))
-	for i, e := range entities {
-		r, err := v.Validate(ctx, e)
-		if err != nil {
-			return nil, fmt.Errorf("validating entity[%d]: %w", i, err)
-		}
-		results[i] = r
-	}
-	return results, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -301,7 +270,7 @@ func (v *entityValidatorImpl) isBlacklisted(text string) bool {
 		return true
 	}
 	// Pure digits (not matching CAS format)
-	if rePureDigits.MatchString(text) {
+    if rePureDigits != nil && rePureDigits.MatchString(text) {
 		return true
 	}
 	return false
@@ -826,4 +795,14 @@ func clampConfidence(c float64) float64 {
 	return math.Max(0.0, math.Min(1.0, c))
 }
 
-
+func (v *entityValidatorImpl) ValidateBatch(ctx context.Context, entities []*RawChemicalEntity) ([]*ValidationResult, error) {
+	results := make([]*ValidationResult, len(entities))
+	for i, ent := range entities {
+		res, err := v.Validate(ctx, ent)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = res
+	}
+	return results, nil
+}

@@ -404,13 +404,13 @@ func NewAnnuityService(
 // CalculateAnnuity computes the next annuity fee for a single patent.
 func (s *annuityServiceImpl) CalculateAnnuity(ctx context.Context, req *CalculateAnnuityRequest) (*AnnuityResult, error) {
 	if req == nil {
-		return nil, errors.NewValidation("annuity.calculate", "request must not be nil")
+		return nil, errors.NewValidationOp("annuity.calculate", "request must not be nil")
 	}
 	if req.PatentID == "" {
-		return nil, errors.NewValidation("annuity.calculate", "patent_id is required")
+		return nil, errors.NewValidationOp("annuity.calculate", "patent_id is required")
 	}
 	if req.Jurisdiction == "" {
-		return nil, errors.NewValidation("annuity.calculate", "jurisdiction is required")
+		return nil, errors.NewValidationOp("annuity.calculate", "jurisdiction is required")
 	}
 
 	targetCurrency := req.TargetCurrency
@@ -440,20 +440,20 @@ func (s *annuityServiceImpl) CalculateAnnuity(ctx context.Context, req *Calculat
 	// Fetch patent
 	patentID, err := uuid.Parse(req.PatentID)
 	if err != nil {
-		return nil, errors.NewValidation("annuity.calculate", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
+		return nil, errors.NewValidationOp("annuity.calculate", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
 	}
 
 	patent, err := s.patentRepo.GetByID(ctx, patentID)
 	if err != nil {
 		s.logger.Error("failed to fetch patent", "patent_id", req.PatentID, "error", err)
-		return nil, errors.NewNotFound("annuity.calculate", fmt.Sprintf("patent %s not found", req.PatentID))
+		return nil, errors.NewNotFoundOp("annuity.calculate", fmt.Sprintf("patent %s not found", req.PatentID))
 	}
 
 	// Delegate to domain service for fee calculation
 	domainAnnuity, err := s.lifecycleSvc.CalculateAnnuityFee(ctx, patent.ID.String(), req.Jurisdiction, asOf)
 	if err != nil {
 		s.logger.Error("domain annuity calculation failed", "patent_id", req.PatentID, "error", err)
-		return nil, errors.NewInternal("annuity.calculate", fmt.Sprintf("fee calculation failed: %v", err))
+		return nil, errors.NewInternalOp("annuity.calculate", fmt.Sprintf("fee calculation failed: %v", err))
 	}
 
 	baseFee := MoneyAmount{
@@ -496,10 +496,10 @@ func (s *annuityServiceImpl) CalculateAnnuity(ctx context.Context, req *Calculat
 // BatchCalculate computes annuity fees for multiple patents concurrently.
 func (s *annuityServiceImpl) BatchCalculate(ctx context.Context, req *BatchCalculateRequest) (*BatchCalculateResponse, error) {
 	if req == nil {
-		return nil, errors.NewValidation("annuity.batch", "request must not be nil")
+		return nil, errors.NewValidationOp("annuity.batch", "request must not be nil")
 	}
 	if len(req.PatentIDs) == 0 {
-		return nil, errors.NewValidation("annuity.batch", "patent_ids must not be empty")
+		return nil, errors.NewValidationOp("annuity.batch", "patent_ids must not be empty")
 	}
 
 	asOf := req.AsOfDate
@@ -593,13 +593,13 @@ func (s *annuityServiceImpl) BatchCalculate(ctx context.Context, req *BatchCalcu
 // GenerateBudget produces a multi-currency budget report for a date range.
 func (s *annuityServiceImpl) GenerateBudget(ctx context.Context, req *GenerateBudgetRequest) (*BudgetReport, error) {
 	if req == nil {
-		return nil, errors.NewValidation("annuity.budget", "request must not be nil")
+		return nil, errors.NewValidationOp("annuity.budget", "request must not be nil")
 	}
 	if req.StartDate.IsZero() || req.EndDate.IsZero() {
-		return nil, errors.NewValidation("annuity.budget", "start_date and end_date are required")
+		return nil, errors.NewValidationOp("annuity.budget", "start_date and end_date are required")
 	}
 	if req.EndDate.Before(req.StartDate) {
-		return nil, errors.NewValidation("annuity.budget", "end_date must be after start_date")
+		return nil, errors.NewValidationOp("annuity.budget", "end_date must be after start_date")
 	}
 
 	targetCurrency := req.TargetCurrency
@@ -616,14 +616,14 @@ func (s *annuityServiceImpl) GenerateBudget(ctx context.Context, req *GenerateBu
 	if len(patentIDs) == 0 && req.PortfolioID != "" {
 		patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
 		if err != nil {
-			return nil, errors.NewInternal("annuity.budget", fmt.Sprintf("failed to list portfolio patents: %v", err))
+			return nil, errors.NewInternalOp("annuity.budget", fmt.Sprintf("failed to list portfolio patents: %v", err))
 		}
 		for _, p := range patents {
 			patentIDs = append(patentIDs, p.ID.String())
 		}
 	}
 	if len(patentIDs) == 0 {
-		return nil, errors.NewValidation("annuity.budget", "no patents specified or found in portfolio")
+		return nil, errors.NewValidationOp("annuity.budget", "no patents specified or found in portfolio")
 	}
 
 	jurisdictions := req.Jurisdictions
@@ -748,7 +748,7 @@ func (s *annuityServiceImpl) GenerateBudget(ctx context.Context, req *GenerateBu
 // GetPaymentSchedule returns upcoming payment entries.
 func (s *annuityServiceImpl) GetPaymentSchedule(ctx context.Context, req *PaymentScheduleRequest) ([]PaymentScheduleEntry, error) {
 	if req == nil {
-		return nil, errors.NewValidation("annuity.schedule", "request must not be nil")
+		return nil, errors.NewValidationOp("annuity.schedule", "request must not be nil")
 	}
 
 	startDate := req.StartDate
@@ -770,13 +770,13 @@ func (s *annuityServiceImpl) GetPaymentSchedule(ctx context.Context, req *Paymen
 	} else if req.PortfolioID != "" {
 		patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
 		if err != nil {
-			return nil, errors.NewInternal("annuity.schedule", fmt.Sprintf("failed to list portfolio: %v", err))
+			return nil, errors.NewInternalOp("annuity.schedule", fmt.Sprintf("failed to list portfolio: %v", err))
 		}
 		for _, p := range patents {
 			patentIDs = append(patentIDs, p.ID.String())
 		}
 	} else {
-		return nil, errors.NewValidation("annuity.schedule", "patent_id or portfolio_id is required")
+		return nil, errors.NewValidationOp("annuity.schedule", "patent_id or portfolio_id is required")
 	}
 
 	now := time.Now()
@@ -837,10 +837,10 @@ func (s *annuityServiceImpl) GetPaymentSchedule(ctx context.Context, req *Paymen
 // OptimizeCosts analyses the portfolio and recommends cost-saving abandonments.
 func (s *annuityServiceImpl) OptimizeCosts(ctx context.Context, req *OptimizeCostsRequest) (*CostOptimizationReport, error) {
 	if req == nil {
-		return nil, errors.NewValidation("annuity.optimize", "request must not be nil")
+		return nil, errors.NewValidationOp("annuity.optimize", "request must not be nil")
 	}
 	if req.PortfolioID == "" {
-		return nil, errors.NewValidation("annuity.optimize", "portfolio_id is required")
+		return nil, errors.NewValidationOp("annuity.optimize", "portfolio_id is required")
 	}
 
 	threshold := req.ValueScoreThreshold
@@ -858,10 +858,10 @@ func (s *annuityServiceImpl) OptimizeCosts(ctx context.Context, req *OptimizeCos
 
 	patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
 	if err != nil {
-		return nil, errors.NewInternal("annuity.optimize", fmt.Sprintf("failed to list portfolio: %v", err))
+		return nil, errors.NewInternalOp("annuity.optimize", fmt.Sprintf("failed to list portfolio: %v", err))
 	}
 	if len(patents) == 0 {
-		return nil, errors.NewNotFound("annuity.optimize", "no patents found in portfolio")
+		return nil, errors.NewNotFoundOp("annuity.optimize", "no patents found in portfolio")
 	}
 
 	now := time.Now()
@@ -965,32 +965,32 @@ func (s *annuityServiceImpl) OptimizeCosts(ctx context.Context, req *OptimizeCos
 // RecordPayment persists a completed annuity payment.
 func (s *annuityServiceImpl) RecordPayment(ctx context.Context, req *RecordPaymentRequest) (*PaymentRecord, error) {
 	if req == nil {
-		return nil, errors.NewValidation("annuity.record", "request must not be nil")
+		return nil, errors.NewValidationOp("annuity.record", "request must not be nil")
 	}
 	if req.PatentID == "" {
-		return nil, errors.NewValidation("annuity.record", "patent_id is required")
+		return nil, errors.NewValidationOp("annuity.record", "patent_id is required")
 	}
 	if req.Jurisdiction == "" {
-		return nil, errors.NewValidation("annuity.record", "jurisdiction is required")
+		return nil, errors.NewValidationOp("annuity.record", "jurisdiction is required")
 	}
 	if req.YearNumber < 1 {
-		return nil, errors.NewValidation("annuity.record", "year_number must be >= 1")
+		return nil, errors.NewValidationOp("annuity.record", "year_number must be >= 1")
 	}
 	if req.Amount.Amount <= 0 {
-		return nil, errors.NewValidation("annuity.record", "amount must be positive")
+		return nil, errors.NewValidationOp("annuity.record", "amount must be positive")
 	}
 	if req.PaidDate.IsZero() {
-		return nil, errors.NewValidation("annuity.record", "paid_date is required")
+		return nil, errors.NewValidationOp("annuity.record", "paid_date is required")
 	}
 
 	// Verify patent exists
 	uid, err := uuid.Parse(req.PatentID)
 	if err != nil {
-		return nil, errors.NewValidation("annuity.record", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
+		return nil, errors.NewValidationOp("annuity.record", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
 	}
 	_, err = s.patentRepo.GetByID(ctx, uid)
 	if err != nil {
-		return nil, errors.NewNotFound("annuity.record", fmt.Sprintf("patent %s not found", req.PatentID))
+		return nil, errors.NewNotFoundOp("annuity.record", fmt.Sprintf("patent %s not found", req.PatentID))
 	}
 
 	// Persist via domain/repository
@@ -1009,7 +1009,7 @@ func (s *annuityServiceImpl) RecordPayment(ctx context.Context, req *RecordPayme
 	saved, err := s.lifecycleRepo.SavePayment(ctx, domainPayment)
 	if err != nil {
 		s.logger.Error("failed to save payment", "patent_id", req.PatentID, "error", err)
-		return nil, errors.NewInternal("annuity.record", fmt.Sprintf("failed to save payment: %v", err))
+		return nil, errors.NewInternalOp("annuity.record", fmt.Sprintf("failed to save payment: %v", err))
 	}
 
 	// Invalidate annuity cache for this patent
@@ -1042,7 +1042,7 @@ func (s *annuityServiceImpl) RecordPayment(ctx context.Context, req *RecordPayme
 // GetPaymentHistory retrieves historical payment records.
 func (s *annuityServiceImpl) GetPaymentHistory(ctx context.Context, req *PaymentHistoryRequest) ([]PaymentRecord, int64, error) {
 	if req == nil {
-		return nil, 0, errors.NewValidation("annuity.history", "request must not be nil")
+		return nil, 0, errors.NewValidationOp("annuity.history", "request must not be nil")
 	}
 
 	page := req.Page
@@ -1067,7 +1067,7 @@ func (s *annuityServiceImpl) GetPaymentHistory(ctx context.Context, req *Payment
 	domainRecords, total, err := s.lifecycleRepo.QueryPayments(ctx, query)
 	if err != nil {
 		s.logger.Error("failed to query payment history", "error", err)
-		return nil, 0, errors.NewInternal("annuity.history", fmt.Sprintf("query failed: %v", err))
+		return nil, 0, errors.NewInternalOp("annuity.history", fmt.Sprintf("query failed: %v", err))
 	}
 
 	records := make([]PaymentRecord, 0, len(domainRecords))
@@ -1112,7 +1112,7 @@ func (s *annuityServiceImpl) convertCurrency(ctx context.Context, from MoneyAmou
 	if fetchErr != nil {
 		s.logger.Error("exchange rate fetch failed",
 			"from", from.Currency, "to", to, "error", fetchErr)
-		return MoneyAmount{}, errors.NewInternal("annuity.currency",
+		return MoneyAmount{}, errors.NewInternalOp("annuity.currency",
 			fmt.Sprintf("exchange rate %s->%s unavailable: %v", from.Currency, to, fetchErr))
 	}
 

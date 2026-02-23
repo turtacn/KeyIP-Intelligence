@@ -1,40 +1,5 @@
 // internal/application/patent_mining/chem_extraction.go
 
-// Generation Plan (embedded as per specification):
-// ---
-// File 214: internal/application/patent_mining/chem_extraction.go
-// Implements chemical entity extraction application service for the Patent Mining Workbench.
-//
-// Functional Positioning:
-//   Orchestration layer for chemical entity extraction from patent documents and scientific
-//   literature. Coordinates the intelligence-layer ChemExtractor with domain-layer Molecule
-//   services to extract, standardize, validate, deduplicate, and persist molecular structures.
-//
-// Core Implementation:
-//   - Define ChemExtractionService interface with 5 methods
-//   - Define request/response DTOs for all operations
-//   - Implement chemExtractionServiceImpl with full dependency injection
-//   - Orchestrate: document fetch -> extraction -> standardization -> validation -> dedup -> persist
-//   - Async batch extraction via Job abstraction with progress tracking
-//
-// Business Logic:
-//   - Supported formats: PDF, DOCX, XML (ST.36/ST.96), HTML
-//   - Entity types: SMILES, InChI, chemical names, CAS numbers, molecular formulae
-//   - Canonical SMILES standardization on all extracted structures
-//   - InChIKey-based deduplication to prevent redundant storage
-//   - Confidence threshold (0.6) below which entities are flagged NeedsReview
-//   - Full provenance tracking: source document, page, position
-//
-// Dependencies:
-//   Depends on: intelligence/chem_extractor, domain/molecule, domain/patent,
-//               infrastructure/storage/minio, pkg/errors, pkg/types
-//   Depended by: interfaces/http/handlers/molecule_handler, interfaces/cli/search
-//
-// Test Requirements:
-//   Mock intelligence layer and repositories; verify orchestration flow, dedup logic,
-//   confidence filtering, async job state machine, error propagation
-// ---
-
 package patent_mining
 
 import (
@@ -219,7 +184,7 @@ type ChemExtractionService interface {
 
 // chemExtractionServiceImpl orchestrates chemical extraction across intelligence and domain layers.
 type chemExtractionServiceImpl struct {
-	extractor   chemextractor.Extractor
+	extractor   chemextractor.ChemicalExtractor
 	molService  molecule.Service
 	molRepo     molecule.Repository
 	patentRepo  patent.Repository
@@ -231,7 +196,7 @@ type chemExtractionServiceImpl struct {
 
 // NewChemExtractionService constructs a ChemExtractionService with all required dependencies.
 func NewChemExtractionService(
-	extractor chemextractor.Extractor,
+	extractor chemextractor.ChemicalExtractor,
 	molService molecule.Service,
 	molRepo molecule.Repository,
 	patentRepo patent.Repository,
@@ -278,16 +243,16 @@ func effectiveThreshold(requested float64) float64 {
 // validateExtractionRequest performs input validation on an ExtractionRequest.
 func validateExtractionRequest(req *ExtractionRequest) error {
 	if req == nil {
-		return errors.NewValidation("extraction request must not be nil")
+		return errors.NewValidationOp("extraction_request", "must not be nil")
 	}
 	if req.DocumentID == "" {
-		return errors.NewValidation("document_id is required")
+		return errors.NewValidationOp("extraction_request", "document_id is required")
 	}
 	if req.DocumentStoragePath == "" {
-		return errors.NewValidation("document_storage_path is required")
+		return errors.NewValidationOp("extraction_request", "document_storage_path is required")
 	}
 	if _, ok := ValidDocumentFormats()[req.Format]; !ok {
-		return errors.NewValidation(fmt.Sprintf("unsupported document format: %s", req.Format))
+		return errors.NewValidationOp("extraction_request", fmt.Sprintf("unsupported document format: %s", req.Format))
 	}
 	return nil
 }
@@ -295,10 +260,10 @@ func validateExtractionRequest(req *ExtractionRequest) error {
 // validateTextExtractionRequest performs input validation on a TextExtractionRequest.
 func validateTextExtractionRequest(req *TextExtractionRequest) error {
 	if req == nil {
-		return errors.NewValidation("text extraction request must not be nil")
+		return errors.NewValidationOp("text_extraction_request", "must not be nil")
 	}
 	if req.Text == "" {
-		return errors.NewValidation("text is required")
+		return errors.NewValidationOp("text_extraction_request", "text is required")
 	}
 	return nil
 }
@@ -331,12 +296,9 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 	}
 
 	// 2. Invoke intelligence-layer extractor.
-	extractorReq := &chemextractor.ExtractionInput{
-		Data:        docBytes,
-		Format:      string(req.Format),
-		EntityTypes: toExtractorEntityTypes(req.EntityTypes),
-	}
-	rawEntities, err := s.extractor.Extract(ctx, extractorReq)
+	// Currently assumes text data. Future: Integrate document parsing/OCR.
+	textData := string(docBytes)
+	extractionResult, err := s.extractor.Extract(ctx, textData)
 	if err != nil {
 		s.logger.Error("intelligence extractor failed",
 			logging.String("document_id", req.DocumentID),
@@ -354,13 +316,13 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 
 	seen := make(map[string]struct{}) // InChIKey dedup within this extraction
 
-	for _, raw := range rawEntities {
+	for _, raw := range extractionResult.Entities {
 		entity := ExtractedEntity{
-			EntityType:   EntityType(raw.Type),
-			RawValue:     raw.Value,
+			EntityType:   EntityType(raw.EntityType),
+			RawValue:     raw.Text,
 			Confidence:   raw.Confidence,
-			SourcePage:   raw.Page,
-			SourceOffset: raw.Offset,
+			SourcePage:   1,
+			SourceOffset: raw.StartOffset,
 		}
 
 		// Confidence filtering.
@@ -372,11 +334,11 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 		}
 
 		// Standardize: resolve to canonical SMILES and compute InChIKey.
-		resolved, err := s.extractor.Resolve(ctx, raw.Value, raw.Type)
+		resolved, err := s.extractor.Resolve(ctx, raw)
 		if err != nil {
 			s.logger.Warn("failed to resolve entity, marking for review",
-				logging.String("raw", raw.Value),
-				logging.String("type", raw.Type),
+				logging.String("raw", raw.Text),
+				logging.String("type", string(raw.EntityType)),
 				logging.Error(err),
 			)
 			entity.ReviewStatus = ReviewStatusNeedsReview
@@ -384,20 +346,8 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 			result.Entities = append(result.Entities, entity)
 			continue
 		}
-		entity.Canonical = resolved.CanonicalSMILES
+		entity.Canonical = resolved.SMILES
 		entity.InChIKey = resolved.InChIKey
-
-		// Validate chemical structure.
-		if valid, vErr := s.extractor.Validate(ctx, resolved.CanonicalSMILES); vErr != nil || !valid {
-			s.logger.Warn("entity failed validation, marking for review",
-				logging.String("canonical", resolved.CanonicalSMILES),
-				logging.Error(vErr),
-			)
-			entity.ReviewStatus = ReviewStatusNeedsReview
-			result.TotalReview++
-			result.Entities = append(result.Entities, entity)
-			continue
-		}
 
 		// Deduplicate within this batch.
 		if _, dup := seen[resolved.InChIKey]; dup {
@@ -425,14 +375,14 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 			result.TotalDuplicated++
 		} else {
 			// Persist new molecule via domain service.
-			mol, createErr := s.molService.CreateFromSMILES(ctx, resolved.CanonicalSMILES, map[string]string{
+			mol, createErr := s.molService.CreateFromSMILES(ctx, resolved.SMILES, map[string]string{
 				"source_document": req.DocumentID,
-				"source_page":    fmt.Sprintf("%d", raw.Page),
+				"source_page":    fmt.Sprintf("%d", 1),
 				"extraction_id":  result.RequestID,
 			})
 			if createErr != nil {
 				s.logger.Error("failed to persist molecule",
-					logging.String("smiles", resolved.CanonicalSMILES),
+					logging.String("smiles", resolved.SMILES),
 					logging.Error(createErr),
 				)
 				entity.ReviewStatus = ReviewStatusNeedsReview
@@ -490,12 +440,7 @@ func (s *chemExtractionServiceImpl) ExtractFromText(ctx context.Context, req *Te
 	)
 
 	// Invoke NER on raw text.
-	nerReq := &chemextractor.ExtractionInput{
-		Data:        []byte(req.Text),
-		Format:      "text",
-		EntityTypes: toExtractorEntityTypes(req.EntityTypes),
-	}
-	rawEntities, err := s.extractor.Extract(ctx, nerReq)
+	extractionResult, err := s.extractor.Extract(ctx, req.Text)
 	if err != nil {
 		s.logger.Error("text extraction failed", logging.Error(err))
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "text chemical extraction failed")
@@ -508,12 +453,12 @@ func (s *chemExtractionServiceImpl) ExtractFromText(ctx context.Context, req *Te
 
 	seen := make(map[string]struct{})
 
-	for _, raw := range rawEntities {
+	for _, raw := range extractionResult.Entities {
 		entity := ExtractedEntity{
-			EntityType:   EntityType(raw.Type),
-			RawValue:     raw.Value,
+			EntityType:   EntityType(raw.EntityType),
+			RawValue:     raw.Text,
 			Confidence:   raw.Confidence,
-			SourceOffset: raw.Offset,
+			SourceOffset: raw.StartOffset,
 		}
 
 		if raw.Confidence < threshold {
@@ -523,22 +468,15 @@ func (s *chemExtractionServiceImpl) ExtractFromText(ctx context.Context, req *Te
 			continue
 		}
 
-		resolved, err := s.extractor.Resolve(ctx, raw.Value, raw.Type)
+		resolved, err := s.extractor.Resolve(ctx, raw)
 		if err != nil {
 			entity.ReviewStatus = ReviewStatusNeedsReview
 			result.TotalReview++
 			result.Entities = append(result.Entities, entity)
 			continue
 		}
-		entity.Canonical = resolved.CanonicalSMILES
+		entity.Canonical = resolved.SMILES
 		entity.InChIKey = resolved.InChIKey
-
-		if valid, vErr := s.extractor.Validate(ctx, resolved.CanonicalSMILES); vErr != nil || !valid {
-			entity.ReviewStatus = ReviewStatusNeedsReview
-			result.TotalReview++
-			result.Entities = append(result.Entities, entity)
-			continue
-		}
 
 		if _, dup := seen[resolved.InChIKey]; dup {
 			entity.IsDuplicate = true
@@ -566,7 +504,7 @@ func (s *chemExtractionServiceImpl) ExtractFromText(ctx context.Context, req *Te
 // The job runs in a background goroutine; callers poll via GetExtractionJob.
 func (s *chemExtractionServiceImpl) BatchExtract(ctx context.Context, req *BatchExtractionRequest) (*ExtractionJob, error) {
 	if req == nil || len(req.Documents) == 0 {
-		return nil, errors.NewValidation("batch extraction requires at least one document")
+		return nil, errors.NewValidationOp("batch_extract", "batch extraction requires at least one document")
 	}
 
 	for i := range req.Documents {
@@ -661,7 +599,7 @@ func (s *chemExtractionServiceImpl) updateJobStatus(job *ExtractionJob, status J
 // GetExtractionJob returns the current state of a batch extraction job.
 func (s *chemExtractionServiceImpl) GetExtractionJob(ctx context.Context, jobID string) (*ExtractionJob, error) {
 	if jobID == "" {
-		return nil, errors.NewValidation("job_id is required")
+		return nil, errors.NewValidationOp("get_extraction_job", "job_id is required")
 	}
 
 	s.jobsMu.RLock()
@@ -669,7 +607,7 @@ func (s *chemExtractionServiceImpl) GetExtractionJob(ctx context.Context, jobID 
 
 	job, ok := s.jobs[jobID]
 	if !ok {
-		return nil, errors.NewNotFound(fmt.Sprintf("extraction job not found: %s", jobID))
+		return nil, errors.NewNotFoundOp("get_extraction_job", fmt.Sprintf("extraction job not found: %s", jobID))
 	}
 
 	// Return a shallow copy to avoid data races on read.
@@ -678,8 +616,6 @@ func (s *chemExtractionServiceImpl) GetExtractionJob(ctx context.Context, jobID 
 }
 
 // ListExtractionHistory returns a paginated view of past extraction results.
-// In a production system this would query a persistent store; here we provide
-// the interface contract and a stub that returns from the in-memory job results.
 func (s *chemExtractionServiceImpl) ListExtractionHistory(ctx context.Context, opts *ListExtractionOpts) (*ExtractionHistoryPage, error) {
 	if opts == nil {
 		opts = &ListExtractionOpts{}
@@ -750,6 +686,3 @@ func toExtractorEntityTypes(types []EntityType) []string {
 
 // Compile-time interface satisfaction check.
 var _ ChemExtractionService = (*chemExtractionServiceImpl)(nil)
-
-//Personal.AI order the ending
-

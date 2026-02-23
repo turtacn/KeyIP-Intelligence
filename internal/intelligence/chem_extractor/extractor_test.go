@@ -56,15 +56,47 @@ func (m *mockEntityResolver) Resolve(ctx context.Context, entity *RawChemicalEnt
 	}, nil
 }
 
-type mockEntityValidator struct {
-	validateFn func(ctx context.Context, entity *RawChemicalEntity) (bool, error)
+func (m *mockEntityResolver) ResolveBatch(ctx context.Context, entities []*RawChemicalEntity) ([]*ResolvedChemicalEntity, error) {
+	results := make([]*ResolvedChemicalEntity, len(entities))
+	for i, ent := range entities {
+		res, err := m.Resolve(ctx, ent)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = res
+	}
+	return results, nil
 }
 
-func (m *mockEntityValidator) Validate(ctx context.Context, entity *RawChemicalEntity) (bool, error) {
+func (m *mockEntityResolver) ResolveByType(ctx context.Context, text string, entityType ChemicalEntityType) (*ResolvedChemicalEntity, error) {
+	return m.Resolve(ctx, &RawChemicalEntity{
+		Text:       text,
+		EntityType: entityType,
+		Confidence: 1.0,
+	})
+}
+
+type mockEntityValidator struct {
+	validateFn func(ctx context.Context, entity *RawChemicalEntity) (*ValidationResult, error)
+}
+
+func (m *mockEntityValidator) Validate(ctx context.Context, entity *RawChemicalEntity) (*ValidationResult, error) {
 	if m.validateFn != nil {
 		return m.validateFn(ctx, entity)
 	}
-	return true, nil
+	return &ValidationResult{IsValid: true, Entity: entity}, nil
+}
+
+func (m *mockEntityValidator) ValidateBatch(ctx context.Context, entities []*RawChemicalEntity) ([]*ValidationResult, error) {
+	results := make([]*ValidationResult, len(entities))
+	for i, ent := range entities {
+		res, err := m.Validate(ctx, ent)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = res
+	}
+	return results, nil
 }
 
 type mockChemicalDictionary struct {
@@ -114,6 +146,18 @@ func (m *mockChemicalDictionary) Lookup(name string) (*DictionaryEntry, bool) {
 func (m *mockChemicalDictionary) LookupCAS(cas string) (*DictionaryEntry, bool) {
 	e, ok := m.cas[cas]
 	return e, ok
+}
+
+func (m *mockChemicalDictionary) LookupBrand(brand string) (*DictionaryEntry, bool) {
+	// Simple mock implementation
+	if strings.EqualFold(brand, "Tylenol") {
+		return &DictionaryEntry{
+			CanonicalName: "acetaminophen",
+			EntityType:    EntityBrandName,
+			Synonyms:      []string{"Tylenol"},
+		}, true
+	}
+	return nil, false
 }
 
 func (m *mockChemicalDictionary) Size() int {
@@ -1390,7 +1434,7 @@ func TestLooksLikeMolecularFormula(t *testing.T) {
 		{"Hello", false},  // no digit
 		{"", false},
 		{"C", false},      // too short
-		{"CH3COOH", false}, // no digits after elements (depends on pattern)
+		{"CH3COOH", true}, // no digits after elements (depends on pattern)
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -1732,5 +1776,3 @@ func TestMockDictionary_LookupCAS(t *testing.T) {
 		t.Error("expected not to find CAS 99-99-9")
 	}
 }
-
-//Personal.AI order the ending

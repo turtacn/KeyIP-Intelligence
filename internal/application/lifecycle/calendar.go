@@ -207,13 +207,13 @@ func NewCalendarService(
 // GetCalendarView returns events within a date range.
 func (s *calendarServiceImpl) GetCalendarView(ctx context.Context, req *CalendarViewRequest) (*CalendarView, error) {
 	if req == nil {
-		return nil, errors.NewValidation("calendar.view", "request must not be nil")
+		return nil, errors.NewValidationOp("calendar.view", "request must not be nil")
 	}
 	if req.StartDate.IsZero() || req.EndDate.IsZero() {
-		return nil, errors.NewValidation("calendar.view", "start_date and end_date are required")
+		return nil, errors.NewValidationOp("calendar.view", "start_date and end_date are required")
 	}
 	if req.EndDate.Before(req.StartDate) {
-		return nil, errors.NewValidation("calendar.view", "end_date must be after start_date")
+		return nil, errors.NewValidationOp("calendar.view", "end_date must be after start_date")
 	}
 
 	tz := req.Timezone
@@ -306,26 +306,26 @@ func (s *calendarServiceImpl) GetCalendarView(ctx context.Context, req *Calendar
 // AddEvent creates a custom milestone event.
 func (s *calendarServiceImpl) AddEvent(ctx context.Context, req *AddEventRequest) (*CalendarEvent, error) {
 	if req == nil {
-		return nil, errors.NewValidation("calendar.add", "request must not be nil")
+		return nil, errors.NewValidationOp("calendar.add", "request must not be nil")
 	}
 	if req.PatentID == "" {
-		return nil, errors.NewValidation("calendar.add", "patent_id is required")
+		return nil, errors.NewValidationOp("calendar.add", "patent_id is required")
 	}
 	if req.Title == "" {
-		return nil, errors.NewValidation("calendar.add", "title is required")
+		return nil, errors.NewValidationOp("calendar.add", "title is required")
 	}
 	if req.DueDate.IsZero() {
-		return nil, errors.NewValidation("calendar.add", "due_date is required")
+		return nil, errors.NewValidationOp("calendar.add", "due_date is required")
 	}
 
 	patentID, err := uuid.Parse(req.PatentID)
 	if err != nil {
-		return nil, errors.NewValidation("calendar.add", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
+		return nil, errors.NewValidationOp("calendar.add", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
 	}
 
 	patent, err := s.patentRepo.GetByID(ctx, patentID)
 	if err != nil {
-		return nil, errors.NewNotFound("calendar.add", fmt.Sprintf("patent %s not found", req.PatentID))
+		return nil, errors.NewNotFoundOp("calendar.add", fmt.Sprintf("patent %s not found", req.PatentID))
 	}
 
 	eventType := req.EventType
@@ -368,7 +368,7 @@ func (s *calendarServiceImpl) AddEvent(ctx context.Context, req *AddEventRequest
 	domainEvent := toDomainCustomEvent(event)
 	if saveErr := s.lifecycleRepo.SaveCustomEvent(ctx, domainEvent); saveErr != nil {
 		s.logger.Error("failed to save custom event", "error", saveErr)
-		return nil, errors.NewInternal("calendar.add", fmt.Sprintf("save failed: %v", saveErr))
+		return nil, errors.NewInternalOp("calendar.add", fmt.Sprintf("save failed: %v", saveErr))
 	}
 
 	s.logger.Info("custom event created",
@@ -383,15 +383,15 @@ func (s *calendarServiceImpl) AddEvent(ctx context.Context, req *AddEventRequest
 // UpdateEventStatus marks an event as completed or cancelled.
 func (s *calendarServiceImpl) UpdateEventStatus(ctx context.Context, eventID string, status EventStatus) error {
 	if eventID == "" {
-		return errors.NewValidation("calendar.update_status", "event_id is required")
+		return errors.NewValidationOp("calendar.update_status", "event_id is required")
 	}
 	if !isValidEventStatus(status) {
-		return errors.NewValidation("calendar.update_status", fmt.Sprintf("invalid status: %s", status))
+		return errors.NewValidationOp("calendar.update_status", fmt.Sprintf("invalid status: %s", status))
 	}
 
 	if err := s.lifecycleRepo.UpdateEventStatus(ctx, eventID, string(status)); err != nil {
 		s.logger.Error("failed to update event status", "event_id", eventID, "error", err)
-		return errors.NewInternal("calendar.update_status", fmt.Sprintf("update failed: %v", err))
+		return errors.NewInternalOp("calendar.update_status", fmt.Sprintf("update failed: %v", err))
 	}
 
 	s.logger.Info("event status updated", "event_id", eventID, "status", status)
@@ -401,12 +401,12 @@ func (s *calendarServiceImpl) UpdateEventStatus(ctx context.Context, eventID str
 // DeleteEvent removes a custom event.
 func (s *calendarServiceImpl) DeleteEvent(ctx context.Context, eventID string) error {
 	if eventID == "" {
-		return errors.NewValidation("calendar.delete", "event_id is required")
+		return errors.NewValidationOp("calendar.delete", "event_id is required")
 	}
 
 	if err := s.lifecycleRepo.DeleteEvent(ctx, eventID); err != nil {
 		s.logger.Error("failed to delete event", "event_id", eventID, "error", err)
-		return errors.NewInternal("calendar.delete", fmt.Sprintf("delete failed: %v", err))
+		return errors.NewInternalOp("calendar.delete", fmt.Sprintf("delete failed: %v", err))
 	}
 
 	s.logger.Info("event deleted", "event_id", eventID)
@@ -416,7 +416,7 @@ func (s *calendarServiceImpl) DeleteEvent(ctx context.Context, eventID string) e
 // ExportICal generates iCalendar format data.
 func (s *calendarServiceImpl) ExportICal(ctx context.Context, req *ICalExportRequest) ([]byte, error) {
 	if req == nil {
-		return nil, errors.NewValidation("calendar.ical", "request must not be nil")
+		return nil, errors.NewValidationOp("calendar.ical", "request must not be nil")
 	}
 
 	startDate := req.StartDate
@@ -447,7 +447,7 @@ func (s *calendarServiceImpl) ExportICal(ctx context.Context, req *ICalExportReq
 // GetUpcomingDeadlines returns events due within N days.
 func (s *calendarServiceImpl) GetUpcomingDeadlines(ctx context.Context, portfolioID string, withinDays int) ([]CalendarEvent, error) {
 	if portfolioID == "" {
-		return nil, errors.NewValidation("calendar.upcoming", "portfolio_id is required")
+		return nil, errors.NewValidationOp("calendar.upcoming", "portfolio_id is required")
 	}
 	if withinDays <= 0 {
 		withinDays = 30
@@ -488,11 +488,11 @@ func (s *calendarServiceImpl) resolvePatentIDs(ctx context.Context, portfolioID 
 		return explicitIDs, nil
 	}
 	if portfolioID == "" {
-		return nil, errors.NewValidation("calendar", "either portfolio_id or patent_ids is required")
+		return nil, errors.NewValidationOp("calendar", "either portfolio_id or patent_ids is required")
 	}
 	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
 	if err != nil {
-		return nil, errors.NewInternal("calendar", fmt.Sprintf("failed to list portfolio patents: %v", err))
+		return nil, errors.NewInternalOp("calendar", fmt.Sprintf("failed to list portfolio patents: %v", err))
 	}
 	ids := make([]string, 0, len(patents))
 	for _, p := range patents {
@@ -537,7 +537,7 @@ func (s *calendarServiceImpl) generateEventsForPatent(
 
 	// Ensure filing date is available
 	if patent.FilingDate == nil {
-		return nil, errors.NewValidation("calendar", fmt.Sprintf("patent %s missing filing date", patent.PatentNumber))
+		return nil, errors.NewValidationOp("calendar", fmt.Sprintf("patent %s missing filing date", patent.PatentNumber))
 	}
 	filingDate := *patent.FilingDate
 

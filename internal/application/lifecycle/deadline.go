@@ -219,7 +219,7 @@ func NewDeadlineService(
 // ListDeadlines returns deadlines matching the query.
 func (s *deadlineServiceImpl) ListDeadlines(ctx context.Context, query *DeadlineQuery) (*DeadlineListResponse, error) {
 	if query == nil {
-		return nil, errors.NewValidation("deadline.list", "query must not be nil")
+		return nil, errors.NewValidationOp("deadline.list", "query must not be nil")
 	}
 
 	page := query.Page
@@ -306,26 +306,26 @@ func (s *deadlineServiceImpl) ListDeadlines(ctx context.Context, query *Deadline
 // CreateDeadline creates a new tracked deadline.
 func (s *deadlineServiceImpl) CreateDeadline(ctx context.Context, req *CreateDeadlineRequest) (*Deadline, error) {
 	if req == nil {
-		return nil, errors.NewValidation("deadline.create", "request must not be nil")
+		return nil, errors.NewValidationOp("deadline.create", "request must not be nil")
 	}
 	if req.PatentID == "" {
-		return nil, errors.NewValidation("deadline.create", "patent_id is required")
+		return nil, errors.NewValidationOp("deadline.create", "patent_id is required")
 	}
 	if req.Title == "" {
-		return nil, errors.NewValidation("deadline.create", "title is required")
+		return nil, errors.NewValidationOp("deadline.create", "title is required")
 	}
 	if req.DueDate.IsZero() {
-		return nil, errors.NewValidation("deadline.create", "due_date is required")
+		return nil, errors.NewValidationOp("deadline.create", "due_date is required")
 	}
 
 	patentID, err := uuid.Parse(req.PatentID)
 	if err != nil {
-		return nil, errors.NewValidation("deadline.create", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
+		return nil, errors.NewValidationOp("deadline.create", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
 	}
 
 	patent, err := s.patentRepo.GetByID(ctx, patentID)
 	if err != nil {
-		return nil, errors.NewNotFound("deadline.create", fmt.Sprintf("patent %s not found", req.PatentID))
+		return nil, errors.NewNotFoundOp("deadline.create", fmt.Sprintf("patent %s not found", req.PatentID))
 	}
 
 	now := time.Now()
@@ -371,12 +371,12 @@ func (s *deadlineServiceImpl) CreateDeadline(ctx context.Context, req *CreateDea
 // CompleteDeadline marks a deadline as completed.
 func (s *deadlineServiceImpl) CompleteDeadline(ctx context.Context, deadlineID string) error {
 	if deadlineID == "" {
-		return errors.NewValidation("deadline.complete", "deadline_id is required")
+		return errors.NewValidationOp("deadline.complete", "deadline_id is required")
 	}
 
 	if err := s.lifecycleRepo.UpdateEventStatus(ctx, deadlineID, "completed"); err != nil {
 		s.logger.Error("failed to complete deadline", "deadline_id", deadlineID, "error", err)
-		return errors.NewInternal("deadline.complete", fmt.Sprintf("update failed: %v", err))
+		return errors.NewInternalOp("deadline.complete", fmt.Sprintf("update failed: %v", err))
 	}
 
 	s.logger.Info("deadline completed", "deadline_id", deadlineID)
@@ -386,18 +386,18 @@ func (s *deadlineServiceImpl) CompleteDeadline(ctx context.Context, deadlineID s
 // ExtendDeadline extends a deadline's due date.
 func (s *deadlineServiceImpl) ExtendDeadline(ctx context.Context, req *ExtendDeadlineRequest) (*Deadline, error) {
 	if req == nil {
-		return nil, errors.NewValidation("deadline.extend", "request must not be nil")
+		return nil, errors.NewValidationOp("deadline.extend", "request must not be nil")
 	}
 	if req.DeadlineID == "" {
-		return nil, errors.NewValidation("deadline.extend", "deadline_id is required")
+		return nil, errors.NewValidationOp("deadline.extend", "deadline_id is required")
 	}
 	if req.NewDueDate.IsZero() {
-		return nil, errors.NewValidation("deadline.extend", "new_due_date is required")
+		return nil, errors.NewValidationOp("deadline.extend", "new_due_date is required")
 	}
 
 	now := time.Now()
 	if req.NewDueDate.Before(now) {
-		return nil, errors.NewValidation("deadline.extend", "new_due_date must be in the future")
+		return nil, errors.NewValidationOp("deadline.extend", "new_due_date must be in the future")
 	}
 
 	extended := &Deadline{
@@ -421,12 +421,12 @@ func (s *deadlineServiceImpl) ExtendDeadline(ctx context.Context, req *ExtendDea
 // DeleteDeadline removes a deadline.
 func (s *deadlineServiceImpl) DeleteDeadline(ctx context.Context, deadlineID string) error {
 	if deadlineID == "" {
-		return errors.NewValidation("deadline.delete", "deadline_id is required")
+		return errors.NewValidationOp("deadline.delete", "deadline_id is required")
 	}
 
 	if err := s.lifecycleRepo.DeleteEvent(ctx, deadlineID); err != nil {
 		s.logger.Error("failed to delete deadline", "deadline_id", deadlineID, "error", err)
-		return errors.NewInternal("deadline.delete", fmt.Sprintf("delete failed: %v", err))
+		return errors.NewInternalOp("deadline.delete", fmt.Sprintf("delete failed: %v", err))
 	}
 
 	s.logger.Info("deadline deleted", "deadline_id", deadlineID)
@@ -436,7 +436,7 @@ func (s *deadlineServiceImpl) DeleteDeadline(ctx context.Context, deadlineID str
 // GetComplianceDashboard returns a compliance summary.
 func (s *deadlineServiceImpl) GetComplianceDashboard(ctx context.Context, portfolioID string) (*ComplianceDashboard, error) {
 	if portfolioID == "" {
-		return nil, errors.NewValidation("deadline.compliance", "portfolio_id is required")
+		return nil, errors.NewValidationOp("deadline.compliance", "portfolio_id is required")
 	}
 
 	now := time.Now()
@@ -502,7 +502,7 @@ func (s *deadlineServiceImpl) GetComplianceDashboard(ctx context.Context, portfo
 // GetOverdueDeadlines returns all overdue deadlines.
 func (s *deadlineServiceImpl) GetOverdueDeadlines(ctx context.Context, portfolioID string) ([]Deadline, error) {
 	if portfolioID == "" {
-		return nil, errors.NewValidation("deadline.overdue", "portfolio_id is required")
+		return nil, errors.NewValidationOp("deadline.overdue", "portfolio_id is required")
 	}
 
 	listResp, err := s.ListDeadlines(ctx, &DeadlineQuery{
@@ -521,17 +521,17 @@ func (s *deadlineServiceImpl) GetOverdueDeadlines(ctx context.Context, portfolio
 // SyncStatutoryDeadlines auto-generates statutory deadlines for a patent.
 func (s *deadlineServiceImpl) SyncStatutoryDeadlines(ctx context.Context, patentID string) (int, error) {
 	if patentID == "" {
-		return 0, errors.NewValidation("deadline.sync", "patent_id is required")
+		return 0, errors.NewValidationOp("deadline.sync", "patent_id is required")
 	}
 
 	uid, err := uuid.Parse(patentID)
 	if err != nil {
-		return 0, errors.NewValidation("deadline.sync", fmt.Sprintf("invalid patent_id: %s", patentID))
+		return 0, errors.NewValidationOp("deadline.sync", fmt.Sprintf("invalid patent_id: %s", patentID))
 	}
 
 	patent, err := s.patentRepo.GetByID(ctx, uid)
 	if err != nil {
-		return 0, errors.NewNotFound("deadline.sync", fmt.Sprintf("patent %s not found", patentID))
+		return 0, errors.NewNotFoundOp("deadline.sync", fmt.Sprintf("patent %s not found", patentID))
 	}
 
 	jurisdiction := domainLifecycle.Jurisdiction(patent.Jurisdiction)
@@ -565,11 +565,11 @@ func (s *deadlineServiceImpl) resolvePatentIDs(ctx context.Context, portfolioID,
 		return []string{patentID}, nil
 	}
 	if portfolioID == "" {
-		return nil, errors.NewValidation("deadline", "either portfolio_id or patent_id is required")
+		return nil, errors.NewValidationOp("deadline", "either portfolio_id or patent_id is required")
 	}
 	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
 	if err != nil {
-		return nil, errors.NewInternal("deadline", fmt.Sprintf("failed to list portfolio: %v", err))
+		return nil, errors.NewInternalOp("deadline", fmt.Sprintf("failed to list portfolio: %v", err))
 	}
 	ids := make([]string, 0, len(patents))
 	for _, p := range patents {

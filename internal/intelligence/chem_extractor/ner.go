@@ -15,17 +15,6 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Interfaces
-// ---------------------------------------------------------------------------
-
-// NERModel defines the chemical named entity recognition interface.
-type NERModel interface {
-	Predict(ctx context.Context, text string) (*NERPrediction, error)
-	PredictBatch(ctx context.Context, texts []string) ([]*NERPrediction, error)
-	GetLabelSet() []string
-}
-
-// ---------------------------------------------------------------------------
 // Label constants
 // ---------------------------------------------------------------------------
 
@@ -63,15 +52,7 @@ var DefaultLabelSet = []string{
 // Data structures
 // ---------------------------------------------------------------------------
 
-// NERPrediction holds the full output of a NER prediction.
-type NERPrediction struct {
-	Tokens        []string      `json:"tokens"`
-	Labels        []string      `json:"labels"`
-	Probabilities [][]float64   `json:"probabilities"`
-	Entities      []*NEREntity  `json:"entities"`
-}
-
-// NEREntity represents a single recognized chemical entity span.
+// NEREntity represents a single recognized chemical entity span (internal).
 type NEREntity struct {
 	Text       string  `json:"text"`
 	Label      string  `json:"label"`
@@ -157,7 +138,7 @@ type windowResult struct {
 // nerModelImpl
 // ---------------------------------------------------------------------------
 
-// nerModelImpl implements NERModel.
+// nerModelImpl implements NERModel (from extractor.go).
 type nerModelImpl struct {
 	backend    common.ModelBackend
 	config     *NERModelConfig
@@ -215,25 +196,13 @@ func NewNERModel(
 	return m, nil
 }
 
-// GetLabelSet returns the full label set.
-func (m *nerModelImpl) GetLabelSet() []string {
-	out := make([]string, len(m.config.LabelSet))
-	copy(out, m.config.LabelSet)
-	return out
-}
-
 // ---------------------------------------------------------------------------
 // Predict — single text
 // ---------------------------------------------------------------------------
 
-func (m *nerModelImpl) Predict(ctx context.Context, text string) (*NERPrediction, error) {
+func (m *nerModelImpl) Predict(ctx context.Context, text string) ([]*RawChemicalEntity, error) {
 	if text == "" {
-		return &NERPrediction{
-			Tokens:        []string{},
-			Labels:        []string{},
-			Probabilities: [][]float64{},
-			Entities:      []*NEREntity{},
-		}, nil
+		return []*RawChemicalEntity{}, nil
 	}
 
 	start := time.Now()
@@ -244,12 +213,7 @@ func (m *nerModelImpl) Predict(ctx context.Context, text string) (*NERPrediction
 	// 2. Tokenize
 	spans := tokenize(normalized)
 	if len(spans) == 0 {
-		return &NERPrediction{
-			Tokens:        []string{},
-			Labels:        []string{},
-			Probabilities: [][]float64{},
-			Entities:      []*NEREntity{},
-		}, nil
+		return []*RawChemicalEntity{}, nil
 	}
 
 	tokens := make([]string, len(spans))
@@ -292,17 +256,17 @@ func (m *nerModelImpl) Predict(ctx context.Context, text string) (*NERPrediction
 	mergedLabels = fixBIOLegality(mergedLabels)
 
 	// 7. Extract entities from BIO
-	rawEntities := bioToEntities(tokens, mergedLabels, mergedProbs, spans)
+	nerEntities := bioToEntities(tokens, mergedLabels, mergedProbs, spans)
 
-	// 8. Filter by confidence
-	var entities []*NEREntity
-	for _, e := range rawEntities {
+	// 8. Filter by confidence and convert to RawChemicalEntity
+	var entities []*RawChemicalEntity
+	for _, e := range nerEntities {
 		if e.Score >= m.config.ConfidenceThreshold {
-			entities = append(entities, e)
+			entities = append(entities, m.convertEntity(e))
 		}
 	}
 	if entities == nil {
-		entities = []*NEREntity{}
+		entities = []*RawChemicalEntity{}
 	}
 
 	elapsed := time.Since(start)
@@ -314,24 +278,19 @@ func (m *nerModelImpl) Predict(ctx context.Context, text string) (*NERPrediction
 		BatchSize:  1,
 	})
 
-	return &NERPrediction{
-		Tokens:        tokens,
-		Labels:        mergedLabels,
-		Probabilities: mergedProbs,
-		Entities:      entities,
-	}, nil
+	return entities, nil
 }
 
 // ---------------------------------------------------------------------------
 // PredictBatch
 // ---------------------------------------------------------------------------
 
-func (m *nerModelImpl) PredictBatch(ctx context.Context, texts []string) ([]*NERPrediction, error) {
+func (m *nerModelImpl) PredictBatch(ctx context.Context, texts []string) ([][]*RawChemicalEntity, error) {
 	if len(texts) == 0 {
-		return []*NERPrediction{}, nil
+		return [][]*RawChemicalEntity{}, nil
 	}
 
-	results := make([]*NERPrediction, len(texts))
+	results := make([][]*RawChemicalEntity, len(texts))
 	errs := make([]error, len(texts))
 
 	batchSize := m.config.MaxBatchSize
@@ -368,6 +327,39 @@ func (m *nerModelImpl) PredictBatch(ctx context.Context, texts []string) ([]*NER
 	}
 
 	return results, nil
+}
+
+// convertEntity converts internal NEREntity to public RawChemicalEntity.
+func (m *nerModelImpl) convertEntity(e *NEREntity) *RawChemicalEntity {
+	return &RawChemicalEntity{
+		Text:        e.Text,
+		EntityType:  mapLabelToType(e.Label),
+		StartOffset: e.StartChar,
+		EndOffset:   e.EndChar,
+		Confidence:  e.Score,
+		Source:      "ner_model",
+	}
+}
+
+func mapLabelToType(label string) ChemicalEntityType {
+	switch label {
+	case "IUPAC":
+		return EntityIUPACName
+	case "CAS":
+		return EntityCASNumber
+	case "FORMULA":
+		return EntityMolecularFormula
+	case "SMILES":
+		return EntitySMILES
+	case "COMMON":
+		return EntityCommonName
+	case "GENERIC":
+		return EntityGenericStructure
+	case "MARKUSH":
+		return EntityMarkushVariable
+	default:
+		return EntityCommonName // Fallback
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -888,4 +880,3 @@ func isLegalBIOTransition(from, to string) bool {
 
 	return false
 }
-

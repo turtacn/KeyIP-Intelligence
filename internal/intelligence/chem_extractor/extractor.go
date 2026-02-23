@@ -150,17 +150,21 @@ type NERModel interface {
 // EntityResolver standardises a raw entity into a canonical representation.
 type EntityResolver interface {
 	Resolve(ctx context.Context, entity *RawChemicalEntity) (*ResolvedChemicalEntity, error)
+	ResolveBatch(ctx context.Context, entities []*RawChemicalEntity) ([]*ResolvedChemicalEntity, error)
+	ResolveByType(ctx context.Context, text string, entityType ChemicalEntityType) (*ResolvedChemicalEntity, error)
 }
 
 // EntityValidator checks whether a raw entity is plausible.
 type EntityValidator interface {
-	Validate(ctx context.Context, entity *RawChemicalEntity) (bool, error)
+	Validate(ctx context.Context, entity *RawChemicalEntity) (*ValidationResult, error)
+	ValidateBatch(ctx context.Context, entities []*RawChemicalEntity) ([]*ValidationResult, error)
 }
 
 // ChemicalDictionary provides fast exact-match lookup for known compounds.
 type ChemicalDictionary interface {
 	Lookup(name string) (*DictionaryEntry, bool)
 	LookupCAS(cas string) (*DictionaryEntry, bool)
+	LookupBrand(brand string) (*DictionaryEntry, bool)
 	Size() int
 }
 
@@ -826,13 +830,13 @@ func (e *chemicalExtractorImpl) validateEntities(ctx context.Context, entities [
 	}
 	var valid []*RawChemicalEntity
 	for _, ent := range entities {
-		ok, err := e.validator.Validate(ctx, ent)
+		res, err := e.validator.Validate(ctx, ent)
 		if err != nil {
 			e.logger.Debug("validation error, keeping entity", "text", ent.Text, "error", err)
 			valid = append(valid, ent)
 			continue
 		}
-		if ok {
+		if res != nil && res.IsValid {
 			valid = append(valid, ent)
 		} else {
 			e.logger.Debug("entity failed validation, discarding", "text", ent.Text, "type", ent.EntityType)
@@ -901,10 +905,15 @@ func expandMarkushDefinition(definition string) []string {
 	var result []string
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
+		// Strip leading "or " / "and " if splitting didn't consume it cleanly
+		p = strings.TrimPrefix(p, "or ")
+		p = strings.TrimPrefix(p, "and ")
+		p = strings.TrimSpace(p)
 		if p != "" {
 			result = append(result, p)
 		}
 	}
+
 	if len(result) > 0 {
 		return result
 	}
@@ -1102,6 +1111,18 @@ func looksLikeSMILES(s string) bool {
 	if indicators < 2 {
 		return false
 	}
+
+    for _, r := range s {
+        if unicode.IsLower(r) {
+            // aromatic: b, c, n, o, p, s, se, as.
+            if !strings.ContainsRune("bcnopse", r) && r != 'a' {
+                if strings.ContainsRune("mugtqjvdkyzwxfh", r) {
+                    return false
+                }
+            }
+        }
+    }
+
 	// Reject if it contains spaces (SMILES never have spaces).
 	if strings.Contains(s, " ") {
 		return false

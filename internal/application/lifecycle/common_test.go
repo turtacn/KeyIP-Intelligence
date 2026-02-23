@@ -280,6 +280,8 @@ func (m *mockPatentRepo) CountByJurisdiction(ctx context.Context) (map[string]in
 func (m *mockPatentRepo) CountByYear(ctx context.Context, field string) (map[int]int64, error) { return nil, nil }
 func (m *mockPatentRepo) GetIPCDistribution(ctx context.Context, level int) (map[string]int64, error) { return nil, nil }
 func (m *mockPatentRepo) WithTx(ctx context.Context, fn func(domainPatent.PatentRepository) error) error { return fn(m) }
+func (m *mockPatentRepo) AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error { return nil }
+func (m *mockPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*domainPatent.Patent, error) { return nil, nil }
 
 type mockExchangeRate struct {
 	rates map[string]float64

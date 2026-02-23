@@ -154,6 +154,27 @@ func (r *postgresPatentRepo) GetByFamilyID(ctx context.Context, familyID string)
 	return scanPatents(rows)
 }
 
+func (r *postgresPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string) ([]*patent.Patent, error) {
+	pid, err := uuid.Parse(portfolioID)
+	if err != nil {
+		return nil, errors.NewInvalidInputError("invalid portfolio ID format")
+	}
+
+	query := `
+		SELECT p.*
+		FROM patents p
+		JOIN portfolio_patents pp ON p.id = pp.patent_id
+		WHERE pp.portfolio_id = $1 AND p.deleted_at IS NULL
+	`
+	rows, err := r.executor().QueryContext(ctx, query, pid)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to list patents by portfolio")
+	}
+	defer rows.Close()
+
+	return scanPatents(rows)
+}
+
 func (r *postgresPatentRepo) GetByAssignee(ctx context.Context, assigneeID uuid.UUID, limit, offset int) ([]*patent.Patent, int64, error) {
 	return nil, 0, nil
 }

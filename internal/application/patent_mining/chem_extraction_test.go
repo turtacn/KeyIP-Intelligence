@@ -26,31 +26,27 @@ import (
 
 // MockExtractor
 type MockExtractor struct {
-	ExtractFunc  func(ctx context.Context, input *chemextractor.ExtractionInput) ([]chemextractor.ExtractedEntity, error)
-	ResolveFunc  func(ctx context.Context, value string, entityType string) (*chemextractor.ResolvedChemicalEntity, error)
-	ValidateFunc func(ctx context.Context, smiles string) (bool, error)
+	ExtractFunc  func(ctx context.Context, text string) (*chemextractor.ExtractionResult, error)
+	ResolveFunc  func(ctx context.Context, entity *chemextractor.RawChemicalEntity) (*chemextractor.ResolvedChemicalEntity, error)
 }
 
-func (m *MockExtractor) Extract(ctx context.Context, input *chemextractor.ExtractionInput) ([]chemextractor.ExtractedEntity, error) {
+func (m *MockExtractor) Extract(ctx context.Context, text string) (*chemextractor.ExtractionResult, error) {
 	if m.ExtractFunc != nil {
-		return m.ExtractFunc(ctx, input)
+		return m.ExtractFunc(ctx, text)
 	}
-	return nil, nil
+	return &chemextractor.ExtractionResult{}, nil
 }
 
-func (m *MockExtractor) Resolve(ctx context.Context, value string, entityType string) (*chemextractor.ResolvedChemicalEntity, error) {
+func (m *MockExtractor) Resolve(ctx context.Context, entity *chemextractor.RawChemicalEntity) (*chemextractor.ResolvedChemicalEntity, error) {
 	if m.ResolveFunc != nil {
-		return m.ResolveFunc(ctx, value, entityType)
+		return m.ResolveFunc(ctx, entity)
 	}
-	return nil, nil
+	return &chemextractor.ResolvedChemicalEntity{}, nil
 }
 
-func (m *MockExtractor) Validate(ctx context.Context, smiles string) (bool, error) {
-	if m.ValidateFunc != nil {
-		return m.ValidateFunc(ctx, smiles)
-	}
-	return true, nil
-}
+func (m *MockExtractor) ExtractBatch(ctx context.Context, texts []string) ([]*chemextractor.ExtractionResult, error) { return nil, nil }
+func (m *MockExtractor) ExtractFromClaim(ctx context.Context, claim *chemextractor.ParsedClaim) (*chemextractor.ClaimExtractionResult, error) { return nil, nil }
+func (m *MockExtractor) LinkToMolecule(ctx context.Context, entity *chemextractor.ResolvedChemicalEntity) (*chemextractor.MoleculeLink, error) { return nil, nil }
 
 // MockMoleculeService
 type MockMoleculeService struct {
@@ -106,6 +102,9 @@ func (m *MockPatentRepo) AssociateMolecule(ctx context.Context, patentID string,
 	return nil
 }
 
+func (m *MockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string) ([]*patent.Patent, error) { return nil, nil }
+func (m *MockPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*patent.Patent, error) { return nil, nil }
+
 func (m *MockPatentRepo) Create(ctx context.Context, p *patent.Patent) error { return nil }
 func (m *MockPatentRepo) GetByID(ctx context.Context, id uuid.UUID) (*patent.Patent, error) { return nil, nil }
 func (m *MockPatentRepo) GetByPatentNumber(ctx context.Context, number string) (*patent.Patent, error) { return nil, nil }
@@ -119,7 +118,6 @@ func (m *MockPatentRepo) GetByAssignee(ctx context.Context, assigneeID uuid.UUID
 func (m *MockPatentRepo) GetByJurisdiction(ctx context.Context, jurisdiction string, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
 func (m *MockPatentRepo) GetExpiringPatents(ctx context.Context, daysAhead int, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
 func (m *MockPatentRepo) FindDuplicates(ctx context.Context, fullTextHash string) ([]*patent.Patent, error) { return nil, nil }
-func (m *MockPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*patent.Patent, error) { return nil, nil }
 func (m *MockPatentRepo) CreateClaim(ctx context.Context, claim *patent.Claim) error { return nil }
 func (m *MockPatentRepo) GetClaimsByPatent(ctx context.Context, patentID uuid.UUID) ([]*patent.Claim, error) { return nil, nil }
 func (m *MockPatentRepo) UpdateClaim(ctx context.Context, claim *patent.Claim) error { return nil }
@@ -191,19 +189,19 @@ func googleUUID(s string) uuid.UUID {
 func TestExtractFromDocument_Success(t *testing.T) {
 	// Setup Mocks
 	extractor := &MockExtractor{
-		ExtractFunc: func(ctx context.Context, input *chemextractor.ExtractionInput) ([]chemextractor.ExtractedEntity, error) {
-			return []chemextractor.ExtractedEntity{
-				{Type: "SMILES", Value: "C1=CC=CC=C1", Confidence: 0.9, Page: 1},
+		ExtractFunc: func(ctx context.Context, text string) (*chemextractor.ExtractionResult, error) {
+			return &chemextractor.ExtractionResult{
+				Entities: []*chemextractor.RawChemicalEntity{
+					{EntityType: chemextractor.EntitySMILES, Text: "C1=CC=CC=C1", Confidence: 0.9, StartOffset: 10},
+				},
 			}, nil
 		},
-		ResolveFunc: func(ctx context.Context, value string, entityType string) (*chemextractor.ResolvedChemicalEntity, error) {
+		ResolveFunc: func(ctx context.Context, entity *chemextractor.RawChemicalEntity) (*chemextractor.ResolvedChemicalEntity, error) {
 			return &chemextractor.ResolvedChemicalEntity{
-				CanonicalSMILES: "c1ccccc1",
-				InChIKey:        "UHOVQNZJYSORNB-UHFFFAOYSA-N",
+				SMILES:   "c1ccccc1",
+				InChIKey: "UHOVQNZJYSORNB-UHFFFAOYSA-N",
+				IsResolved: true,
 			}, nil
-		},
-		ValidateFunc: func(ctx context.Context, smiles string) (bool, error) {
-			return true, nil
 		},
 	}
 
@@ -255,19 +253,19 @@ func TestExtractFromDocument_Success(t *testing.T) {
 
 func TestExtractFromText_Success(t *testing.T) {
 	extractor := &MockExtractor{
-		ExtractFunc: func(ctx context.Context, input *chemextractor.ExtractionInput) ([]chemextractor.ExtractedEntity, error) {
-			return []chemextractor.ExtractedEntity{
-				{Type: "SMILES", Value: "C", Confidence: 0.8},
+		ExtractFunc: func(ctx context.Context, text string) (*chemextractor.ExtractionResult, error) {
+			return &chemextractor.ExtractionResult{
+				Entities: []*chemextractor.RawChemicalEntity{
+					{EntityType: chemextractor.EntitySMILES, Text: "C", Confidence: 0.8},
+				},
 			}, nil
 		},
-		ResolveFunc: func(ctx context.Context, value string, entityType string) (*chemextractor.ResolvedChemicalEntity, error) {
+		ResolveFunc: func(ctx context.Context, entity *chemextractor.RawChemicalEntity) (*chemextractor.ResolvedChemicalEntity, error) {
 			return &chemextractor.ResolvedChemicalEntity{
-				CanonicalSMILES: "C",
-				InChIKey:        "Methane",
+				SMILES:   "C",
+				InChIKey: "Methane",
+				IsResolved: true,
 			}, nil
-		},
-		ValidateFunc: func(ctx context.Context, smiles string) (bool, error) {
-			return true, nil
 		},
 	}
 
@@ -285,4 +283,3 @@ func TestExtractFromText_Success(t *testing.T) {
 		t.Errorf("expected 1 extracted, got %d", res.TotalExtracted)
 	}
 }
-//Personal.AI order the ending
