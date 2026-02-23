@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import patents from '../data/patents.json';
+import patents from '@/mocks/data/patents.json';
 
 // Type assertion for mock data if needed, or rely on inference
 const typedPatents = patents as any[];

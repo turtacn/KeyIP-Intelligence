@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import portfolio from '../data/portfolio.json';
+import portfolio from '@/mocks/data/portfolio.json';
 
 const typedPortfolio = portfolio as any;
 

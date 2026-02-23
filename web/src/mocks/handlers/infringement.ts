@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import alerts from '../data/alerts.json';
+import alerts from '@/mocks/data/alerts.json';
 
 const typedAlerts = alerts as any[];
 
