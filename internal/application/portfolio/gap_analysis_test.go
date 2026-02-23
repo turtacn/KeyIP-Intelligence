@@ -82,46 +82,18 @@ func TestNewGapAnalysisService_DefaultTTL(t *testing.T) {
 
 func buildGapTestPatentRepo() *mockPatentRepo {
 	repo := newMockPatentRepo()
-	ownPatents := []domainpatent.Patent{
-		&mockPatent{
-			id: "p1", number: "US1001", techDomain: "A61K", legalStatus: "granted",
-			assignee: "OwnCorp", filingDate: time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC),
-			valueScore: 8.0, moleculeIDs: []string{"m1"},
-		},
-		&mockPatent{
-			id: "p2", number: "US1002", techDomain: "A61K", legalStatus: "granted",
-			assignee: "OwnCorp", filingDate: time.Date(2018, 6, 1, 0, 0, 0, 0, time.UTC),
-			valueScore: 7.5, moleculeIDs: []string{"m2"},
-		},
-		&mockPatent{
-			id: "p3", number: "US1003", techDomain: "C07D", legalStatus: "granted",
-			assignee: "OwnCorp", filingDate: time.Date(2022, 3, 1, 0, 0, 0, 0, time.UTC),
-			valueScore: 9.0, moleculeIDs: []string{"m3"},
-		},
+	ownPatents := []*domainpatent.Patent{
+		createTestPatent("US1001", "A61K", "OwnCorp", time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC), 8.0),
+		createTestPatent("US1002", "A61K", "OwnCorp", time.Date(2018, 6, 1, 0, 0, 0, 0, time.UTC), 7.5),
+		createTestPatent("US1003", "C07D", "OwnCorp", time.Date(2022, 3, 1, 0, 0, 0, 0, time.UTC), 9.0),
 	}
 	repo.byPortfolio["portfolio-gap"] = ownPatents
 
-	compPatents := []domainpatent.Patent{
-		&mockPatent{
-			id: "c1", number: "EP2001", techDomain: "A61K", legalStatus: "granted",
-			assignee: "RivalCo", filingDate: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
-			valueScore: 7.0,
-		},
-		&mockPatent{
-			id: "c2", number: "EP2002", techDomain: "G16B", legalStatus: "granted",
-			assignee: "RivalCo", filingDate: time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
-			valueScore: 8.5,
-		},
-		&mockPatent{
-			id: "c3", number: "CN3001", techDomain: "G16B", legalStatus: "granted",
-			assignee: "RivalCo", filingDate: time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC),
-			valueScore: 6.0,
-		},
-		&mockPatent{
-			id: "c4", number: "JP4001", techDomain: "C12N", legalStatus: "granted",
-			assignee: "RivalCo", filingDate: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
-			valueScore: 9.0,
-		},
+	compPatents := []*domainpatent.Patent{
+		createTestPatent("EP2001", "A61K", "RivalCo", time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), 7.0),
+		createTestPatent("EP2002", "G16B", "RivalCo", time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), 8.5),
+		createTestPatent("CN3001", "G16B", "RivalCo", time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC), 6.0),
+		createTestPatent("JP4001", "C12N", "RivalCo", time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC), 9.0),
 	}
 	repo.byAssignee["RivalCo"] = compPatents
 
@@ -247,15 +219,9 @@ func TestAnalyzeGaps_NoCompetitors(t *testing.T) {
 func TestGetExpirationRisks_Success(t *testing.T) {
 	repo := newMockPatentRepo()
 	// Patent filed 16 years ago — expires in 4 years.
-	repo.byPortfolio["port-exp"] = []domainpatent.Patent{
-		&mockPatent{
-			id: "exp1", number: "US9999", techDomain: "A61K",
-			filingDate: time.Now().AddDate(-16, 0, 0), valueScore: 8.0,
-		},
-		&mockPatent{
-			id: "exp2", number: "US8888", techDomain: "C07D",
-			filingDate: time.Now().AddDate(-5, 0, 0), valueScore: 7.0,
-		},
+	repo.byPortfolio["port-exp"] = []*domainpatent.Patent{
+		createTestPatent("US9999", "A61K", "OwnCorp", time.Now().AddDate(-16, 0, 0), 8.0),
+		createTestPatent("US8888", "C07D", "OwnCorp", time.Now().AddDate(-5, 0, 0), 7.0),
 	}
 
 	cfg := GapAnalysisServiceConfig{
@@ -298,7 +264,7 @@ func TestGetExpirationRisks_EmptyPortfolioID(t *testing.T) {
 
 func TestGetExpirationRisks_DefaultWindow(t *testing.T) {
 	repo := newMockPatentRepo()
-	repo.byPortfolio["port-def"] = []domainpatent.Patent{}
+	repo.byPortfolio["port-def"] = []*domainpatent.Patent{}
 	cfg := GapAnalysisServiceConfig{
 		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: repo,
@@ -321,9 +287,9 @@ func TestGetExpirationRisks_DefaultWindow(t *testing.T) {
 
 func TestGetGeographicGaps_Success(t *testing.T) {
 	repo := newMockPatentRepo()
-	repo.byPortfolio["port-geo"] = []domainpatent.Patent{
-		&mockPatent{id: "g1", number: "US1111", techDomain: "A61K"},
-		&mockPatent{id: "g2", number: "EP2222", techDomain: "A61K"},
+	repo.byPortfolio["port-geo"] = []*domainpatent.Patent{
+		createTestPatent("US1111", "A61K", "OwnCorp", time.Now(), 5.0),
+		createTestPatent("EP2222", "A61K", "OwnCorp", time.Now(), 5.0),
 	}
 	cfg := GapAnalysisServiceConfig{
 		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
@@ -378,8 +344,8 @@ func TestGetGeographicGaps_EmptyPortfolioID(t *testing.T) {
 
 func TestGetGeographicGaps_DefaultJurisdictions(t *testing.T) {
 	repo := newMockPatentRepo()
-	repo.byPortfolio["port-def-geo"] = []domainpatent.Patent{
-		&mockPatent{id: "dg1", number: "US5555", techDomain: "A61K"},
+	repo.byPortfolio["port-def-geo"] = []*domainpatent.Patent{
+		createTestPatent("US5555", "A61K", "OwnCorp", time.Now(), 5.0),
 	}
 	cfg := GapAnalysisServiceConfig{
 		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
@@ -537,19 +503,15 @@ func TestExpirationRiskLevels(t *testing.T) {
 	svc := &gapAnalysisServiceImpl{logger: &mockLogger{}}
 
 	now := time.Now()
-	patents := []domainpatent.Patent{
+	patents := []*domainpatent.Patent{
 		// Expires in ~6 months -> critical
-		&mockPatent{id: "r1", number: "US-R1", techDomain: "A61K",
-			filingDate: now.AddDate(-19, -6, 0)},
+		createTestPatent("US-R1", "A61K", "OwnCorp", now.AddDate(-19, -6, 0), 5.0),
 		// Expires in ~1.5 years -> high
-		&mockPatent{id: "r2", number: "US-R2", techDomain: "A61K",
-			filingDate: now.AddDate(-18, -6, 0)},
+		createTestPatent("US-R2", "A61K", "OwnCorp", now.AddDate(-18, -6, 0), 5.0),
 		// Expires in ~2.5 years -> medium
-		&mockPatent{id: "r3", number: "US-R3", techDomain: "C07D",
-			filingDate: now.AddDate(-17, -6, 0)},
+		createTestPatent("US-R3", "C07D", "OwnCorp", now.AddDate(-17, -6, 0), 5.0),
 		// Expires in ~4 years -> low
-		&mockPatent{id: "r4", number: "US-R4", techDomain: "C07D",
-			filingDate: now.AddDate(-16, 0, 0)},
+		createTestPatent("US-R4", "C07D", "OwnCorp", now.AddDate(-16, 0, 0), 5.0),
 	}
 
 	risks := svc.identifyExpirationRisks(patents, 5)
@@ -587,9 +549,9 @@ func TestComputeHealthScore_EmptyPortfolio(t *testing.T) {
 
 func TestComputeHealthScore_HealthyPortfolio(t *testing.T) {
 	svc := &gapAnalysisServiceImpl{logger: &mockLogger{}}
-	patents := make([]domainpatent.Patent, 10)
+	patents := make([]*domainpatent.Patent, 10)
 	for i := range patents {
-		patents[i] = &mockPatent{id: fmt.Sprintf("h%d", i)}
+		patents[i] = createTestPatent(fmt.Sprintf("US-%d", i), "A61K", "OwnCorp", time.Now(), 5.0)
 	}
 	score := svc.computeHealthScore(patents, nil, nil, nil)
 	if score <= 0 || score > 100 {
@@ -599,9 +561,9 @@ func TestComputeHealthScore_HealthyPortfolio(t *testing.T) {
 
 func TestComputeHealthScore_WithGaps(t *testing.T) {
 	svc := &gapAnalysisServiceImpl{logger: &mockLogger{}}
-	patents := make([]domainpatent.Patent, 5)
+	patents := make([]*domainpatent.Patent, 5)
 	for i := range patents {
-		patents[i] = &mockPatent{id: fmt.Sprintf("g%d", i)}
+		patents[i] = createTestPatent(fmt.Sprintf("US-%d", i), "A61K", "OwnCorp", time.Now(), 5.0)
 	}
 
 	gaps := []TechnologyGap{
@@ -634,4 +596,23 @@ func createTestPortfolio(name string) *domainportfolio.Portfolio {
 		UpdatedAt:    now,
 	}
 	return p
+}
+
+// Helper to create test patent from mock data
+func createTestPatent(number, techDomain, assignee string, filingDate time.Time, valueScore float64) *domainpatent.Patent {
+	now := time.Now()
+	return &domainpatent.Patent{
+		ID:              uuid.New(),
+		Number:          number,
+		Title:           "Test Patent",
+		Abstract:        "Test abstract",
+		Assignee:        assignee,
+		FilingDate:      &filingDate,
+		GrantDate:       &now,
+		Status:          domainpatent.PatentStatusGranted,
+		Office:          domainpatent.OfficeUSPTO,
+		IPCCodes:        []string{techDomain},
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
 }

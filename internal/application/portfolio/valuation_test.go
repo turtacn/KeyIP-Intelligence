@@ -25,8 +25,8 @@ import (
 
 type mockPatentRepo struct {
 	patents     map[string]*patent.Patent
-	byPortfolio map[string][]domainpatent.Patent
-	byAssignee  map[string][]domainpatent.Patent
+	byPortfolio map[string][]*patent.Patent
+	byAssignee  map[string][]*patent.Patent
 	err         error
 }
 
@@ -71,14 +71,7 @@ func (m *mockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string
 		return nil, m.err
 	}
 	if patents, ok := m.byPortfolio[portfolioID]; ok {
-		// Convert []domainpatent.Patent to []*patent.Patent
-		result := make([]*patent.Patent, len(patents))
-		for i, p := range patents {
-			if pp, ok := p.(*patent.Patent); ok {
-				result[i] = pp
-			}
-		}
-		return result, nil
+		return patents, nil
 	}
 	return nil, nil
 }
@@ -88,11 +81,11 @@ func (m *mockPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Pate
 	}
 	return len(patents), nil
 }
-func (m *mockPatentRepo) BatchCreateClaims(ctx context.Context, claims []*patent.Claim) (int, error) {
-	if m.err != nil {
-		return 0, m.err
-	}
-	return len(claims), nil
+func (m *mockPatentRepo) BatchCreateClaims(ctx context.Context, claims []*patent.Claim) error {
+	return m.err
+}
+func (m *mockPatentRepo) BatchUpdateStatus(ctx context.Context, updates []patent.StatusUpdate) error {
+	return m.err
 }
 
 // ---------------------------------------------------------------------------
