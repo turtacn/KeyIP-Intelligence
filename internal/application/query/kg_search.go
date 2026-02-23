@@ -364,10 +364,10 @@ func (s *kgSearchServiceImpl) SearchEntities(ctx context.Context, req *EntitySea
 //
 func (s *kgSearchServiceImpl) TraverseRelations(ctx context.Context, req *RelationTraverseRequest) (*RelationTraverseResponse, error) {
 	if req.MaxDepth <= 0 || req.MaxDepth > MaxGraphSearchDepth {
-		return nil, errors.NewInvalidParameterError(fmt.Sprintf("MaxDepth must be between 1 and %d", MaxGraphSearchDepth))
+		return nil, errors.NewValidation(fmt.Sprintf("MaxDepth must be between 1 and %d", MaxGraphSearchDepth))
 	}
 	if req.StartNodeID == "" {
-		return nil, errors.NewInvalidParameterError("StartNodeID cannot be empty")
+		return nil, errors.NewValidation("StartNodeID cannot be empty")
 	}
 
 	nodes, edges, meta, err := s.repo.Traverse(ctx, req)
@@ -411,10 +411,10 @@ func (s *kgSearchServiceImpl) TraverseRelations(ctx context.Context, req *Relati
 // ----------------------------------------------------------------------------
 func (s *kgSearchServiceImpl) FindPaths(ctx context.Context, req *PathFindRequest) (*PathFindResponse, error) {
 	if req.MaxPathLength <= 0 || req.MaxPathLength > MaxPathLength {
-		return nil, errors.NewInvalidParameterError(fmt.Sprintf("MaxPathLength must be between 1 and %d", MaxPathLength))
+		return nil, errors.NewValidation(fmt.Sprintf("MaxPathLength must be between 1 and %d", MaxPathLength))
 	}
 	if req.SourceID == "" || req.TargetID == "" {
-		return nil, errors.NewInvalidParameterError("SourceID and TargetID are required")
+		return nil, errors.NewValidation("SourceID and TargetID are required")
 	}
 
 	var paths []GraphPath
@@ -457,7 +457,7 @@ func (s *kgSearchServiceImpl) AggregateByDimension(ctx context.Context, req *Agg
 		req.TopN = MaxTopNLimit
 	}
 	if req.Dimension == "" {
-		return nil, errors.NewInvalidParameterError("Aggregation dimension is required")
+		return nil, errors.NewValidation("Aggregation dimension is required")
 	}
 
 	cacheKey := s.generateCacheKey("Agg", req)
@@ -508,7 +508,7 @@ func (s *kgSearchServiceImpl) HybridSearch(ctx context.Context, req *HybridSearc
 	// 权重校验 (允许浮点精度误差)
 	totalWeight := req.VectorWeight + req.TextWeight + req.GraphWeight
 	if math.Abs(totalWeight-1.0) > 0.01 {
-		return nil, errors.NewInvalidParameterError(fmt.Sprintf("Sum of weights must be approximately 1.0, got %f", totalWeight))
+		return nil, errors.NewValidation(fmt.Sprintf("Sum of weights must be approximately 1.0, got %f", totalWeight))
 	}
 
 	if req.Limit <= 0 || req.Limit > MaxPaginationLimit {
@@ -617,23 +617,43 @@ func (s *kgSearchServiceImpl) HybridSearch(ctx context.Context, req *HybridSearc
 		}
 	}
 
-	// 分数融合与动态归一化 (Per-entity normalization)
+	// 分数融合与动态归一化
+	// 如果有路失败，则对剩余成功的路进行全局归一化；否则使用固定权重
+	var globalTextWeight, globalVectorWeight, globalGraphWeight float64
+	if textErr == nil {
+		globalTextWeight = req.TextWeight
+	}
+	if vecErr == nil {
+		globalVectorWeight = req.VectorWeight
+	}
+	if graphErr == nil {
+		globalGraphWeight = req.GraphWeight
+	}
+	
+	// 检查是否需要归一化（有任何路失败）
+	needNormalization := (textErr != nil) || (vecErr != nil) || (graphErr != nil)
+	if needNormalization {
+		totalActiveWeight := globalTextWeight + globalVectorWeight + globalGraphWeight
+		if totalActiveWeight > 0 {
+			globalTextWeight /= totalActiveWeight
+			globalVectorWeight /= totalActiveWeight
+			globalGraphWeight /= totalActiveWeight
+		}
+	}
+	
 	var results []HybridSearchResult
 
 	for id, entity := range entitySet {
 		var ts, vs, gs float64
-		var tWeight, vWeight, gWeight float64
 
 		if textErr == nil {
 			if val, ok := textScores[id]; ok {
 				ts = val
-				tWeight = req.TextWeight
 			}
 		}
 		if vecErr == nil {
 			if val, ok := vecScores[id]; ok {
 				vs = val
-				vWeight = req.VectorWeight
 			}
 		}
 		if graphErr == nil {
@@ -641,23 +661,12 @@ func (s *kgSearchServiceImpl) HybridSearch(ctx context.Context, req *HybridSearc
 			for _, n := range graphNodes {
 				if n.Node.ID == id {
 					gs = 1.0
-					gWeight = req.GraphWeight
 					break
 				}
 			}
 		}
 
-		// Per-entity 权重归一化计算
-		localTotalWeight := tWeight + vWeight + gWeight
-		if localTotalWeight <= 0 {
-			continue // 忽略毫无得分的实体(理论不可达)
-		}
-
-		normT := tWeight / localTotalWeight
-		normV := vWeight / localTotalWeight
-		normG := gWeight / localTotalWeight
-
-		combinedScore := normT*ts + normV*vs + normG*gs
+		combinedScore := globalTextWeight*ts + globalVectorWeight*vs + globalGraphWeight*gs
 
 		results = append(results, HybridSearchResult{
 			Entity:        entity,
@@ -696,7 +705,7 @@ func (s *kgSearchServiceImpl) HybridSearch(ctx context.Context, req *HybridSearc
 
 func (s *kgSearchServiceImpl) validateEntitySearchRequest(req *EntitySearchRequest) error {
 	if req.EntityType == "" {
-		return errors.NewInvalidParameterError("EntityType cannot be empty")
+		return errors.NewValidation("EntityType cannot be empty")
 	}
 
 	// Allowed Entity Types White-list
@@ -710,7 +719,7 @@ func (s *kgSearchServiceImpl) validateEntitySearchRequest(req *EntitySearchReque
 		EntityTypeProperty:   true,
 	}
 	if !validTypes[req.EntityType] {
-		return errors.NewInvalidParameterError(fmt.Sprintf("Invalid EntityType: %s", req.EntityType))
+		return errors.NewValidation(fmt.Sprintf("Invalid EntityType: %s", req.EntityType))
 	}
 
 	if req.Offset < 0 {
@@ -735,7 +744,7 @@ func (s *kgSearchServiceImpl) validateEntitySearchRequest(req *EntitySearchReque
 	}
 	for k := range req.Filters {
 		if !whitelist[k] {
-			return errors.NewInvalidParameterError(fmt.Sprintf("Filter field not allowed: %s", k))
+			return errors.NewValidation(fmt.Sprintf("Filter field not allowed: %s", k))
 		}
 	}
 

@@ -151,13 +151,11 @@ func (m *mockCache) Get(ctx context.Context, key string, dest interface{}) error
 
 func (m *mockCache) Set(ctx context.Context, key string, val interface{}, ttl time.Duration) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.data[key] = val
 	m.ttls[key] = ttl
-	select {
-	case m.setCh <- key:
-	default:
-	}
+	m.mu.Unlock()
+	// Send to channel without holding lock, always succeed (buffered channel)
+	m.setCh <- key
 	return nil
 }
 
@@ -417,7 +415,11 @@ func TestSearchEntities_PaginationBoundary(t *testing.T) {
 func TestSearchEntities_CacheHit(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestKGSearchService()
-	req := &EntitySearchRequest{EntityType: EntityTypePatent}
+	req := &EntitySearchRequest{
+		EntityType: EntityTypePatent,
+		Offset:     0,
+		Limit:      20, // DefaultPaginationLimit
+	}
 
 	// Pre-fill cache
 	cacheKey := svc.(*kgSearchServiceImpl).generateCacheKey("SearchEntities", req)
@@ -442,7 +444,11 @@ func TestSearchEntities_CacheHit(t *testing.T) {
 func TestSearchEntities_CacheMiss_ThenSet(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestKGSearchService()
-	req := &EntitySearchRequest{EntityType: EntityTypePatent}
+	req := &EntitySearchRequest{
+		EntityType: EntityTypePatent,
+		Offset:     0,
+		Limit:      20, // DefaultPaginationLimit
+	}
 	cacheKey := svc.(*kgSearchServiceImpl).generateCacheKey("SearchEntities", req)
 
 	m.repo.queryNodesFunc = func(ctx context.Context, req *EntitySearchRequest) ([]GraphEntity, int64, map[string][]FacetBucket, error) {
@@ -454,16 +460,37 @@ func TestSearchEntities_CacheMiss_ThenSet(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// Wait for async cache set
-	if !m.cache.WaitForSet(cacheKey, 2*time.Second) {
-		t.Fatalf("Cache was not set asynchronously within timeout")
+	// Poll for async cache set (goroutine may take time to execute)
+	timeout := time.After(2 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	
+	var exists bool
+	var ttl time.Duration
+	for {
+		select {
+		case <-timeout:
+			m.cache.mu.RLock()
+			numKeys := len(m.cache.data)
+			keys := make([]string, 0, len(m.cache.data))
+			for k := range m.cache.data {
+				keys = append(keys, k)
+			}
+			m.cache.mu.RUnlock()
+			t.Fatalf("Cache was not set asynchronously within timeout. Expected key: %s, Found %d keys: %v", cacheKey, numKeys, keys)
+		case <-ticker.C:
+			m.cache.mu.RLock()
+			ttl, exists = m.cache.ttls[cacheKey]
+			m.cache.mu.RUnlock()
+			if exists {
+				goto checkTTL
+			}
+		}
 	}
-
-	m.cache.mu.RLock()
-	defer m.cache.mu.RUnlock()
-	ttl, exists := m.cache.ttls[cacheKey]
-	if !exists || ttl != 5*time.Minute {
-		t.Errorf("Expected TTL 5m, got %v (exists: %v)", ttl, exists)
+	
+checkTTL:
+	if ttl != 5*time.Minute {
+		t.Errorf("Expected TTL 5m, got %v", ttl)
 	}
 }
 
@@ -781,7 +808,10 @@ func TestAggregateByDimension_TopNUpperBound(t *testing.T) {
 func TestAggregateByDimension_CacheHit(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestKGSearchService()
-	req := &AggregationRequest{Dimension: ByTechDomain}
+	req := &AggregationRequest{
+		Dimension: ByTechDomain,
+		TopN:      20, // DefaultPaginationLimit
+	}
 	cacheKey := svc.(*kgSearchServiceImpl).generateCacheKey("Agg", req)
 
 	mockResp := AggregationResponse{Total: 777, Buckets: []AggBucket{}}
@@ -804,7 +834,10 @@ func TestAggregateByDimension_CacheHit(t *testing.T) {
 func TestAggregateByDimension_CacheMiss_ThenSet(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestKGSearchService()
-	req := &AggregationRequest{Dimension: ByTechDomain}
+	req := &AggregationRequest{
+		Dimension: ByTechDomain,
+		TopN:      20, // DefaultPaginationLimit
+	}
 	cacheKey := svc.(*kgSearchServiceImpl).generateCacheKey("Agg", req)
 
 	m.repo.aggregateFunc = func(ctx context.Context, req *AggregationRequest) ([]AggBucket, int64, error) {
@@ -813,14 +846,29 @@ func TestAggregateByDimension_CacheMiss_ThenSet(t *testing.T) {
 
 	_, _ = svc.AggregateByDimension(context.Background(), req)
 
-	if !m.cache.WaitForSet(cacheKey, 2*time.Second) {
-		t.Fatalf("Cache was not set asynchronously within timeout")
+	// Poll for async cache set (goroutine may take time to execute)
+	timeout := time.After(2 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	
+	var exists bool
+	var ttl time.Duration
+	for {
+		select {
+		case <-timeout:
+			t.Fatalf("Cache was not set asynchronously within timeout")
+		case <-ticker.C:
+			m.cache.mu.RLock()
+			ttl, exists = m.cache.ttls[cacheKey]
+			m.cache.mu.RUnlock()
+			if exists {
+				goto checkTTL
+			}
+		}
 	}
-
-	m.cache.mu.RLock()
-	defer m.cache.mu.RUnlock()
-	ttl, exists := m.cache.ttls[cacheKey]
-	if !exists || ttl != 15*time.Minute {
+	
+checkTTL:
+	if ttl != 15*time.Minute {
 		t.Errorf("Expected TTL 15m, got %v", ttl)
 	}
 }

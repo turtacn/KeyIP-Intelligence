@@ -270,7 +270,7 @@ func (s *nlQueryServiceImpl) Query(ctx context.Context, req *NLQueryRequest) (*N
 	// Step 0: Prompt Injection Check
 	if s.checkPromptInjection(req.Question) {
 		s.metrics.IncCounter("nl_query_prompt_injection", map[string]string{"user": req.UserContext.UserID})
-		return nil, errors.New(errors.ErrCodeBadRequest, "Detect invalid query patterns. Please rephrase your question.")
+		return nil, errors.NewValidation("Detect invalid query patterns. Please rephrase your question.")
 	}
 
 	convID := req.ConversationID
@@ -468,7 +468,15 @@ func (s *nlQueryServiceImpl) stepIntentClassification(ctx context.Context, quest
 
 	var intent QueryIntent
 	if err := json.Unmarshal([]byte(resStr), &intent); err != nil {
-		return nil, 0, errors.Wrap(err, errors.ErrCodeInternal, "failed to parse intent JSON")
+		// Retry with lower temperature if JSON parsing fails
+		s.logger.Warn(ctx, "Intent JSON parse failed, retrying with lower temperature", "error", err)
+		resStr, err = s.llm.InferIntent(ctx, prompt, 0.1)
+		if err != nil {
+			return nil, 0, errors.NewInternal("LLM intent inference failed after retry")
+		}
+		if err := json.Unmarshal([]byte(resStr), &intent); err != nil {
+			return nil, 0, errors.Wrap(err, errors.ErrCodeInternal, "failed to parse intent JSON after retry")
+		}
 	}
 
 	confidence := 0.9
@@ -594,7 +602,7 @@ func (s *nlQueryServiceImpl) buildStructuredQuery(intent QueryIntent, entities [
 		return map[string]interface{}{"action": "similarity", "entities": entities}, QueryTypeAPI, nil
 
 	default:
-		return nil, QueryTypeAPI, errors.NewInvalidParameterError("Unsupported intent type")
+		return nil, QueryTypeAPI, errors.NewValidation("Unsupported intent type")
 	}
 }
 
