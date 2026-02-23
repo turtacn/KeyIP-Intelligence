@@ -15,7 +15,6 @@ import (
 "time"
 
 "github.com/google/uuid"
-"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
 const Version = "0.1.0"
@@ -98,19 +97,19 @@ HasMore  bool  `json:"has_more"`
 // NewClient creates a new KeyIP-Intelligence SDK client
 func NewClient(baseURL string, apiKey string, opts ...Option) (*Client, error) {
 if baseURL == "" {
-return nil, errors.ErrInvalidConfig
+return nil, fmt.Errorf("invalid config")
 }
 if apiKey == "" {
-return nil, errors.ErrInvalidConfig
+return nil, fmt.Errorf("invalid config")
 }
 
 // Validate baseURL
 parsedURL, err := url.Parse(baseURL)
 if err != nil {
-return nil, fmt.Errorf("%w: invalid baseURL: %v", errors.ErrInvalidConfig, err)
+return nil, fmt.Errorf("%w: invalid baseURL: %v", fmt.Errorf("invalid config"), err)
 }
 if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-return nil, fmt.Errorf("%w: baseURL scheme must be http or https", errors.ErrInvalidConfig)
+return nil, fmt.Errorf("%w: baseURL scheme must be http or https", fmt.Errorf("invalid config"))
 }
 
 // Trim trailing slash
