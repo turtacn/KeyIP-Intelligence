@@ -9,15 +9,27 @@ export const patentHandlers = [
     const url = new URL(request.url);
     const page = Number(url.searchParams.get('page')) || 1;
     const pageSize = Number(url.searchParams.get('pageSize')) || 20;
+    const query = url.searchParams.get('query') || '';
 
     // Simulate error
     if (url.searchParams.get('__error')) {
       return new HttpResponse(null, { status: 500, statusText: 'Internal Server Error' });
     }
 
+    // Filter logic
+    let filtered = typedPatents;
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      filtered = filtered.filter((p: any) =>
+        p.title.toLowerCase().includes(lowerQuery) ||
+        p.publicationNumber.toLowerCase().includes(lowerQuery) ||
+        p.assignee.toLowerCase().includes(lowerQuery)
+      );
+    }
+
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
-    const paginatedData = typedPatents.slice(start, end);
+    const paginatedData = filtered.slice(start, end);
 
     return HttpResponse.json({
       code: 0,
@@ -26,7 +38,7 @@ export const patentHandlers = [
       pagination: {
         page,
         pageSize,
-        total: typedPatents.length
+        total: filtered.length
       }
     });
   }),
