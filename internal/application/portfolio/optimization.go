@@ -157,6 +157,9 @@ func NewOptimizationService(cfg OptimizationServiceConfig) (OptimizationService,
 	if cfg.PortfolioService == nil {
 		return nil, errors.NewValidation("OptimizationService requires PortfolioService")
 	}
+	if cfg.PortfolioRepository == nil {
+		return nil, errors.NewValidation("OptimizationService requires PortfolioRepository")
+	}
 	if cfg.PatentRepository == nil {
 		return nil, errors.NewValidation("OptimizationService requires PatentRepository")
 	}

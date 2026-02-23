@@ -158,6 +158,9 @@ func NewGapAnalysisService(cfg GapAnalysisServiceConfig) (GapAnalysisService, er
 	if cfg.PortfolioService == nil {
 		return nil, errors.NewValidation("GapAnalysisService requires PortfolioService")
 	}
+	if cfg.PortfolioRepository == nil {
+		return nil, errors.NewValidation("GapAnalysisService requires PortfolioRepository")
+	}
 	if cfg.PatentRepository == nil {
 		return nil, errors.NewValidation("GapAnalysisService requires PatentRepository")
 	}
