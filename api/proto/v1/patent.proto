@@ -1,0 +1,669 @@
+// =============================================================================
+// 生成计划:
+// 功能定位：专利领域 gRPC 服务 Proto 定义，提供专利 CRUD、全文检索、
+//           权利要求解析、侵权风险评估和专利价值评估的高性能接口。
+// 核心实现：
+//   - 定义 PatentService gRPC 服务，包含 GetPatent、ListPatents、
+//     ImportPatent、UpdatePatent、DeletePatent、SearchPatents、
+//     GetPatentClaims、ParseMarkush、AssessInfringementRisk、
+//     AssessPatentValue、GetPatentFamily 方法
+//   - 定义所有请求/响应 message 类型
+//   - 定义 Patent、Claim、MarkushGroup、ValueScores、InfringementAnalysis
+//     等数据模型
+//   - 声明枚举：LegalStatus、ClaimType、PatentOffice、ValueTier、
+//     InfringementType
+//   - 使用 google.protobuf.Timestamp 处理时间字段
+// 业务逻辑：
+//   - AssessInfringementRisk 实现 All-Elements Rule 字面侵权分析
+//     和 Function-Way-Result 等同原则分析
+//   - AssessPatentValue 输出四维评分（技术/法律/商业/战略）
+//   - ParseMarkush 展开 Markush 通式，计算分子空间覆盖范围
+// 依赖关系：
+//   - 依赖：google/protobuf/timestamp.proto、google/protobuf/struct.proto
+//   - 被依赖：internal/interfaces/grpc/services/patent_service.go、
+//             pkg/client/patents.go
+// 测试要求：通过 protoc 编译无错误；字段编号永不复用
+// 强制约束：文件最后一行必须为 // Personal.AI order the ending
+// =============================================================================
+
+syntax = "proto3";
+
+package keyip.v1;
+
+option go_package = "github.com/turtacn/KeyIP-Intelligence/api/proto/v1;keyipv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// ---------------------------------------------------------------------------
+// Enumerations
+// ---------------------------------------------------------------------------
+
+// LegalStatus represents the prosecution and validity state of a patent
+// across its lifecycle.
+enum LegalStatus {
+  LEGAL_STATUS_UNSPECIFIED = 0;
+
+  // Application filed; examination not yet initiated.
+  LEGAL_STATUS_PENDING = 1;
+
+  // Under substantive examination by the patent office.
+  LEGAL_STATUS_EXAMINATION = 2;
+
+  // Patent granted and in force.
+  LEGAL_STATUS_GRANTED = 3;
+
+  // Application finally refused by the patent office.
+  LEGAL_STATUS_REFUSED = 4;
+
+  // Patent lapsed due to non-payment of annuity; potentially restorable.
+  LEGAL_STATUS_LAPSED = 5;
+
+  // Patent revoked after post-grant opposition or invalidation proceeding.
+  LEGAL_STATUS_REVOKED = 6;
+
+  // Patent expired at end of its maximum statutory term.
+  LEGAL_STATUS_EXPIRED = 7;
+
+  // Application withdrawn by the applicant.
+  LEGAL_STATUS_WITHDRAWN = 8;
+}
+
+// ClaimType classifies a patent claim as independent or dependent.
+enum ClaimType {
+  CLAIM_TYPE_UNSPECIFIED = 0;
+  CLAIM_TYPE_INDEPENDENT = 1;
+  CLAIM_TYPE_DEPENDENT = 2;
+}
+
+// PatentOffice identifies the issuing national or regional patent authority.
+enum PatentOffice {
+  PATENT_OFFICE_UNSPECIFIED = 0;
+  PATENT_OFFICE_CNIPA = 1;  // China National Intellectual Property Administration
+  PATENT_OFFICE_USPTO = 2;  // United States Patent and Trademark Office
+  PATENT_OFFICE_EPO = 3;    // European Patent Office
+  PATENT_OFFICE_JPO = 4;    // Japan Patent Office
+  PATENT_OFFICE_KIPO = 5;   // Korean Intellectual Property Office
+  PATENT_OFFICE_WIPO = 6;   // World Intellectual Property Organization (PCT)
+}
+
+// ValueTier classifies a patent into a strategic maintenance tier based on
+// its composite value score.
+enum ValueTier {
+  VALUE_TIER_UNSPECIFIED = 0;
+
+  // S-tier: flagship asset; maximum investment justified.
+  VALUE_TIER_S = 1;
+
+  // A-tier: core asset; standard maintenance + enforcement warranted.
+  VALUE_TIER_A = 2;
+
+  // B-tier: supporting asset; maintain at current cost.
+  VALUE_TIER_B = 3;
+
+  // C-tier: marginal asset; cost-reduction review recommended.
+  VALUE_TIER_C = 4;
+
+  // D-tier: low value; consider abandonment in low-priority jurisdictions.
+  VALUE_TIER_D = 5;
+}
+
+// InfringementType classifies the legal theory under which infringement is
+// asserted or assessed.
+enum InfringementType {
+  INFRINGEMENT_TYPE_UNSPECIFIED = 0;
+
+  // All-Elements Rule: every element of the claim is literally met.
+  INFRINGEMENT_TYPE_LITERAL = 1;
+
+  // Doctrine of equivalents: each element is met by an insubstantially
+  // different substitute (function/way/result test).
+  INFRINGEMENT_TYPE_DOCTRINE_OF_EQUIVALENTS = 2;
+
+  // Prosecution history estoppel bars equivalents assertion for surrendered
+  // claim scope.
+  INFRINGEMENT_TYPE_PROSECUTION_HISTORY_ESTOPPEL = 3;
+}
+
+// RecommendedAction enumerates the actionable maintenance decisions for a
+// patent identified in a value assessment.
+enum RecommendedAction {
+  RECOMMENDED_ACTION_UNSPECIFIED = 0;
+  RECOMMENDED_ACTION_MAINTAIN = 1;
+  RECOMMENDED_ACTION_STRENGTHEN = 2;
+  RECOMMENDED_ACTION_ENFORCE = 3;
+  RECOMMENDED_ACTION_LICENSE = 4;
+  RECOMMENDED_ACTION_ABANDON = 5;
+}
+
+// ActionPriority classifies the urgency of a recommended action.
+enum ActionPriority {
+  ACTION_PRIORITY_UNSPECIFIED = 0;
+  ACTION_PRIORITY_CRITICAL = 1;
+  ACTION_PRIORITY_HIGH = 2;
+  ACTION_PRIORITY_MEDIUM = 3;
+  ACTION_PRIORITY_LOW = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Core Data Models
+// ---------------------------------------------------------------------------
+
+// Patent is the primary aggregate for patent records.
+message Patent {
+  // Stable UUID identifier within KeyIP-Intelligence.
+  string id = 1;
+
+  // Official patent number as published by the issuing office
+  // (e.g., "CN115012345A", "US11,234,567B2").
+  string patent_number = 2;
+
+  // Full title of the invention.
+  string title = 3;
+
+  // Current assignee (rights holder) name.
+  string assignee = 4;
+
+  // Issuing patent office.
+  PatentOffice office = 5;
+
+  // Current legal status.
+  LegalStatus legal_status = 6;
+
+  // Filing date (priority date in the originating office).
+  google.protobuf.Timestamp filing_date = 7;
+
+  // Publication date of the application.
+  google.protobuf.Timestamp publication_date = 8;
+
+  // Grant date; zero value if not yet granted.
+  google.protobuf.Timestamp grant_date = 9;
+
+  // Statutory expiry date computed from grant date + term.
+  google.protobuf.Timestamp expiry_date = 10;
+
+  // Earliest priority date across the patent family.
+  google.protobuf.Timestamp priority_date = 11;
+
+  // IPC classification codes (e.g., ["C09K 11/06", "H10K 85/60"]).
+  repeated string ipc_codes = 12;
+
+  // Inventor names as listed on the patent document.
+  repeated string inventors = 13;
+
+  // INPADOC patent family identifier; shared across family members.
+  string family_id = 14;
+
+  // Abstract text.
+  string abstract = 15;
+
+  // Public URL to the full-text patent document.
+  string document_url = 16;
+
+  // Arbitrary caller-supplied metadata.
+  google.protobuf.Struct metadata = 17;
+
+  // Record creation timestamp (UTC).
+  google.protobuf.Timestamp created_at = 18;
+
+  // Record last-modified timestamp (UTC).
+  google.protobuf.Timestamp updated_at = 19;
+}
+
+// Claim represents a single patent claim with its structural decomposition.
+message Claim {
+  // UUID within KeyIP-Intelligence.
+  string id = 1;
+
+  // Parent patent UUID.
+  string patent_id = 2;
+
+  // Claim number as it appears in the patent document (1-indexed).
+  uint32 claim_number = 3;
+
+  // Whether the claim is independent or dependent.
+  ClaimType type = 4;
+
+  // Full verbatim claim text.
+  string text = 5;
+
+  // For dependent claims: list of claim numbers this claim depends on.
+  repeated uint32 depends_on = 6;
+
+  // Structural elements extracted by ClaimBERT (method steps, structural
+  // features, functional limitations, etc.).
+  repeated string elements = 7;
+
+  // True if the claim text includes a Markush group expression.
+  bool has_markush = 8;
+
+  // ClaimBERT-computed semantic embedding of the claim text.
+  // 512-dimensional float32 array encoded as base64.
+  string embedding = 9;
+}
+
+// MarkushSubstituent represents one variable position in a Markush group.
+message MarkushSubstituent {
+  // Variable label as it appears in the claim (e.g., "R1", "Ar", "X").
+  string label = 1;
+
+  // Enumerated substituent options; each is a SMILES fragment or class name
+  // (e.g., "phenyl", "C1-C6 alkyl").
+  repeated string options = 2;
+
+  // Structural annotation from ClaimBERT (e.g., "aryl", "alkyl", "heteroaryl").
+  string class_annotation = 3;
+}
+
+// MarkushGroup captures a Markush-style general formula from a patent claim.
+message MarkushGroup {
+  // Parent claim UUID.
+  string claim_id = 1;
+
+  // SMILES representation of the core scaffold with variable positions
+  // denoted using dummy atom notation (e.g., [*:1], [*:2]).
+  string scaffold_smiles = 2;
+
+  // Variable substituent definitions.
+  repeated MarkushSubstituent substituents = 3;
+
+  // Estimated number of distinct molecules covered by this Markush group.
+  // -1 if the enumeration space exceeds the configured ceiling (default: 10M).
+  int64 estimated_coverage_count = 4;
+
+  // Whether the coverage space was fully enumerated or statistically estimated.
+  bool fully_enumerated = 5;
+}
+
+// ClaimElementAnalysis holds the per-element comparison result for a single
+// claim element during infringement assessment.
+message ClaimElementAnalysis {
+  // Text of the claim element being assessed.
+  string element_text = 1;
+
+  // True if the query molecule/product literally satisfies this element.
+  bool literally_met = 2;
+
+  // Probability that the element is met under doctrine of equivalents.
+  double equivalents_probability = 3;
+
+  // Brief explanation of the assessment.
+  string reasoning = 4;
+}
+
+// InfringementClaimAnalysis is the full assessment for a single claim.
+message InfringementClaimAnalysis {
+  // Claim number assessed.
+  uint32 claim_number = 1;
+
+  // Per-element breakdown.
+  repeated ClaimElementAnalysis element_analyses = 2;
+
+  // True if all claim elements are literally met (All-Elements Rule).
+  bool all_elements_literally_met = 3;
+
+  // Probability of literal infringement.
+  double literal_infringement_probability = 4;
+
+  // Probability of doctrine-of-equivalents infringement.
+  double equivalents_probability = 5;
+
+  // Whether prosecution history estoppel limits equivalents analysis.
+  bool prosecution_history_estoppel_applies = 6;
+
+  // Human-readable explanation of the estoppel finding.
+  string estoppel_explanation = 7;
+}
+
+// ValueDimensionScore holds the score and factor breakdown for one value
+// dimension of a patent.
+message ValueDimensionScore {
+  // Normalized score in [0, 100].
+  uint32 score = 1;
+
+  // Named sub-factor scores contributing to the dimension total.
+  map<string, uint32> factors = 2;
+
+  // Human-readable explanation of the score.
+  string explanation = 3;
+}
+
+// Recommendation is an actionable output from the value assessment.
+message Recommendation {
+  RecommendedAction action = 1;
+  ActionPriority priority = 2;
+
+  // Specific action description.
+  string description = 3;
+
+  // Rationale for the recommendation.
+  string reason = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Request / Response Messages — Patent CRUD
+// ---------------------------------------------------------------------------
+
+message GetPatentRequest {
+  string patent_id = 1;
+}
+
+message GetPatentResponse {
+  Patent patent = 1;
+}
+
+message ListPatentsRequest {
+  uint32 page_size = 1;
+  string page_token = 2;
+
+  // Filter by assignee name (case-insensitive substring).
+  string assignee = 3;
+
+  // Filter by IPC code prefix (e.g., "C09K").
+  string ipc_code = 4;
+
+  // Filter by current legal status.
+  LegalStatus legal_status = 5;
+
+  // ISO 8601 date string; filters to patents filed on or after this date.
+  string filing_date_from = 6;
+
+  // ISO 8601 date string; filters to patents filed on or before this date.
+  string filing_date_to = 7;
+
+  // Filter by issuing office.
+  PatentOffice office = 8;
+}
+
+message ListPatentsResponse {
+  repeated Patent patents = 1;
+  string next_page_token = 2;
+  int64 total_count = 3;
+}
+
+message ImportPatentRequest {
+  // Official patent number (required).
+  string patent_number = 1;
+
+  // Issuing patent office (required).
+  PatentOffice office = 2;
+
+  // Optional full-text content; if omitted, the server attempts to fetch from
+  // the patent office API using the patent_number.
+  string full_text = 3;
+
+  // Caller-supplied metadata merged into the created record.
+  google.protobuf.Struct metadata = 4;
+}
+
+message ImportPatentResponse {
+  Patent patent = 1;
+
+  // True if the patent was newly created; false if it already existed and
+  // the existing record was returned.
+  bool created = 2;
+}
+
+message UpdatePatentRequest {
+  string patent_id = 1;
+
+  // Fields to update. Only non-zero/non-empty values are applied.
+  string title = 2;
+  string abstract = 3;
+  LegalStatus legal_status = 4;
+  google.protobuf.Struct metadata = 5;
+}
+
+message UpdatePatentResponse {
+  Patent patent = 1;
+}
+
+message DeletePatentRequest {
+  string patent_id = 1;
+}
+
+message DeletePatentResponse {
+  // Empty on success.
+}
+
+// ---------------------------------------------------------------------------
+// Request / Response Messages — Search
+// ---------------------------------------------------------------------------
+
+message SearchPatentsRequest {
+  // Full-text query string (OpenSearch syntax supported).
+  string query = 1;
+
+  uint32 page_size = 2;
+  string page_token = 3;
+
+  // Optional structured filters applied alongside the full-text query.
+  ListPatentsRequest filters = 4;
+}
+
+message SearchPatentsResponse {
+  repeated Patent patents = 1;
+  string next_page_token = 2;
+  int64 total_count = 3;
+
+  // Query execution time in milliseconds.
+  uint32 query_time_ms = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Request / Response Messages — Claims
+// ---------------------------------------------------------------------------
+
+message GetPatentClaimsRequest {
+  string patent_id = 1;
+
+  // When true, populate the embedding field on each returned Claim.
+  bool include_embeddings = 2;
+}
+
+message GetPatentClaimsResponse {
+  string patent_id = 1;
+  repeated Claim claims = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Request / Response Messages — Markush
+// ---------------------------------------------------------------------------
+
+message ParseMarkushRequest {
+  // Patent UUID whose claims will be parsed for Markush groups.
+  string patent_id = 1;
+
+  // Specific claim numbers to parse; if empty, all claims are processed.
+  repeated uint32 claim_numbers = 2;
+
+  // When true, attempt full enumeration of the Markush space for each group.
+  // Enumeration is capped at 10M molecules; groups exceeding this are estimated.
+  bool enumerate_coverage = 3;
+}
+
+message ParseMarkushResponse {
+  string patent_id = 1;
+  repeated MarkushGroup groups = 2;
+
+  // Total wall-clock time for parsing all groups, in milliseconds.
+  uint32 parse_time_ms = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Request / Response Messages — Infringement
+// ---------------------------------------------------------------------------
+
+message AssessInfringementRiskRequest {
+  // SMILES of the molecule to assess (the alleged infringing compound).
+  string molecule_smiles = 1;
+
+  // UUID of the patent whose claims are being assessed.
+  string patent_id = 2;
+
+  // Specific claim numbers to include in the analysis. At minimum, independent
+  // claims should be included. If empty, all claims are analyzed.
+  repeated uint32 claim_numbers = 3;
+
+  // When true, prosecution history is retrieved and estoppel analysis is
+  // included. Requires access to stored examination files.
+  bool include_prosecution_history_analysis = 4;
+}
+
+message AssessInfringementRiskResponse {
+  // SMILES of the assessed molecule.
+  string molecule_smiles = 1;
+
+  // UUID of the assessed patent.
+  string patent_id = 2;
+
+  // Per-claim analysis results.
+  repeated InfringementClaimAnalysis claim_analyses = 3;
+
+  // Aggregated risk level across all analyzed claims.
+  // Set to the highest risk level found across all claims.
+  string overall_risk_level = 4;
+
+  // Model confidence in the overall assessment, in [0, 1].
+  double confidence = 5;
+
+  // Human-readable summary recommendation.
+  string recommendation = 6;
+
+  // Time taken for the full analysis in milliseconds.
+  uint32 analysis_time_ms = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Request / Response Messages — Value Assessment
+// ---------------------------------------------------------------------------
+
+message AssessPatentValueRequest {
+  // UUID of the patent to assess.
+  string patent_id = 1;
+
+  // Dimensions to evaluate. If empty, all four dimensions are computed.
+  repeated string dimensions = 2;
+
+  // Optional strategic context used by the ValueScorer model.
+  message Context {
+    // Competitor assignee names for positioning analysis.
+    repeated string competitors = 1;
+
+    // High-level business objectives (e.g., "defend_blue_host").
+    repeated string business_goals = 2;
+
+    // KeyIP technology domain codes representing focus areas.
+    repeated string tech_focus_areas = 3;
+  }
+  Context context = 3;
+}
+
+message AssessPatentValueResponse {
+  string patent_id = 1;
+
+  // Technical value score and factor breakdown.
+  ValueDimensionScore technical_value = 2;
+
+  // Legal value score and factor breakdown.
+  ValueDimensionScore legal_value = 3;
+
+  // Commercial value score and factor breakdown.
+  ValueDimensionScore commercial_value = 4;
+
+  // Strategic value score and factor breakdown.
+  ValueDimensionScore strategic_value = 5;
+
+  // Composite score in [0, 100] and tier classification.
+  uint32 overall_score = 6;
+  ValueTier overall_tier = 7;
+
+  // Human-readable tier description.
+  string tier_description = 8;
+
+  // Actionable maintenance and enforcement recommendations.
+  repeated Recommendation recommendations = 9;
+
+  // Model confidence in the overall assessment, in [0, 1].
+  double confidence = 10;
+}
+
+// ---------------------------------------------------------------------------
+// Request / Response Messages — Patent Family
+// ---------------------------------------------------------------------------
+
+message GetPatentFamilyRequest {
+  // UUID of any member patent; all family members will be returned.
+  string patent_id = 1;
+}
+
+message GetPatentFamilyResponse {
+  // INPADOC family identifier shared by all members.
+  string family_id = 1;
+
+  // All patents belonging to this family, including the input patent.
+  repeated Patent members = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Service Definition
+// ---------------------------------------------------------------------------
+
+// PatentService provides high-performance gRPC access to patent record
+// management, full-text search, claim parsing, Markush analysis, infringement
+// risk assessment, and patent value scoring.
+//
+// Tenant context: gRPC metadata key "x-tenant-id" (required).
+// Authentication: gRPC metadata key "authorization": "Bearer <token>".
+//
+// Infringement assessment benchmarks (ClaimBERT + InfringeNet, p50 / p99):
+//   Single-claim literal analysis:             350 ms / 900 ms
+//   10-claim analysis with equivalents:        1.2 s  / 3.0 s
+//   Markush enumeration (10k molecules):       800 ms / 2.0 s
+//   Patent value assessment (4 dimensions):    1.5 s  / 4.0 s
+service PatentService {
+  // GetPatent retrieves a single patent by its UUID.
+  rpc GetPatent(GetPatentRequest) returns (GetPatentResponse);
+
+  // ListPatents returns a paginated, filtered list of patents for the tenant.
+  rpc ListPatents(ListPatentsRequest) returns (ListPatentsResponse);
+
+  // ImportPatent registers a patent record. If the patent number already
+  // exists for the tenant, the existing record is returned (idempotent).
+  rpc ImportPatent(ImportPatentRequest) returns (ImportPatentResponse);
+
+  // UpdatePatent applies partial updates to a patent record.
+  rpc UpdatePatent(UpdatePatentRequest) returns (UpdatePatentResponse);
+
+  // DeletePatent soft-deletes a patent and all associated claims.
+  rpc DeletePatent(DeletePatentRequest) returns (DeletePatentResponse);
+
+  // SearchPatents performs full-text search over patent titles, abstracts,
+  // and claim text with optional structured filters.
+  rpc SearchPatents(SearchPatentsRequest) returns (SearchPatentsResponse);
+
+  // GetPatentClaims retrieves and returns the structured claims for a patent.
+  // Claims are parsed by ClaimBERT on first access and cached thereafter.
+  rpc GetPatentClaims(GetPatentClaimsRequest) returns (GetPatentClaimsResponse);
+
+  // ParseMarkush identifies and expands Markush groups in patent claims,
+  // computing the estimated coverage of the Markush molecular space.
+  rpc ParseMarkush(ParseMarkushRequest) returns (ParseMarkushResponse);
+
+  // AssessInfringementRisk evaluates whether a target molecule infringes
+  // specified claims of a patent, applying the All-Elements Rule for literal
+  // infringement and the Function-Way-Result test for doctrine of equivalents.
+  rpc AssessInfringementRisk(AssessInfringementRiskRequest)
+      returns (AssessInfringementRiskResponse);
+
+  // AssessPatentValue computes a multi-dimensional value score for a patent
+  // across technical, legal, commercial, and strategic dimensions.
+  rpc AssessPatentValue(AssessPatentValueRequest)
+      returns (AssessPatentValueResponse);
+
+  // GetPatentFamily retrieves all members of the INPADOC patent family
+  // containing the specified patent.
+  rpc GetPatentFamily(GetPatentFamilyRequest) returns (GetPatentFamilyResponse);
+}
+
+// Personal.AI order the ending

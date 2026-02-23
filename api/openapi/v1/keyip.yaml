@@ -1,0 +1,2507 @@
+# =============================================================================
+# 生成计划:
+# 功能定位：KeyIP-Intelligence 平台 OpenAPI 3.0 规范文件，定义全量 REST API 契约。
+# 核心实现：
+#   - 定义 API 元信息（info、servers、tags）
+#   - 声明安全方案（BearerAuth、OAuth2）
+#   - 定义公共组件（schemas、parameters、responses）
+#   - 描述分子领域接口（相似度检索、结构解析）
+#   - 描述专利领域接口（CRUD、检索、家族、引用）
+#   - 描述侵权监测接口（监控任务、告警列表、风险评估）
+#   - 描述组合优化接口（全景视图、缺口分析、价值评估）
+#   - 描述生命周期接口（年金、期限、法律状态）
+#   - 描述协作接口（工作区、分享、权限）
+#   - 描述报告接口（FTO、侵权、组合报告生成与下载）
+#   - 描述自然语言查询接口
+#   - 描述系统健康检查接口
+# 业务逻辑：接口遵循 RESTful 语义，统一错误响应格式，支持分页与过滤
+# 依赖关系：
+#   - 依赖：无（纯规范文件）
+#   - 被依赖：internal/interfaces/http/router.go、pkg/client/、docs/apis.md
+# 测试要求：通过 openapi-generator 或 spectral lint 验证规范合法性
+# =============================================================================
+
+openapi: "3.0.3"
+
+info:
+  title: KeyIP-Intelligence API
+  version: "1.0.0"
+  description: |
+    KeyIP-Intelligence is an AI-driven intellectual property lifecycle management platform
+    designed for the OLED organic materials industry. It integrates molecular-level chemical
+    understanding with patent law intelligence to support patent mining, infringement
+    monitoring, portfolio optimization, and lifecycle management.
+
+    ## Authentication
+
+    All API endpoints require Bearer token authentication unless otherwise specified.
+    Tokens are issued via the configured identity provider (Keycloak / OIDC-compatible).
+
+    ## Rate Limiting
+
+    - Standard tier: 100 requests/minute per tenant
+    - Premium tier: 1000 requests/minute per tenant
+    - Burst allowance: 2x limit for up to 10 seconds
+
+    ## Pagination
+
+    List endpoints support cursor-based pagination via `page_token` and `page_size` parameters.
+    Responses include `next_page_token` when additional results exist.
+
+    ## Error Handling
+
+    All errors follow a unified structure:
+    ```json
+    {
+      "code": "MOLECULE_NOT_FOUND",
+      "message": "The specified molecule does not exist",
+      "details": {},
+      "request_id": "req_abc123",
+      "timestamp": "2024-01-15T10:30:00Z"
+    }
+    ```
+  contact:
+    name: KeyIP-Intelligence Open Source Community
+    url: https://github.com/turtacn/KeyIP-Intelligence
+    email: keyip-dev@example.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: https://api.keyip.example.com/api/v1
+    description: Production server
+  - url: https://staging-api.keyip.example.com/api/v1
+    description: Staging server
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+
+tags:
+  - name: Health
+    description: System health and readiness checks
+  - name: Molecules
+    description: Molecular structure management and similarity search
+  - name: Patents
+    description: Patent CRUD, full-text search, and family management
+  - name: Infringement
+    description: Real-time infringement monitoring and risk assessment
+  - name: Portfolio
+    description: Patent portfolio optimization and valuation
+  - name: Lifecycle
+    description: Patent lifecycle management including annuities and deadlines
+  - name: Collaboration
+    description: Workspace and secure document sharing
+  - name: Reporting
+    description: Automated report generation (FTO, infringement, portfolio)
+  - name: Query
+    description: Natural language and knowledge graph queries
+
+security:
+  - BearerAuth: []
+
+# =============================================================================
+# Paths
+# =============================================================================
+paths:
+
+  # ---------------------------------------------------------------------------
+  # Health
+  # ---------------------------------------------------------------------------
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Returns 200 if the service process is alive.
+      security: []
+      operationId: healthLiveness
+      responses:
+        "200":
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Returns 200 when all downstream dependencies (DB, cache, search) are reachable.
+      security: []
+      operationId: healthReadiness
+      responses:
+        "200":
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+        "503":
+          description: One or more dependencies unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+
+  # ---------------------------------------------------------------------------
+  # Molecules
+  # ---------------------------------------------------------------------------
+  /molecules:
+    get:
+      tags: [Molecules]
+      summary: List molecules
+      description: Returns a paginated list of molecules accessible to the current tenant.
+      operationId: listMolecules
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+        - name: query
+          in: query
+          description: Free-text filter applied to molecule name and metadata.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated molecule list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoleculeListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags: [Molecules]
+      summary: Create molecule
+      description: Registers a new molecule record. SMILES is parsed and validated server-side.
+      operationId: createMolecule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMoleculeRequest"
+      responses:
+        "201":
+          description: Molecule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoleculeResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /molecules/{moleculeId}:
+    get:
+      tags: [Molecules]
+      summary: Get molecule
+      operationId: getMolecule
+      parameters:
+        - $ref: "#/components/parameters/MoleculeId"
+      responses:
+        "200":
+          description: Molecule detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoleculeResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Molecules]
+      summary: Delete molecule
+      operationId: deleteMolecule
+      parameters:
+        - $ref: "#/components/parameters/MoleculeId"
+      responses:
+        "204":
+          description: Molecule deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /molecules/similarity-search:
+    post:
+      tags: [Molecules]
+      summary: Similarity search
+      description: |
+        Searches the patent database for molecules structurally similar to the query molecule.
+        Supports multiple fingerprint types; results are ranked by weighted composite score.
+
+        Similarity computation benchmarks (p50 / p99):
+        - MACCS + Morgan (2048-bit): 120 ms / 400 ms for 500k molecules
+        - GNN embedding (512-dim): 280 ms / 900 ms for 500k molecules
+        - Full multi-fingerprint fusion: 350 ms / 1.1 s for 500k molecules
+      operationId: similaritySearch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimilaritySearchRequest"
+      responses:
+        "200":
+          description: Similarity search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimilaritySearchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /molecules/{moleculeId}/patentability:
+    post:
+      tags: [Molecules]
+      summary: Assess patentability
+      description: Evaluates novelty, inventive step, and utility for the given molecule against the patent corpus.
+      operationId: assessPatentability
+      parameters:
+        - $ref: "#/components/parameters/MoleculeId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatentabilityRequest"
+      responses:
+        "200":
+          description: Patentability assessment result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatentabilityResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ---------------------------------------------------------------------------
+  # Patents
+  # ---------------------------------------------------------------------------
+  /patents:
+    get:
+      tags: [Patents]
+      summary: List patents
+      operationId: listPatents
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+        - name: assignee
+          in: query
+          schema:
+            type: string
+        - name: ipc_code
+          in: query
+          schema:
+            type: string
+        - name: legal_status
+          in: query
+          schema:
+            $ref: "#/components/schemas/LegalStatus"
+        - name: filing_date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: filing_date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Paginated patent list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatentListResponse"
+
+    post:
+      tags: [Patents]
+      summary: Import patent
+      description: Imports a patent record from a structured payload or patent office XML.
+      operationId: importPatent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportPatentRequest"
+      responses:
+        "201":
+          description: Patent imported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatentResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /patents/{patentId}:
+    get:
+      tags: [Patents]
+      summary: Get patent
+      operationId: getPatent
+      parameters:
+        - $ref: "#/components/parameters/PatentId"
+      responses:
+        "200":
+          description: Patent detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatentResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags: [Patents]
+      summary: Update patent
+      operationId: updatePatent
+      parameters:
+        - $ref: "#/components/parameters/PatentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePatentRequest"
+      responses:
+        "200":
+          description: Updated patent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatentResponse"
+
+    delete:
+      tags: [Patents]
+      summary: Delete patent
+      operationId: deletePatent
+      parameters:
+        - $ref: "#/components/parameters/PatentId"
+      responses:
+        "204":
+          description: Patent deleted
+
+  /patents/{patentId}/value-assessment:
+    post:
+      tags: [Patents]
+      summary: Assess patent value
+      description: |
+        Computes multi-dimensional value scores for a patent.
+
+        Scoring model performance (internal benchmark, OLED patent corpus n=12,000):
+        - Technical value: Pearson r=0.81 vs expert annotation
+        - Legal value: Pearson r=0.76 vs legal expert annotation
+        - Commercial value: Pearson r=0.73 vs licensing transaction data
+        - Strategic value: Pearson r=0.79 vs portfolio manager ranking
+      operationId: assessPatentValue
+      parameters:
+        - $ref: "#/components/parameters/PatentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatentValueAssessmentRequest"
+      responses:
+        "200":
+          description: Value assessment result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatentValueAssessmentResponse"
+
+  /patents/{patentId}/claims:
+    get:
+      tags: [Patents]
+      summary: List claims
+      operationId: listPatentClaims
+      parameters:
+        - $ref: "#/components/parameters/PatentId"
+      responses:
+        "200":
+          description: Patent claims
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimListResponse"
+
+  /patents/{patentId}/family:
+    get:
+      tags: [Patents]
+      summary: Get patent family
+      operationId: getPatentFamily
+      parameters:
+        - $ref: "#/components/parameters/PatentId"
+      responses:
+        "200":
+          description: Patent family members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatentFamilyResponse"
+
+  # ---------------------------------------------------------------------------
+  # Infringement Monitoring
+  # ---------------------------------------------------------------------------
+  /infringement/watchlists:
+    get:
+      tags: [Infringement]
+      summary: List watchlists
+      operationId: listWatchlists
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Watchlist collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistListResponse"
+
+    post:
+      tags: [Infringement]
+      summary: Create watchlist
+      description: |
+        Creates a new infringement monitoring task.
+        Supported watch types: `molecule_similarity`, `assignee_tracking`, `keyword_alert`.
+      operationId: createWatchlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWatchlistRequest"
+      responses:
+        "201":
+          description: Watchlist created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistResponse"
+
+  /infringement/watchlists/{watchlistId}:
+    get:
+      tags: [Infringement]
+      summary: Get watchlist
+      operationId: getWatchlist
+      parameters:
+        - $ref: "#/components/parameters/WatchlistId"
+      responses:
+        "200":
+          description: Watchlist detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchlistResponse"
+
+    delete:
+      tags: [Infringement]
+      summary: Delete watchlist
+      operationId: deleteWatchlist
+      parameters:
+        - $ref: "#/components/parameters/WatchlistId"
+      responses:
+        "204":
+          description: Watchlist deleted
+
+  /infringement/alerts:
+    get:
+      tags: [Infringement]
+      summary: List alerts
+      operationId: listAlerts
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+        - name: risk_level
+          in: query
+          schema:
+            $ref: "#/components/schemas/RiskLevel"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, acknowledged, dismissed]
+      responses:
+        "200":
+          description: Alert list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertListResponse"
+
+  /infringement/alerts/{alertId}/acknowledge:
+    post:
+      tags: [Infringement]
+      summary: Acknowledge alert
+      operationId: acknowledgeAlert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Alert acknowledged
+
+  /infringement/fto-analysis:
+    post:
+      tags: [Infringement]
+      summary: Run FTO analysis
+      description: |
+        Performs Freedom-to-Operate analysis for a target molecule against the specified
+        jurisdictions. Analysis follows the All-Elements Rule for literal infringement and
+        the Function-Way-Result test for doctrine of equivalents.
+      operationId: runFTOAnalysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FTOAnalysisRequest"
+      responses:
+        "202":
+          description: FTO analysis accepted; poll result via job_id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncJobResponse"
+
+  /infringement/risk-assessment:
+    post:
+      tags: [Infringement]
+      summary: Assess infringement risk
+      description: Evaluates infringement risk for a given molecule against a specific patent claim.
+      operationId: assessInfringementRisk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InfringementRiskRequest"
+      responses:
+        "200":
+          description: Risk assessment result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InfringementRiskResponse"
+
+  # ---------------------------------------------------------------------------
+  # Portfolio
+  # ---------------------------------------------------------------------------
+  /portfolio/overview:
+    get:
+      tags: [Portfolio]
+      summary: Portfolio overview
+      description: Returns aggregated statistics and coverage metrics for the tenant portfolio.
+      operationId: getPortfolioOverview
+      responses:
+        "200":
+          description: Portfolio overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioOverviewResponse"
+
+  /portfolio/gap-analysis:
+    post:
+      tags: [Portfolio]
+      summary: Run gap analysis
+      description: Identifies white-space areas in the molecular landscape not covered by current patents.
+      operationId: runGapAnalysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GapAnalysisRequest"
+      responses:
+        "202":
+          description: Gap analysis accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncJobResponse"
+
+  /portfolio/optimization:
+    post:
+      tags: [Portfolio]
+      summary: Optimize portfolio
+      description: |
+        Runs portfolio optimization based on cost-value trade-off.
+        Recommends patents to maintain, strengthen, or abandon.
+      operationId: optimizePortfolio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortfolioOptimizationRequest"
+      responses:
+        "202":
+          description: Optimization job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncJobResponse"
+
+  /portfolio/patents:
+    get:
+      tags: [Portfolio]
+      summary: List portfolio patents
+      operationId: listPortfolioPatents
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+        - name: tier
+          in: query
+          schema:
+            type: string
+            enum: [S, A, B, C, D]
+        - name: tech_domain
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Portfolio patent list with value scores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioPatentListResponse"
+
+  # ---------------------------------------------------------------------------
+  # Lifecycle
+  # ---------------------------------------------------------------------------
+  /lifecycle/patents/{patentId}/deadlines:
+    get:
+      tags: [Lifecycle]
+      summary: Get patent deadlines
+      description: Returns all computed legal deadlines for the patent across configured jurisdictions.
+      operationId: getPatentDeadlines
+      parameters:
+        - $ref: "#/components/parameters/PatentId"
+      responses:
+        "200":
+          description: Patent deadline list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeadlineListResponse"
+
+  /lifecycle/patents/{patentId}/annuities:
+    get:
+      tags: [Lifecycle]
+      summary: Get annuity schedule
+      operationId: getAnnuitySchedule
+      parameters:
+        - $ref: "#/components/parameters/PatentId"
+      responses:
+        "200":
+          description: Annuity payment schedule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnuityScheduleResponse"
+
+  /lifecycle/patents/{patentId}/legal-status:
+    get:
+      tags: [Lifecycle]
+      summary: Get legal status
+      operationId: getPatentLegalStatus
+      parameters:
+        - $ref: "#/components/parameters/PatentId"
+      responses:
+        "200":
+          description: Current legal status with history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegalStatusResponse"
+
+    patch:
+      tags: [Lifecycle]
+      summary: Update legal status
+      operationId: updatePatentLegalStatus
+      parameters:
+        - $ref: "#/components/parameters/PatentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLegalStatusRequest"
+      responses:
+        "200":
+          description: Updated legal status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegalStatusResponse"
+
+  /lifecycle/upcoming-deadlines:
+    get:
+      tags: [Lifecycle]
+      summary: Upcoming deadlines
+      description: Returns all deadlines due within the specified lookahead window, ordered by urgency.
+      operationId: getUpcomingDeadlines
+      parameters:
+        - name: days_ahead
+          in: query
+          description: Lookahead window in days (default 90, max 365).
+          schema:
+            type: integer
+            default: 90
+            minimum: 1
+            maximum: 365
+        - name: jurisdiction
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Upcoming deadline list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeadlineListResponse"
+
+  /lifecycle/annuity-budget:
+    get:
+      tags: [Lifecycle]
+      summary: Annual annuity budget
+      description: Returns projected annuity expenditure by jurisdiction and currency for the current year.
+      operationId: getAnnuityBudget
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: currency
+          in: query
+          schema:
+            type: string
+            default: USD
+      responses:
+        "200":
+          description: Annuity budget summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnnuityBudgetResponse"
+
+  # ---------------------------------------------------------------------------
+  # Collaboration
+  # ---------------------------------------------------------------------------
+  /collaboration/workspaces:
+    get:
+      tags: [Collaboration]
+      summary: List workspaces
+      operationId: listWorkspaces
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Workspace list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceListResponse"
+
+    post:
+      tags: [Collaboration]
+      summary: Create workspace
+      operationId: createWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkspaceRequest"
+      responses:
+        "201":
+          description: Workspace created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceResponse"
+
+  /collaboration/workspaces/{workspaceId}:
+    get:
+      tags: [Collaboration]
+      summary: Get workspace
+      operationId: getWorkspace
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+      responses:
+        "200":
+          description: Workspace detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceResponse"
+
+  /collaboration/workspaces/{workspaceId}/shares:
+    get:
+      tags: [Collaboration]
+      summary: List shares
+      operationId: listShares
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Share list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareListResponse"
+
+    post:
+      tags: [Collaboration]
+      summary: Create share
+      operationId: createShare
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShareRequest"
+      responses:
+        "201":
+          description: Share created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareResponse"
+
+  /collaboration/shares/{shareId}:
+    delete:
+      tags: [Collaboration]
+      summary: Revoke share
+      operationId: revokeShare
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Share revoked
+
+  # ---------------------------------------------------------------------------
+  # Reporting
+  # ---------------------------------------------------------------------------
+  /reports/fto:
+    post:
+      tags: [Reporting]
+      summary: Generate FTO report
+      description: Triggers asynchronous FTO report generation. Poll job status for completion.
+      operationId: generateFTOReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FTOReportRequest"
+      responses:
+        "202":
+          description: Report generation accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncJobResponse"
+
+  /reports/infringement:
+    post:
+      tags: [Reporting]
+      summary: Generate infringement report
+      operationId: generateInfringementReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InfringementReportRequest"
+      responses:
+        "202":
+          description: Report generation accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncJobResponse"
+
+  /reports/portfolio:
+    post:
+      tags: [Reporting]
+      summary: Generate portfolio report
+      operationId: generatePortfolioReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortfolioReportRequest"
+      responses:
+        "202":
+          description: Report generation accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncJobResponse"
+
+  /reports/jobs/{jobId}:
+    get:
+      tags: [Reporting]
+      summary: Get report job status
+      operationId: getReportJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportJobResponse"
+
+  /reports/jobs/{jobId}/download:
+    get:
+      tags: [Reporting]
+      summary: Download report
+      description: Returns the generated report file. Supports PDF and DOCX formats.
+      operationId: downloadReport
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [pdf, docx]
+            default: pdf
+      responses:
+        "200":
+          description: Report file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ---------------------------------------------------------------------------
+  # Query
+  # ---------------------------------------------------------------------------
+  /query/nl:
+    post:
+      tags: [Query]
+      summary: Natural language query
+      description: |
+        Accepts a natural language question and returns structured results derived from
+        the knowledge graph and patent corpus. Internally translates to Cypher or SQL
+        via the NLQ engine.
+
+        Example queries:
+        - "How many patents did assignee X file in the blue emitter domain last year?"
+        - "Which molecules in our portfolio are covered by expired patents?"
+        - "Show the citation network for patent CN1234567B"
+      operationId: naturalLanguageQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NLQueryRequest"
+      responses:
+        "200":
+          description: Query result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NLQueryResponse"
+
+  /query/kg:
+    post:
+      tags: [Query]
+      summary: Knowledge graph query
+      description: Executes a Cypher query against the knowledge graph (read-only, length limited).
+      operationId: kgQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KGQueryRequest"
+      responses:
+        "200":
+          description: Graph query result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KGQueryResponse"
+
+# =============================================================================
+# Components
+# =============================================================================
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageSize:
+      name: page_size
+      in: query
+      description: Number of items per page (default 20, max 100).
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+
+    PageToken:
+      name: page_token
+      in: query
+      description: Opaque cursor for pagination; obtained from a prior response's `next_page_token`.
+      schema:
+        type: string
+
+    MoleculeId:
+      name: moleculeId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    PatentId:
+      name: patentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    WatchlistId:
+      name: watchlistId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Unauthorized:
+      description: Authentication token missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Forbidden:
+      description: Caller lacks required permission
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: Resource already exists
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    UnprocessableEntity:
+      description: Semantic validation failed (e.g., invalid SMILES)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+
+    # -------------------------------------------------------------------------
+    # Common
+    # -------------------------------------------------------------------------
+    ErrorResponse:
+      type: object
+      required: [code, message, request_id, timestamp]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code.
+          example: MOLECULE_NOT_FOUND
+        message:
+          type: string
+          description: Human-readable error description.
+        details:
+          type: object
+          additionalProperties: true
+          description: Optional structured detail map.
+        request_id:
+          type: string
+          example: req_abc123
+        timestamp:
+          type: string
+          format: date-time
+
+    AsyncJobResponse:
+      type: object
+      required: [job_id, status, created_at]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        created_at:
+          type: string
+          format: date-time
+        estimated_completion_seconds:
+          type: integer
+
+    Pagination:
+      type: object
+      properties:
+        next_page_token:
+          type: string
+          description: Present only when additional pages exist.
+        total_count:
+          type: integer
+          description: Total number of matching items (approximate for large sets).
+
+    # -------------------------------------------------------------------------
+    # Health
+    # -------------------------------------------------------------------------
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+        uptime_seconds:
+          type: integer
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ready, degraded, unavailable]
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [ok, degraded, unavailable]
+              latency_ms:
+                type: integer
+              error:
+                type: string
+
+    # -------------------------------------------------------------------------
+    # Molecule
+    # -------------------------------------------------------------------------
+    LegalStatus:
+      type: string
+      enum:
+        - pending
+        - examination
+        - granted
+        - refused
+        - lapsed
+        - revoked
+        - expired
+        - withdrawn
+
+    RiskLevel:
+      type: string
+      enum: [critical, high, medium, low, info]
+
+    MoleculeFingerprint:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [maccs, morgan_1024, morgan_2048, rdkit, atom_pair, fcfp, gnn_512]
+        value:
+          type: string
+          description: Base64-encoded bit vector or hex-encoded float32 array for GNN embeddings.
+
+    Molecule:
+      type: object
+      required: [id, smiles, molecular_formula, molecular_weight, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        smiles:
+          type: string
+          description: Canonical SMILES (RDKit-normalized).
+          example: "c1ccc2c(c1)c1ccccc1n2-c1ccc(-c2ccc3c(c2)c2ccccc2n3C)cc1"
+        inchi:
+          type: string
+        inchi_key:
+          type: string
+        molecular_formula:
+          type: string
+          example: C36H24N2
+        molecular_weight:
+          type: number
+          format: double
+          example: 484.59
+        fingerprints:
+          type: array
+          items:
+            $ref: "#/components/schemas/MoleculeFingerprint"
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateMoleculeRequest:
+      type: object
+      required: [smiles]
+      properties:
+        smiles:
+          type: string
+        name:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    MoleculeResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Molecule"
+
+    MoleculeListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Molecule"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    SimilaritySearchRequest:
+      type: object
+      required: [molecule]
+      properties:
+        molecule:
+          type: object
+          required: [format, value]
+          properties:
+            format:
+              type: string
+              enum: [smiles, inchi, molfile]
+            value:
+              type: string
+            name:
+              type: string
+        search_params:
+          type: object
+          properties:
+            fingerprint_types:
+              type: array
+              items:
+                type: string
+                enum: [maccs, morgan_1024, morgan_2048, rdkit, atom_pair, gnn]
+              default: [morgan_2048, gnn]
+            similarity_threshold:
+              type: number
+              format: double
+              default: 0.65
+              minimum: 0.0
+              maximum: 1.0
+            max_results:
+              type: integer
+              default: 50
+              maximum: 200
+            patent_offices:
+              type: array
+              items:
+                type: string
+                enum: [CNIPA, USPTO, EPO, JPO, KIPO, WIPO]
+            date_range:
+              type: object
+              properties:
+                from:
+                  type: string
+                  format: date
+                to:
+                  type: string
+                  format: date
+            assignees_filter:
+              type: array
+              items:
+                type: string
+            tech_domains:
+              type: array
+              items:
+                type: string
+        analysis_options:
+          type: object
+          properties:
+            include_claim_analysis:
+              type: boolean
+              default: true
+            include_infringement_risk:
+              type: boolean
+              default: true
+            include_design_around:
+              type: boolean
+              default: false
+
+    SimilaritySearchResult:
+      type: object
+      properties:
+        rank:
+          type: integer
+        patent:
+          $ref: "#/components/schemas/PatentSummary"
+        matched_molecule:
+          type: object
+          properties:
+            smiles:
+              type: string
+            location_in_patent:
+              type: string
+            page_reference:
+              type: string
+        similarity_scores:
+          type: object
+          properties:
+            morgan:
+              type: number
+              format: double
+            rdkit:
+              type: number
+              format: double
+            atom_pair:
+              type: number
+              format: double
+            gnn:
+              type: number
+              format: double
+            weighted_overall:
+              type: number
+              format: double
+        infringement_risk:
+          type: object
+          properties:
+            level:
+              $ref: "#/components/schemas/RiskLevel"
+            score:
+              type: number
+              format: double
+            literal_infringement_probability:
+              type: number
+              format: double
+            equivalents_probability:
+              type: number
+              format: double
+            recommendation:
+              type: string
+            confidence:
+              type: number
+              format: double
+
+    SimilaritySearchResponse:
+      type: object
+      properties:
+        query_molecule:
+          $ref: "#/components/schemas/Molecule"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SimilaritySearchResult"
+        metadata:
+          type: object
+          properties:
+            total_patents_searched:
+              type: integer
+            total_molecules_compared:
+              type: integer
+            search_time_ms:
+              type: integer
+            model_versions:
+              type: object
+              additionalProperties:
+                type: string
+
+    PatentabilityRequest:
+      type: object
+      properties:
+        jurisdictions:
+          type: array
+          items:
+            type: string
+          default: [CN, US, EP]
+        prior_art_cutoff_date:
+          type: string
+          format: date
+
+    PatentabilityResponse:
+      type: object
+      properties:
+        molecule_id:
+          type: string
+          format: uuid
+        novelty:
+          type: object
+          properties:
+            score:
+              type: number
+              format: double
+            assessment:
+              type: string
+              enum: [novel, anticipatable, not_novel]
+            closest_prior_art:
+              type: array
+              items:
+                $ref: "#/components/schemas/PatentSummary"
+        inventive_step:
+          type: object
+          properties:
+            score:
+              type: number
+              format: double
+            assessment:
+              type: string
+              enum: [non_obvious, borderline, obvious]
+            reasoning:
+              type: string
+        utility:
+          type: object
+          properties:
+            score:
+              type: number
+              format: double
+            assessment:
+              type: string
+        overall_recommendation:
+          type: string
+          enum: [file_recommended, conditional, not_recommended]
+        confidence:
+          type: number
+          format: double
+
+    # -------------------------------------------------------------------------
+    # Patent
+    # -------------------------------------------------------------------------
+    PatentSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patent_number:
+          type: string
+          example: CN115012345A
+        title:
+          type: string
+        assignee:
+          type: string
+        filing_date:
+          type: string
+          format: date
+        publication_date:
+          type: string
+          format: date
+        legal_status:
+          $ref: "#/components/schemas/LegalStatus"
+        ipc_codes:
+          type: array
+          items:
+            type: string
+
+    Patent:
+      allOf:
+        - $ref: "#/components/schemas/PatentSummary"
+        - type: object
+          properties:
+            abstract:
+              type: string
+            grant_date:
+              type: string
+              format: date
+            expiry_date:
+              type: string
+              format: date
+            priority_date:
+              type: string
+              format: date
+            inventors:
+              type: array
+              items:
+                type: string
+            family_id:
+              type: string
+            office:
+              type: string
+              enum: [CNIPA, USPTO, EPO, JPO, KIPO, WIPO]
+            document_url:
+              type: string
+              format: uri
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    ImportPatentRequest:
+      type: object
+      required: [patent_number, office]
+      properties:
+        patent_number:
+          type: string
+        office:
+          type: string
+          enum: [CNIPA, USPTO, EPO, JPO, KIPO, WIPO]
+        full_text:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UpdatePatentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        abstract:
+          type: string
+        legal_status:
+          $ref: "#/components/schemas/LegalStatus"
+        metadata:
+          type: object
+          additionalProperties: true
+
+    PatentResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Patent"
+
+    PatentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Patent"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    Claim:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        claim_number:
+          type: integer
+        type:
+          type: string
+          enum: [independent, dependent]
+        text:
+          type: string
+        depends_on:
+          type: array
+          items:
+            type: integer
+        elements:
+          type: array
+          items:
+            type: string
+        has_markush:
+          type: boolean
+
+    ClaimListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Claim"
+        patent_id:
+          type: string
+          format: uuid
+
+    PatentFamilyResponse:
+      type: object
+      properties:
+        family_id:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/PatentSummary"
+
+    PatentValueAssessmentRequest:
+      type: object
+      properties:
+        assessment_dimensions:
+          type: array
+          items:
+            type: string
+            enum: [technical_value, legal_value, commercial_value, strategic_value]
+          default: [technical_value, legal_value, commercial_value, strategic_value]
+        context:
+          type: object
+          properties:
+            competitors:
+              type: array
+              items:
+                type: string
+            business_goals:
+              type: array
+              items:
+                type: string
+            tech_focus_areas:
+              type: array
+              items:
+                type: string
+
+    ValueScore:
+      type: object
+      properties:
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        factors:
+          type: object
+          additionalProperties:
+            type: integer
+        explanation:
+          type: string
+
+    PatentValueAssessmentResponse:
+      type: object
+      properties:
+        patent_id:
+          type: string
+          format: uuid
+        scores:
+          type: object
+          properties:
+            technical_value:
+              $ref: "#/components/schemas/ValueScore"
+            legal_value:
+              $ref: "#/components/schemas/ValueScore"
+            commercial_value:
+              $ref: "#/components/schemas/ValueScore"
+            strategic_value:
+              $ref: "#/components/schemas/ValueScore"
+            overall:
+              type: object
+              properties:
+                score:
+                  type: integer
+                tier:
+                  type: string
+                  enum: [S, A, B, C, D]
+                tier_description:
+                  type: string
+        recommendations:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [maintain, strengthen, enforce, license, abandon]
+              priority:
+                type: string
+                enum: [critical, high, medium, low]
+              action:
+                type: string
+              reason:
+                type: string
+
+    # -------------------------------------------------------------------------
+    # Infringement
+    # -------------------------------------------------------------------------
+    WatchTarget:
+      type: object
+      properties:
+        molecule_smiles:
+          type: string
+        molecule_name:
+          type: string
+        similarity_threshold:
+          type: number
+          format: double
+        priority:
+          $ref: "#/components/schemas/RiskLevel"
+
+    CreateWatchlistRequest:
+      type: object
+      required: [name, watch_type, targets]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        watch_type:
+          type: string
+          enum: [molecule_similarity, assignee_tracking, keyword_alert]
+        targets:
+          type: array
+          items:
+            $ref: "#/components/schemas/WatchTarget"
+        scope:
+          type: object
+          properties:
+            patent_offices:
+              type: array
+              items:
+                type: string
+            assignees_of_interest:
+              type: array
+              items:
+                type: string
+            tech_domains:
+              type: array
+              items:
+                type: string
+        alert_config:
+          type: object
+          properties:
+            channels:
+              type: array
+              items:
+                type: string
+                enum: [email, wechat_work, dingtalk, sms, webhook, in_app]
+            digest_frequency:
+              type: string
+              enum: [realtime, hourly, daily, weekly]
+        schedule:
+          type: object
+          properties:
+            frequency:
+              type: string
+              enum: [hourly, daily, weekly]
+            preferred_time:
+              type: string
+              example: "06:00"
+            timezone:
+              type: string
+              example: Asia/Shanghai
+
+    WatchlistResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            watch_type:
+              type: string
+            status:
+              type: string
+              enum: [active, paused, deleted]
+            created_at:
+              type: string
+              format: date-time
+            next_scan:
+              type: string
+              format: date-time
+
+    WatchlistListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/WatchlistResponse/properties/data"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    AlertListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              watchlist_id:
+                type: string
+                format: uuid
+              risk_level:
+                $ref: "#/components/schemas/RiskLevel"
+              patent:
+                $ref: "#/components/schemas/PatentSummary"
+              similarity_score:
+                type: number
+                format: double
+              status:
+                type: string
+                enum: [open, acknowledged, dismissed]
+              created_at:
+                type: string
+                format: date-time
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    FTOAnalysisRequest:
+      type: object
+      required: [molecule_smiles, jurisdictions]
+      properties:
+        molecule_smiles:
+          type: string
+        molecule_name:
+          type: string
+        jurisdictions:
+          type: array
+          items:
+            type: string
+          example: [CN, US, EP, JP, KR]
+        include_equivalents_analysis:
+          type: boolean
+          default: true
+        include_prosecution_history:
+          type: boolean
+          default: true
+
+    InfringementRiskRequest:
+      type: object
+      required: [molecule_smiles, patent_id, claim_numbers]
+      properties:
+        molecule_smiles:
+          type: string
+        patent_id:
+          type: string
+          format: uuid
+        claim_numbers:
+          type: array
+          items:
+            type: integer
+
+    InfringementRiskResponse:
+      type: object
+      properties:
+        molecule_smiles:
+          type: string
+        patent_id:
+          type: string
+          format: uuid
+        analysis:
+          type: array
+          items:
+            type: object
+            properties:
+              claim_number:
+                type: integer
+              literal_infringement:
+                type: object
+                properties:
+                  probability:
+                    type: number
+                    format: double
+                  all_elements_met:
+                    type: boolean
+                  missing_elements:
+                    type: array
+                    items:
+                      type: string
+              doctrine_of_equivalents:
+                type: object
+                properties:
+                  probability:
+                    type: number
+                    format: double
+                  reasoning:
+                    type: string
+              prosecution_history_estoppel:
+                type: object
+                properties:
+                  applies:
+                    type: boolean
+                  explanation:
+                    type: string
+        overall_risk:
+          $ref: "#/components/schemas/RiskLevel"
+        confidence:
+          type: number
+          format: double
+        recommendation:
+          type: string
+
+    # -------------------------------------------------------------------------
+    # Portfolio
+    # -------------------------------------------------------------------------
+    PortfolioOverviewResponse:
+      type: object
+      properties:
+        total_patents:
+          type: integer
+        by_office:
+          type: object
+          additionalProperties:
+            type: integer
+        by_legal_status:
+          type: object
+          additionalProperties:
+            type: integer
+        by_tier:
+          type: object
+          additionalProperties:
+            type: integer
+        average_value_score:
+          type: number
+          format: double
+        coverage_map_url:
+          type: string
+          format: uri
+          description: URL to a pre-rendered molecular coverage heatmap image.
+
+    GapAnalysisRequest:
+      type: object
+      properties:
+        tech_domains:
+          type: array
+          items:
+            type: string
+        competitor_assignees:
+          type: array
+          items:
+            type: string
+        dimensionality_reduction:
+          type: string
+          enum: [tsne, umap]
+          default: umap
+
+    PortfolioOptimizationRequest:
+      type: object
+      properties:
+        optimization_goal:
+          type: string
+          enum: [minimize_cost, maximize_coverage, balance]
+          default: balance
+        constraints:
+          type: object
+          properties:
+            max_annual_budget:
+              type: number
+              format: double
+            min_coverage_score:
+              type: number
+              format: double
+              minimum: 0.0
+              maximum: 1.0
+
+    PortfolioPatentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              patent:
+                $ref: "#/components/schemas/PatentSummary"
+              tier:
+                type: string
+                enum: [S, A, B, C, D]
+              value_score:
+                type: integer
+              annual_maintenance_cost:
+                type: number
+                format: double
+              currency:
+                type: string
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    # -------------------------------------------------------------------------
+    # Lifecycle
+    # -------------------------------------------------------------------------
+    Deadline:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patent_id:
+          type: string
+          format: uuid
+        deadline_type:
+          type: string
+          enum:
+            - annuity
+            - response_to_oa
+            - divisional_filing
+            - national_phase_entry
+            - appeal
+            - grant_fee
+            - renewal
+        jurisdiction:
+          type: string
+        due_date:
+          type: string
+          format: date
+        days_remaining:
+          type: integer
+        grace_period_days:
+          type: integer
+        status:
+          type: string
+          enum: [upcoming, due_soon, overdue, completed, waived]
+
+    DeadlineListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Deadline"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    AnnuityPayment:
+      type: object
+      properties:
+        year:
+          type: integer
+        jurisdiction:
+          type: string
+        due_date:
+          type: string
+          format: date
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, paid, overdue, waived]
+
+    AnnuityScheduleResponse:
+      type: object
+      properties:
+        patent_id:
+          type: string
+          format: uuid
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnnuityPayment"
+        total_projected_cost:
+          type: number
+          format: double
+        currency:
+          type: string
+
+    LegalStatusEntry:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/LegalStatus"
+        effective_date:
+          type: string
+          format: date
+        source:
+          type: string
+          enum: [patent_office_api, manual, import]
+        note:
+          type: string
+
+    LegalStatusResponse:
+      type: object
+      properties:
+        patent_id:
+          type: string
+          format: uuid
+        current_status:
+          $ref: "#/components/schemas/LegalStatus"
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/LegalStatusEntry"
+        last_synced_at:
+          type: string
+          format: date-time
+
+    UpdateLegalStatusRequest:
+      type: object
+      required: [status, effective_date]
+      properties:
+        status:
+          $ref: "#/components/schemas/LegalStatus"
+        effective_date:
+          type: string
+          format: date
+        note:
+          type: string
+
+    AnnuityBudgetResponse:
+      type: object
+      properties:
+        year:
+          type: integer
+        currency:
+          type: string
+        total:
+          type: number
+          format: double
+        by_jurisdiction:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        by_quarter:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+
+    # -------------------------------------------------------------------------
+    # Collaboration
+    # -------------------------------------------------------------------------
+    CreateWorkspaceRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        partner_type:
+          type: string
+          enum: [law_firm, agent, partner_company, academic]
+
+    WorkspaceResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            partner_type:
+              type: string
+            status:
+              type: string
+              enum: [active, suspended, closed]
+            created_at:
+              type: string
+              format: date-time
+
+    WorkspaceListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkspaceResponse/properties/data"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    CreateShareRequest:
+      type: object
+      required: [resource_type, resource_id, permissions]
+      properties:
+        resource_type:
+          type: string
+          enum: [patent, portfolio, report, molecule]
+        resource_id:
+          type: string
+          format: uuid
+        permissions:
+          type: array
+          items:
+            type: string
+            enum: [read, comment, edit]
+        expiry:
+          type: string
+          enum: [never, 7d, 30d, custom]
+        expiry_date:
+          type: string
+          format: date
+          description: Required when expiry is custom.
+        watermark:
+          type: boolean
+          default: true
+
+    ShareResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            share_url:
+              type: string
+              format: uri
+            token:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
+            created_at:
+              type: string
+              format: date-time
+
+    ShareListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShareResponse/properties/data"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    # -------------------------------------------------------------------------
+    # Reporting
+    # -------------------------------------------------------------------------
+    ReportFormat:
+      type: string
+      enum: [pdf, docx]
+
+    FTOReportRequest:
+      type: object
+      required: [molecule_smiles, jurisdictions]
+      properties:
+        molecule_smiles:
+          type: string
+        title:
+          type: string
+        jurisdictions:
+          type: array
+          items:
+            type: string
+        format:
+          $ref: "#/components/schemas/ReportFormat"
+        include_design_around:
+          type: boolean
+          default: false
+
+    InfringementReportRequest:
+      type: object
+      required: [alert_ids]
+      properties:
+        alert_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        title:
+          type: string
+        format:
+          $ref: "#/components/schemas/ReportFormat"
+
+    PortfolioReportRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        as_of_date:
+          type: string
+          format: date
+        include_valuation:
+          type: boolean
+          default: true
+        include_gap_analysis:
+          type: boolean
+          default: false
+        format:
+          $ref: "#/components/schemas/ReportFormat"
+
+    ReportJobResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        progress_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        error:
+          type: string
+        download_url:
+          type: string
+          format: uri
+          description: Available when status is completed.
+        expires_at:
+          type: string
+          format: date-time
+          description: When the download URL expires.
+
+    # -------------------------------------------------------------------------
+    # Query
+    # -------------------------------------------------------------------------
+    NLQueryRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+          example: "How many patents did Samsung SDI file in the blue emitter domain last year?"
+        context:
+          type: object
+          properties:
+            tenant_scope_only:
+              type: boolean
+              default: false
+              description: Restrict results to the tenant's own patent portfolio.
+
+    NLQueryResponse:
+      type: object
+      properties:
+        question:
+          type: string
+        answer:
+          type: string
+        structured_result:
+          description: Typed result when the query maps to a well-formed graph/SQL query.
+          oneOf:
+            - type: array
+              items:
+                type: object
+                additionalProperties: true
+            - type: object
+              additionalProperties: true
+        generated_query:
+          type: string
+          description: The Cypher or SQL query generated from the natural language input.
+        confidence:
+          type: number
+          format: double
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [patent, molecule, company, knowledge_graph]
+              id:
+                type: string
+
+    KGQueryRequest:
+      type: object
+      required: [cypher]
+      properties:
+        cypher:
+          type: string
+          description: |
+            Read-only Cypher query. Must not contain WRITE, CREATE, MERGE, DELETE, SET clauses.
+            Maximum length: 2000 characters.
+          example: "MATCH (p:Patent)-[:CONTAINS_MOLECULE]->(m:Molecule) WHERE p.assignee = 'Samsung SDI' RETURN p.patent_number, m.smiles LIMIT 10"
+
+    KGQueryResponse:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: array
+            items:
+              description: Cell value; may be string, number, boolean, or null.
+        row_count:
+          type: integer
+        query_time_ms:
+          type: integer
+
+# Personal.AI order the ending

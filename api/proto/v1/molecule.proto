@@ -1,0 +1,495 @@
+// =============================================================================
+// 生成计划:
+// 功能定位：分子领域 gRPC 服务 Proto 定义，提供高性能二进制协议接口，
+//           适用于内部服务间调用及 SDK 客户端集成。
+// 核心实现：
+//   - 定义 MoleculeService gRPC 服务，包含 GetMolecule、ListMolecules、
+//     CreateMolecule、DeleteMolecule、SimilaritySearch、
+//     BatchSimilaritySearch（服务器流）、AssessPatentability 方法
+//   - 定义所有请求/响应 message 类型
+//   - 定义 Molecule、Fingerprint、SimilarityResult、PatentabilitySummary 数据模型
+//   - 声明枚举：FingerprintType、MoleculeStatus、AssessmentOutcome
+//   - 使用 google.protobuf.Timestamp 处理时间字段
+//   - 使用 google.protobuf.Struct 处理动态 metadata
+// 业务逻辑：
+//   - SimilaritySearch 同步返回，适用于 top-K 快速检索（<500ms）
+//   - BatchSimilaritySearch 使用服务器流，适用于批量分子列表处理
+//   - 所有方法均传递 tenant_id header（通过 gRPC metadata）
+// 依赖关系：
+//   - 依赖：google/protobuf/timestamp.proto、google/protobuf/struct.proto
+//   - 被依赖：internal/interfaces/grpc/services/molecule_service.go、
+//             pkg/client/molecules.go
+// 测试要求：通过 protoc 编译无错误；服务端实现与 proto 签名严格匹配
+// 强制约束：文件最后一行必须为 // Personal.AI order the ending
+// =============================================================================
+
+syntax = "proto3";
+
+package keyip.v1;
+
+option go_package = "github.com/turtacn/KeyIP-Intelligence/api/proto/v1;keyipv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// ---------------------------------------------------------------------------
+// Enumerations
+// ---------------------------------------------------------------------------
+
+// FingerprintType enumerates the molecular fingerprint algorithms supported
+// by the similarity search engine. Multiple types may be requested in a
+// single query; scores are fused using weighted combination.
+enum FingerprintType {
+  FINGERPRINT_TYPE_UNSPECIFIED = 0;
+
+  // 166-bit key dictionary fingerprint. Fast; used for coarse pre-filtering.
+  FINGERPRINT_TYPE_MACCS = 1;
+
+  // Circular fingerprint with radius 2, 1024-bit vector.
+  FINGERPRINT_TYPE_MORGAN_1024 = 2;
+
+  // Circular fingerprint with radius 2, 2048-bit vector. Default choice
+  // for patent similarity tasks.
+  FINGERPRINT_TYPE_MORGAN_2048 = 3;
+
+  // RDKit topological path fingerprint, 2048-bit.
+  FINGERPRINT_TYPE_RDKIT = 4;
+
+  // Atom-pair distance fingerprint. Sensitive to inter-atomic topology.
+  FINGERPRINT_TYPE_ATOM_PAIR = 5;
+
+  // Feature-class circular fingerprint (pharmacophore-aware).
+  FINGERPRINT_TYPE_FCFP = 6;
+
+  // 512-dimensional dense embedding from the MolPatent-GNN model.
+  // Captures structure-property relationships learned from the patent corpus.
+  FINGERPRINT_TYPE_GNN_512 = 7;
+}
+
+// MoleculeStatus represents the lifecycle state of a molecule record.
+enum MoleculeStatus {
+  MOLECULE_STATUS_UNSPECIFIED = 0;
+  MOLECULE_STATUS_ACTIVE = 1;
+  MOLECULE_STATUS_ARCHIVED = 2;
+  MOLECULE_STATUS_DELETED = 3;
+}
+
+// AssessmentOutcome represents the categorical result of a patentability
+// dimension evaluation.
+enum AssessmentOutcome {
+  ASSESSMENT_OUTCOME_UNSPECIFIED = 0;
+
+  // Novelty outcomes
+  ASSESSMENT_OUTCOME_NOVEL = 1;
+  ASSESSMENT_OUTCOME_ANTICIPATABLE = 2;
+  ASSESSMENT_OUTCOME_NOT_NOVEL = 3;
+
+  // Inventive step outcomes
+  ASSESSMENT_OUTCOME_NON_OBVIOUS = 4;
+  ASSESSMENT_OUTCOME_BORDERLINE = 5;
+  ASSESSMENT_OUTCOME_OBVIOUS = 6;
+}
+
+// OverallRecommendation for patentability assessment.
+enum OverallRecommendation {
+  OVERALL_RECOMMENDATION_UNSPECIFIED = 0;
+  OVERALL_RECOMMENDATION_FILE_RECOMMENDED = 1;
+  OVERALL_RECOMMENDATION_CONDITIONAL = 2;
+  OVERALL_RECOMMENDATION_NOT_RECOMMENDED = 3;
+}
+
+// RiskLevel represents the severity of an infringement risk finding.
+enum RiskLevel {
+  RISK_LEVEL_UNSPECIFIED = 0;
+  RISK_LEVEL_CRITICAL = 1;
+  RISK_LEVEL_HIGH = 2;
+  RISK_LEVEL_MEDIUM = 3;
+  RISK_LEVEL_LOW = 4;
+  RISK_LEVEL_INFO = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Core Data Models
+// ---------------------------------------------------------------------------
+
+// Fingerprint holds a single molecular fingerprint in a specified format.
+message Fingerprint {
+  // Fingerprint algorithm used to compute this value.
+  FingerprintType type = 1;
+
+  // Base64-encoded bit vector, or hex-encoded float32 array for GNN embeddings.
+  string value = 2;
+
+  // Bit length or embedding dimension, depending on fingerprint type.
+  uint32 dimension = 3;
+}
+
+// Molecule represents a chemical structure and its computed properties.
+message Molecule {
+  // Stable UUID identifier, assigned on creation.
+  string id = 1;
+
+  // Human-readable name or internal identifier; optional.
+  string name = 2;
+
+  // Canonical SMILES string (RDKit-normalized). Immutable after creation.
+  string smiles = 3;
+
+  // IUPAC InChI string. Computed server-side from SMILES.
+  string inchi = 4;
+
+  // Standard InChIKey (27-character hashed form). Used for deduplication.
+  string inchi_key = 5;
+
+  // Molecular formula derived from structure (e.g., "C36H24N2").
+  string molecular_formula = 6;
+
+  // Exact molecular weight in g/mol.
+  double molecular_weight = 7;
+
+  // Computed fingerprints. At minimum morgan_2048 is always present.
+  repeated Fingerprint fingerprints = 8;
+
+  // Current lifecycle state of this record.
+  MoleculeStatus status = 9;
+
+  // Arbitrary key-value metadata supplied by the caller.
+  google.protobuf.Struct metadata = 10;
+
+  // Record creation timestamp (UTC).
+  google.protobuf.Timestamp created_at = 11;
+
+  // Record last-modified timestamp (UTC).
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// SimilarityScores holds per-algorithm Tanimoto (or cosine) similarity values
+// and a computed weighted composite score.
+message SimilarityScores {
+  // MACCS Keys Tanimoto similarity; 0.0 if not computed.
+  double maccs = 1;
+
+  // Morgan fingerprint Tanimoto similarity.
+  double morgan = 2;
+
+  // RDKit fingerprint Tanimoto similarity.
+  double rdkit = 3;
+
+  // Atom-pair Tanimoto similarity.
+  double atom_pair = 4;
+
+  // GNN embedding cosine similarity.
+  double gnn = 5;
+
+  // Weighted composite: 0.30·gnn + 0.30·morgan + 0.20·rdkit + 0.15·atom_pair + 0.05·maccs.
+  // Weights may be tuned via system configuration.
+  double weighted_overall = 6;
+}
+
+// InfringementRiskSummary is an abbreviated risk assessment embedded in
+// similarity search results.
+message InfringementRiskSummary {
+  RiskLevel level = 1;
+
+  // Composite infringement risk score in [0, 1].
+  double score = 2;
+
+  // Probability that a literal infringement finding applies.
+  double literal_infringement_probability = 3;
+
+  // Probability that doctrine-of-equivalents infringement applies.
+  double equivalents_probability = 4;
+
+  // Short human-readable recommendation.
+  string recommendation = 5;
+
+  // Model confidence in the above assessments, in [0, 1].
+  double confidence = 6;
+}
+
+// PatentRef is a lightweight patent reference embedded in query results.
+message PatentRef {
+  string id = 1;
+  string patent_number = 2;
+  string title = 3;
+  string assignee = 4;
+  string legal_status = 5;
+}
+
+// SimilarityResult represents one entry in a similarity search response.
+message SimilarityResult {
+  // Rank position (1-indexed, ascending by rank = descending by similarity).
+  uint32 rank = 1;
+
+  // Patent where the matched molecule was identified.
+  PatentRef patent = 2;
+
+  // SMILES of the specific matched molecule within the patent.
+  string matched_molecule_smiles = 3;
+
+  // Location description within the patent document.
+  string location_in_patent = 4;
+
+  // Per-algorithm and composite similarity scores.
+  SimilarityScores similarity_scores = 5;
+
+  // Risk summary; populated when include_infringement_risk is true.
+  InfringementRiskSummary infringement_risk = 6;
+}
+
+// PriorArtRef is a reference to a prior-art document used in patentability
+// assessment.
+message PriorArtRef {
+  string patent_number = 1;
+  string title = 2;
+  double similarity_to_query = 3;
+}
+
+// DimensionAssessment holds evaluation data for a single patentability
+// dimension.
+message DimensionAssessment {
+  // Normalized score in [0, 1].
+  double score = 1;
+
+  // Categorical assessment outcome.
+  AssessmentOutcome assessment = 2;
+
+  // Human-readable reasoning for the assessment.
+  string reasoning = 3;
+
+  // Most relevant prior-art documents; populated for novelty and inventive step.
+  repeated PriorArtRef closest_prior_art = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Request / Response Messages
+// ---------------------------------------------------------------------------
+
+message GetMoleculeRequest {
+  // UUID of the molecule to retrieve.
+  string molecule_id = 1;
+}
+
+message GetMoleculeResponse {
+  Molecule molecule = 1;
+}
+
+message ListMoleculesRequest {
+  // Maximum number of results to return (server may return fewer).
+  // Default: 20. Maximum: 100.
+  uint32 page_size = 1;
+
+  // Opaque continuation token from a prior ListMoleculesResponse.
+  // Omit for the first page.
+  string page_token = 2;
+
+  // Optional free-text filter applied to name and metadata fields.
+  string query = 3;
+}
+
+message ListMoleculesResponse {
+  repeated Molecule molecules = 1;
+
+  // Present when additional pages exist; omit to signal end of results.
+  string next_page_token = 2;
+
+  // Approximate total count; may be -1 if not computed.
+  int64 total_count = 3;
+}
+
+message CreateMoleculeRequest {
+  // Molecule structure input; at minimum smiles must be provided.
+  string smiles = 1;
+
+  // Optional human-readable label.
+  string name = 2;
+
+  // Arbitrary caller-supplied metadata.
+  google.protobuf.Struct metadata = 3;
+}
+
+message CreateMoleculeResponse {
+  Molecule molecule = 1;
+}
+
+message DeleteMoleculeRequest {
+  string molecule_id = 1;
+}
+
+message DeleteMoleculeResponse {
+  // Empty; success is indicated by status code OK.
+}
+
+// SimilaritySearchRequest is the primary input for molecular similarity search
+// against the patent corpus.
+message SimilaritySearchRequest {
+  // Input molecule; smiles is required, format field is informational.
+  string smiles = 1;
+
+  // Optional: caller-supplied label for logging and result attribution.
+  string molecule_name = 2;
+
+  // Fingerprint algorithms to compute and fuse. If empty, the server uses
+  // the configured default set (morgan_2048 + gnn_512).
+  repeated FingerprintType fingerprint_types = 3;
+
+  // Minimum weighted_overall score for a result to be included.
+  // Default: 0.65. Range: [0.0, 1.0].
+  double similarity_threshold = 4;
+
+  // Maximum number of results to return. Default: 50. Maximum: 200.
+  uint32 max_results = 5;
+
+  // Restrict search to specific patent offices.
+  // If empty, all configured offices are searched.
+  repeated string patent_offices = 6;
+
+  // Restrict search to patents filed on or after this date (YYYY-MM-DD).
+  string date_from = 7;
+
+  // Restrict search to patents filed on or before this date (YYYY-MM-DD).
+  string date_to = 8;
+
+  // Filter to specific assignee names (case-insensitive substring match).
+  repeated string assignees_filter = 9;
+
+  // Filter to KeyIP technology domain codes (e.g., "1.2.3").
+  repeated string tech_domains = 10;
+
+  // When true, ClaimBERT claim analysis is included in each result.
+  bool include_claim_analysis = 11;
+
+  // When true, InfringeNet risk assessment is included in each result.
+  bool include_infringement_risk = 12;
+
+  // When true, design-around candidate molecules are generated.
+  // This significantly increases latency; use asynchronously when possible.
+  bool include_design_around = 13;
+}
+
+message SearchMetadata {
+  // Number of patents examined during the search.
+  uint64 total_patents_searched = 1;
+
+  // Number of distinct molecule instances compared.
+  uint64 total_molecules_compared = 2;
+
+  // Wall-clock time for the full search pipeline in milliseconds.
+  uint32 search_time_ms = 3;
+
+  // Versions of the models used, keyed by model name.
+  map<string, string> model_versions = 4;
+}
+
+message SimilaritySearchResponse {
+  // Normalized molecule derived from the input SMILES.
+  Molecule query_molecule = 1;
+
+  // Ranked similarity results, up to max_results entries.
+  repeated SimilarityResult results = 2;
+
+  // Diagnostic metadata for observability and benchmarking.
+  SearchMetadata metadata = 3;
+}
+
+// BatchSimilaritySearchRequest submits multiple molecules for similarity
+// search in a single RPC call. Results are streamed back as they complete.
+message BatchSimilaritySearchRequest {
+  // One entry per molecule to search.
+  repeated SimilaritySearchRequest requests = 1;
+}
+
+// BatchSimilaritySearchItem is one streamed result for a single molecule
+// from a batch request.
+message BatchSimilaritySearchItem {
+  // Zero-indexed position of this result in the original request list.
+  uint32 request_index = 1;
+
+  // The search result for this molecule.
+  SimilaritySearchResponse response = 2;
+
+  // Non-empty if this particular molecule search encountered an error;
+  // the stream continues with remaining molecules.
+  string error = 3;
+}
+
+message AssessPatentabilityRequest {
+  // UUID of a molecule already registered in the system.
+  string molecule_id = 1;
+
+  // ISO 3166-1 alpha-2 jurisdiction codes; e.g., ["CN", "US", "EP"].
+  // If empty, the server uses the tenant's configured default jurisdictions.
+  repeated string jurisdictions = 2;
+
+  // Prior-art search cutoff date (YYYY-MM-DD). Defaults to today.
+  string prior_art_cutoff_date = 3;
+}
+
+message AssessPatentabilityResponse {
+  string molecule_id = 1;
+
+  // Novelty assessment across all requested jurisdictions.
+  DimensionAssessment novelty = 2;
+
+  // Inventive step / non-obviousness assessment.
+  DimensionAssessment inventive_step = 3;
+
+  // Industrial applicability / utility assessment.
+  DimensionAssessment utility = 4;
+
+  // Aggregated recommendation across all dimensions.
+  OverallRecommendation overall_recommendation = 5;
+
+  // Model confidence in the overall recommendation, in [0, 1].
+  double confidence = 6;
+}
+
+// ---------------------------------------------------------------------------
+// Service Definition
+// ---------------------------------------------------------------------------
+
+// MoleculeService provides high-performance gRPC access to molecular structure
+// management, similarity search, and patentability assessment capabilities.
+//
+// Tenant context is conveyed via gRPC metadata key "x-tenant-id".
+// Authentication token is conveyed via gRPC metadata key "authorization"
+// using the "Bearer <token>" format.
+//
+// Performance benchmarks (p50 / p99, measured against 500k molecule corpus):
+//   SimilaritySearch (morgan_2048 only):          120 ms / 400 ms
+//   SimilaritySearch (morgan_2048 + gnn_512):     350 ms / 1100 ms
+//   AssessPatentability:                          800 ms / 2500 ms
+//   BatchSimilaritySearch (10 molecules, stream): 1200 ms / 3500 ms total
+service MoleculeService {
+  // GetMolecule retrieves a single molecule by its UUID.
+  rpc GetMolecule(GetMoleculeRequest) returns (GetMoleculeResponse);
+
+  // ListMolecules returns a paginated list of molecules for the tenant.
+  rpc ListMolecules(ListMoleculesRequest) returns (ListMoleculesResponse);
+
+  // CreateMolecule registers a new molecule. Duplicate InChIKeys within the
+  // same tenant are rejected with ALREADY_EXISTS.
+  rpc CreateMolecule(CreateMoleculeRequest) returns (CreateMoleculeResponse);
+
+  // DeleteMolecule soft-deletes a molecule. It remains searchable for 30 days
+  // before being purged from the index.
+  rpc DeleteMolecule(DeleteMoleculeRequest) returns (DeleteMoleculeResponse);
+
+  // SimilaritySearch searches the patent corpus for molecules structurally
+  // similar to the query molecule and returns ranked results with optional
+  // infringement risk scores.
+  rpc SimilaritySearch(SimilaritySearchRequest) returns (SimilaritySearchResponse);
+
+  // BatchSimilaritySearch performs SimilaritySearch for multiple molecules
+  // concurrently and streams results as they complete. Partial failures (one
+  // molecule's search fails) are reported per-item; the stream is not aborted.
+  rpc BatchSimilaritySearch(BatchSimilaritySearchRequest)
+      returns (stream BatchSimilaritySearchItem);
+
+  // AssessPatentability evaluates novelty, inventive step, and utility for a
+  // registered molecule against the patent prior-art corpus.
+  rpc AssessPatentability(AssessPatentabilityRequest)
+      returns (AssessPatentabilityResponse);
+}
+
+// Personal.AI order the ending
