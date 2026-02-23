@@ -13,6 +13,11 @@ type MoleculeDomainService interface {
 	CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error)
 }
 
+// Service defines the interface for molecule operations used by application layer.
+type Service interface {
+	CreateFromSMILES(ctx context.Context, smiles string, metadata map[string]string) (*Molecule, error)
+}
+
 // MoleculeService coordinates molecule-related business operations.
 type MoleculeService struct {
 	repo             MoleculeRepository
@@ -369,6 +374,52 @@ func (s *MoleculeService) TagMolecule(ctx context.Context, moleculeID string, ta
 		if err := mol.AddTag(t); err != nil { return err }
 	}
 	return s.repo.Update(ctx, mol)
+}
+
+// CreateFromSMILES creates a molecule from SMILES string with metadata, delegating to RegisterMolecule.
+func (s *MoleculeService) CreateFromSMILES(ctx context.Context, smiles string, metadata map[string]string) (*Molecule, error) {
+	// Default source
+	source := SourceManual
+	sourceRef := "unknown"
+
+	if val, ok := metadata["source_document"]; ok && val != "" {
+		// Heuristic: if document ID looks like a patent, use SourcePatent
+		source = SourcePatent
+		sourceRef = val
+	} else if val, ok := metadata["extraction_id"]; ok && val != "" {
+		source = SourcePrediction // Or extraction
+		sourceRef = val
+	}
+
+	mol, err := s.RegisterMolecule(ctx, smiles, source, sourceRef)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add metadata as properties or tags if needed
+	// For now, we assume RegisterMolecule handles basic creation.
+	// If metadata contains specific keys like "source_page", we could add them as properties.
+	// But Molecule struct has Metadata field (map[string]any).
+	// Let's add them there if RegisterMolecule didn't.
+	// RegisterMolecule creates NewMolecule which initializes empty Metadata? No, NewMolecule doesn't take metadata.
+	// So we should update it.
+
+	if len(metadata) > 0 {
+		if mol.Metadata == nil {
+			mol.Metadata = make(map[string]any)
+		}
+		for k, v := range metadata {
+			mol.Metadata[k] = v
+		}
+		// We need to save the updated metadata. RegisterMolecule already saved it.
+		// So we need to Update.
+		if err := s.repo.Update(ctx, mol); err != nil {
+			// Log warning but don't fail creation? Or return error?
+			s.logger.Warn("failed to update molecule metadata", logging.Error(err))
+		}
+	}
+
+	return mol, nil
 }
 
 //Personal.AI order the ending

@@ -218,7 +218,7 @@ func TestSearchByStructure_EmptySMILES(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty SMILES")
 	}
-	if !apperrors.IsValidationError(err) {
+	if !apperrors.IsValidation(err) {
 		t.Errorf("expected ValidationError, got: %v", err)
 	}
 }

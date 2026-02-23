@@ -153,4 +153,7 @@ type MoleculeUnitOfWork interface {
 	Rollback(ctx context.Context) error
 }
 
+// Repository alias for MoleculeRepository to support external packages using simple name
+type Repository = MoleculeRepository
+
 //Personal.AI order the ending

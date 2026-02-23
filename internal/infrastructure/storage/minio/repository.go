@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/minio/minio-go/v7"
@@ -36,7 +37,11 @@ type ObjectStorageRepository interface {
 	GetPresignedUploadURL(ctx context.Context, bucket, objectKey string, expiry time.Duration) (string, error)
 	SetTags(ctx context.Context, bucket, objectKey string, tags map[string]string) error
 	GetTags(ctx context.Context, bucket, objectKey string) (map[string]string, error)
+	Get(ctx context.Context, path string) ([]byte, error)
 }
+
+// ObjectRepository alias for backward compatibility
+type ObjectRepository = ObjectStorageRepository
 
 type UploadRequest struct {
 	Bucket      string
@@ -323,6 +328,20 @@ func (r *minioRepository) GetTags(ctx context.Context, bucket, objectKey string)
 	ot, err := r.client.GetClient().GetObjectTagging(ctx, bucket, objectKey, minio.GetObjectTaggingOptions{})
 	if err != nil { return nil, err }
 	return ot.ToMap(), nil
+}
+
+func (r *minioRepository) Get(ctx context.Context, path string) ([]byte, error) {
+	parts := strings.SplitN(path, "/", 2)
+	if len(parts) != 2 {
+		return nil, errors.New(errors.ErrCodeValidation, "path must be in format 'bucket/key'")
+	}
+	bucket, key := parts[0], parts[1]
+
+	res, err := r.Download(ctx, bucket, key)
+	if err != nil {
+		return nil, err
+	}
+	return res.Data, nil
 }
 
 func min(a, b int) int {
