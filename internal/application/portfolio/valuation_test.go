@@ -2809,7 +2809,7 @@ func TestAnalyzeCostOptimization_AllLowTier(t *testing.T) {
 // Tests: ExportAssessment
 // ---------------------------------------------------------------------------
 
-func TestExportAssessment_JSON(t *testing.T) {
+func TestExportAssessment_JSON_V2(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
 		ID:           "EXP_JSON",
@@ -2848,7 +2848,7 @@ func TestExportAssessment_JSON(t *testing.T) {
 	}
 }
 
-func TestExportAssessment_CSV(t *testing.T) {
+func TestExportAssessment_CSV_V2(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
 		ID:           "EXP_CSV",
@@ -2889,7 +2889,7 @@ func TestExportAssessment_CSV(t *testing.T) {
 	}
 }
 
-func TestExportAssessment_NotFound(t *testing.T) {
+func TestExportAssessment_NotFound_V2(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	svc := buildTestService(nil, nil, assessmentRepo, nil, nil, nil)
 
@@ -2899,7 +2899,7 @@ func TestExportAssessment_NotFound(t *testing.T) {
 	}
 }
 
-func TestExportAssessment_EmptyID(t *testing.T) {
+func TestExportAssessment_EmptyID_V2(t *testing.T) {
 	svc := buildTestService(nil, nil, nil, nil, nil, nil)
 
 	_, err := svc.ExportAssessment(context.Background(), "", ExportJSON)
@@ -2908,7 +2908,7 @@ func TestExportAssessment_EmptyID(t *testing.T) {
 	}
 }
 
-func TestExportAssessment_UnsupportedFormat(t *testing.T) {
+func TestExportAssessment_UnsupportedFormat_V2(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
 		ID:           "EXP_UNK",
@@ -2972,7 +2972,7 @@ func TestRecommendActions_Success(t *testing.T) {
 	}
 }
 
-func TestRecommendActions_EmptyID(t *testing.T) {
+func TestRecommendActions_EmptyID_V2(t *testing.T) {
 	svc := buildTestService(nil, nil, nil, nil, nil, nil)
 
 	_, err := svc.RecommendActions(context.Background(), "")
@@ -2981,7 +2981,7 @@ func TestRecommendActions_EmptyID(t *testing.T) {
 	}
 }
 
-func TestRecommendActions_NotFound(t *testing.T) {
+func TestRecommendActions_NotFound_V2(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	svc := buildTestService(nil, nil, assessmentRepo, nil, nil, nil)
 
@@ -3320,13 +3320,13 @@ type historyOptions struct {
 	offset int
 }
 
-func WithLimit(limit int) HistoryOption {
+func WithHistoryLimit(limit int) HistoryOption {
 	return func(o *historyOptions) {
 		o.limit = limit
 	}
 }
 
-func WithOffset(offset int) HistoryOption {
+func WithHistoryOffset(offset int) HistoryOption {
 	return func(o *historyOptions) {
 		o.offset = offset
 	}

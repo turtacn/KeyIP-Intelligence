@@ -24,14 +24,19 @@ import (
 // Mock: Logger
 // -----------------------------------------------------------------------
 
-type mockLogger struct{}
+type mockLoggerConstellation struct{}
 
-func (m *mockLogger) Debug(ctx context.Context, msg string, args ...interface{}) {}
-func (m *mockLogger) Info(ctx context.Context, msg string, args ...interface{})  {}
-func (m *mockLogger) Warn(ctx context.Context, msg string, args ...interface{})  {}
-func (m *mockLogger) Error(ctx context.Context, msg string, args ...interface{}) {}
+func (m *mockLoggerConstellation) Debug(msg string, fields ...logging.Field) {}
+func (m *mockLoggerConstellation) Info(msg string, fields ...logging.Field)  {}
+func (m *mockLoggerConstellation) Warn(msg string, fields ...logging.Field)  {}
+func (m *mockLoggerConstellation) Error(msg string, fields ...logging.Field) {}
+func (m *mockLoggerConstellation) Fatal(msg string, fields ...logging.Field) {}
+func (m *mockLoggerConstellation) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockLoggerConstellation) WithContext(ctx context.Context) logging.Logger { return m }
+func (m *mockLoggerConstellation) WithError(err error) logging.Logger { return m }
+func (m *mockLoggerConstellation) Sync() error { return nil }
 
-var _ logging.Logger = (*mockLogger)(nil)
+var _ logging.Logger = (*mockLoggerConstellation)(nil)
 
 // -----------------------------------------------------------------------
 // Mock: ConstellationCache
@@ -45,7 +50,7 @@ type mockConstellationCache struct {
 	setCalls int
 }
 
-func newMockCache() *mockConstellationCache {
+func newMockConstellationCache() *mockConstellationCache {
 	return &mockConstellationCache{store: make(map[string]interface{})}
 }
 
@@ -116,36 +121,36 @@ var _ domainportfolio.Portfolio = (*mockPortfolio)(nil)
 // Mock: Patent Repository
 // -----------------------------------------------------------------------
 
-type mockPatentRepo struct {
+type mockPatentRepoConstellation struct {
 	byPortfolio map[string][]domainpatent.Patent
 	byAssignee  map[string][]domainpatent.Patent
 	byIDs       map[string]domainpatent.Patent
 	findErr     error
 }
 
-func newMockPatentRepo() *mockPatentRepo {
-	return &mockPatentRepo{
+func newMockPatentRepoConstellation() *mockPatentRepoConstellation {
+	return &mockPatentRepoConstellation{
 		byPortfolio: make(map[string][]domainpatent.Patent),
 		byAssignee:  make(map[string][]domainpatent.Patent),
 		byIDs:       make(map[string]domainpatent.Patent),
 	}
 }
 
-func (m *mockPatentRepo) FindByPortfolioID(ctx context.Context, portfolioID string) ([]domainpatent.Patent, error) {
+func (m *mockPatentRepoConstellation) FindByPortfolioID(ctx context.Context, portfolioID string) ([]domainpatent.Patent, error) {
 	if m.findErr != nil {
 		return nil, m.findErr
 	}
 	return m.byPortfolio[portfolioID], nil
 }
 
-func (m *mockPatentRepo) FindByAssignee(ctx context.Context, assignee string) ([]domainpatent.Patent, error) {
+func (m *mockPatentRepoConstellation) FindByAssignee(ctx context.Context, assignee string) ([]domainpatent.Patent, error) {
 	if m.findErr != nil {
 		return nil, m.findErr
 	}
 	return m.byAssignee[assignee], nil
 }
 
-func (m *mockPatentRepo) FindByIDs(ctx context.Context, ids []string) ([]domainpatent.Patent, error) {
+func (m *mockPatentRepoConstellation) FindByIDs(ctx context.Context, ids []string) ([]domainpatent.Patent, error) {
 	if m.findErr != nil {
 		return nil, m.findErr
 	}
@@ -159,11 +164,11 @@ func (m *mockPatentRepo) FindByIDs(ctx context.Context, ids []string) ([]domainp
 }
 
 // Stub remaining interface methods.
-func (m *mockPatentRepo) Save(ctx context.Context, p domainpatent.Patent) error   { return nil }
-func (m *mockPatentRepo) GetByID(ctx context.Context, id string) (domainpatent.Patent, error) { return nil, nil }
-func (m *mockPatentRepo) Delete(ctx context.Context, id string) error              { return nil }
+func (m *mockPatentRepoConstellation) Save(ctx context.Context, p domainpatent.Patent) error   { return nil }
+func (m *mockPatentRepoConstellation) GetByID(ctx context.Context, id string) (domainpatent.Patent, error) { return nil, nil }
+func (m *mockPatentRepoConstellation) Delete(ctx context.Context, id string) error              { return nil }
 
-var _ domainpatent.Repository = (*mockPatentRepo)(nil)
+var _ domainpatent.Repository = (*mockPatentRepoConstellation)(nil)
 
 // -----------------------------------------------------------------------
 // Mock: Patent entity
@@ -297,7 +302,7 @@ var _ molpatent_gnn.InferenceEngine = (*mockGNNInference)(nil)
 // -----------------------------------------------------------------------
 
 func buildTestConfig(overrides ...func(*ConstellationServiceConfig)) ConstellationServiceConfig {
-	patentRepo := newMockPatentRepo()
+	patentRepo := newMockPatentRepoConstellation()
 	molRepo := newMockMoleculeRepo()
 
 	// Seed test data: 3 patents, each with 1 molecule.
@@ -346,8 +351,8 @@ func buildTestConfig(overrides ...func(*ConstellationServiceConfig)) Constellati
 		PatentRepository:   patentRepo,
 		MoleculeRepository: molRepo,
 		GNNInference:       &mockGNNInference{},
-		Logger:             &mockLogger{},
-		Cache:              newMockCache(),
+		Logger:             &mockLoggerConstellation{},
+		Cache:              newMockConstellationCache(),
 		CacheTTL:           5 * time.Minute,
 	}
 
@@ -498,7 +503,7 @@ func TestGenerateConstellation_PortfolioNotFound(t *testing.T) {
 }
 
 func TestGenerateConstellation_EmptyPatents(t *testing.T) {
-	patentRepo := newMockPatentRepo()
+	patentRepo := newMockPatentRepoConstellation()
 	// No patents for this portfolio.
 	cfg := buildTestConfig(func(c *ConstellationServiceConfig) {
 		c.PatentRepository = patentRepo
@@ -517,7 +522,7 @@ func TestGenerateConstellation_EmptyPatents(t *testing.T) {
 }
 
 func TestGenerateConstellation_CacheHit(t *testing.T) {
-	cache := newMockCache()
+	cache := newMockConstellationCache()
 	cfg := buildTestConfig(func(c *ConstellationServiceConfig) {
 		c.Cache = cache
 	})
@@ -658,7 +663,7 @@ func TestGetTechDomainDistribution_PortfolioNotFound(t *testing.T) {
 
 func TestGetTechDomainDistribution_NoPatents(t *testing.T) {
 	cfg := buildTestConfig(func(c *ConstellationServiceConfig) {
-		c.PatentRepository = newMockPatentRepo()
+		c.PatentRepository = newMockPatentRepoConstellation()
 	})
 	svc, _ := NewConstellationService(cfg)
 
@@ -866,7 +871,7 @@ func TestCompareWithCompetitor_StrengthIndex(t *testing.T) {
 
 func TestCompareWithCompetitor_PatentRepoError(t *testing.T) {
 	cfg := buildTestConfig(func(c *ConstellationServiceConfig) {
-		repo := newMockPatentRepo()
+		repo := newMockPatentRepoConstellation()
 		repo.findErr = fmt.Errorf("db connection lost")
 		c.PatentRepository = repo
 	})
@@ -950,7 +955,7 @@ func TestGetCoverageHeatmap_DefaultResolution(t *testing.T) {
 
 func TestGetCoverageHeatmap_NoPatents(t *testing.T) {
 	cfg := buildTestConfig(func(c *ConstellationServiceConfig) {
-		c.PatentRepository = newMockPatentRepo()
+		c.PatentRepository = newMockPatentRepoConstellation()
 	})
 	svc, _ := NewConstellationService(cfg)
 
@@ -964,7 +969,7 @@ func TestGetCoverageHeatmap_NoPatents(t *testing.T) {
 }
 
 func TestGetCoverageHeatmap_CacheInteraction(t *testing.T) {
-	cache := newMockCache()
+	cache := newMockConstellationCache()
 	cfg := buildTestConfig(func(c *ConstellationServiceConfig) {
 		c.Cache = cache
 	})
