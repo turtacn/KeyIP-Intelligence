@@ -678,7 +678,7 @@ func TestFTOReportService_ListReports_EmptyResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if res.TotalCount != 0 || len(res.Data) != 0 {
+	if res.Pagination.Total != 0 || len(res.Items) != 0 {
 		t.Errorf("Expected empty results")
 	}
 }

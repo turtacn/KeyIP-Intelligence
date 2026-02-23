@@ -50,7 +50,8 @@ func (m *infMockEquivalentsAnalyzer) Analyze(ctx context.Context, claimData inte
 	if m.analyzeFunc != nil {
 		return m.analyzeFunc(ctx, claimData, targetSmiles)
 	}
-	return sampleEquivalentsAssessment(), nil
+	score, mappings := sampleEquivalentsAssessment()
+	return score, mappings, nil
 }
 
 type infMockClaimParser struct {
@@ -99,11 +100,32 @@ func (m *infMockChemExtractor) ExtractMolecules(ctx context.Context, text string
 type infMockTemplateEngine struct {
 	renderFunc func(ctx context.Context, templateName string, data interface{}, format ReportFormat) ([]byte, error)
 }
-func (m *infMockTemplateEngine) Render(ctx context.Context, templateName string, data interface{}, format ReportFormat) ([]byte, error) {
-	if m.renderFunc != nil {
-		return m.renderFunc(ctx, templateName, data, format)
-	}
+func (m *infMockTemplateEngine) Render(ctx context.Context, req *RenderRequest) (*RenderResult, error) {
+	return &RenderResult{Content: []byte("dummy-report")}, nil
+}
+func (m *infMockTemplateEngine) RenderToBytes(ctx context.Context, req *RenderRequest) ([]byte, error) {
 	return []byte("dummy-report"), nil
+}
+func (m *infMockTemplateEngine) ListTemplates(ctx context.Context, opts *ListTemplateOptions) (*common.PaginatedResult[TemplateMeta], error) {
+	return &common.PaginatedResult[TemplateMeta]{}, nil
+}
+func (m *infMockTemplateEngine) GetTemplate(ctx context.Context, templateID string) (*Template, error) {
+	return &Template{}, nil
+}
+func (m *infMockTemplateEngine) RegisterTemplate(ctx context.Context, tmpl *Template) error {
+	return nil
+}
+func (m *infMockTemplateEngine) UpdateTemplate(ctx context.Context, tmpl *Template) error {
+	return nil
+}
+func (m *infMockTemplateEngine) DeleteTemplate(ctx context.Context, templateID string) error {
+	return nil
+}
+func (m *infMockTemplateEngine) ValidateTemplate(ctx context.Context, tmpl *Template) (*ValidationResult, error) {
+	return &ValidationResult{}, nil
+}
+func (m *infMockTemplateEngine) PreviewTemplate(ctx context.Context, templateID string, sampleData map[string]interface{}) (*RenderResult, error) {
+	return &RenderResult{}, nil
 }
 
 type infMockStorageRepo struct {
@@ -275,7 +297,7 @@ func sampleEquivalentsAssessment() (float64, []claimElementMapping) {
 	return 0.85, mappings
 }
 
-func assertErrCode(t *testing.T, err error, code string) {
+func assertErrCode(t *testing.T, err error, code errors.ErrorCode) {
 	t.Helper()
 	if err == nil { t.Fatalf("Expected error code %s, got nil", code) }
 	if !errors.IsCode(err, code) { t.Errorf("Expected error code %s, got %v", code, err) }
@@ -430,7 +452,7 @@ func TestInfringementReportService_Generate_OwnedPatentNotFound(t *testing.T) {
 	req := validInfringementRequest() // 2 patents
 	m.patRepo.getDetailsFunc = func(ctx context.Context, patentIDs []string) (interface{}, error) {
 		if patentIDs[0] == "CN1000001" {
-			return nil, errors.NewError(errors.ErrNotFound, "not found")
+			return nil, errors.NewNotFound("not found")
 		}
 		return sampleOwnedPatent(), nil
 	}
@@ -450,11 +472,11 @@ func TestInfringementReportService_Generate_AllOwnedPatentsNotFound(t *testing.T
 	svc, m := newTestInfringementService()
 	req := validInfringementRequest()
 	m.patRepo.getDetailsFunc = func(ctx context.Context, patentIDs []string) (interface{}, error) {
-		return nil, errors.NewError(errors.ErrNotFound, "not found")
+		return nil, errors.NewNotFound("not found")
 	}
 
 	_, err := svc.Generate(context.Background(), req)
-	assertErrCode(t, err, errors.ErrInvalidState) // No valid owned patents
+	assertErrCode(t, err, errors.ErrCodeConflict) // No valid owned patents
 }
 
 func TestInfringementReportService_Generate_ClaimParserError(t *testing.T) {
@@ -679,10 +701,10 @@ func TestInfringementReportService_GetStatus_NotFound(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestInfringementService()
 	m.metaRepo.getFunc = func(ctx context.Context, reportID string) (*InfringementReportSummary, error) {
-		return nil, errors.NewError(errors.ErrNotFound, "not found")
+		return nil, errors.NewNotFound("not found")
 	}
 	_, err := svc.GetStatus(context.Background(), "R3")
-	assertErrCode(t, err, errors.ErrNotFound)
+	assertErrCode(t, err, errors.ErrCodeNotFound)
 }
 
 func TestInfringementReportService_GetReport_Success(t *testing.T) {
@@ -700,15 +722,15 @@ func TestInfringementReportService_GetReport_NotCompleted(t *testing.T) {
 		return &InfringementReportSummary{ReportID: "R1", Status: StatusProcessing}, nil
 	}
 	_, err := svc.GetReport(context.Background(), "R1", FormatPDF)
-	assertErrCode(t, err, errors.ErrInvalidState)
+	assertErrCode(t, err, errors.ErrCodeConflict)
 }
 
 func TestInfringementReportService_ListReports_Success(t *testing.T) {
 	t.Parallel()
 	svc, _ := newTestInfringementService()
-	res, err := svc.ListReports(context.Background(), nil, &common.Pagination{Page: 1, Size: 10})
+	res, err := svc.ListReports(context.Background(), nil, &common.Pagination{Page: 1, PageSize: 10})
 	if err != nil { t.Fatalf("Unexpected error") }
-	if res.TotalCount != 1 { t.Errorf("Expected 1 result") }
+	if res.Pagination.Total != 1 { t.Errorf("Expected 1 result") }
 }
 
 func TestInfringementReportService_ListReports_FilterByOwnedPatent(t *testing.T) {
@@ -730,7 +752,7 @@ func TestInfringementReportService_ListReports_EmptyResult(t *testing.T) {
 		return []InfringementReportSummary{}, 0, nil
 	}
 	res, _ := svc.ListReports(context.Background(), nil, nil)
-	if res.TotalCount != 0 { t.Errorf("Expected total 0") }
+	if res.Pagination.Total != 0 { t.Errorf("Expected total 0") }
 }
 
 func TestInfringementReportService_DeleteReport_Success(t *testing.T) {
@@ -744,10 +766,10 @@ func TestInfringementReportService_DeleteReport_NotFound(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestInfringementService()
 	m.metaRepo.getFunc = func(ctx context.Context, reportID string) (*InfringementReportSummary, error) {
-		return nil, errors.NewError(errors.ErrNotFound, "not found")
+		return nil, errors.NewNotFound("not found")
 	}
 	err := svc.DeleteReport(context.Background(), "R1")
-	assertErrCode(t, err, errors.ErrNotFound)
+	assertErrCode(t, err, errors.ErrCodeNotFound)
 }
 
 //Personal.AI order the ending

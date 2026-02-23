@@ -34,7 +34,7 @@ func closeEnough(a, b float64) bool {
 	return math.Abs(a-b) < 1e-6
 }
 
-func assertErrCodePort(t *testing.T, err error, code string) {
+func assertErrCodePort(t *testing.T, err error, code errors.ErrorCode) {
 	t.Helper()
 	if err == nil {
 		t.Fatalf("Expected error code %s, got nil", code)
@@ -77,9 +77,32 @@ type portMockMoleculeRepo struct{} // Placeholder for molecule interactions
 type portMockTemplateEngine struct {
 	renderFunc func(ctx context.Context, templateName string, data interface{}, format ReportFormat) ([]byte, error)
 }
-func (m *portMockTemplateEngine) Render(ctx context.Context, templateName string, data interface{}, format ReportFormat) ([]byte, error) {
-	if m.renderFunc != nil { return m.renderFunc(ctx, templateName, data, format) }
-	return []byte("dummy-report-bytes"), nil
+func (m *portMockTemplateEngine) Render(ctx context.Context, req *RenderRequest) (*RenderResult, error) {
+	return &RenderResult{Content: []byte("dummy-report")}, nil
+}
+func (m *portMockTemplateEngine) RenderToBytes(ctx context.Context, req *RenderRequest) ([]byte, error) {
+	return []byte("dummy-report"), nil
+}
+func (m *portMockTemplateEngine) ListTemplates(ctx context.Context, opts *ListTemplateOptions) (*common.PaginatedResult[TemplateMeta], error) {
+	return &common.PaginatedResult[TemplateMeta]{}, nil
+}
+func (m *portMockTemplateEngine) GetTemplate(ctx context.Context, templateID string) (*Template, error) {
+	return &Template{}, nil
+}
+func (m *portMockTemplateEngine) RegisterTemplate(ctx context.Context, tmpl *Template) error {
+	return nil
+}
+func (m *portMockTemplateEngine) UpdateTemplate(ctx context.Context, tmpl *Template) error {
+	return nil
+}
+func (m *portMockTemplateEngine) DeleteTemplate(ctx context.Context, templateID string) error {
+	return nil
+}
+func (m *portMockTemplateEngine) ValidateTemplate(ctx context.Context, tmpl *Template) (*ValidationResult, error) {
+	return &ValidationResult{}, nil
+}
+func (m *portMockTemplateEngine) PreviewTemplate(ctx context.Context, templateID string, sampleData map[string]interface{}) (*RenderResult, error) {
+	return &RenderResult{}, nil
 }
 
 type portMockStrategyGPTService struct {
@@ -136,7 +159,7 @@ func (m *portMockMetadataRepo) Get(ctx context.Context, reportID string) (*Repor
 	if m.getFunc != nil { return m.getFunc(ctx, reportID) }
 	m.mu.RLock(); defer m.mu.RUnlock()
 	if r, ok := m.records[reportID]; ok { return r, nil }
-	return nil, errors.NewError(errors.ErrNotFound, "report not found")
+	return nil, errors.NewNotFound("report not found")
 }
 func (m *portMockMetadataRepo) List(ctx context.Context, portfolioID string, opts *ListReportOptions) ([]ReportMeta, int64, error) {
 	if m.listFunc != nil { return m.listFunc(ctx, portfolioID, opts) }
@@ -306,7 +329,7 @@ func TestGenerateFullReport_PortfolioNotFound(t *testing.T) {
 	// but the current implementation blindly creates the task. 
 	// Let's test what happens if metadata creation fails to simulate a DB error.
 	m.metaRepo.createFunc = func(ctx context.Context, meta *ReportMeta) error {
-		return errors.NewError(errors.ErrNotFound, "portfolio not found")
+		return errors.NewNotFound("portfolio not found")
 	}
 
 	req := &PortfolioReportRequest{PortfolioID: "port-missing"}
@@ -326,7 +349,7 @@ func TestGenerateFullReport_ConcurrentLock(t *testing.T) {
 
 	req := &PortfolioReportRequest{PortfolioID: "port-locked"}
 	_, err := svc.GenerateFullReport(context.Background(), req)
-	assertErrCodePort(t, err, errors.ErrInvalidState)
+	assertErrCodePort(t, err, errors.ErrCodeConflict)
 	if !strings.Contains(err.Error(), "currently running") {
 		t.Errorf("Expected conflict error message")
 	}
@@ -446,7 +469,7 @@ func TestGenerateGapReport_Success_StandardDepth(t *testing.T) {
 func TestGenerateGapReport_DeepAnalysis(t *testing.T) {
 	t.Parallel()
 	svc, _ := newTestPortfolioReportService()
-	req := &GapReportRequest{PortfolioID: "port-gap", AnalysisDepth: DepthDeep}
+	req := &GapReportRequest{PortfolioID: "port-gap", AnalysisDepth: DepthComprehensive}
 	_, err := svc.GenerateGapReport(context.Background(), req)
 	if err != nil { t.Errorf("Deep analysis should trigger successfully") }
 }
@@ -502,18 +525,18 @@ func TestGenerateCompetitiveReport_SingleDimension(t *testing.T) {
 func TestGetReportStatus_Exists(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestPortfolioReportService()
-	_ = m.cache.Set(context.Background(), "prpt_status:R1", ReportStatusInfo{ReportID: "R1", Status: StatusGenerating}, 1*time.Minute)
+	_ = m.cache.Set(context.Background(), "prpt_status:R1", ReportStatusInfo{ReportID: "R1", Status: StatusProcessing}, 1*time.Minute)
 
 	info, err := svc.GetReportStatus(context.Background(), "R1")
 	if err != nil { t.Fatalf("Unexpected error") }
-	if info.Status != StatusGenerating { t.Errorf("Expected StatusGenerating") }
+	if info.Status != StatusProcessing { t.Errorf("Expected StatusProcessing") }
 }
 
 func TestGetReportStatus_NotFound(t *testing.T) {
 	t.Parallel()
 	svc, _ := newTestPortfolioReportService()
 	_, err := svc.GetReportStatus(context.Background(), "unknown")
-	assertErrCodePort(t, err, errors.ErrNotFound)
+	assertErrCodePort(t, err, errors.ErrCodeNotFound)
 }
 
 func TestListReports_Success(t *testing.T) {
@@ -529,11 +552,11 @@ func TestListReports_Success(t *testing.T) {
 		})
 	}
 
-	opts := &ListReportOptions{Pagination: common.Pagination{Page: 1, Size: 10}}
+	opts := &ListReportOptions{Pagination: common.Pagination{Page: 1, PageSize: 10}}
 	res, err := svc.ListReports(context.Background(), "P1", opts)
 	if err != nil { t.Fatalf("Unexpected error") }
 
-	if res.TotalCount != 15 { t.Errorf("Expected 15 total reports, got %d", res.TotalCount) }
+	if res.Pagination.Total != 15 { t.Errorf("Expected 15 total reports, got %d", res.Pagination.Total) }
 	// In a real DB mock, it would paginate. Our simple map mock returns all 15, but we check logic.
 	if len(res.Data) != 15 { t.Errorf("Mock returns all, expected 15") }
 }
@@ -546,10 +569,10 @@ func TestListReports_FilterByType(t *testing.T) {
 	_ = m.metaRepo.Create(context.Background(), &ReportMeta{ReportID: "R2", PortfolioID: "P1", Type: TypeSummaryReport})
 
 	rtype := TypeFullReport
-	opts := &ListReportOptions{Type: &rtype, Pagination: common.Pagination{Page: 1, Size: 10}}
+	opts := &ListReportOptions{Type: &rtype, Pagination: common.Pagination{Page: 1, PageSize: 10}}
 	res, _ := svc.ListReports(context.Background(), "P1", opts)
 
-	if res.TotalCount != 1 { t.Errorf("Expected 1 filtered result") }
+	if res.Pagination.Total != 1 { t.Errorf("Expected 1 filtered result") }
 	if res.Data[0].Type != TypeFullReport { t.Errorf("Filter failed") }
 }
 
@@ -575,25 +598,25 @@ func TestExportReport_DifferentFormat(t *testing.T) {
 	})
 	m.storage.getStreamFunc = func(ctx context.Context, key string) (io.ReadCloser, error) {
 		if strings.HasSuffix(key, ".DOCX") {
-			return nil, errors.NewError(errors.ErrNotFound, "not found")
+			return nil, errors.NewNotFound("not found")
 		}
 		return io.NopCloser(bytes.NewReader([]byte("dummy"))), nil
 	}
 
 	// Requesting DOCX when only PDF might be natively saved. Current MVP logic returns error.
 	_, err := svc.ExportReport(context.Background(), "R1", FormatPortfolioDOCX)
-	assertErrCodePort(t, err, errors.ErrNotFound)
+	assertErrCodePort(t, err, errors.ErrCodeNotFound)
 }
 
 func TestExportReport_ReportNotCompleted(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestPortfolioReportService()
 	_ = m.metaRepo.Create(context.Background(), &ReportMeta{
-		ReportID: "R1", PortfolioID: "P1", Status: StatusGenerating,
+		ReportID: "R1", PortfolioID: "P1", Status: StatusProcessing,
 	})
 
 	_, err := svc.ExportReport(context.Background(), "R1", FormatPortfolioPDF)
-	assertErrCodePort(t, err, errors.ErrInvalidState)
+	assertErrCodePort(t, err, errors.ErrCodeConflict)
 }
 
 // ============================================================================
