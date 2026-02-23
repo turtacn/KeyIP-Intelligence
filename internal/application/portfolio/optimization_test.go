@@ -68,21 +68,21 @@ func buildOptTestRepo() *mockPatentRepo {
 		createTestPatentWithMolecules("o4", "US004", "C07D", "Own", now.AddDate(-1, 0, 0), 8.5, []string{"m4"}),
 		createTestPatentWithMolecules("o5", "CN005", "G16B", "Own", now.AddDate(-3, 0, 0), 7.0, []string{"m5"}),
 	}
-	repo.byPortfolio["opt-port"] = patentPtrs
+	repo.byPortfolio["40000000-0000-0000-0000-000000000003"] = patentPtrs
 	return repo
 }
 
 func TestOptimize_Success(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "opt-port",
+		PortfolioID: "40000000-0000-0000-0000-000000000003",
 		Objective:   GoalBalanced,
 	})
 	if err != nil {
@@ -91,7 +91,7 @@ func TestOptimize_Success(t *testing.T) {
 	if resp == nil {
 		t.Fatal("expected non-nil response")
 	}
-	if resp.PortfolioID != "opt-port" {
+	if resp.PortfolioID != "40000000-0000-0000-0000-000000000003" {
 		t.Errorf("expected opt-port, got %s", resp.PortfolioID)
 	}
 	if resp.Summary.TotalPatents != 5 {
@@ -134,14 +134,14 @@ func TestOptimize_EmptyPortfolioID(t *testing.T) {
 func TestOptimize_DefaultObjective(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "opt-port",
+		PortfolioID: "40000000-0000-0000-0000-000000000003",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -154,14 +154,14 @@ func TestOptimize_DefaultObjective(t *testing.T) {
 func TestOptimize_MinCostObjective(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "opt-port",
+		PortfolioID: "40000000-0000-0000-0000-000000000003",
 		Objective:   GoalMinCost,
 		Constraints: OptConstraints{
 			MinPatentCount:  4,
@@ -193,14 +193,14 @@ func TestOptimize_MinCostObjective(t *testing.T) {
 func TestOptimize_MaxROIObjective(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "opt-port",
+		PortfolioID: "40000000-0000-0000-0000-000000000003",
 		Objective:   GoalMaxROI,
 	})
 	if err != nil {
@@ -214,14 +214,14 @@ func TestOptimize_MaxROIObjective(t *testing.T) {
 func TestOptimize_WithPreferences(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "opt-port",
+		PortfolioID: "40000000-0000-0000-0000-000000000003",
 		Objective:   GoalBalanced,
 		Preferences: OptPreferences{
 			PreferRecent:    true,
@@ -248,7 +248,7 @@ func TestOptimize_PortfolioNotFound(t *testing.T) {
 	svc, _ := NewOptimizationService(cfg)
 
 	_, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "nonexistent",
+		PortfolioID: "40000000-0000-0000-0000-000000000002",
 	})
 	if err == nil {
 		t.Fatal("expected not-found error")
@@ -257,16 +257,16 @@ func TestOptimize_PortfolioNotFound(t *testing.T) {
 
 func TestOptimize_EmptyPortfolio(t *testing.T) {
 	repo := newMockPatentRepo()
-	repo.byPortfolio["empty-port"] = []*domainpatent.Patent{}
+	repo.byPortfolio["40000000-0000-0000-0000-000000000001"] = []*domainpatent.Patent{}
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("empty-port")},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000001")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "empty-port",
+		PortfolioID: "40000000-0000-0000-0000-000000000001",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -286,13 +286,13 @@ func TestOptimize_EmptyPortfolio(t *testing.T) {
 func TestGetPruneCandidates_Success(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
-	candidates, err := svc.GetPruneCandidates(context.Background(), "opt-port", 3)
+	candidates, err := svc.GetPruneCandidates(context.Background(), "40000000-0000-0000-0000-000000000003", 3)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -318,13 +318,13 @@ func TestGetPruneCandidates_EmptyPortfolioID(t *testing.T) {
 func TestGetPruneCandidates_DefaultLimit(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
-	candidates, err := svc.GetPruneCandidates(context.Background(), "opt-port", 0)
+	candidates, err := svc.GetPruneCandidates(context.Background(), "40000000-0000-0000-0000-000000000003", 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -340,20 +340,20 @@ func TestGetPruneCandidates_DefaultLimit(t *testing.T) {
 func TestEstimateCost_Success(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
-	estimate, err := svc.EstimateCost(context.Background(), "opt-port")
+	estimate, err := svc.EstimateCost(context.Background(), "40000000-0000-0000-0000-000000000003")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if estimate == nil {
 		t.Fatal("expected non-nil estimate")
 	}
-	if estimate.PortfolioID != "opt-port" {
+	if estimate.PortfolioID != "40000000-0000-0000-0000-000000000003" {
 		t.Errorf("expected opt-port, got %s", estimate.PortfolioID)
 	}
 	if estimate.TotalAnnualCost <= 0 {
@@ -403,7 +403,7 @@ func TestEstimateCost_PortfolioNotFound(t *testing.T) {
 	}
 	svc, _ := NewOptimizationService(cfg)
 
-	_, err := svc.EstimateCost(context.Background(), "nonexistent")
+	_, err := svc.EstimateCost(context.Background(), "40000000-0000-0000-0000-000000000002")
 	if err == nil {
 		t.Fatal("expected not-found error")
 	}

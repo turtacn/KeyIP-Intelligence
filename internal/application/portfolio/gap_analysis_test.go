@@ -87,7 +87,7 @@ func buildGapTestPatentRepo() *mockPatentRepo {
 		createTestPatent("US1002", "A61K", "OwnCorp", time.Date(2018, 6, 1, 0, 0, 0, 0, time.UTC), 7.5),
 		createTestPatent("US1003", "C07D", "OwnCorp", time.Date(2022, 3, 1, 0, 0, 0, 0, time.UTC), 9.0),
 	}
-	repo.byPortfolio["portfolio-gap"] = ownPatents
+	repo.byPortfolio["40000000-0000-0000-0000-000000000002"] = ownPatents
 
 	compPatents := []*domainpatent.Patent{
 		createTestPatent("EP2001", "A61K", "RivalCo", time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), 7.0),
@@ -110,7 +110,7 @@ func TestAnalyzeGaps_Success(t *testing.T) {
 	svc, _ := NewGapAnalysisService(cfg)
 
 	resp, err := svc.AnalyzeGaps(context.Background(), &GapAnalysisRequest{
-		PortfolioID:      "portfolio-gap",
+		PortfolioID:      "40000000-0000-0000-0000-000000000002",
 		CompetitorNames:  []string{"RivalCo"},
 		ExpirationWindow: 10,
 	})
@@ -120,7 +120,7 @@ func TestAnalyzeGaps_Success(t *testing.T) {
 	if resp == nil {
 		t.Fatal("expected non-nil response")
 	}
-	if resp.PortfolioID != "portfolio-gap" {
+	if resp.PortfolioID != "40000000-0000-0000-0000-000000000002" {
 		t.Errorf("expected portfolio-gap, got %s", resp.PortfolioID)
 	}
 
@@ -186,7 +186,7 @@ func TestAnalyzeGaps_PortfolioNotFound(t *testing.T) {
 	}
 	svc, _ := NewGapAnalysisService(cfg)
 
-	_, err := svc.AnalyzeGaps(context.Background(), &GapAnalysisRequest{PortfolioID: "nonexistent"})
+	_, err := svc.AnalyzeGaps(context.Background(), &GapAnalysisRequest{PortfolioID: "40000000-0000-0000-0000-000000000001"})
 	if err == nil {
 		t.Fatal("expected not-found error")
 	}
@@ -202,7 +202,7 @@ func TestAnalyzeGaps_NoCompetitors(t *testing.T) {
 	svc, _ := NewGapAnalysisService(cfg)
 
 	resp, err := svc.AnalyzeGaps(context.Background(), &GapAnalysisRequest{
-		PortfolioID: "portfolio-gap",
+		PortfolioID: "40000000-0000-0000-0000-000000000002",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -382,7 +382,7 @@ func TestGetFilingOpportunities_Success(t *testing.T) {
 	}
 	svc, _ := NewGapAnalysisService(cfg)
 
-	opps, err := svc.GetFilingOpportunities(context.Background(), "portfolio-gap", 5)
+	opps, err := svc.GetFilingOpportunities(context.Background(), "40000000-0000-0000-0000-000000000002", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -421,7 +421,7 @@ func TestGetFilingOpportunities_DefaultLimit(t *testing.T) {
 	}
 	svc, _ := NewGapAnalysisService(cfg)
 
-	opps, err := svc.GetFilingOpportunities(context.Background(), "portfolio-gap", 0)
+	opps, err := svc.GetFilingOpportunities(context.Background(), "40000000-0000-0000-0000-000000000002", 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

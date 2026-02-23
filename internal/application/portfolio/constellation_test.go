@@ -915,7 +915,7 @@ func TestGenerateConstellation_PortfolioNotFound(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	_, err := svc.GenerateConstellation(context.Background(), &ConstellationRequest{
-		PortfolioID: "nonexistent",
+		PortfolioID: "40000000-0000-0000-0000-000000000001",
 	})
 	if err == nil {
 		t.Fatal("expected not-found error")
@@ -1075,7 +1075,7 @@ func TestGetTechDomainDistribution_PortfolioNotFound(t *testing.T) {
 	})
 	svc, _ := NewConstellationService(cfg)
 
-	_, err := svc.GetTechDomainDistribution(context.Background(), "nonexistent")
+	_, err := svc.GetTechDomainDistribution(context.Background(), "40000000-0000-0000-0000-000000000001")
 	if err == nil {
 		t.Fatal("expected not-found error")
 	}
