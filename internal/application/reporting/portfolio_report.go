@@ -275,7 +275,7 @@ func NewPortfolioReportService(
 
 func (s *portfolioReportServiceImpl) GenerateFullReport(ctx context.Context, req *PortfolioReportRequest) (*PortfolioReportResult, error) {
 	if req.PortfolioID == "" {
-		return nil, errors.NewInvalidParameterError("portfolioID is required")
+		return nil, errors.NewValidation("portfolioID is required")
 	}
 	hasOverview := false
 	for _, sec := range req.IncludeSections {
@@ -303,7 +303,7 @@ func (s *portfolioReportServiceImpl) GenerateFullReport(ctx context.Context, req
 
 func (s *portfolioReportServiceImpl) GenerateSummaryReport(ctx context.Context, req *PortfolioSummaryRequest) (*PortfolioReportResult, error) {
 	if req.PortfolioID == "" {
-		return nil, errors.NewInvalidParameterError("portfolioID is required")
+		return nil, errors.NewValidation("portfolioID is required")
 	}
 	if req.TopN <= 0 {
 		req.TopN = 10
@@ -325,7 +325,7 @@ func (s *portfolioReportServiceImpl) GenerateSummaryReport(ctx context.Context, 
 
 func (s *portfolioReportServiceImpl) GenerateGapReport(ctx context.Context, req *GapReportRequest) (*PortfolioReportResult, error) {
 	if req.PortfolioID == "" {
-		return nil, errors.NewInvalidParameterError("portfolioID is required")
+		return nil, errors.NewValidation("portfolioID is required")
 	}
 
 	reportID, err := s.initiateReportTask(ctx, req.PortfolioID, TypeGapReport, req.RequestedBy)
@@ -344,7 +344,7 @@ func (s *portfolioReportServiceImpl) GenerateGapReport(ctx context.Context, req 
 
 func (s *portfolioReportServiceImpl) GenerateCompetitiveReport(ctx context.Context, req *CompetitiveReportRequest) (*PortfolioReportResult, error) {
 	if req.PortfolioID == "" || len(req.CompetitorIDs) == 0 || len(req.Dimensions) == 0 {
-		return nil, errors.NewInvalidParameterError("portfolioID, competitors and dimensions are required")
+		return nil, errors.NewValidation("portfolioID, competitors and dimensions are required")
 	}
 
 	reportID, err := s.initiateReportTask(ctx, req.PortfolioID, TypeCompetitiveReport, req.RequestedBy)
@@ -603,7 +603,7 @@ func (s *portfolioReportServiceImpl) calculateCompetitivenessIndex(dimScores map
 
 func (s *portfolioReportServiceImpl) GetReportStatus(ctx context.Context, reportID string) (*ReportStatusInfo, error) {
 	if reportID == "" {
-		return nil, errors.NewInvalidParameterError("reportID empty")
+		return nil, errors.NewValidation("reportID empty")
 	}
 
 	var statusInfo ReportStatusInfo

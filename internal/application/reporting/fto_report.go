@@ -278,17 +278,17 @@ func NewFTOReportService(
 
 func (s *ftoReportServiceImpl) validateRequest(req *FTOReportRequest) error {
 	if len(req.TargetMolecules) == 0 {
-		return errors.NewInvalidParameterError("target_molecules cannot be empty")
+		return errors.NewValidation("target_molecules cannot be empty")
 	}
 	if len(req.Jurisdictions) == 0 {
-		return errors.NewInvalidParameterError("jurisdictions cannot be empty")
+		return errors.NewValidation("jurisdictions cannot be empty")
 	}
 	validDepths := map[AnalysisDepth]bool{DepthQuick: true, DepthStandard: true, DepthComprehensive: true}
 	if !validDepths[req.AnalysisDepth] {
-		return errors.NewInvalidParameterError("invalid analysis_depth")
+		return errors.NewValidation("invalid analysis_depth")
 	}
 	if req.RequestedBy == "" {
-		return errors.NewInvalidParameterError("requested_by is required")
+		return errors.NewValidation("requested_by is required")
 	}
 	return nil
 }
@@ -502,7 +502,7 @@ func (s *ftoReportServiceImpl) executePipelineWithProgress(ctx context.Context, 
 
 func (s *ftoReportServiceImpl) GetStatus(ctx context.Context, reportID string) (*ReportStatusInfo, error) {
 	if reportID == "" {
-		return nil, errors.NewInvalidParameterError("reportID cannot be empty")
+		return nil, errors.NewValidation("reportID cannot be empty")
 	}
 
 	var statusInfo ReportStatusInfo
@@ -530,10 +530,10 @@ func (s *ftoReportServiceImpl) GetStatus(ctx context.Context, reportID string) (
 
 func (s *ftoReportServiceImpl) GetReport(ctx context.Context, reportID string, format ReportFormat) (io.ReadCloser, error) {
 	if reportID == "" {
-		return nil, errors.NewInvalidParameterError("reportID cannot be empty")
+		return nil, errors.NewValidation("reportID cannot be empty")
 	}
 	if format != FormatPDF && format != FormatDOCX {
-		return nil, errors.NewInvalidParameterError("unsupported format")
+		return nil, errors.NewValidation("unsupported format")
 	}
 
 	// Verify completion
@@ -585,7 +585,7 @@ func (s *ftoReportServiceImpl) ListReports(ctx context.Context, filter *FTORepor
 
 func (s *ftoReportServiceImpl) DeleteReport(ctx context.Context, reportID string) error {
 	if reportID == "" {
-		return errors.NewInvalidParameterError("reportID cannot be empty")
+		return errors.NewValidation("reportID cannot be empty")
 	}
 
 	// Check existence

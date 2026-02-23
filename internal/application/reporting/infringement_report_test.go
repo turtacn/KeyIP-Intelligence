@@ -101,6 +101,13 @@ type infMockTemplateEngine struct {
 	renderFunc func(ctx context.Context, templateName string, data interface{}, format ReportFormat) ([]byte, error)
 }
 func (m *infMockTemplateEngine) Render(ctx context.Context, req *RenderRequest) (*RenderResult, error) {
+	if m.renderFunc != nil {
+		content, err := m.renderFunc(ctx, req.TemplateID, req.Data, req.OutputFormat)
+		if err != nil {
+			return nil, err
+		}
+		return &RenderResult{Content: content}, nil
+	}
 	return &RenderResult{Content: []byte("dummy-report")}, nil
 }
 func (m *infMockTemplateEngine) RenderToBytes(ctx context.Context, req *RenderRequest) ([]byte, error) {
@@ -527,6 +534,7 @@ func TestInfringementReportService_Generate_ChemExtractorError(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestInfringementService()
 	req := validInfringementRequest()
+	req.OwnedPatentNumbers = []string{"P0"} // Reduce to 1 to avoid async processing (complexity: 1 * 6 = 6 < 10)
 	req.SuspectedMolecules = nil
 	req.SuspectedPatentNumbers = []string{"P1", "P2"}
 
@@ -538,10 +546,10 @@ func TestInfringementReportService_Generate_ChemExtractorError(t *testing.T) {
 	}
 
 	resp, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Expected partial success handling") }
-	if resp.Status != StatusCompleted { t.Errorf("Expected StatusCompleted") }
-	// Assessor should run for MOL-P2 (2 owned patents * 1 valid extracted molecule)
-	if m.assessor.callCount != 2 { t.Errorf("Expected 2 assessments") }
+	if err != nil { t.Fatalf("Expected partial success handling, got error: %v", err) }
+	if resp.Status != StatusCompleted { t.Errorf("Expected StatusCompleted, got %s", resp.Status) }
+	// Assessor should run for MOL-P2 (1 owned patent * 1 valid extracted molecule)
+	if m.assessor.callCount != 1 { t.Errorf("Expected 1 assessment, got %d", m.assessor.callCount) }
 }
 
 func TestInfringementReportService_Generate_ClaimChart(t *testing.T) {
@@ -572,6 +580,7 @@ func TestInfringementReportService_Generate_RiskLevelCalculation(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestInfringementService()
 	req := validInfringementRequest()
+	req.AnalysisMode = ModeLiteral // Use literal mode to test risk level calculation without equivalents interference
 
 	// Force only 1 patent and 1 molecule
 	req.OwnedPatentNumbers = []string{"P1"}
@@ -589,6 +598,7 @@ func TestInfringementReportService_Generate_RiskLevelCalculation(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc // Capture loop variable
 		m.assessor.assessFunc = func(ctx context.Context, smiles string, claimData interface{}, depth string) (interface{}, error) {
 			return sampleLiteralAssessment(tc.litProb), nil
 		}
@@ -603,7 +613,7 @@ func TestInfringementReportService_Generate_RiskLevelCalculation(t *testing.T) {
 		}
 
 		_, err := svc.Generate(context.Background(), req)
-		if err != nil { t.Fatalf("Unexpected error") }
+		if err != nil { t.Fatalf("Unexpected error: %v", err) }
 		if finalRisk != tc.expected {
 			t.Errorf("For probability %f, expected risk %s, got %s", tc.litProb, tc.expected, finalRisk)
 		}

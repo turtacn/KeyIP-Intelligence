@@ -213,10 +213,10 @@ func NewInfringementReportService(
 
 func (s *infringementReportServiceImpl) validateRequest(req *InfringementReportRequest) error {
 	if len(req.OwnedPatentNumbers) == 0 {
-		return errors.NewInvalidParameterError("owned_patent_numbers cannot be empty")
+		return errors.NewValidation("owned_patent_numbers cannot be empty")
 	}
 	if len(req.SuspectedMolecules) == 0 && len(req.SuspectedPatentNumbers) == 0 {
-		return errors.NewInvalidParameterError("must provide at least one suspected molecule or patent")
+		return errors.NewValidation("must provide at least one suspected molecule or patent")
 	}
 	validModes := map[InfringementAnalysisMode]bool{
 		ModeLiteral:       true,
@@ -224,10 +224,10 @@ func (s *infringementReportServiceImpl) validateRequest(req *InfringementReportR
 		ModeComprehensive: true,
 	}
 	if !validModes[req.AnalysisMode] {
-		return errors.NewInvalidParameterError("invalid analysis_mode")
+		return errors.NewValidation("invalid analysis_mode")
 	}
 	if req.RequestedBy == "" {
-		return errors.NewInvalidParameterError("requested_by is required")
+		return errors.NewValidation("requested_by is required")
 	}
 
 	// Auto-upgrade Mode
@@ -540,7 +540,7 @@ func riskToInt(r InfringementRiskLevel) int {
 
 func (s *infringementReportServiceImpl) GetStatus(ctx context.Context, reportID string) (*ReportStatusInfo, error) {
 	if reportID == "" {
-		return nil, errors.NewInvalidParameterError("reportID empty")
+		return nil, errors.NewValidation("reportID empty")
 	}
 
 	var statusInfo ReportStatusInfo

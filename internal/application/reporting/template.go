@@ -372,7 +372,7 @@ func (s *templateEngineImpl) Render(ctx context.Context, req *RenderRequest) (*R
 	start := time.Now()
 
 	if req.TemplateID == "" || req.Data == nil || req.OutputFormat == "" {
-		return nil, errors.NewInvalidParameterError("invalid render request parameters")
+		return nil, errors.NewValidation("invalid render request parameters")
 	}
 
 	renderCtx, cancel := context.WithTimeout(ctx, TotalRenderTimeout)
@@ -381,7 +381,8 @@ func (s *templateEngineImpl) Render(ctx context.Context, req *RenderRequest) (*R
 	// 1. Load Template
 	tmpl, err := s.GetTemplate(renderCtx, req.TemplateID)
 	if err != nil {
-		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load template")
+		// Preserve original error code (e.g., NotFound)
+		return nil, err
 	}
 
 	var warnings []string
@@ -485,7 +486,7 @@ func (s *templateEngineImpl) Render(ctx context.Context, req *RenderRequest) (*R
 		contentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 	default:
-		return nil, errors.NewInvalidParameterError(fmt.Sprintf("unsupported output format: %s", req.OutputFormat))
+		return nil, errors.NewValidation(fmt.Sprintf("unsupported output format: %s", req.OutputFormat))
 	}
 
 	return &RenderResult{
@@ -537,7 +538,7 @@ func (s *templateEngineImpl) ListTemplates(ctx context.Context, opts *ListTempla
 
 func (s *templateEngineImpl) GetTemplate(ctx context.Context, templateID string) (*Template, error) {
 	if templateID == "" {
-		return nil, errors.NewInvalidParameterError("templateID cannot be empty")
+		return nil, errors.NewValidation("templateID cannot be empty")
 	}
 	// Note: caching of the struct could be added here, currently relying on repo or AST cache
 	return s.repo.Get(ctx, templateID)
@@ -545,7 +546,7 @@ func (s *templateEngineImpl) GetTemplate(ctx context.Context, templateID string)
 
 func (s *templateEngineImpl) RegisterTemplate(ctx context.Context, tmpl *Template) error {
 	if tmpl.ID == "" || tmpl.Content == "" {
-		return errors.NewInvalidParameterError("invalid template data")
+		return errors.NewValidation("invalid template data")
 	}
 
 	exists, _ := s.repo.CheckExists(ctx, tmpl.ID)
@@ -558,7 +559,7 @@ func (s *templateEngineImpl) RegisterTemplate(ctx context.Context, tmpl *Templat
 		return err
 	}
 	if !valRes.Valid {
-		return errors.NewInvalidParameterError("template validation failed")
+		return errors.NewValidation("template validation failed")
 	}
 
 	tmpl.Placeholders = s.extractPlaceholders(tmpl.Content)
@@ -571,19 +572,29 @@ func (s *templateEngineImpl) RegisterTemplate(ctx context.Context, tmpl *Templat
 
 func (s *templateEngineImpl) UpdateTemplate(ctx context.Context, tmpl *Template) error {
 	if tmpl.ID == "" {
-		return errors.NewInvalidParameterError("templateID required")
+		return errors.NewValidation("templateID required")
+	}
+
+	// Load existing template to get current version
+	existing, err := s.repo.Get(ctx, tmpl.ID)
+	if err != nil {
+		return err
 	}
 
 	valRes, err := s.ValidateTemplate(ctx, tmpl)
 	if err != nil { return err }
-	if !valRes.Valid { return errors.NewInvalidParameterError("template validation failed") }
+	if !valRes.Valid { return errors.NewValidation("template validation failed") }
 
-	// Clear AST cache
-	s.astCache.Delete(tmpl.ID + ":" + tmpl.Version) // Simple eviction
+	// Clear AST cache for old version
+	s.astCache.Delete(tmpl.ID + ":" + existing.Version) // Simple eviction
 
 	tmpl.UpdatedAt = time.Now()
-	// Bump version logic abstracted
-	tmpl.Version = fmt.Sprintf("%s.1", tmpl.Version)
+	// Bump version from existing version
+	if existing.Version == "" {
+		tmpl.Version = "1.0.0"
+	} else {
+		tmpl.Version = fmt.Sprintf("%s.1", existing.Version)
+	}
 
 	return s.repo.Update(ctx, tmpl)
 }
