@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 )
 
 // -----------------------------------------------------------------------
@@ -16,7 +18,7 @@ import (
 
 func TestNewGapAnalysisService_Success(t *testing.T) {
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1", name: "Test"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("Test")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -41,7 +43,7 @@ func TestNewGapAnalysisService_MissingDeps(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := GapAnalysisServiceConfig{
-				PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+				PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 				PatentRepository: newMockPatentRepo(),
 				Logger:           &mockLogger{},
 			}
@@ -59,7 +61,7 @@ func TestNewGapAnalysisService_MissingDeps(t *testing.T) {
 
 func TestNewGapAnalysisService_DefaultTTL(t *testing.T) {
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 		CacheTTL:         0,
@@ -129,7 +131,7 @@ func buildGapTestPatentRepo() *mockPatentRepo {
 func TestAnalyzeGaps_Success(t *testing.T) {
 	repo := buildGapTestPatentRepo()
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "portfolio-gap", name: "Gap Test"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("Gap Test")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -178,7 +180,7 @@ func TestAnalyzeGaps_Success(t *testing.T) {
 
 func TestAnalyzeGaps_NilRequest(t *testing.T) {
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -192,7 +194,7 @@ func TestAnalyzeGaps_NilRequest(t *testing.T) {
 
 func TestAnalyzeGaps_EmptyPortfolioID(t *testing.T) {
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -221,7 +223,7 @@ func TestAnalyzeGaps_PortfolioNotFound(t *testing.T) {
 func TestAnalyzeGaps_NoCompetitors(t *testing.T) {
 	repo := buildGapTestPatentRepo()
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "portfolio-gap"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -257,7 +259,7 @@ func TestGetExpirationRisks_Success(t *testing.T) {
 	}
 
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "port-exp"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -282,7 +284,7 @@ func TestGetExpirationRisks_Success(t *testing.T) {
 
 func TestGetExpirationRisks_EmptyPortfolioID(t *testing.T) {
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -298,7 +300,7 @@ func TestGetExpirationRisks_DefaultWindow(t *testing.T) {
 	repo := newMockPatentRepo()
 	repo.byPortfolio["port-def"] = []domainpatent.Patent{}
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "port-def"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -324,7 +326,7 @@ func TestGetGeographicGaps_Success(t *testing.T) {
 		&mockPatent{id: "g2", number: "EP2222", techDomain: "A61K"},
 	}
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "port-geo"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -362,7 +364,7 @@ func TestGetGeographicGaps_Success(t *testing.T) {
 
 func TestGetGeographicGaps_EmptyPortfolioID(t *testing.T) {
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -380,7 +382,7 @@ func TestGetGeographicGaps_DefaultJurisdictions(t *testing.T) {
 		&mockPatent{id: "dg1", number: "US5555", techDomain: "A61K"},
 	}
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "port-def-geo"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -408,7 +410,7 @@ func TestGetGeographicGaps_DefaultJurisdictions(t *testing.T) {
 func TestGetFilingOpportunities_Success(t *testing.T) {
 	repo := buildGapTestPatentRepo()
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "portfolio-gap"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -432,7 +434,7 @@ func TestGetFilingOpportunities_Success(t *testing.T) {
 
 func TestGetFilingOpportunities_EmptyPortfolioID(t *testing.T) {
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -447,7 +449,7 @@ func TestGetFilingOpportunities_EmptyPortfolioID(t *testing.T) {
 func TestGetFilingOpportunities_DefaultLimit(t *testing.T) {
 	repo := buildGapTestPatentRepo()
 	cfg := GapAnalysisServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "portfolio-gap"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("test")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -619,3 +621,17 @@ func TestComputeHealthScore_WithGaps(t *testing.T) {
 }
 
 //Personal.AI order the ending
+
+// Helper to create a test portfolio
+func createTestPortfolio(name string) *domainportfolio.Portfolio {
+	now := time.Now()
+	p := &domainportfolio.Portfolio{
+		ID:           uuid.New(),
+		Name:         name,
+		OwnerID:      uuid.New(),
+		TechDomains:  []string{"C07D"},
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	return p
+}

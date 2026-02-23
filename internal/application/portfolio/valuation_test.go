@@ -23,8 +23,10 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockPatentRepo struct {
-	patents map[string]*patent.Patent
-	err     error
+	patents     map[string]*patent.Patent
+	byPortfolio map[string][]domainpatent.Patent
+	byAssignee  map[string][]domainpatent.Patent
+	err         error
 }
 
 func newMockPatentRepo() *mockPatentRepo {
@@ -64,7 +66,23 @@ func (m *mockPatentRepo) AssociateMolecule(ctx context.Context, patentID, molecu
 	return m.err
 }
 func (m *mockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string) ([]*patent.Patent, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if patents, ok := m.byPortfolio[portfolioID]; ok {
+		// Convert []domainpatent.Patent to []*patent.Patent
+		result := make([]*patent.Patent, len(patents))
+		for i, p := range patents {
+			if pp, ok := p.(*patent.Patent); ok {
+				result[i] = pp
+			}
+		}
+		return result, nil
+	}
 	return nil, nil
+}
+func (m *mockPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Patent) error {
+	return m.err
 }
 
 // ---------------------------------------------------------------------------
@@ -290,6 +308,7 @@ func (mockLogger) Warn(msg string, fields ...logging.Field)  {}
 func (mockLogger) Error(msg string, fields ...logging.Field) {}
 func (mockLogger) Fatal(msg string, fields ...logging.Field) {}
 func (mockLogger) With(fields ...logging.Field) logging.Logger { return mockLogger{} }
+func (mockLogger) Sync() error { return nil }
 
 // ---------------------------------------------------------------------------
 // Mock: Domain Services (minimal stubs)
