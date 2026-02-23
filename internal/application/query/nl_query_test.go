@@ -231,10 +231,10 @@ func assertPromptContains(t *testing.T, mock *mockStrategyGPTModel, callType str
 		t.Fatalf("unknown call type %s", callType)
 	}
 
-	for _, sub := string range expectedSubstrings {
+	for _, sub := range expectedSubstrings {
 		if !strings.Contains(prompt, sub) {
-		t.Errorf("Expected prompt to contain %q, but it did not. Prompt: %s", sub, prompt)
-	}
+			t.Errorf("Expected prompt to contain %q, but it did not. Prompt: %s", sub, prompt)
+		}
 	}
 }
 
@@ -251,10 +251,10 @@ func assertPromptNotContains(t *testing.T, mock *mockStrategyGPTModel, callType 
 		prompt = mock.inferCalls[callIndex].prompt
 	}
 
-	for _, sub := string range unexpectedSubstrings {
+	for _, sub := range unexpectedSubstrings {
 		if strings.Contains(prompt, sub) {
-		t.Errorf("Expected prompt NOT to contain %q, but it did. Prompt: %s", sub, prompt)
-	}
+			t.Errorf("Expected prompt NOT to contain %q, but it did. Prompt: %s", sub, prompt)
+		}
 	}
 }
 

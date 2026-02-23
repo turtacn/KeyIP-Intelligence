@@ -33,7 +33,6 @@
 package portfolio
 
 import (
-	"github.com/google/uuid"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -44,11 +43,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ---------------------------------------------------------------------------
@@ -704,7 +703,7 @@ func (s *valuationServiceImpl) AssessPatent(ctx context.Context, req *SinglePate
 	for _, dim := range req.Dimensions {
 		dimScore, scoreErr := s.scoreDimension(ctx, pat, dim, req.Context)
 		if scoreErr != nil {
-			s.logger.Warn("dimension scoring failed, using fallback", "dimension", dim, "error", scoreErr)
+			s.logger.Warn("dimension scoring failed, using fallback", logging.String("dimension", string(dim)), logging.Err(scoreErr))
 			dimScore = s.fallbackDimensionScore(dim)
 		}
 		scores[dim] = dimScore
@@ -777,11 +776,25 @@ func (s *valuationServiceImpl) AssessPortfolio(ctx context.Context, req *Portfol
 	// Resolve patent IDs: either from request or from portfolio membership
 	patentIDs := req.PatentIDs
 	if len(patentIDs) == 0 && req.PortfolioID != "" {
-		portfolio, fetchErr := s.portfolioRepo.FindByID(ctx, req.PortfolioID)
+		portfolioUUID, parseErr := uuid.Parse(req.PortfolioID)
+		if parseErr != nil {
+			return nil, errors.Wrap(parseErr, errors.ErrCodeValidation, "invalid portfolio ID")
+		}
+		
+		_, fetchErr := s.portfolioRepo.GetByID(ctx, portfolioUUID)
 		if fetchErr != nil {
 			return nil, errors.NewNotFound(fmt.Sprintf("portfolio %s not found", req.PortfolioID))
 		}
-		patentIDs = portfolio.PatentIDs
+		
+		// Get patents from portfolio
+		patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
+		if err != nil {
+			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio patents")
+		}
+		patentIDs = make([]string, len(patents))
+		for i, p := range patents {
+			patentIDs[i] = p.GetID()
+		}
 	}
 	if len(patentIDs) == 0 {
 		return nil, errors.NewValidation("no patents to assess in portfolio")
@@ -818,7 +831,7 @@ func (s *valuationServiceImpl) AssessPortfolio(ctx context.Context, req *Portfol
 	assessments := make([]*SinglePatentAssessmentResponse, 0, len(results))
 	for _, r := range results {
 		if r.err != nil {
-			s.logger.Warn("patent assessment failed in portfolio batch", "error", r.err)
+			s.logger.Warn("patent assessment failed in portfolio batch", logging.Err(r.err))
 			continue
 		}
 		assessments = append(assessments, r.resp)
@@ -855,7 +868,7 @@ func (s *valuationServiceImpl) AssessPortfolio(ctx context.Context, req *Portfol
 			AssessorType: a.AssessorType,
 		}
 		if saveErr := s.assessmentRepo.Save(ctx, record); saveErr != nil {
-			s.logger.Error("failed to persist portfolio assessment record", "patent_id", a.PatentID, "error", saveErr)
+			s.logger.Error("failed to persist portfolio assessment record", logging.String("patent_id", a.PatentID), logging.Err(saveErr))
 		}
 	}
 
@@ -884,8 +897,8 @@ func (s *valuationServiceImpl) GetAssessmentHistory(ctx context.Context, patentI
 
 	records, err := s.assessmentRepo.FindByPatentID(ctx, patentID, qo.Limit, qo.Offset)
 	if err != nil {
-		s.logger.Error("failed to fetch assessment history", "patent_id", patentID, "error", err)
-		return nil, errors.Wrap(err, "fetch assessment history")
+		s.logger.Error("failed to fetch assessment history", logging.String("patent_id", patentID), logging.Err(err))
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "fetch assessment history")
 	}
 
 	// Sort by assessed_at descending (most recent first)
@@ -907,7 +920,7 @@ func (s *valuationServiceImpl) CompareAssessments(ctx context.Context, req *Comp
 
 	records, err := s.assessmentRepo.FindByIDs(ctx, req.AssessmentIDs)
 	if err != nil {
-		return nil, errors.Wrap(err, "fetch assessments for comparison")
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "fetch assessments for comparison")
 	}
 	if len(records) < 2 {
 		return nil, errors.NewValidation("could not find enough assessment records for comparison")
@@ -1033,7 +1046,7 @@ func (s *valuationServiceImpl) exportCSV(record *AssessmentRecord) ([]byte, erro
 		header = append(header, string(d))
 	}
 	if err := w.Write(header); err != nil {
-		return nil, errors.Wrap(err, "write CSV header")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "write CSV header")
 	}
 
 	// Row
@@ -1054,12 +1067,12 @@ func (s *valuationServiceImpl) exportCSV(record *AssessmentRecord) ([]byte, erro
 		}
 	}
 	if err := w.Write(row); err != nil {
-		return nil, errors.Wrap(err, "write CSV row")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "write CSV row")
 	}
 
 	w.Flush()
 	if err := w.Error(); err != nil {
-		return nil, errors.Wrap(err, "flush CSV")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "flush CSV")
 	}
 	return []byte(buf.String()), nil
 }
@@ -1084,7 +1097,7 @@ func (s *valuationServiceImpl) GetTierDistribution(ctx context.Context, portfoli
 
 	records, err := s.assessmentRepo.FindByPortfolioID(ctx, portfolioID)
 	if err != nil {
-		return nil, errors.Wrap(err, "fetch portfolio assessments for tier distribution")
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "fetch portfolio assessments for tier distribution")
 	}
 
 	// Deduplicate: keep only the latest assessment per patent
@@ -1164,7 +1177,7 @@ func (s *valuationServiceImpl) scoreDimension(ctx context.Context, pat *patent.P
 		aiScores, aiErr := s.aiScorer.ScorePatent(ctx, pat, dim)
 		if aiErr != nil {
 			s.logger.Warn("AI scorer unavailable, falling back to rule-based scoring",
-				"dimension", dim, "patent_id", pat.ID, "error", aiErr)
+				logging.String("dimension", string(dim)), logging.String("patent_id", pat.ID.String()), logging.Err(aiErr))
 		} else {
 			for k, v := range aiScores {
 				rawScores[k] = v
@@ -1266,7 +1279,7 @@ func (s *valuationServiceImpl) ruleTechnicalFactor(ctx context.Context, pat *pat
 		}
 		indepCount := 0
 		for _, c := range pat.Claims {
-			if c.IsIndependent {
+			if c.Type == patent.ClaimTypeIndependent {
 				indepCount++
 			}
 		}
@@ -1281,8 +1294,8 @@ func (s *valuationServiceImpl) ruleTechnicalFactor(ctx context.Context, pat *pat
 		return score
 
 	case "inventive_step":
-		// Heuristic: longer description often correlates with more detailed inventive step
-		descLen := len(pat.Description)
+		// Heuristic: longer abstract often correlates with more detailed inventive step
+		descLen := len(pat.Abstract)
 		if descLen > 10000 {
 			return 80
 		}
@@ -1296,7 +1309,7 @@ func (s *valuationServiceImpl) ruleTechnicalFactor(ctx context.Context, pat *pat
 
 	case "technical_breadth":
 		// Heuristic: number of IPC classifications indicates breadth
-		ipcCount := len(pat.IPCClassifications)
+		ipcCount := len(pat.IPCCodes)
 		if ipcCount >= 5 {
 			return 90
 		}
@@ -1344,7 +1357,7 @@ func (s *valuationServiceImpl) ruleLegalFactor(ctx context.Context, pat *patent.
 		}
 		var minWords int = math.MaxInt32
 		for _, c := range pat.Claims {
-			if c.IsIndependent {
+			if c.Type == patent.ClaimTypeIndependent {
 				wordCount := len(strings.Fields(c.Text))
 				if wordCount < minWords {
 					minWords = wordCount
@@ -1375,7 +1388,7 @@ func (s *valuationServiceImpl) ruleLegalFactor(ctx context.Context, pat *patent.
 		// More dependent claims relative to independent → better claim tree structure
 		indep := 0
 		for _, c := range pat.Claims {
-			if c.IsIndependent {
+			if c.Type == patent.ClaimTypeIndependent {
 				indep++
 			}
 		}
@@ -1395,11 +1408,11 @@ func (s *valuationServiceImpl) ruleLegalFactor(ctx context.Context, pat *patent.
 	case "prosecution_strength":
 		// Heuristic: granted patents score higher than pending
 		switch pat.Status {
-		case "granted", "active":
+		case patent.PatentStatusGranted:
 			return 85
-		case "pending":
+		case patent.PatentStatusFiled, patent.PatentStatusUnderExamination, patent.PatentStatusPublished:
 			return 55
-		case "rejected", "withdrawn":
+		case patent.PatentStatusRejected, patent.PatentStatusWithdrawn:
 			return 15
 		default:
 			return 50
@@ -1410,10 +1423,10 @@ func (s *valuationServiceImpl) ruleLegalFactor(ctx context.Context, pat *patent.
 		if maxLife <= 0 {
 			maxLife = 20
 		}
-		if pat.FilingDate.IsZero() {
+		if pat.FilingDate == nil || pat.FilingDate.IsZero() {
 			return 50
 		}
-		elapsed := time.Since(pat.FilingDate).Hours() / (24 * 365.25)
+		elapsed := time.Since(*pat.FilingDate).Hours() / (24 * 365.25)
 		remaining := float64(maxLife) - elapsed
 		if remaining < 0 {
 			remaining = 0
@@ -1421,20 +1434,12 @@ func (s *valuationServiceImpl) ruleLegalFactor(ctx context.Context, pat *patent.
 		return clampScore(remaining / float64(maxLife) * 100)
 
 	case "family_coverage":
-		familySize := len(pat.FamilyMembers)
-		if familySize >= 10 {
-			return 95
+		// Heuristic: if patent has a family ID, assume moderate family coverage
+		// TODO: Query actual family members from repository for more accurate scoring
+		if pat.FamilyID != "" {
+			return 60 // Moderate score assuming family membership
 		}
-		if familySize >= 5 {
-			return 75
-		}
-		if familySize >= 2 {
-			return 55
-		}
-		if familySize == 1 {
-			return 35
-		}
-		return 20
+		return 35 // Lower score for standalone patents
 
 	default:
 		return 50
@@ -1478,13 +1483,13 @@ func (s *valuationServiceImpl) ruleCommercialFactor(ctx context.Context, pat *pa
 	case "licensing_potential":
 		// Heuristic: granted + broad claims + active status → high licensing potential
 		score := 50.0
-		if pat.Status == "granted" || pat.Status == "active" {
+		if pat.Status == patent.PatentStatusGranted {
 			score += 20
 		}
 		if len(pat.Claims) > 10 {
 			score += 15
 		}
-		if len(pat.FamilyMembers) > 3 {
+		if pat.FamilyID != "" {
 			score += 10
 		}
 		return clampScore(score)
@@ -1492,7 +1497,7 @@ func (s *valuationServiceImpl) ruleCommercialFactor(ctx context.Context, pat *pa
 	case "cost_of_design_around":
 		// Heuristic: more IPC classes + more claims → harder to design around
 		score := 40.0
-		score += float64(len(pat.IPCClassifications)) * 8
+		score += float64(len(pat.IPCCodes)) * 8
 		score += float64(len(pat.Claims)) * 1.5
 		return clampScore(score)
 
@@ -1517,21 +1522,23 @@ func (s *valuationServiceImpl) ruleStrategicFactor(ctx context.Context, pat *pat
 		score := 40.0
 		indepClaims := 0
 		for _, c := range pat.Claims {
-			if c.IsIndependent {
+			if c.Type == patent.ClaimTypeIndependent {
 				indepClaims++
 			}
 		}
 		score += float64(indepClaims) * 10
-		score += float64(len(pat.IPCClassifications)) * 5
+		score += float64(len(pat.IPCCodes)) * 5
 		return clampScore(score)
 
 	case "negotiation_leverage":
 		// Heuristic: granted + large family + active → strong negotiation position
 		score := 30.0
-		if pat.Status == "granted" || pat.Status == "active" {
+		if pat.Status == patent.PatentStatusGranted {
 			score += 25
 		}
-		score += float64(len(pat.FamilyMembers)) * 5
+		if pat.FamilyID != "" {
+			score += 15
+		}
 		if len(pat.Claims) > 15 {
 			score += 15
 		}
@@ -1539,10 +1546,10 @@ func (s *valuationServiceImpl) ruleStrategicFactor(ctx context.Context, pat *pat
 
 	case "technology_trajectory_alignment":
 		// Heuristic: recent filing date → more aligned with current tech trajectory
-		if pat.FilingDate.IsZero() {
+		if pat.FilingDate == nil || pat.FilingDate.IsZero() {
 			return 50
 		}
-		yearsAgo := time.Since(pat.FilingDate).Hours() / (24 * 365.25)
+		yearsAgo := time.Since(*pat.FilingDate).Hours() / (24 * 365.25)
 		if yearsAgo <= 2 {
 			return 90
 		}
@@ -1559,7 +1566,7 @@ func (s *valuationServiceImpl) ruleStrategicFactor(ctx context.Context, pat *pat
 		if len(assessCtx.Competitors) == 0 {
 			return 60
 		}
-		patText := strings.ToLower(pat.Title + " " + pat.Abstract + " " + pat.Description)
+		patText := strings.ToLower(pat.Title + " " + pat.Abstract)
 		matchCount := 0
 		for _, comp := range assessCtx.Competitors {
 			if strings.Contains(patText, strings.ToLower(comp)) {
@@ -1581,15 +1588,15 @@ func (s *valuationServiceImpl) computeCitationImpact(ctx context.Context, pat *p
 		return 50 // neutral when citation data unavailable
 	}
 
-	fwd, err := s.citationRepo.CountForwardCitations(ctx, pat.ID)
+	fwd, err := s.citationRepo.CountForwardCitations(ctx, pat.ID.String())
 	if err != nil {
-		s.logger.Warn("failed to count forward citations", "patent_id", pat.ID, "error", err)
+		s.logger.Warn("failed to count forward citations", logging.String("patent_id", pat.ID.String()), logging.Err(err))
 		return 50
 	}
 
 	domain := ""
-	if len(pat.IPCClassifications) > 0 {
-		domain = pat.IPCClassifications[0]
+	if len(pat.IPCCodes) > 0 {
+		domain = pat.IPCCodes[0]
 	}
 
 	maxFwd, err := s.citationRepo.MaxForwardCitationsInDomain(ctx, domain)

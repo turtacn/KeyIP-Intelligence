@@ -363,7 +363,7 @@ func (s *optimizationServiceImpl) EstimateCost(ctx context.Context, portfolioID 
 	entries := make([]PatentCostEntry, 0, len(patents))
 
 	for _, p := range patents {
-		cost := estimatePatentAnnualCost(p)
+		cost := estimatePatentAnnualCost(*p)
 		totalCost += cost
 
 		domain := p.GetPrimaryTechDomain()
