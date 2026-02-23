@@ -448,6 +448,7 @@ var (
 	ErrInvalidSortOrder  = New(ErrCodeValidation, "invalid sort order")
 	ErrParsingFailed     = New(ErrCodeValidation, "parsing failed")
 	ErrInvalidMolecule   = New(ErrCodeMoleculeInvalidFormat, "invalid molecule")
+	ErrInvalidConfig     = New(ErrCodeValidation, "invalid configuration")
 )
 
 func NewParsingError(message string) *AppError {
