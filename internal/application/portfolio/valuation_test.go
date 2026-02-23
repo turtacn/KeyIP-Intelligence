@@ -641,6 +641,12 @@ func buildTestService(
 		cache = newMockCache()
 	}
 
+	// Cast citationRepo to interface type if nil to avoid typed-nil issue
+	var citationRepoInterface CitationRepository
+	if citationRepo != nil {
+		citationRepoInterface = citationRepo
+	}
+
 	return NewValuationService(
 		mockPortfolioDomainSvc{},
 		mockValuationDomainSvc{},
@@ -648,7 +654,7 @@ func buildTestService(
 		portfolioRepo,
 		assessmentRepo,
 		aiScorer,
-		citationRepo,
+		citationRepoInterface,
 		mockLogger{},
 		cache,
 		nil, // metrics: will use noopMetrics

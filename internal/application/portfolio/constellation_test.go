@@ -584,7 +584,7 @@ func buildTestConfig(overrides ...func(*ConstellationServiceConfig)) Constellati
 			valueScore: 9.1, moleculeIDs: []string{"mol-3"},
 		}).toPatent(),
 	}
-	patentRepo.byPortfolio["portfolio-1"] = patents
+	patentRepo.byPortfolio["00000000-0000-0000-0000-000000000001"] = patents
 
 	// Competitor patents.
 	compPatents := []*domainpatent.Patent{
@@ -607,7 +607,7 @@ func buildTestConfig(overrides ...func(*ConstellationServiceConfig)) Constellati
 	molRepo.molecules["mol-3"] = (&mockMolecule{id: "mol-3", smiles: "CC(=O)O"}).toMolecule()
 
 	// Use toPortfolio() helper
-	portfolioForService := (&mockPortfolio{id: "portfolio-1", name: "Test Portfolio"}).toPortfolio()
+	portfolioForService := (&mockPortfolio{id: "00000000-0000-0000-0000-000000000001", name: "Test Portfolio"}).toPortfolio()
 	
 	cfg := ConstellationServiceConfig{
 		PortfolioService:   &mockPortfolioService{portfolio: portfolioForService},
@@ -705,7 +705,7 @@ func TestGenerateConstellation_Success(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	resp, err := svc.GenerateConstellation(context.Background(), &ConstellationRequest{
-		PortfolioID:        "portfolio-1",
+		PortfolioID:        "00000000-0000-0000-0000-000000000001",
 		IncludeWhiteSpaces: true,
 		Reduction: DimensionReduction{
 			Algorithm:  ReductionUMAP,
@@ -718,7 +718,7 @@ func TestGenerateConstellation_Success(t *testing.T) {
 	if resp == nil {
 		t.Fatal("expected non-nil response")
 	}
-	if resp.PortfolioID != "portfolio-1" {
+	if resp.PortfolioID != "00000000-0000-0000-0000-000000000001" {
 		t.Errorf("expected portfolio_id 'portfolio-1', got '%s'", resp.PortfolioID)
 	}
 	if len(resp.Points) == 0 {
@@ -775,7 +775,7 @@ func TestGenerateConstellation_EmptyPatents(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	resp, err := svc.GenerateConstellation(context.Background(), &ConstellationRequest{
-		PortfolioID: "portfolio-1",
+		PortfolioID: "00000000-0000-0000-0000-000000000001",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -793,7 +793,7 @@ func TestGenerateConstellation_CacheHit(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	// First call populates cache.
-	req := &ConstellationRequest{PortfolioID: "portfolio-1"}
+	req := &ConstellationRequest{PortfolioID: "00000000-0000-0000-0000-000000000001"}
 	_, err := svc.GenerateConstellation(context.Background(), req)
 	if err != nil {
 		t.Fatalf("first call error: %v", err)
@@ -820,7 +820,7 @@ func TestGenerateConstellation_GNNEmbeddingError(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	_, err := svc.GenerateConstellation(context.Background(), &ConstellationRequest{
-		PortfolioID: "portfolio-1",
+		PortfolioID: "00000000-0000-0000-0000-000000000001",
 	})
 	if err == nil {
 		t.Fatal("expected error when GNN embedding fails")
@@ -832,7 +832,7 @@ func TestGenerateConstellation_WithFilters(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	resp, err := svc.GenerateConstellation(context.Background(), &ConstellationRequest{
-		PortfolioID: "portfolio-1",
+		PortfolioID: "00000000-0000-0000-0000-000000000001",
 		Filters: ConstellationFilters{
 			TechDomains: []string{"A61K"},
 		},
@@ -856,14 +856,14 @@ func TestGetTechDomainDistribution_Success(t *testing.T) {
 	cfg := buildTestConfig()
 	svc, _ := NewConstellationService(cfg)
 
-	dist, err := svc.GetTechDomainDistribution(context.Background(), "portfolio-1")
+	dist, err := svc.GetTechDomainDistribution(context.Background(), "00000000-0000-0000-0000-000000000001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if dist == nil {
 		t.Fatal("expected non-nil distribution")
 	}
-	if dist.PortfolioID != "portfolio-1" {
+	if dist.PortfolioID != "00000000-0000-0000-0000-000000000001" {
 		t.Errorf("expected portfolio_id 'portfolio-1', got '%s'", dist.PortfolioID)
 	}
 	if dist.TotalCount != 3 {
@@ -931,7 +931,7 @@ func TestGetTechDomainDistribution_NoPatents(t *testing.T) {
 	})
 	svc, _ := NewConstellationService(cfg)
 
-	dist, err := svc.GetTechDomainDistribution(context.Background(), "portfolio-1")
+	dist, err := svc.GetTechDomainDistribution(context.Background(), "00000000-0000-0000-0000-000000000001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -944,7 +944,7 @@ func TestGetTechDomainDistribution_ValuePercentages(t *testing.T) {
 	cfg := buildTestConfig()
 	svc, _ := NewConstellationService(cfg)
 
-	dist, err := svc.GetTechDomainDistribution(context.Background(), "portfolio-1")
+	dist, err := svc.GetTechDomainDistribution(context.Background(), "00000000-0000-0000-0000-000000000001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -970,7 +970,7 @@ func TestCompareWithCompetitor_Success(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	resp, err := svc.CompareWithCompetitor(context.Background(), &CompetitorCompareRequest{
-		PortfolioID:    "portfolio-1",
+		PortfolioID:    "00000000-0000-0000-0000-000000000001",
 		CompetitorName: "CompetitorInc",
 	})
 	if err != nil {
@@ -979,7 +979,7 @@ func TestCompareWithCompetitor_Success(t *testing.T) {
 	if resp == nil {
 		t.Fatal("expected non-nil response")
 	}
-	if resp.PortfolioID != "portfolio-1" {
+	if resp.PortfolioID != "00000000-0000-0000-0000-000000000001" {
 		t.Errorf("expected portfolio_id 'portfolio-1', got '%s'", resp.PortfolioID)
 	}
 	if resp.CompetitorName != "CompetitorInc" {
@@ -1076,7 +1076,7 @@ func TestCompareWithCompetitor_EmptyCompetitorName(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	_, err := svc.CompareWithCompetitor(context.Background(), &CompetitorCompareRequest{
-		PortfolioID: "portfolio-1",
+		PortfolioID: "00000000-0000-0000-0000-000000000001",
 	})
 	if err == nil {
 		t.Fatal("expected validation error for empty competitor_name")
@@ -1088,7 +1088,7 @@ func TestCompareWithCompetitor_WithTechDomainFilter(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	resp, err := svc.CompareWithCompetitor(context.Background(), &CompetitorCompareRequest{
-		PortfolioID:    "portfolio-1",
+		PortfolioID:    "00000000-0000-0000-0000-000000000001",
 		CompetitorName: "CompetitorInc",
 		TechDomains:    []string{"A61K"},
 	})
@@ -1116,7 +1116,7 @@ func TestCompareWithCompetitor_StrengthIndex(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	resp, err := svc.CompareWithCompetitor(context.Background(), &CompetitorCompareRequest{
-		PortfolioID:    "portfolio-1",
+		PortfolioID:    "00000000-0000-0000-0000-000000000001",
 		CompetitorName: "CompetitorInc",
 	})
 	if err != nil {
@@ -1142,7 +1142,7 @@ func TestCompareWithCompetitor_PatentRepoError(t *testing.T) {
 	svc, _ := NewConstellationService(cfg)
 
 	_, err := svc.CompareWithCompetitor(context.Background(), &CompetitorCompareRequest{
-		PortfolioID:    "portfolio-1",
+		PortfolioID:    "00000000-0000-0000-0000-000000000001",
 		CompetitorName: "CompetitorInc",
 	})
 	if err == nil {
@@ -1158,14 +1158,14 @@ func TestGetCoverageHeatmap_Success(t *testing.T) {
 	cfg := buildTestConfig()
 	svc, _ := NewConstellationService(cfg)
 
-	heatmap, err := svc.GetCoverageHeatmap(context.Background(), "portfolio-1", WithResolution(50))
+	heatmap, err := svc.GetCoverageHeatmap(context.Background(), "00000000-0000-0000-0000-000000000001", WithResolution(50))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if heatmap == nil {
 		t.Fatal("expected non-nil heatmap")
 	}
-	if heatmap.PortfolioID != "portfolio-1" {
+	if heatmap.PortfolioID != "00000000-0000-0000-0000-000000000001" {
 		t.Errorf("expected portfolio_id 'portfolio-1', got '%s'", heatmap.PortfolioID)
 	}
 	if heatmap.Resolution != 50 {
@@ -1208,7 +1208,7 @@ func TestGetCoverageHeatmap_DefaultResolution(t *testing.T) {
 	cfg := buildTestConfig()
 	svc, _ := NewConstellationService(cfg)
 
-	heatmap, err := svc.GetCoverageHeatmap(context.Background(), "portfolio-1")
+	heatmap, err := svc.GetCoverageHeatmap(context.Background(), "00000000-0000-0000-0000-000000000001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1223,7 +1223,7 @@ func TestGetCoverageHeatmap_NoPatents(t *testing.T) {
 	})
 	svc, _ := NewConstellationService(cfg)
 
-	heatmap, err := svc.GetCoverageHeatmap(context.Background(), "portfolio-1")
+	heatmap, err := svc.GetCoverageHeatmap(context.Background(), "00000000-0000-0000-0000-000000000001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1239,7 +1239,7 @@ func TestGetCoverageHeatmap_CacheInteraction(t *testing.T) {
 	})
 	svc, _ := NewConstellationService(cfg)
 
-	_, err := svc.GetCoverageHeatmap(context.Background(), "portfolio-1", WithResolution(20))
+	_, err := svc.GetCoverageHeatmap(context.Background(), "00000000-0000-0000-0000-000000000001", WithResolution(20))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1252,7 +1252,7 @@ func TestGetCoverageHeatmap_WithDensityRange(t *testing.T) {
 	cfg := buildTestConfig()
 	svc, _ := NewConstellationService(cfg)
 
-	heatmap, err := svc.GetCoverageHeatmap(context.Background(), "portfolio-1",
+	heatmap, err := svc.GetCoverageHeatmap(context.Background(), "00000000-0000-0000-0000-000000000001",
 		WithResolution(10),
 		WithDensityRange(0.0, 5.0),
 	)
@@ -1271,7 +1271,7 @@ func TestGetCoverageHeatmap_GNNReduceError(t *testing.T) {
 	})
 	svc, _ := NewConstellationService(cfg)
 
-	_, err := svc.GetCoverageHeatmap(context.Background(), "portfolio-1")
+	_, err := svc.GetCoverageHeatmap(context.Background(), "00000000-0000-0000-0000-000000000001")
 	if err == nil {
 		t.Fatal("expected error when dimension reduction fails")
 	}
