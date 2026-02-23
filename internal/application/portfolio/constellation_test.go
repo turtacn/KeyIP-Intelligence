@@ -100,6 +100,7 @@ func (m *mockPortfolioService) Create(ctx context.Context, p domainportfolio.Por
 func (m *mockPortfolioService) Update(ctx context.Context, p domainportfolio.Portfolio) error { return nil }
 func (m *mockPortfolioService) Delete(ctx context.Context, id string) error                  { return nil }
 func (m *mockPortfolioService) List(ctx context.Context) ([]domainportfolio.Portfolio, error) { return nil, nil }
+func (m *mockPortfolioService) ActivatePortfolio(ctx context.Context, id string) error       { return nil }
 
 var _ domainportfolio.Service = (*mockPortfolioService)(nil)
 
@@ -167,6 +168,7 @@ func (m *mockPatentRepoConstellation) FindByIDs(ctx context.Context, ids []strin
 func (m *mockPatentRepoConstellation) Save(ctx context.Context, p domainpatent.Patent) error   { return nil }
 func (m *mockPatentRepoConstellation) GetByID(ctx context.Context, id string) (domainpatent.Patent, error) { return nil, nil }
 func (m *mockPatentRepoConstellation) Delete(ctx context.Context, id string) error              { return nil }
+func (m *mockPatentRepoConstellation) AssociateMolecule(ctx context.Context, patentID, moleculeID string) error { return nil }
 
 var _ domainpatent.Repository = (*mockPatentRepoConstellation)(nil)
 
@@ -226,6 +228,7 @@ func (m *mockMoleculeRepo) FindByIDs(ctx context.Context, ids []string) ([]domai
 func (m *mockMoleculeRepo) Save(ctx context.Context, mol domainmol.Molecule) error { return nil }
 func (m *mockMoleculeRepo) GetByID(ctx context.Context, id string) (domainmol.Molecule, error) { return nil, nil }
 func (m *mockMoleculeRepo) Delete(ctx context.Context, id string) error             { return nil }
+func (m *mockMoleculeRepo) BatchSave(ctx context.Context, molecules []domainmol.Molecule) error { return nil }
 
 var _ domainmol.Repository = (*mockMoleculeRepo)(nil)
 
@@ -251,6 +254,7 @@ type mockMoleculeService struct{}
 
 func (m *mockMoleculeService) GetByID(ctx context.Context, id string) (domainmol.Molecule, error) { return nil, nil }
 func (m *mockMoleculeService) Create(ctx context.Context, mol domainmol.Molecule) error           { return nil }
+func (m *mockMoleculeService) CreateFromSMILES(ctx context.Context, smiles string) (domainmol.Molecule, error) { return nil, nil }
 
 var _ domainmol.Service = (*mockMoleculeService)(nil)
 
@@ -259,43 +263,38 @@ var _ domainmol.Service = (*mockMoleculeService)(nil)
 // -----------------------------------------------------------------------
 
 type mockGNNInference struct {
-	embeddingVec []float64
-	embedErr     error
-	reducedVecs  [][]float64
-	reduceErr    error
+	embedding []float32
+	embedErr  error
 }
 
-func (m *mockGNNInference) GenerateEmbedding(ctx context.Context, req *molpatent_gnn.EmbeddingRequest) (*molpatent_gnn.EmbeddingResponse, error) {
+func (m *mockGNNInference) Embed(ctx context.Context, req *molpatent_gnn.EmbedRequest) (*molpatent_gnn.EmbedResponse, error) {
 	if m.embedErr != nil {
 		return nil, m.embedErr
 	}
-	vec := m.embeddingVec
+	vec := m.embedding
 	if vec == nil {
-		vec = []float64{0.1, 0.2, 0.3, 0.4}
+		vec = []float32{0.1, 0.2, 0.3, 0.4}
 	}
-	return &molpatent_gnn.EmbeddingResponse{Vector: vec}, nil
+	return &molpatent_gnn.EmbedResponse{
+		Embedding:    vec,
+		SMILES:       req.SMILES,
+		Confidence:   0.95,
+		InferenceMs:  10,
+		ModelVersion: "test-v1",
+	}, nil
 }
 
-func (m *mockGNNInference) ReduceDimensions(ctx context.Context, req *molpatent_gnn.ReductionRequest) (*molpatent_gnn.ReductionResponse, error) {
-	if m.reduceErr != nil {
-		return nil, m.reduceErr
-	}
-	if m.reducedVecs != nil {
-		return &molpatent_gnn.ReductionResponse{Reduced: m.reducedVecs}, nil
-	}
-	// Generate synthetic 2D coordinates for each input vector.
-	reduced := make([][]float64, len(req.Vectors))
-	for i := range req.Vectors {
-		reduced[i] = []float64{float64(i) * 1.5, float64(i) * 0.8}
-	}
-	return &molpatent_gnn.ReductionResponse{Reduced: reduced}, nil
+func (m *mockGNNInference) BatchEmbed(ctx context.Context, req *molpatent_gnn.BatchEmbedRequest) (*molpatent_gnn.BatchEmbedResponse, error) {
+	return &molpatent_gnn.BatchEmbedResponse{Results: nil}, nil
 }
 
-func (m *mockGNNInference) Predict(ctx context.Context, req *molpatent_gnn.PredictionRequest) (*molpatent_gnn.PredictionResponse, error) {
-	return nil, nil
+func (m *mockGNNInference) ComputeSimilarity(ctx context.Context, req *molpatent_gnn.SimilarityRequest) (*molpatent_gnn.SimilarityResponse, error) {
+	return &molpatent_gnn.SimilarityResponse{Score: 0.85}, nil
 }
 
-var _ molpatent_gnn.InferenceEngine = (*mockGNNInference)(nil)
+func (m *mockGNNInference) SearchSimilar(ctx context.Context, req *molpatent_gnn.SimilarSearchRequest) (*molpatent_gnn.SimilarSearchResponse, error) {
+	return &molpatent_gnn.SimilarSearchResponse{Results: nil}, nil
+}
 
 // -----------------------------------------------------------------------
 // Test Helpers
