@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
-	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 )
 
 // -----------------------------------------------------------------------

@@ -201,7 +201,7 @@ func (s *gapAnalysisServiceImpl) AnalyzeGaps(ctx context.Context, req *GapAnalys
 		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "failed to load portfolio")
 	}
 	if portfolio == nil {
-		return nil, errors.NewNotFound("portfolio", req.PortfolioID)
+		return nil, errors.ErrNotFound("portfolio", req.PortfolioID)
 	}
 
 	// Load own patents.
@@ -329,7 +329,7 @@ func (s *gapAnalysisServiceImpl) GetExpirationRisks(ctx context.Context, portfol
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio")
 	}
 	if portfolio == nil {
-		return nil, errors.NewNotFound("portfolio", portfolioID)
+		return nil, errors.ErrNotFound("portfolio", portfolioID)
 	}
 
 	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
@@ -364,7 +364,7 @@ func (s *gapAnalysisServiceImpl) GetGeographicGaps(ctx context.Context, portfoli
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio")
 	}
 	if portfolio == nil {
-		return nil, errors.NewNotFound("portfolio", portfolioID)
+		return nil, errors.ErrNotFound("portfolio", portfolioID)
 	}
 
 	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)

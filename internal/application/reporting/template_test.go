@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ============================================================================
@@ -55,7 +54,7 @@ func (m *mockTemplateRepository) Get(ctx context.Context, id string) (*Template,
 	if t, ok := m.data[id]; ok {
 		return t, nil
 	}
-	return nil, errors.New(errors.ErrNotFound, "template not found")
+	return nil, errors.ErrNotFound("template", id)
 }
 
 func (m *mockTemplateRepository) List(ctx context.Context, opts *ListTemplateOptions) ([]TemplateMeta, int64, error) {
@@ -99,7 +98,7 @@ func (m *mockTemplateRepository) Update(ctx context.Context, tmpl *Template) err
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.data[tmpl.ID]; !ok {
-		return errors.New(errors.ErrNotFound, "not found")
+		return errors.ErrNotFound("template", tmpl.ID)
 	}
 	m.data[tmpl.ID] = tmpl
 	return nil
@@ -773,17 +772,17 @@ func TestListTemplates_FiltersAndPagination(t *testing.T) {
 
 	// No filters
 	res, _ := engine.ListTemplates(context.Background(), nil)
-	if res.TotalCount != 5 { t.Errorf("Expected 5 templates, got %d", res.TotalCount) }
+	if res.Pagination.Total != 5 { t.Errorf("Expected 5 templates, got %d", res.Pagination.Total) }
 
 	// Filter by Type
 	ftoType := string(FTOReport)
 	resFto, _ := engine.ListTemplates(context.Background(), &ListTemplateOptions{Type: &ftoType})
-	if resFto.TotalCount != 3 { t.Errorf("Expected 3 FTO templates, got %d", resFto.TotalCount) }
+	if resFto.Pagination.Total != 3 { t.Errorf("Expected 3 FTO templates, got %d", resFto.Pagination.Total) }
 
 	// Filter by Format
 	htmlFmt := HTMLTemplate
 	resHtml, _ := engine.ListTemplates(context.Background(), &ListTemplateOptions{Format: &htmlFmt})
-	if resHtml.TotalCount != 3 { t.Errorf("Expected 3 HTML templates, got %d", resHtml.TotalCount) }
+	if resHtml.Pagination.Total != 3 { t.Errorf("Expected 3 HTML templates, got %d", resHtml.Pagination.Total) }
 }
 
 func TestGetTemplate_Success_NotFound(t *testing.T) {
@@ -812,7 +811,7 @@ func TestRegisterTemplate_Success_Duplicate_Invalid(t *testing.T) {
 
 	// Duplicate
 	err = engine.RegisterTemplate(context.Background(), tmpl)
-	assertErrCodeTmpl(t, err, errors.ErrConflict)
+	assertErrCodeTmpl(t, err, errors.ErrCodeConflict)
 
 	// Invalid Syntax
 	tmplInvalid := &Template{ID: "new-2", Format: HTMLTemplate, Content: "<div>{{.Title"}
@@ -940,7 +939,7 @@ func TestSecurity_XSSPrevention(t *testing.T) {
 
 func TestSecurity_TemplateInjection(t *testing.T) {
 	t.Parallel()
-	engine, m := newTestTemplateEngine(t)
+	engine, _ := newTestTemplateEngine(t)
 
 	// If a user tries to register a template with malicious OS calls
 	tmpl := &Template{ID: "inj-1", Format: HTMLTemplate, Content: `{{exec "rm -rf /"}}`}

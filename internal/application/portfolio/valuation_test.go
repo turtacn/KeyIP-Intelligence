@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
-	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	pkgerrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
@@ -226,6 +225,101 @@ func (m *mockPortfolioRepo) FindByOwner(ctx context.Context, ownerID string) ([]
 	return nil, nil
 }
 
+// Additional methods to satisfy domainportfolio.PortfolioRepository interface
+func (m *mockPortfolioRepo) Create(ctx context.Context, p *domainportfolio.Portfolio) error {
+	return m.err
+}
+func (m *mockPortfolioRepo) GetByID(ctx context.Context, id uuid.UUID) (*domainportfolio.Portfolio, error) {
+	return m.FindByID(ctx, id.String())
+}
+func (m *mockPortfolioRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	return m.err
+}
+func (m *mockPortfolioRepo) List(ctx context.Context, ownerID uuid.UUID, status *domainportfolio.Status, limit, offset int) ([]*domainportfolio.Portfolio, int64, error) {
+	return nil, 0, m.err
+}
+func (m *mockPortfolioRepo) GetByOwner(ctx context.Context, ownerID uuid.UUID) ([]*domainportfolio.Portfolio, error) {
+	return m.FindByOwner(ctx, ownerID.String())
+}
+func (m *mockPortfolioRepo) AddPatent(ctx context.Context, portfolioID, patentID uuid.UUID, role string, addedBy uuid.UUID) error {
+	return m.err
+}
+func (m *mockPortfolioRepo) RemovePatent(ctx context.Context, portfolioID, patentID uuid.UUID) error {
+	return m.err
+}
+func (m *mockPortfolioRepo) GetPatents(ctx context.Context, portfolioID uuid.UUID, role *string, limit, offset int) ([]*patent.Patent, int64, error) {
+	return nil, 0, m.err
+}
+func (m *mockPortfolioRepo) IsPatentInPortfolio(ctx context.Context, portfolioID, patentID uuid.UUID) (bool, error) {
+	return false, m.err
+}
+func (m *mockPortfolioRepo) BatchAddPatents(ctx context.Context, portfolioID uuid.UUID, patentIDs []uuid.UUID, role string, addedBy uuid.UUID) error {
+	return m.err
+}
+func (m *mockPortfolioRepo) GetPortfoliosByPatent(ctx context.Context, patentID uuid.UUID) ([]*domainportfolio.Portfolio, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) CreateValuation(ctx context.Context, v *domainportfolio.Valuation) error {
+	return m.err
+}
+func (m *mockPortfolioRepo) GetLatestValuation(ctx context.Context, patentID uuid.UUID) (*domainportfolio.Valuation, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) GetValuationHistory(ctx context.Context, patentID uuid.UUID, limit int) ([]*domainportfolio.Valuation, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) BatchCreateValuations(ctx context.Context, valuations []*domainportfolio.Valuation) error {
+	return m.err
+}
+func (m *mockPortfolioRepo) GetValuationsByPortfolio(ctx context.Context, portfolioID uuid.UUID) ([]*domainportfolio.Valuation, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) GetValuationDistribution(ctx context.Context, portfolioID uuid.UUID) (map[domainportfolio.ValuationTier]int64, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) CreateHealthScore(ctx context.Context, score *domainportfolio.HealthScore) error {
+	return m.err
+}
+func (m *mockPortfolioRepo) GetLatestHealthScore(ctx context.Context, portfolioID uuid.UUID) (*domainportfolio.HealthScore, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) GetHealthScoreHistory(ctx context.Context, portfolioID uuid.UUID, limit int) ([]*domainportfolio.HealthScore, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) GetHealthScoreTrend(ctx context.Context, portfolioID uuid.UUID, startDate, endDate time.Time) ([]*domainportfolio.HealthScore, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) CreateSuggestion(ctx context.Context, s *domainportfolio.OptimizationSuggestion) error {
+	return m.err
+}
+func (m *mockPortfolioRepo) GetSuggestions(ctx context.Context, portfolioID uuid.UUID, status *string, limit, offset int) ([]*domainportfolio.OptimizationSuggestion, int64, error) {
+	return nil, 0, m.err
+}
+func (m *mockPortfolioRepo) UpdateSuggestionStatus(ctx context.Context, id uuid.UUID, status string, resolvedBy uuid.UUID) error {
+	return m.err
+}
+func (m *mockPortfolioRepo) GetPendingSuggestionCount(ctx context.Context, portfolioID uuid.UUID) (int64, error) {
+	return 0, m.err
+}
+func (m *mockPortfolioRepo) GetPortfolioSummary(ctx context.Context, portfolioID uuid.UUID) (*domainportfolio.Summary, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) GetJurisdictionCoverage(ctx context.Context, portfolioID uuid.UUID) (map[string]int64, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) GetTechDomainCoverage(ctx context.Context, portfolioID uuid.UUID) (map[string]int64, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) ComparePortfolios(ctx context.Context, portfolioIDs []uuid.UUID) ([]*domainportfolio.ComparisonResult, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) GetExpiryTimeline(ctx context.Context, portfolioID uuid.UUID) ([]*domainportfolio.ExpiryTimelineEntry, error) {
+	return nil, m.err
+}
+func (m *mockPortfolioRepo) WithTx(ctx context.Context, fn func(domainportfolio.PortfolioRepository) error) error {
+	return fn(m)
+}
+
 // ---------------------------------------------------------------------------
 // Mock: AssessmentRepository
 // ---------------------------------------------------------------------------
@@ -424,17 +518,39 @@ func (mockLogger) Sync() error { return nil }
 
 type mockPortfolioDomainSvc struct{}
 
-func (mockPortfolioDomainSvc) CreatePortfolio(ctx context.Context, name, ownerID string) (*domainportfolio.Portfolio, error) {
+func (mockPortfolioDomainSvc) CreatePortfolio(ctx context.Context, name, ownerID string, techDomains []string) (*domainportfolio.Portfolio, error) {
 	return nil, nil
 }
-func (mockPortfolioDomainSvc) AddPatent(ctx context.Context, portfolioID, patentID string) error {
+func (mockPortfolioDomainSvc) AddPatentsToPortfolio(ctx context.Context, portfolioID string, patentIDs []string) error {
 	return nil
 }
-func (mockPortfolioDomainSvc) RemovePatent(ctx context.Context, portfolioID, patentID string) error {
+func (mockPortfolioDomainSvc) RemovePatentsFromPortfolio(ctx context.Context, portfolioID string, patentIDs []string) error {
 	return nil
+}
+func (mockPortfolioDomainSvc) ActivatePortfolio(ctx context.Context, portfolioID string) error {
+	return nil
+}
+func (mockPortfolioDomainSvc) ArchivePortfolio(ctx context.Context, portfolioID string) error {
+	return nil
+}
+func (mockPortfolioDomainSvc) CalculateHealthScore(ctx context.Context, portfolioID string) (*domainportfolio.HealthScore, error) {
+	return nil, nil
+}
+func (mockPortfolioDomainSvc) ComparePortfolios(ctx context.Context, portfolioIDs []string) ([]*domainportfolio.PortfolioComparison, error) {
+	return nil, nil
+}
+func (mockPortfolioDomainSvc) IdentifyGaps(ctx context.Context, portfolioID string, targetDomains []string) ([]*domainportfolio.GapInfo, error) {
+	return nil, nil
+}
+func (mockPortfolioDomainSvc) GetOverlapAnalysis(ctx context.Context, portfolioID1, portfolioID2 string) (*domainportfolio.OverlapResult, error) {
+	return nil, nil
 }
 
 type mockValuationDomainSvc struct{}
+
+func (mockValuationDomainSvc) CalculateHealthScore(ctx context.Context, portfolioID string) (*domainportfolio.HealthScore, error) {
+	return nil, nil
+}
 
 // ---------------------------------------------------------------------------
 // Test Fixtures
@@ -1177,9 +1293,13 @@ func TestAssessPortfolio_FromPortfolioID(t *testing.T) {
 	patentRepo.patents["P10"] = makeTestPatent("P10", "Portfolio Patent", "granted", 12, 3, 2)
 
 	portfolioRepo := newMockPortfolioRepo()
+	portfolioID, _ := uuid.Parse("00000000-0000-0000-0000-000000000100")
 	portfolioRepo.portfolios["PF100"] = &domainportfolio.Portfolio{
-		ID:        "PF100",
-		PatentIDs: []string{"P10"},
+		ID:          portfolioID,
+		Name:        "Test Portfolio",
+		PatentCount: 1,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	cache := newMockCache()
@@ -1214,9 +1334,13 @@ func TestAssessPortfolio_PortfolioNotFound(t *testing.T) {
 
 func TestAssessPortfolio_EmptyPatentList(t *testing.T) {
 	portfolioRepo := newMockPortfolioRepo()
+	emptyPortfolioID, _ := uuid.Parse("00000000-0000-0000-0000-000000000000")
 	portfolioRepo.portfolios["PF_EMPTY"] = &domainportfolio.Portfolio{
-		ID:        "PF_EMPTY",
-		PatentIDs: []string{},
+		ID:          emptyPortfolioID,
+		Name:        "Empty Portfolio",
+		PatentCount: 0,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	cache := newMockCache()
@@ -1333,9 +1457,7 @@ func TestCostOptimization_TierBasedActions(t *testing.T) {
 	patentRepo.patents["PS"] = makeTestPatent("PS", "S-Tier Patent", "granted", 25, 6, 0.5)
 	// Low-value: few claims, few IPCs, pending, old, small family
 	lowPat := makeTestPatent("PD", "D-Tier Patent", "pending", 2, 1, 18)
-	lowPat.FamilyMembers = nil
 	lowPat.Abstract = "simple method"
-	lowPat.Description = "short"
 	patentRepo.patents["PD"] = lowPat
 
 	cache := newMockCache()
@@ -2149,7 +2271,6 @@ func TestRuleTechnicalFactor_InventiveStep(t *testing.T) {
 
 	// Short description
 	patShort := makeTestPatent("PT4", "Short", "granted", 10, 3, 2)
-	patShort.Description = "brief"
 	scoreShort := svc.ruleBasedFactorScore(ctx, patShort, DimensionTechnicalValue, "inventive_step", assessCtx)
 	if scoreShort != 35 {
 		t.Errorf("inventive_step for short desc = %.2f, want 35", scoreShort)
@@ -2277,7 +2398,6 @@ func TestRuleLegalFactor_FamilyCoverage(t *testing.T) {
 
 	// No family
 	patNoFam := makeTestPatent("PFC2", "No Family", "granted", 10, 3, 2)
-	patNoFam.FamilyMembers = nil
 	scoreNoFam := svc.ruleBasedFactorScore(ctx, patNoFam, DimensionLegalValue, "family_coverage", assessCtx)
 	if scoreNoFam != 20 {
 		t.Errorf("family_coverage(0 members) = %.2f, want 20", scoreNoFam)
@@ -2375,7 +2495,6 @@ func TestRuleStrategicFactor_NegotiationLeverage(t *testing.T) {
 
 	// Pending + no family + few claims → low leverage
 	patWeak := makeTestPatent("PNL2", "Weak Leverage", "pending", 3, 1, 2)
-	patWeak.FamilyMembers = nil
 	scoreWeak := svc.ruleBasedFactorScore(ctx, patWeak, DimensionStrategicValue, "negotiation_leverage", assessCtx)
 	if scoreWeak > 40 {
 		t.Errorf("negotiation_leverage(pending, 0 fam, 3 claims) = %.2f, expected <= 40", scoreWeak)
@@ -2446,7 +2565,6 @@ func TestRuleCommercialFactor_LicensingPotential(t *testing.T) {
 
 	// Pending + few claims + no family → low
 	patLow := makeTestPatent("PLP2", "Low License", "pending", 3, 1, 2)
-	patLow.FamilyMembers = nil
 	scoreLow := svc.ruleBasedFactorScore(ctx, patLow, DimensionCommercialValue, "licensing_potential", assessCtx)
 	if scoreLow > 55 {
 		t.Errorf("licensing_potential(pending, 3 claims, 0 fam) = %.2f, expected <= 55", scoreLow)
@@ -3357,10 +3475,8 @@ func TestAssessPatent_ZeroClaims(t *testing.T) {
 	patentRepo := newMockPatentRepo()
 	pat := makeTestPatent("P_ZERO", "Zero Claims", "granted", 0, 0, 5)
 	pat.Claims = nil
-	pat.IPCClassifications = nil
-	pat.FamilyMembers = nil
+	pat.IPCCodes = nil
 	pat.Abstract = ""
-	pat.Description = ""
 	patentRepo.patents["P_ZERO"] = pat
 
 	cache := newMockCache()
@@ -3385,7 +3501,7 @@ func TestAssessPatent_ZeroClaims(t *testing.T) {
 func TestAssessPatent_ZeroFilingDate(t *testing.T) {
 	patentRepo := newMockPatentRepo()
 	pat := makeTestPatent("P_NODATE", "No Date", "granted", 10, 3, 0)
-	pat.FilingDate = time.Time{} // zero value
+	pat.FilingDate = nil // zero value
 	patentRepo.patents["P_NODATE"] = pat
 
 	cache := newMockCache()

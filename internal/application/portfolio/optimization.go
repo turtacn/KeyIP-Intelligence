@@ -199,7 +199,7 @@ func (s *optimizationServiceImpl) Optimize(ctx context.Context, req *Optimizatio
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio")
 	}
 	if portfolio == nil {
-		return nil, errors.NewNotFound("portfolio", req.PortfolioID)
+		return nil, errors.ErrNotFound("portfolio", req.PortfolioID)
 	}
 
 	patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
@@ -349,7 +349,7 @@ func (s *optimizationServiceImpl) EstimateCost(ctx context.Context, portfolioID 
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio")
 	}
 	if portfolio == nil {
-		return nil, errors.NewNotFound("portfolio", portfolioID)
+		return nil, errors.ErrNotFound("portfolio", portfolioID)
 	}
 
 	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)

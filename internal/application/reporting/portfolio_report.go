@@ -70,6 +70,9 @@ const (
 	TypeSummaryReport     ReportType = "Summary"
 	TypeGapReport         ReportType = "Gap"
 	TypeCompetitiveReport ReportType = "Competitive"
+	FTOReport             ReportType = "FTO"
+	InfringementReport    ReportType = "Infringement"
+	PortfolioReport       ReportType = "Portfolio"
 )
 
 // ============================================================================

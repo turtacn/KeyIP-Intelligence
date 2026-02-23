@@ -14,7 +14,6 @@ package reporting
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"strings"
 	"sync"
