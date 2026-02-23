@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
@@ -31,7 +32,11 @@ type mockPatentRepo struct {
 }
 
 func newMockPatentRepo() *mockPatentRepo {
-	return &mockPatentRepo{patents: make(map[string]*patent.Patent)}
+	return &mockPatentRepo{
+		patents:     make(map[string]*patent.Patent),
+		byPortfolio: make(map[string][]*patent.Patent),
+		byAssignee:  make(map[string][]*patent.Patent),
+	}
 }
 
 func (m *mockPatentRepo) FindByID(ctx context.Context, id string) (*patent.Patent, error) {
@@ -60,9 +65,6 @@ func (m *mockPatentRepo) FindByIDs(ctx context.Context, ids []string) ([]*patent
 	}
 	return result, nil
 }
-func (m *mockPatentRepo) Search(ctx context.Context, query string, limit, offset int) ([]*patent.Patent, int, error) {
-	return nil, 0, nil
-}
 func (m *mockPatentRepo) AssociateMolecule(ctx context.Context, patentID, moleculeID string) error {
 	return m.err
 }
@@ -84,8 +86,109 @@ func (m *mockPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Pate
 func (m *mockPatentRepo) BatchCreateClaims(ctx context.Context, claims []*patent.Claim) error {
 	return m.err
 }
-func (m *mockPatentRepo) BatchUpdateStatus(ctx context.Context, updates []patent.StatusUpdate) error {
+func (m *mockPatentRepo) BatchUpdateStatus(ctx context.Context, ids []uuid.UUID, status patent.PatentStatus) (int64, error) {
+	if m.err != nil {
+		return 0, m.err
+	}
+	return int64(len(ids)), nil
+}
+
+// Additional methods to satisfy patent.PatentRepository interface
+func (m *mockPatentRepo) Create(ctx context.Context, p *patent.Patent) error { return m.err }
+func (m *mockPatentRepo) GetByID(ctx context.Context, id uuid.UUID) (*patent.Patent, error) {
+	return m.FindByID(ctx, id.String())
+}
+func (m *mockPatentRepo) GetByPatentNumber(ctx context.Context, number string) (*patent.Patent, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	for _, p := range m.patents {
+		if p.PatentNumber == number {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("patent not found")
+}
+func (m *mockPatentRepo) SoftDelete(ctx context.Context, id uuid.UUID) error  { return m.err }
+func (m *mockPatentRepo) Restore(ctx context.Context, id uuid.UUID) error     { return m.err }
+func (m *mockPatentRepo) HardDelete(ctx context.Context, id uuid.UUID) error  { return m.err }
+func (m *mockPatentRepo) Search(ctx context.Context, query patent.SearchQuery) (*patent.SearchResult, error) {
+	return &patent.SearchResult{}, m.err
+}
+func (m *mockPatentRepo) GetByFamilyID(ctx context.Context, familyID string) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) GetByAssignee(ctx context.Context, assigneeID uuid.UUID, limit, offset int) ([]*patent.Patent, int64, error) {
+	if m.err != nil {
+		return nil, 0, m.err
+	}
+	if patents, ok := m.byAssignee[assigneeID.String()]; ok {
+		return patents, int64(len(patents)), nil
+	}
+	return nil, 0, nil
+}
+func (m *mockPatentRepo) GetByJurisdiction(ctx context.Context, jurisdiction string, limit, offset int) ([]*patent.Patent, int64, error) {
+	return nil, 0, m.err
+}
+func (m *mockPatentRepo) GetExpiringPatents(ctx context.Context, daysAhead int, limit, offset int) ([]*patent.Patent, int64, error) {
+	return nil, 0, m.err
+}
+func (m *mockPatentRepo) FindDuplicates(ctx context.Context, fullTextHash string) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+
+// Claims
+func (m *mockPatentRepo) CreateClaim(ctx context.Context, claim *patent.Claim) error { return m.err }
+func (m *mockPatentRepo) GetClaimsByPatent(ctx context.Context, patentID uuid.UUID) ([]*patent.Claim, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) UpdateClaim(ctx context.Context, claim *patent.Claim) error { return m.err }
+func (m *mockPatentRepo) DeleteClaimsByPatent(ctx context.Context, patentID uuid.UUID) error {
 	return m.err
+}
+func (m *mockPatentRepo) GetIndependentClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.Claim, error) {
+	return nil, m.err
+}
+
+// Inventors
+func (m *mockPatentRepo) SetInventors(ctx context.Context, patentID uuid.UUID, inventors []*patent.Inventor) error {
+	return m.err
+}
+func (m *mockPatentRepo) GetInventors(ctx context.Context, patentID uuid.UUID) ([]*patent.Inventor, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) SearchByInventor(ctx context.Context, inventorName string, limit, offset int) ([]*patent.Patent, int64, error) {
+	return nil, 0, m.err
+}
+
+// Priority
+func (m *mockPatentRepo) SetPriorityClaims(ctx context.Context, patentID uuid.UUID, claims []*patent.PriorityClaim) error {
+	return m.err
+}
+func (m *mockPatentRepo) GetPriorityClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.PriorityClaim, error) {
+	return nil, m.err
+}
+
+// Stats
+func (m *mockPatentRepo) CountByStatus(ctx context.Context) (map[patent.PatentStatus]int64, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) CountByJurisdiction(ctx context.Context) (map[string]int64, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) CountByYear(ctx context.Context, field string) (map[int]int64, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) GetIPCDistribution(ctx context.Context, level int) (map[string]int64, error) {
+	return nil, m.err
+}
+
+// Transaction
+func (m *mockPatentRepo) WithTx(ctx context.Context, fn func(patent.PatentRepository) error) error {
+	return fn(m)
 }
 
 // ---------------------------------------------------------------------------
@@ -340,10 +443,16 @@ type mockValuationDomainSvc struct{}
 func makeTestPatent(id, title, status string, claimCount int, ipcCount int, filingYearsAgo float64) *patent.Patent {
 	claims := make([]patent.Claim, claimCount)
 	for i := 0; i < claimCount; i++ {
+		claimType := patent.ClaimTypeDependent
+		if i < 3 { // first 3 are independent
+			claimType = patent.ClaimTypeIndependent
+		}
 		claims[i] = patent.Claim{
-			Number:        i + 1,
-			Text:          fmt.Sprintf("A method comprising step %d of performing an operation on a device", i+1),
-			IsIndependent: i < 3, // first 3 are independent
+			Number:   i + 1,
+			Text:     fmt.Sprintf("A method comprising step %d of performing an operation on a device", i+1),
+			Type:     claimType,
+			Category: patent.ClaimCategoryMethod,
+			Language: "en",
 		}
 	}
 
@@ -353,17 +462,45 @@ func makeTestPatent(id, title, status string, claimCount int, ipcCount int, fili
 	}
 
 	filingDate := time.Now().AddDate(0, 0, -int(filingYearsAgo*365.25))
+	
+	// Convert ID string to UUID
+	var patentID uuid.UUID
+	if parsedID, err := uuid.Parse(id); err == nil {
+		patentID = parsedID
+	} else {
+		patentID = uuid.New()
+	}
+	
+	// Convert status string to PatentStatus
+	patentStatus := patent.PatentStatusGranted
+	switch status {
+	case "filed":
+		patentStatus = patent.PatentStatusFiled
+	case "published":
+		patentStatus = patent.PatentStatusPublished
+	case "granted":
+		patentStatus = patent.PatentStatusGranted
+	}
+	
+	// Convert claims to pointers
+	claimPtrs := make([]*patent.Claim, len(claims))
+	for i := range claims {
+		claimPtrs[i] = &claims[i]
+	}
 
 	return &patent.Patent{
-		ID:                 id,
-		Title:              title,
-		Abstract:           "An improved method to enhance performance and reduce latency in distributed systems 提高效率 优化性能",
-		Description:        "This invention relates to a novel approach for distributed computing that significantly improves throughput. " + string(make([]byte, 6000)),
-		Status:             status,
-		Claims:             claims,
-		IPCClassifications: ipcs,
-		FilingDate:         filingDate,
-		FamilyMembers:      []string{"US123", "EP456", "JP789", "CN101", "KR202"},
+		ID:           patentID,
+		PatentNumber: id, // Use id as patent number
+		Title:        title,
+		Abstract:     "An improved method to enhance performance and reduce latency in distributed systems",
+		Status:       patentStatus,
+		Claims:       claimPtrs,
+		IPCCodes:     ipcs,
+		FilingDate:   &filingDate,
+		FamilyID:     "family-" + id,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+		Version:      1,
 	}
 }
 

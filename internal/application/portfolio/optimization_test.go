@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 )
 
 // -----------------------------------------------------------------------
@@ -15,7 +17,7 @@ import (
 
 func TestNewOptimizationService_Success(t *testing.T) {
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -40,7 +42,7 @@ func TestNewOptimizationService_MissingDeps(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := OptimizationServiceConfig{
-				PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+				PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
 				PatentRepository: newMockPatentRepo(),
 				Logger:           &mockLogger{},
 			}
@@ -60,26 +62,21 @@ func TestNewOptimizationService_MissingDeps(t *testing.T) {
 func buildOptTestRepo() *mockPatentRepo {
 	repo := newMockPatentRepo()
 	now := time.Now()
-	patents := []domainpatent.Patent{
-		&mockPatent{id: "o1", number: "US001", techDomain: "A61K", assignee: "Own",
-			filingDate: now.AddDate(-2, 0, 0), valueScore: 9.0, moleculeIDs: []string{"m1"}},
-		&mockPatent{id: "o2", number: "US002", techDomain: "A61K", assignee: "Own",
-			filingDate: now.AddDate(-15, 0, 0), valueScore: 2.0, moleculeIDs: []string{"m2"}},
-		&mockPatent{id: "o3", number: "EP003", techDomain: "A61K", assignee: "Own",
-			filingDate: now.AddDate(-10, 0, 0), valueScore: 3.0, moleculeIDs: []string{"m3"}},
-		&mockPatent{id: "o4", number: "US004", techDomain: "C07D", assignee: "Own",
-			filingDate: now.AddDate(-1, 0, 0), valueScore: 8.5, moleculeIDs: []string{"m4"}},
-		&mockPatent{id: "o5", number: "CN005", techDomain: "G16B", assignee: "Own",
-			filingDate: now.AddDate(-3, 0, 0), valueScore: 7.0, moleculeIDs: []string{"m5"}},
+	patentPtrs := []*domainpatent.Patent{
+		createTestPatentWithMolecules("o1", "US001", "A61K", "Own", now.AddDate(-2, 0, 0), 9.0, []string{"m1"}),
+		createTestPatentWithMolecules("o2", "US002", "A61K", "Own", now.AddDate(-15, 0, 0), 2.0, []string{"m2"}),
+		createTestPatentWithMolecules("o3", "EP003", "A61K", "Own", now.AddDate(-10, 0, 0), 3.0, []string{"m3"}),
+		createTestPatentWithMolecules("o4", "US004", "C07D", "Own", now.AddDate(-1, 0, 0), 8.5, []string{"m4"}),
+		createTestPatentWithMolecules("o5", "CN005", "G16B", "Own", now.AddDate(-3, 0, 0), 7.0, []string{"m5"}),
 	}
-	repo.byPortfolio["opt-port"] = patents
+	repo.byPortfolio["opt-port"] = patentPtrs
 	return repo
 }
 
 func TestOptimize_Success(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "opt-port"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -111,7 +108,7 @@ func TestOptimize_Success(t *testing.T) {
 
 func TestOptimize_NilRequest(t *testing.T) {
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -124,7 +121,7 @@ func TestOptimize_NilRequest(t *testing.T) {
 
 func TestOptimize_EmptyPortfolioID(t *testing.T) {
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -138,7 +135,7 @@ func TestOptimize_EmptyPortfolioID(t *testing.T) {
 func TestOptimize_DefaultObjective(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "opt-port"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -158,7 +155,7 @@ func TestOptimize_DefaultObjective(t *testing.T) {
 func TestOptimize_MinCostObjective(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "opt-port"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -197,7 +194,7 @@ func TestOptimize_MinCostObjective(t *testing.T) {
 func TestOptimize_MaxROIObjective(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "opt-port"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -218,7 +215,7 @@ func TestOptimize_MaxROIObjective(t *testing.T) {
 func TestOptimize_WithPreferences(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "opt-port"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -261,9 +258,9 @@ func TestOptimize_PortfolioNotFound(t *testing.T) {
 
 func TestOptimize_EmptyPortfolio(t *testing.T) {
 	repo := newMockPatentRepo()
-	repo.byPortfolio["empty-port"] = []domainpatent.Patent{}
+	repo.byPortfolio["empty-port"] = []*domainpatent.Patent{}
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "empty-port"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("empty-port")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -290,7 +287,7 @@ func TestOptimize_EmptyPortfolio(t *testing.T) {
 func TestGetPruneCandidates_Success(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "opt-port"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -307,7 +304,7 @@ func TestGetPruneCandidates_Success(t *testing.T) {
 
 func TestGetPruneCandidates_EmptyPortfolioID(t *testing.T) {
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -322,7 +319,7 @@ func TestGetPruneCandidates_EmptyPortfolioID(t *testing.T) {
 func TestGetPruneCandidates_DefaultLimit(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "opt-port"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -344,7 +341,7 @@ func TestGetPruneCandidates_DefaultLimit(t *testing.T) {
 func TestEstimateCost_Success(t *testing.T) {
 	repo := buildOptTestRepo()
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "opt-port"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("opt-port")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -387,7 +384,7 @@ func TestEstimateCost_Success(t *testing.T) {
 
 func TestEstimateCost_EmptyPortfolioID(t *testing.T) {
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "p1"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -415,9 +412,9 @@ func TestEstimateCost_PortfolioNotFound(t *testing.T) {
 
 func TestEstimateCost_EmptyPortfolio(t *testing.T) {
 	repo := newMockPatentRepo()
-	repo.byPortfolio["empty"] = []domainpatent.Patent{}
+	repo.byPortfolio["empty"] = []*domainpatent.Patent{}
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: &mockPortfolio{id: "empty"}},
+		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("empty")},
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
@@ -437,8 +434,8 @@ func TestEstimateCost_EmptyPortfolio(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestEstimatePatentAnnualCost_USPatent(t *testing.T) {
-	p := &mockPatent{number: "US1234", filingDate: time.Now().AddDate(-2, 0, 0)}
-	cost := estimatePatentAnnualCost(p)
+	p := createTestPatentSimple("US1234", time.Now().AddDate(-2, 0, 0))
+	cost := estimatePatentAnnualCost(*p) // Dereference pointer to value
 	if cost <= 0 {
 		t.Error("expected positive cost")
 	}
@@ -449,8 +446,8 @@ func TestEstimatePatentAnnualCost_USPatent(t *testing.T) {
 }
 
 func TestEstimatePatentAnnualCost_EPPatent(t *testing.T) {
-	p := &mockPatent{number: "EP5678", filingDate: time.Now().AddDate(-2, 0, 0)}
-	cost := estimatePatentAnnualCost(p)
+	p := createTestPatentSimple("EP5678", time.Now().AddDate(-2, 0, 0))
+	cost := estimatePatentAnnualCost(*p) // Dereference pointer to value
 	expected := 2000.0 * 1.8
 	if cost != expected {
 		t.Errorf("expected %f for young EP patent, got %f", expected, cost)
@@ -458,8 +455,8 @@ func TestEstimatePatentAnnualCost_EPPatent(t *testing.T) {
 }
 
 func TestEstimatePatentAnnualCost_OldPatent(t *testing.T) {
-	p := &mockPatent{number: "US9999", filingDate: time.Now().AddDate(-14, 0, 0)}
-	cost := estimatePatentAnnualCost(p)
+	p := createTestPatentSimple("US9999", time.Now().AddDate(-14, 0, 0))
+	cost := estimatePatentAnnualCost(*p) // Dereference pointer to value
 	// Age ~14 years, ageFactor = 1.0 + (14-4)*0.05 = 1.5
 	expected := 2000.0 * 1.0 * 1.5
 	tolerance := 100.0
@@ -469,8 +466,8 @@ func TestEstimatePatentAnnualCost_OldPatent(t *testing.T) {
 }
 
 func TestEstimatePatentAnnualCost_MaxAgeFactor(t *testing.T) {
-	p := &mockPatent{number: "US0001", filingDate: time.Now().AddDate(-50, 0, 0)}
-	cost := estimatePatentAnnualCost(p)
+	p := createTestPatentSimple("US0001", time.Now().AddDate(-50, 0, 0))
+	cost := estimatePatentAnnualCost(*p) // Dereference pointer to value
 	// ageFactor capped at 3.0.
 	expected := 2000.0 * 1.0 * 3.0
 	if cost != expected {
@@ -479,11 +476,35 @@ func TestEstimatePatentAnnualCost_MaxAgeFactor(t *testing.T) {
 }
 
 func TestEstimatePatentAnnualCost_UnknownJurisdiction(t *testing.T) {
-	p := &mockPatent{number: "ZZ1234", filingDate: time.Now().AddDate(-1, 0, 0)}
-	cost := estimatePatentAnnualCost(p)
+	p := createTestPatentSimple("ZZ1234", time.Now().AddDate(-1, 0, 0))
+	cost := estimatePatentAnnualCost(*p) // Dereference pointer to value
 	// Unknown jurisdiction uses multiplier 1.0, age < 4 so ageFactor = 1.0.
 	if cost != 2000.0 {
 		t.Errorf("expected 2000 for unknown jurisdiction, got %f", cost)
+	}
+}
+
+// -----------------------------------------------------------------------
+// Test Helpers
+// -----------------------------------------------------------------------
+// Note: createTestPortfolio and createTestPatent are defined in gap_analysis_test.go
+
+// createTestPatentSimple creates a simple test patent with minimal fields
+func createTestPatentSimple(number string, filingDate time.Time) *domainpatent.Patent {
+	now := time.Now()
+	expiryDate := filingDate.AddDate(20, 0, 0)
+	return &domainpatent.Patent{
+		ID:              uuid.New(),
+		PatentNumber:    number,
+		Title:           "Test Patent",
+		FilingDate:      &filingDate,
+		GrantDate:       &now,
+		ExpiryDate:      &expiryDate,
+		Status:          domainpatent.PatentStatusGranted,
+		Office:          domainpatent.OfficeUSPTO,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		Version:         1,
 	}
 }
 

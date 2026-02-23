@@ -503,7 +503,7 @@ func TestExpirationRiskLevels(t *testing.T) {
 	svc := &gapAnalysisServiceImpl{logger: &mockLogger{}}
 
 	now := time.Now()
-	patents := []*domainpatent.Patent{
+	patentPtrs := []*domainpatent.Patent{
 		// Expires in ~6 months -> critical
 		createTestPatent("US-R1", "A61K", "OwnCorp", now.AddDate(-19, -6, 0), 5.0),
 		// Expires in ~1.5 years -> high
@@ -512,6 +512,12 @@ func TestExpirationRiskLevels(t *testing.T) {
 		createTestPatent("US-R3", "C07D", "OwnCorp", now.AddDate(-17, -6, 0), 5.0),
 		// Expires in ~4 years -> low
 		createTestPatent("US-R4", "C07D", "OwnCorp", now.AddDate(-16, 0, 0), 5.0),
+	}
+	
+	// Convert pointers to values as the function expects
+	patents := make([]domainpatent.Patent, len(patentPtrs))
+	for i, p := range patentPtrs {
+		patents[i] = *p
 	}
 
 	risks := svc.identifyExpirationRisks(patents, 5)
@@ -549,9 +555,14 @@ func TestComputeHealthScore_EmptyPortfolio(t *testing.T) {
 
 func TestComputeHealthScore_HealthyPortfolio(t *testing.T) {
 	svc := &gapAnalysisServiceImpl{logger: &mockLogger{}}
-	patents := make([]*domainpatent.Patent, 10)
-	for i := range patents {
-		patents[i] = createTestPatent(fmt.Sprintf("US-%d", i), "A61K", "OwnCorp", time.Now(), 5.0)
+	patentPtrs := make([]*domainpatent.Patent, 10)
+	for i := range patentPtrs {
+		patentPtrs[i] = createTestPatent(fmt.Sprintf("US-%d", i), "A61K", "OwnCorp", time.Now(), 5.0)
+	}
+	// Convert pointers to values
+	patents := make([]domainpatent.Patent, len(patentPtrs))
+	for i, p := range patentPtrs {
+		patents[i] = *p
 	}
 	score := svc.computeHealthScore(patents, nil, nil, nil)
 	if score <= 0 || score > 100 {
@@ -561,9 +572,14 @@ func TestComputeHealthScore_HealthyPortfolio(t *testing.T) {
 
 func TestComputeHealthScore_WithGaps(t *testing.T) {
 	svc := &gapAnalysisServiceImpl{logger: &mockLogger{}}
-	patents := make([]*domainpatent.Patent, 5)
-	for i := range patents {
-		patents[i] = createTestPatent(fmt.Sprintf("US-%d", i), "A61K", "OwnCorp", time.Now(), 5.0)
+	patentPtrs := make([]*domainpatent.Patent, 5)
+	for i := range patentPtrs {
+		patentPtrs[i] = createTestPatent(fmt.Sprintf("US-%d", i), "A61K", "OwnCorp", time.Now(), 5.0)
+	}
+	// Convert pointers to values
+	patents := make([]domainpatent.Patent, len(patentPtrs))
+	for i, p := range patentPtrs {
+		patents[i] = *p
 	}
 
 	gaps := []TechnologyGap{
@@ -598,21 +614,43 @@ func createTestPortfolio(name string) *domainportfolio.Portfolio {
 	return p
 }
 
-// Helper to create test patent from mock data
+// Helper to create test patent from mock data (simple version without ID and moleculeIDs)
 func createTestPatent(number, techDomain, assignee string, filingDate time.Time, valueScore float64) *domainpatent.Patent {
+	return createTestPatentWithMolecules("", number, techDomain, assignee, filingDate, valueScore, nil)
+}
+
+// Helper to create test patent with full fields including ID and moleculeIDs
+func createTestPatentWithMolecules(id, number, techDomain, assignee string, filingDate time.Time, valueScore float64, moleculeIDs []string) *domainpatent.Patent {
+	var patentID uuid.UUID
+	if id != "" {
+		if parsedID, err := uuid.Parse(id); err == nil {
+			patentID = parsedID
+		} else {
+			patentID = uuid.New()
+		}
+	} else {
+		patentID = uuid.New()
+	}
+	
 	now := time.Now()
+	expiryDate := filingDate.AddDate(20, 0, 0) // Standard 20-year term
 	return &domainpatent.Patent{
-		ID:              uuid.New(),
-		Number:          number,
+		ID:              patentID,
+		PatentNumber:    number,
 		Title:           "Test Patent",
 		Abstract:        "Test abstract",
-		Assignee:        assignee,
+		AssigneeName:    assignee,
 		FilingDate:      &filingDate,
 		GrantDate:       &now,
+		ExpiryDate:      &expiryDate,
 		Status:          domainpatent.PatentStatusGranted,
 		Office:          domainpatent.OfficeUSPTO,
 		IPCCodes:        []string{techDomain},
+		KeyIPTechCodes:  []string{techDomain},
+		MoleculeIDs:     moleculeIDs,
+		Metadata:        map[string]any{"value_score": valueScore},
 		CreatedAt:       now,
 		UpdatedAt:       now,
+		Version:         1,
 	}
 }
