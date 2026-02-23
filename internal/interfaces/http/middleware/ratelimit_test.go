@@ -4,18 +4,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 )
 
-func TestRateLimit(t *testing.T) {
-	handler := RateLimit(1, time.Minute)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+func TestRatelimit(t *testing.T) {
+	handler := Ratelimit(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
 	req := httptest.NewRequest("GET", "/", nil)
-	w1 := httptest.NewRecorder()
-	handler.ServeHTTP(w1, req)
-	if w1.Code != http.StatusOK {
-		t.Error("first request failed")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Errorf("expected 200, got %d", w.Code)
 	}
 }
 

@@ -2,53 +2,34 @@ package http
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 )
 
 type Server struct {
-	srv    *http.Server
-	router http.Handler
-	port   int
+	httpServer *http.Server
+	handler    http.Handler
 }
 
-func NewServer(port int) *Server {
-	router := NewRouter()
-
+func NewServer(addr string, handler http.Handler) *Server {
 	return &Server{
-		router: router,
-		port:   port,
-		srv: &http.Server{
-			Addr:         fmt.Sprintf(":%d", port),
-			Handler:      router,
+		httpServer: &http.Server{
+			Addr:         addr,
+			Handler:      handler,
 			ReadTimeout:  15 * time.Second,
 			WriteTimeout: 15 * time.Second,
 			IdleTimeout:  60 * time.Second,
 		},
+		handler: handler,
 	}
 }
 
 func (s *Server) Start() error {
-	fmt.Printf("HTTP server listening on :%d\n", s.port)
-	return s.srv.ListenAndServe()
+	return s.httpServer.ListenAndServe()
 }
 
-func (s *Server) Stop(ctx context.Context) error {
-	fmt.Println("Shutting down HTTP server...")
-	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	if err := s.srv.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("server shutdown failed: %w", err)
-	}
-
-	fmt.Println("HTTP server stopped")
-	return nil
-}
-
-func (s *Server) Handler() http.Handler {
-	return s.router
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.httpServer.Shutdown(ctx)
 }
 
 //Personal.AI order the ending

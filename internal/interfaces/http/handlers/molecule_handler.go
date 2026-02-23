@@ -11,9 +11,12 @@ func NewMoleculeHandler() *MoleculeHandler {
 	return &MoleculeHandler{}
 }
 
-func (h *MoleculeHandler) Handle(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok"})
+func (h *MoleculeHandler) GetMolecule(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(map[string]string{"id": "mol-123", "smiles": "C1=CC=CC=C1"})
+}
+
+func (h *MoleculeHandler) SearchMolecules(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(map[string]interface{}{"results": []map[string]string{{"id": "mol-001"}}})
 }
 
 //Personal.AI order the ending

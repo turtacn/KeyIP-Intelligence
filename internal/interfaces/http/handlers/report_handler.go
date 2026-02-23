@@ -11,9 +11,12 @@ func NewReportHandler() *ReportHandler {
 	return &ReportHandler{}
 }
 
-func (h *ReportHandler) Handle(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok"})
+func (h *ReportHandler) GenerateReport(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(map[string]string{"report_id": "rpt-123", "status": "generating"})
+}
+
+func (h *ReportHandler) GetReportStatus(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(map[string]string{"status": "completed", "url": "/reports/123.pdf"})
 }
 
 //Personal.AI order the ending
