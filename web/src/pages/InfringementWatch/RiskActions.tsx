@@ -36,7 +36,7 @@ const RiskActions: React.FC<RiskActionsProps> = ({ alert, onMarkReviewed }) => {
     setLoadingAction('assign');
     setTimeout(() => {
       setLoadingAction(null);
-      alert('Assigned to Legal Team successfully.');
+      window.alert('Assigned to Legal Team successfully.');
     }, 1500);
   };
 
