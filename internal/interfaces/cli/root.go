@@ -20,6 +20,11 @@ var RootCmd = &cobra.Command{
 	Version: "0.1.0",
 }
 
+// NewRootCommand creates the root command
+func NewRootCommand() *cobra.Command {
+	return RootCmd
+}
+
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
