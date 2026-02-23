@@ -465,8 +465,9 @@ func TestQuery_ConversationHistorySlidingWindow(t *testing.T) {
 
 	// Verify only last 10 (5 rounds) are kept. Q0 and Q1 should be dropped.
 	// We can verify this indirectly by checking the prompt
-	assertPromptNotContains(t, m.llm, "infer", 0, "Q0", "Q1")
-	assertPromptContains(t, m.llm, "infer", 0, "Q11", "Q-New")
+	// Use more specific patterns to avoid false positives (Q1 substring matches Q10, Q11)
+	assertPromptNotContains(t, m.llm, "infer", 0, "User: Q0\n", "User: Q1\n")
+	assertPromptContains(t, m.llm, "infer", 0, "User: Q2", "Q11", "Q-New")
 }
 
 // ============================================================================

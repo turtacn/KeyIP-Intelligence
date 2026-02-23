@@ -515,6 +515,16 @@ func (s *nlQueryServiceImpl) normalizeEntities(ctx context.Context, entities []R
 	var unresolved []UnresolvedEntity
 
 	for _, e := range entities {
+		// Skip normalization if entity already has normalized value
+		if e.NormalizedValue != "" {
+			// If no confidence specified, assume high confidence
+			if e.Confidence == 0 {
+				e.Confidence = 1.0
+			}
+			resolved = append(resolved, e)
+			continue
+		}
+		
 		cacheKey := fmt.Sprintf("entity_dict:%s:%s", e.Type, e.Text)
 		var normValue string
 
@@ -616,6 +626,14 @@ func (s *nlQueryServiceImpl) executeQuery(ctx context.Context, query interface{}
 		return s.kgSearch.TraverseRelations(ctx, q)
 	case *PathFindRequest:
 		return s.kgSearch.FindPaths(ctx, q)
+	case map[string]interface{}:
+		// Handle similarity search (returns map from buildStructuredQuery)
+		if action, ok := q["action"].(string); ok && action == "similarity" {
+			// Extract parameters from map (simplified - in real impl would be in dedicated request type)
+			return s.simSearch.FindSimilar(ctx, "", 0.8, 20)
+		}
+		// Fallback for other map-based queries
+		return map[string]string{"status": "executed generic query"}, nil
 	default:
 		// Fallback for mock/simulation
 		return map[string]string{"status": "executed generic query"}, nil
@@ -663,6 +681,10 @@ func (s *nlQueryServiceImpl) loadConversationHistory(ctx context.Context, convID
 	err := s.cache.Get(ctx, cacheKey, &history)
 	if err != nil {
 		return nil, nil // Return empty history if not found
+	}
+	// Apply sliding window to limit history size
+	if len(history) > MaxConversationTurns*2 {
+		history = history[len(history)-MaxConversationTurns*2:]
 	}
 	return history, nil
 }

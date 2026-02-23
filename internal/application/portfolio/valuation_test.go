@@ -641,10 +641,15 @@ func buildTestService(
 		cache = newMockCache()
 	}
 
-	// Cast citationRepo to interface type if nil to avoid typed-nil issue
+	// Cast to interface types if nil to avoid typed-nil issue
 	var citationRepoInterface CitationRepository
 	if citationRepo != nil {
 		citationRepoInterface = citationRepo
+	}
+	
+	var aiScorerInterface IntelligenceValueScorer
+	if aiScorer != nil {
+		aiScorerInterface = aiScorer
 	}
 
 	return NewValuationService(
@@ -653,7 +658,7 @@ func buildTestService(
 		patentRepo,
 		portfolioRepo,
 		assessmentRepo,
-		aiScorer,
+		aiScorerInterface,
 		citationRepoInterface,
 		mockLogger{},
 		cache,
@@ -779,7 +784,7 @@ func TestSinglePatentAssessmentRequest_Validate(t *testing.T) {
 
 	t.Run("unknown dimension", func(t *testing.T) {
 		req := &SinglePatentAssessmentRequest{
-			PatentID:   "P001",
+			PatentID:   "10000000-0000-0000-0000-000000000001",
 			Dimensions: []AssessmentDimension{"unknown_dim"},
 		}
 		err := req.Validate()
@@ -789,7 +794,7 @@ func TestSinglePatentAssessmentRequest_Validate(t *testing.T) {
 	})
 
 	t.Run("defaults applied", func(t *testing.T) {
-		req := &SinglePatentAssessmentRequest{PatentID: "P001"}
+		req := &SinglePatentAssessmentRequest{PatentID: "10000000-0000-0000-0000-000000000001"}
 		err := req.Validate()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -807,7 +812,7 @@ func TestSinglePatentAssessmentRequest_Validate(t *testing.T) {
 
 	t.Run("negative max life corrected", func(t *testing.T) {
 		req := &SinglePatentAssessmentRequest{
-			PatentID: "P001",
+			PatentID: "10000000-0000-0000-0000-000000000001",
 			Context:  &AssessmentContext{MaxPatentLifeYrs: -5},
 		}
 		err := req.Validate()
@@ -841,7 +846,7 @@ func TestPortfolioAssessmentRequest_Validate(t *testing.T) {
 	})
 
 	t.Run("patent_ids only", func(t *testing.T) {
-		req := &PortfolioAssessmentRequest{PatentIDs: []string{"P1", "P2"}}
+		req := &PortfolioAssessmentRequest{PatentIDs: []string{"30000000-0000-0000-0000-000000000002", "30000000-0000-0000-0000-000000000004"}}
 		err := req.Validate()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -873,11 +878,11 @@ func TestCompareAssessmentsRequest_Validate(t *testing.T) {
 
 func TestAssessPatent_Success(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P001", "Distributed Cache System", "granted", 15, 4, 3)
-	patentRepo.patents["P001"] = pat
+	pat := makeTestPatent("10000000-0000-0000-0000-000000000001", "Distributed Cache System", "granted", 15, 4, 3)
+	patentRepo.patents["10000000-0000-0000-0000-000000000001"] = pat
 
 	citationRepo := newMockCitationRepo()
-	citationRepo.forwardCounts["P001"] = 25
+	citationRepo.forwardCounts["10000000-0000-0000-0000-000000000001"] = 25
 	citationRepo.maxInDomain["G06F17/00"] = 100
 
 	assessmentRepo := newMockAssessmentRepo()
@@ -885,14 +890,14 @@ func TestAssessPatent_Success(t *testing.T) {
 
 	svc := buildTestService(patentRepo, nil, assessmentRepo, nil, citationRepo, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P001"}
+	req := &SinglePatentAssessmentRequest{PatentID: "10000000-0000-0000-0000-000000000001"}
 	resp, err := svc.AssessPatent(context.Background(), req)
 	if err != nil {
 		t.Fatalf("AssessPatent failed: %v", err)
 	}
 
 	// Verify response structure
-	if resp.PatentID != "P001" {
+	if resp.PatentID != "10000000-0000-0000-0000-000000000001" {
 		t.Errorf("PatentID = %s, want P001", resp.PatentID)
 	}
 	if resp.PatentTitle != pat.Title {
@@ -958,7 +963,7 @@ func TestAssessPatent_Success(t *testing.T) {
 	}
 
 	// Verify result was cached
-	cacheKey := cacheKeyPrefixAssess + "P001"
+	cacheKey := cacheKeyPrefixAssess + "10000000-0000-0000-0000-000000000001"
 	if _, exists := cache.store[cacheKey]; !exists {
 		t.Error("expected assessment result to be cached")
 	}
@@ -969,17 +974,17 @@ func TestAssessPatent_CacheHit(t *testing.T) {
 
 	// Pre-populate cache
 	cachedResp := &SinglePatentAssessmentResponse{
-		PatentID:     "P001",
+		PatentID:     "10000000-0000-0000-0000-000000000001",
 		PatentTitle:  "Cached Patent",
 		OverallScore: &OverallValuation{Score: 88, Tier: TierA, TierDescription: "cached"},
 		AssessedAt:   time.Now(),
 	}
 	data, _ := json.Marshal(cachedResp)
-	cache.store[cacheKeyPrefixAssess+"P001"] = data
+	cache.store[cacheKeyPrefixAssess+"10000000-0000-0000-0000-000000000001"] = data
 
 	svc := buildTestService(nil, nil, nil, nil, nil, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P001"}
+	req := &SinglePatentAssessmentRequest{PatentID: "10000000-0000-0000-0000-000000000001"}
 	resp, err := svc.AssessPatent(context.Background(), req)
 	if err != nil {
 		t.Fatalf("AssessPatent with cache hit failed: %v", err)
@@ -999,7 +1004,7 @@ func TestAssessPatent_PatentNotFound(t *testing.T) {
 
 	svc := buildTestService(patentRepo, nil, nil, nil, nil, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "NONEXISTENT"}
+	req := &SinglePatentAssessmentRequest{PatentID: "30000000-0000-0000-0000-000000000001"}
 	_, err := svc.AssessPatent(context.Background(), req)
 	if err == nil {
 		t.Fatal("expected error for non-existent patent")
@@ -1018,8 +1023,8 @@ func TestAssessPatent_ValidationError(t *testing.T) {
 
 func TestAssessPatent_WithAIScorer(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P002", "AI Enhanced Patent", "granted", 20, 5, 1)
-	patentRepo.patents["P002"] = pat
+	pat := makeTestPatent("10000000-0000-0000-0000-000000000002", "AI Enhanced Patent", "granted", 20, 5, 1)
+	patentRepo.patents["10000000-0000-0000-0000-000000000002"] = pat
 
 	aiScorer := newMockAIScorer()
 	aiScorer.scores[DimensionTechnicalValue] = map[string]float64{
@@ -1056,7 +1061,7 @@ func TestAssessPatent_WithAIScorer(t *testing.T) {
 
 	svc := buildTestService(patentRepo, nil, nil, aiScorer, nil, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P002"}
+	req := &SinglePatentAssessmentRequest{PatentID: "10000000-0000-0000-0000-000000000002"}
 	resp, err := svc.AssessPatent(context.Background(), req)
 	if err != nil {
 		t.Fatalf("AssessPatent with AI scorer failed: %v", err)
@@ -1081,8 +1086,8 @@ func TestAssessPatent_WithAIScorer(t *testing.T) {
 
 func TestAssessPatent_AIFallbackOnError(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P003", "Fallback Patent", "granted", 10, 3, 5)
-	patentRepo.patents["P003"] = pat
+	pat := makeTestPatent("10000000-0000-0000-0000-000000000003", "Fallback Patent", "granted", 10, 3, 5)
+	patentRepo.patents["10000000-0000-0000-0000-000000000003"] = pat
 
 	aiScorer := newMockAIScorer()
 	aiScorer.err = fmt.Errorf("AI service unavailable")
@@ -1092,7 +1097,7 @@ func TestAssessPatent_AIFallbackOnError(t *testing.T) {
 
 	svc := buildTestService(patentRepo, nil, nil, aiScorer, nil, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P003"}
+	req := &SinglePatentAssessmentRequest{PatentID: "10000000-0000-0000-0000-000000000003"}
 	resp, err := svc.AssessPatent(context.Background(), req)
 	if err != nil {
 		t.Fatalf("AssessPatent should succeed with AI fallback, got: %v", err)
@@ -1109,8 +1114,8 @@ func TestAssessPatent_AIFallbackOnError(t *testing.T) {
 
 func TestAssessPatent_NoAIScorer(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P004", "Rule Only Patent", "pending", 8, 2, 8)
-	patentRepo.patents["P004"] = pat
+	pat := makeTestPatent("10000000-0000-0000-0000-000000000004", "Rule Only Patent", "pending", 8, 2, 8)
+	patentRepo.patents["10000000-0000-0000-0000-000000000004"] = pat
 
 	cache := newMockCache()
 	cache.err = fmt.Errorf("cache miss")
@@ -1118,7 +1123,7 @@ func TestAssessPatent_NoAIScorer(t *testing.T) {
 	// nil AI scorer
 	svc := buildTestService(patentRepo, nil, nil, nil, nil, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P004"}
+	req := &SinglePatentAssessmentRequest{PatentID: "10000000-0000-0000-0000-000000000004"}
 	resp, err := svc.AssessPatent(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1132,8 +1137,8 @@ func TestAssessPatent_NoAIScorer(t *testing.T) {
 
 func TestAssessPatent_SpecificDimensions(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P005", "Partial Dimensions", "granted", 12, 3, 4)
-	patentRepo.patents["P005"] = pat
+	pat := makeTestPatent("10000000-0000-0000-0000-000000000005", "Partial Dimensions", "granted", 12, 3, 4)
+	patentRepo.patents["10000000-0000-0000-0000-000000000005"] = pat
 
 	cache := newMockCache()
 	cache.err = fmt.Errorf("cache miss")
@@ -1141,7 +1146,7 @@ func TestAssessPatent_SpecificDimensions(t *testing.T) {
 	svc := buildTestService(patentRepo, nil, nil, nil, nil, cache)
 
 	req := &SinglePatentAssessmentRequest{
-		PatentID:   "P005",
+		PatentID:   "10000000-0000-0000-0000-000000000005",
 		Dimensions: []AssessmentDimension{DimensionTechnicalValue, DimensionLegalValue},
 	}
 	resp, err := svc.AssessPatent(context.Background(), req)
@@ -1164,8 +1169,8 @@ func TestAssessPatent_SpecificDimensions(t *testing.T) {
 
 func TestAssessPatent_PersistenceFailureNonFatal(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P006", "Persist Fail", "granted", 10, 3, 2)
-	patentRepo.patents["P006"] = pat
+	pat := makeTestPatent("10000000-0000-0000-0000-000000000006", "Persist Fail", "granted", 10, 3, 2)
+	patentRepo.patents["10000000-0000-0000-0000-000000000006"] = pat
 
 	assessmentRepo := newMockAssessmentRepo()
 	assessmentRepo.err = fmt.Errorf("database write error")
@@ -1175,7 +1180,7 @@ func TestAssessPatent_PersistenceFailureNonFatal(t *testing.T) {
 
 	svc := buildTestService(patentRepo, nil, assessmentRepo, nil, nil, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P006"}
+	req := &SinglePatentAssessmentRequest{PatentID: "10000000-0000-0000-0000-000000000006"}
 	resp, err := svc.AssessPatent(context.Background(), req)
 	// Should succeed even if persistence fails
 	if err != nil {
@@ -1223,9 +1228,9 @@ func TestTierBoundaries(t *testing.T) {
 
 func TestAssessPortfolio_Success(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	patentRepo.patents["P1"] = makeTestPatent("P1", "Patent One", "granted", 20, 5, 1)
-	patentRepo.patents["P2"] = makeTestPatent("P2", "Patent Two", "granted", 10, 3, 5)
-	patentRepo.patents["P3"] = makeTestPatent("P3", "Patent Three", "pending", 5, 1, 10)
+	patentRepo.patents["30000000-0000-0000-0000-000000000002"] = makeTestPatent("30000000-0000-0000-0000-000000000002", "Patent One", "granted", 20, 5, 1)
+	patentRepo.patents["30000000-0000-0000-0000-000000000004"] = makeTestPatent("30000000-0000-0000-0000-000000000004", "Patent Two", "granted", 10, 3, 5)
+	patentRepo.patents["30000000-0000-0000-0000-000000000006"] = makeTestPatent("30000000-0000-0000-0000-000000000006", "Patent Three", "pending", 5, 1, 10)
 
 	cache := newMockCache()
 	cache.err = fmt.Errorf("cache miss")
@@ -1234,7 +1239,7 @@ func TestAssessPortfolio_Success(t *testing.T) {
 
 	req := &PortfolioAssessmentRequest{
 		PortfolioID:             "PF001",
-		PatentIDs:               []string{"P1", "P2", "P3"},
+		PatentIDs:               []string{"30000000-0000-0000-0000-000000000002", "30000000-0000-0000-0000-000000000004", "30000000-0000-0000-0000-000000000006"},
 		IncludeCostOptimization: true,
 		Context: &AssessmentContext{
 			CurrencyCode:     "CNY",
@@ -1296,7 +1301,7 @@ func TestAssessPortfolio_Success(t *testing.T) {
 
 func TestAssessPortfolio_FromPortfolioID(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	patentRepo.patents["P10"] = makeTestPatent("P10", "Portfolio Patent", "granted", 12, 3, 2)
+	patentRepo.patents["30000000-0000-0000-0000-000000000003"] = makeTestPatent("30000000-0000-0000-0000-000000000003", "Portfolio Patent", "granted", 12, 3, 2)
 
 	portfolioRepo := newMockPortfolioRepo()
 	portfolioID, _ := uuid.Parse("00000000-0000-0000-0000-000000000100")
@@ -1331,7 +1336,7 @@ func TestAssessPortfolio_PortfolioNotFound(t *testing.T) {
 
 	svc := buildTestService(nil, portfolioRepo, nil, nil, nil, cache)
 
-	req := &PortfolioAssessmentRequest{PortfolioID: "NONEXISTENT"}
+	req := &PortfolioAssessmentRequest{PortfolioID: "30000000-0000-0000-0000-000000000001"}
 	_, err := svc.AssessPortfolio(context.Background(), req)
 	if err == nil {
 		t.Fatal("expected error for non-existent portfolio")
@@ -1402,7 +1407,7 @@ func TestAssessPortfolio_ConcurrencyControl(t *testing.T) {
 
 func TestAssessPortfolio_PartialFailure(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	patentRepo.patents["P_OK"] = makeTestPatent("P_OK", "Good Patent", "granted", 10, 3, 2)
+	patentRepo.patents["30000000-0000-0000-0000-000000000064"] = makeTestPatent("30000000-0000-0000-0000-000000000064", "Good Patent", "granted", 10, 3, 2)
 	// P_FAIL is not in the repo, so it will fail
 
 	cache := newMockCache()
@@ -1412,7 +1417,7 @@ func TestAssessPortfolio_PartialFailure(t *testing.T) {
 
 	req := &PortfolioAssessmentRequest{
 		PortfolioID: "PF_PARTIAL",
-		PatentIDs:   []string{"P_OK", "P_FAIL"},
+		PatentIDs:   []string{"30000000-0000-0000-0000-000000000064", "P_FAIL"},
 	}
 
 	resp, err := svc.AssessPortfolio(context.Background(), req)
@@ -1430,7 +1435,7 @@ func TestAssessPortfolio_PartialFailure(t *testing.T) {
 
 func TestAssessPortfolio_WithoutCostOptimization(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	patentRepo.patents["P20"] = makeTestPatent("P20", "No Cost Opt", "granted", 10, 3, 2)
+	patentRepo.patents["30000000-0000-0000-0000-000000000005"] = makeTestPatent("30000000-0000-0000-0000-000000000005", "No Cost Opt", "granted", 10, 3, 2)
 
 	cache := newMockCache()
 	cache.err = fmt.Errorf("cache miss")
@@ -1439,7 +1444,7 @@ func TestAssessPortfolio_WithoutCostOptimization(t *testing.T) {
 
 	req := &PortfolioAssessmentRequest{
 		PortfolioID:             "PF_NOCOST",
-		PatentIDs:               []string{"P20"},
+		PatentIDs:               []string{"30000000-0000-0000-0000-000000000005"},
 		IncludeCostOptimization: false,
 	}
 
@@ -1460,11 +1465,11 @@ func TestCostOptimization_TierBasedActions(t *testing.T) {
 	patentRepo := newMockPatentRepo()
 	// Create patents that will land in different tiers based on their characteristics
 	// High-value: many claims, many IPCs, granted, recent, large family
-	patentRepo.patents["PS"] = makeTestPatent("PS", "S-Tier Patent", "granted", 25, 6, 0.5)
+	patentRepo.patents["30000000-0000-0000-0000-000000000029"] = makeTestPatent("30000000-0000-0000-0000-000000000029", "S-Tier Patent", "granted", 25, 6, 0.5)
 	// Low-value: few claims, few IPCs, pending, old, small family
-	lowPat := makeTestPatent("PD", "D-Tier Patent", "pending", 2, 1, 18)
+	lowPat := makeTestPatent("30000000-0000-0000-0000-000000000014", "D-Tier Patent", "pending", 2, 1, 18)
 	lowPat.Abstract = "simple method"
-	patentRepo.patents["PD"] = lowPat
+	patentRepo.patents["30000000-0000-0000-0000-000000000014"] = lowPat
 
 	cache := newMockCache()
 	cache.err = fmt.Errorf("cache miss")
@@ -1473,7 +1478,7 @@ func TestCostOptimization_TierBasedActions(t *testing.T) {
 
 	req := &PortfolioAssessmentRequest{
 		PortfolioID:             "PF_COST",
-		PatentIDs:               []string{"PS", "PD"},
+		PatentIDs:               []string{"30000000-0000-0000-0000-000000000029", "30000000-0000-0000-0000-000000000014"},
 		IncludeCostOptimization: true,
 		Context:                 &AssessmentContext{CurrencyCode: "CNY", MaxPatentLifeYrs: 20},
 	}
@@ -1524,7 +1529,7 @@ func TestGetAssessmentHistory_Success(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		rec := &AssessmentRecord{
 			ID:           fmt.Sprintf("AR%03d", i),
-			PatentID:     "P_HIST",
+			PatentID:     "30000000-0000-0000-0000-000000000059",
 			OverallScore: float64(60 + i*5),
 			Tier:         TierFromScore(float64(60 + i*5)),
 			AssessedAt:   now.Add(time.Duration(i) * time.Hour),
@@ -1535,7 +1540,7 @@ func TestGetAssessmentHistory_Success(t *testing.T) {
 
 	svc := buildTestService(nil, nil, assessmentRepo, nil, nil, nil)
 
-	records, err := svc.GetAssessmentHistory(context.Background(), "P_HIST")
+	records, err := svc.GetAssessmentHistory(context.Background(), "30000000-0000-0000-0000-000000000059")
 	if err != nil {
 		t.Fatalf("GetAssessmentHistory failed: %v", err)
 	}
@@ -1557,7 +1562,7 @@ func TestGetAssessmentHistory_WithLimit(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		rec := &AssessmentRecord{
 			ID:           fmt.Sprintf("ARL%03d", i),
-			PatentID:     "P_LIM",
+			PatentID:     "30000000-0000-0000-0000-000000000060",
 			OverallScore: 70,
 			Tier:         TierB,
 			AssessedAt:   time.Now().Add(time.Duration(i) * time.Hour),
@@ -1568,7 +1573,7 @@ func TestGetAssessmentHistory_WithLimit(t *testing.T) {
 
 	svc := buildTestService(nil, nil, assessmentRepo, nil, nil, nil)
 
-	records, err := svc.GetAssessmentHistory(context.Background(), "P_LIM", WithLimit(3))
+	records, err := svc.GetAssessmentHistory(context.Background(), "30000000-0000-0000-0000-000000000060", WithLimit(3))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1608,7 +1613,7 @@ func TestCompareAssessments_Success(t *testing.T) {
 	now := time.Now()
 	rec1 := &AssessmentRecord{
 		ID:           "CMP1",
-		PatentID:     "P_CMP",
+		PatentID:     "30000000-0000-0000-0000-000000000051",
 		OverallScore: 60,
 		Tier:         TierC,
 		DimensionScores: map[AssessmentDimension]float64{
@@ -1622,7 +1627,7 @@ func TestCompareAssessments_Success(t *testing.T) {
 	}
 	rec2 := &AssessmentRecord{
 		ID:           "CMP2",
-		PatentID:     "P_CMP",
+		PatentID:     "30000000-0000-0000-0000-000000000051",
 		OverallScore: 78,
 		Tier:         TierB,
 		DimensionScores: map[AssessmentDimension]float64{
@@ -1650,7 +1655,7 @@ func TestCompareAssessments_Success(t *testing.T) {
 	}
 
 	comp := resp.Comparisons[0]
-	if comp.PatentID != "P_CMP" {
+	if comp.PatentID != "30000000-0000-0000-0000-000000000051" {
 		t.Errorf("PatentID = %s, want P_CMP", comp.PatentID)
 	}
 	if comp.Trend != "improving" {
@@ -1688,12 +1693,12 @@ func TestCompareAssessments_Declining(t *testing.T) {
 
 	now := time.Now()
 	rec1 := &AssessmentRecord{
-		ID: "DEC1", PatentID: "P_DEC", OverallScore: 85, Tier: TierA,
+		ID: "DEC1", PatentID: "30000000-0000-0000-0000-000000000054", OverallScore: 85, Tier: TierA,
 		DimensionScores: map[AssessmentDimension]float64{},
 		AssessedAt: now.Add(-60 * 24 * time.Hour), AssessorType: AssessorAI,
 	}
 	rec2 := &AssessmentRecord{
-		ID: "DEC2", PatentID: "P_DEC", OverallScore: 55, Tier: TierC,
+		ID: "DEC2", PatentID: "30000000-0000-0000-0000-000000000054", OverallScore: 55, Tier: TierC,
 		DimensionScores: map[AssessmentDimension]float64{},
 		AssessedAt: now, AssessorType: AssessorAI,
 	}
@@ -1720,12 +1725,12 @@ func TestCompareAssessments_Stable(t *testing.T) {
 
 	now := time.Now()
 	rec1 := &AssessmentRecord{
-		ID: "STB1", PatentID: "P_STB", OverallScore: 72, Tier: TierB,
+		ID: "STB1", PatentID: "30000000-0000-0000-0000-000000000069", OverallScore: 72, Tier: TierB,
 		DimensionScores: map[AssessmentDimension]float64{},
 		AssessedAt: now.Add(-10 * 24 * time.Hour), AssessorType: AssessorHybrid,
 	}
 	rec2 := &AssessmentRecord{
-		ID: "STB2", PatentID: "P_STB", OverallScore: 74, Tier: TierB,
+		ID: "STB2", PatentID: "30000000-0000-0000-0000-000000000069", OverallScore: 74, Tier: TierB,
 		DimensionScores: map[AssessmentDimension]float64{},
 		AssessedAt: now, AssessorType: AssessorHybrid,
 	}
@@ -1758,7 +1763,7 @@ func TestCompareAssessments_NotEnoughRecords(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	// Only one record exists
 	_ = assessmentRepo.Save(context.Background(), &AssessmentRecord{
-		ID: "LONE", PatentID: "P_LONE", OverallScore: 70, Tier: TierB,
+		ID: "LONE", PatentID: "30000000-0000-0000-0000-000000000061", OverallScore: 70, Tier: TierB,
 		AssessedAt: time.Now(), AssessorType: AssessorAI,
 	})
 
@@ -1779,7 +1784,7 @@ func TestExportAssessment_JSON(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
 		ID:           "EXP_JSON",
-		PatentID:     "P_EXP",
+		PatentID:     "30000000-0000-0000-0000-000000000056",
 		OverallScore: 75,
 		Tier:         TierB,
 		DimensionScores: map[AssessmentDimension]float64{
@@ -1818,7 +1823,7 @@ func TestExportAssessment_CSV(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
 		ID:           "EXP_CSV",
-		PatentID:     "P_CSV",
+		PatentID:     "30000000-0000-0000-0000-000000000052",
 		PortfolioID:  "PF_CSV",
 		OverallScore: 82,
 		Tier:         TierA,
@@ -1866,7 +1871,7 @@ func TestExportAssessment_PDF_Fallback(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
 		ID:           "EXP_PDF",
-		PatentID:     "P_PDF",
+		PatentID:     "30000000-0000-0000-0000-000000000065",
 		OverallScore: 70,
 		Tier:         TierB,
 		AssessedAt:   time.Now(),
@@ -1889,7 +1894,7 @@ func TestExportAssessment_PDF_Fallback(t *testing.T) {
 func TestExportAssessment_UnsupportedFormat(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
-		ID: "EXP_BAD", PatentID: "P_BAD", OverallScore: 50, Tier: TierC,
+		ID: "EXP_BAD", PatentID: "30000000-0000-0000-0000-000000000046", OverallScore: 50, Tier: TierC,
 		AssessedAt: time.Now(), AssessorType: AssessorAI,
 	}
 	_ = assessmentRepo.Save(context.Background(), rec)
@@ -1906,7 +1911,7 @@ func TestExportAssessment_NotFound(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	svc := buildTestService(nil, nil, assessmentRepo, nil, nil, nil)
 
-	_, err := svc.ExportAssessment(context.Background(), "NONEXISTENT", ExportJSON)
+	_, err := svc.ExportAssessment(context.Background(), "30000000-0000-0000-0000-000000000001", ExportJSON)
 	if err == nil {
 		t.Fatal("expected error for non-existent assessment")
 	}
@@ -1930,11 +1935,11 @@ func TestGetTierDistribution_Success(t *testing.T) {
 
 	now := time.Now()
 	records := []*AssessmentRecord{
-		{ID: "TD1", PatentID: "P1", PortfolioID: "PF_TD", OverallScore: 95, Tier: TierS, AssessedAt: now},
-		{ID: "TD2", PatentID: "P2", PortfolioID: "PF_TD", OverallScore: 85, Tier: TierA, AssessedAt: now},
-		{ID: "TD3", PatentID: "P3", PortfolioID: "PF_TD", OverallScore: 70, Tier: TierB, AssessedAt: now},
-		{ID: "TD4", PatentID: "P4", PortfolioID: "PF_TD", OverallScore: 55, Tier: TierC, AssessedAt: now},
-		{ID: "TD5", PatentID: "P5", PortfolioID: "PF_TD", OverallScore: 30, Tier: TierD, AssessedAt: now},
+		{ID: "TD1", PatentID: "30000000-0000-0000-0000-000000000002", PortfolioID: "PF_TD", OverallScore: 95, Tier: TierS, AssessedAt: now},
+		{ID: "TD2", PatentID: "30000000-0000-0000-0000-000000000004", PortfolioID: "PF_TD", OverallScore: 85, Tier: TierA, AssessedAt: now},
+		{ID: "TD3", PatentID: "30000000-0000-0000-0000-000000000006", PortfolioID: "PF_TD", OverallScore: 70, Tier: TierB, AssessedAt: now},
+		{ID: "TD4", PatentID: "30000000-0000-0000-0000-000000000007", PortfolioID: "PF_TD", OverallScore: 55, Tier: TierC, AssessedAt: now},
+		{ID: "TD5", PatentID: "30000000-0000-0000-0000-000000000008", PortfolioID: "PF_TD", OverallScore: 30, Tier: TierD, AssessedAt: now},
 	}
 	for _, r := range records {
 		_ = assessmentRepo.Save(context.Background(), r)
@@ -1988,11 +1993,11 @@ func TestGetTierDistribution_Deduplication(t *testing.T) {
 	now := time.Now()
 	// Same patent assessed twice; only latest should count
 	_ = assessmentRepo.Save(context.Background(), &AssessmentRecord{
-		ID: "DD1", PatentID: "P_DUP", PortfolioID: "PF_DD", OverallScore: 55, Tier: TierC,
+		ID: "DD1", PatentID: "30000000-0000-0000-0000-000000000055", PortfolioID: "PF_DD", OverallScore: 55, Tier: TierC,
 		AssessedAt: now.Add(-24 * time.Hour), AssessorType: AssessorAI,
 	})
 	_ = assessmentRepo.Save(context.Background(), &AssessmentRecord{
-		ID: "DD2", PatentID: "P_DUP", PortfolioID: "PF_DD", OverallScore: 85, Tier: TierA,
+		ID: "DD2", PatentID: "30000000-0000-0000-0000-000000000055", PortfolioID: "PF_DD", OverallScore: 85, Tier: TierA,
 		AssessedAt: now, AssessorType: AssessorAI,
 	})
 
@@ -2054,7 +2059,7 @@ func TestGetTierDistribution_EmptyPortfolioID(t *testing.T) {
 func TestRecommendActions_TierS(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	_ = assessmentRepo.Save(context.Background(), &AssessmentRecord{
-		ID: "RA_S", PatentID: "P_S", OverallScore: 95, Tier: TierS,
+		ID: "RA_S", PatentID: "30000000-0000-0000-0000-000000000068", OverallScore: 95, Tier: TierS,
 		DimensionScores: map[AssessmentDimension]float64{
 			DimensionTechnicalValue: 95, DimensionLegalValue: 92,
 			DimensionCommercialValue: 96, DimensionStrategicValue: 97,
@@ -2098,7 +2103,7 @@ func TestRecommendActions_TierS(t *testing.T) {
 func TestRecommendActions_TierD(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	_ = assessmentRepo.Save(context.Background(), &AssessmentRecord{
-		ID: "RA_D", PatentID: "P_D", OverallScore: 30, Tier: TierD,
+		ID: "RA_D", PatentID: "30000000-0000-0000-0000-000000000053", OverallScore: 30, Tier: TierD,
 		DimensionScores: map[AssessmentDimension]float64{
 			DimensionTechnicalValue: 25, DimensionLegalValue: 30,
 			DimensionCommercialValue: 35, DimensionStrategicValue: 28,
@@ -2127,7 +2132,7 @@ func TestRecommendActions_TierD(t *testing.T) {
 func TestRecommendActions_TierA_WithWeakDimension(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	_ = assessmentRepo.Save(context.Background(), &AssessmentRecord{
-		ID: "RA_A_WEAK", PatentID: "P_A_WEAK", OverallScore: 82, Tier: TierA,
+		ID: "RA_A_WEAK", PatentID: "30000000-0000-0000-0000-000000000044", OverallScore: 82, Tier: TierA,
 		DimensionScores: map[AssessmentDimension]float64{
 			DimensionTechnicalValue:  90,
 			DimensionLegalValue:      85,
@@ -2161,7 +2166,7 @@ func TestRecommendActions_TierA_WithWeakDimension(t *testing.T) {
 func TestRecommendActions_TierB_HighCommercial(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	_ = assessmentRepo.Save(context.Background(), &AssessmentRecord{
-		ID: "RA_B_LIC", PatentID: "P_B_LIC", OverallScore: 72, Tier: TierB,
+		ID: "RA_B_LIC", PatentID: "30000000-0000-0000-0000-000000000047", OverallScore: 72, Tier: TierB,
 		DimensionScores: map[AssessmentDimension]float64{
 			DimensionTechnicalValue:  65,
 			DimensionLegalValue:      68,
@@ -2192,7 +2197,7 @@ func TestRecommendActions_TierB_HighCommercial(t *testing.T) {
 func TestRecommendActions_CrossDimensional_FileNew(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	_ = assessmentRepo.Save(context.Background(), &AssessmentRecord{
-		ID: "RA_FN", PatentID: "P_FN", OverallScore: 68, Tier: TierB,
+		ID: "RA_FN", PatentID: "30000000-0000-0000-0000-000000000057", OverallScore: 68, Tier: TierB,
 		DimensionScores: map[AssessmentDimension]float64{
 			DimensionTechnicalValue:  70,
 			DimensionLegalValue:      65,
@@ -2224,7 +2229,7 @@ func TestRecommendActions_NotFound(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	svc := buildTestService(nil, nil, assessmentRepo, nil, nil, nil)
 
-	_, err := svc.RecommendActions(context.Background(), "NONEXISTENT")
+	_, err := svc.RecommendActions(context.Background(), "30000000-0000-0000-0000-000000000001")
 	if err == nil {
 		t.Fatal("expected error for non-existent assessment")
 	}
@@ -2249,14 +2254,14 @@ func TestRuleTechnicalFactor_Novelty(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// Patent with 3 independent out of 15 total claims
-	pat := makeTestPatent("PT1", "Test", "granted", 15, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000030", "Test", "granted", 15, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionTechnicalValue, "novelty", assessCtx)
 	if score < 20 || score > 95 {
 		t.Errorf("novelty score = %.2f, out of expected range [20, 95]", score)
 	}
 
 	// Patent with 0 claims
-	patNoClaims := makeTestPatent("PT2", "No Claims", "granted", 0, 3, 2)
+	patNoClaims := makeTestPatent("30000000-0000-0000-0000-000000000031", "No Claims", "granted", 0, 3, 2)
 	score0 := svc.ruleBasedFactorScore(ctx, patNoClaims, DimensionTechnicalValue, "novelty", assessCtx)
 	if score0 != 40 {
 		t.Errorf("novelty score for 0 claims = %.2f, want 40", score0)
@@ -2269,14 +2274,14 @@ func TestRuleTechnicalFactor_InventiveStep(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// Long description (>10000 chars from makeTestPatent)
-	pat := makeTestPatent("PT3", "Long Desc", "granted", 10, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000032", "Long Desc", "granted", 10, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionTechnicalValue, "inventive_step", assessCtx)
 	if score != 80 {
 		t.Errorf("inventive_step for long desc = %.2f, want 80", score)
 	}
 
 	// Short description
-	patShort := makeTestPatent("PT4", "Short", "granted", 10, 3, 2)
+	patShort := makeTestPatent("30000000-0000-0000-0000-000000000033", "Short", "granted", 10, 3, 2)
 	scoreShort := svc.ruleBasedFactorScore(ctx, patShort, DimensionTechnicalValue, "inventive_step", assessCtx)
 	if scoreShort != 35 {
 		t.Errorf("inventive_step for short desc = %.2f, want 35", scoreShort)
@@ -2301,7 +2306,7 @@ func TestRuleTechnicalFactor_TechnicalBreadth(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		pat := makeTestPatent("PTB", "Breadth", "granted", 10, tt.ipcCount, 2)
+		pat := makeTestPatent("30000000-0000-0000-0000-000000000034", "Breadth", "granted", 10, tt.ipcCount, 2)
 		score := svc.ruleBasedFactorScore(ctx, pat, DimensionTechnicalValue, "technical_breadth", assessCtx)
 		if score < tt.minScore || score > tt.maxScore {
 			t.Errorf("technical_breadth(ipc=%d) = %.2f, want [%.0f, %.0f]", tt.ipcCount, score, tt.minScore, tt.maxScore)
@@ -2315,14 +2320,14 @@ func TestRuleTechnicalFactor_PerformanceImprovement(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// makeTestPatent abstract contains "improve", "enhance", "reduce", "提高", "优化" → 5 matches
-	pat := makeTestPatent("PTP", "Perf", "granted", 10, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000035", "Perf", "granted", 10, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionTechnicalValue, "performance_improvement", assessCtx)
 	if score < 60 {
 		t.Errorf("performance_improvement with keywords = %.2f, expected >= 60", score)
 	}
 
 	// No keywords
-	patNoKw := makeTestPatent("PTP2", "Plain", "granted", 10, 3, 2)
+	patNoKw := makeTestPatent("30000000-0000-0000-0000-000000000036", "Plain", "granted", 10, 3, 2)
 	patNoKw.Abstract = "a method for data processing"
 	scoreNoKw := svc.ruleBasedFactorScore(ctx, patNoKw, DimensionTechnicalValue, "performance_improvement", assessCtx)
 	if scoreNoKw != 20 {
@@ -2336,7 +2341,7 @@ func TestRuleLegalFactor_ClaimBreadth(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// makeTestPatent creates claims with ~14 words each, first 3 independent
-	pat := makeTestPatent("PLB", "Claim Breadth", "granted", 15, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000019", "Claim Breadth", "granted", 15, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionLegalValue, "claim_breadth", assessCtx)
 	// 14 words < 50 → score should be 90
 	if score != 90 {
@@ -2362,7 +2367,7 @@ func TestRuleLegalFactor_ProsecutionStrength(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		pat := makeTestPatent("PPS", "Prosecution", tt.status, 10, 3, 2)
+		pat := makeTestPatent("30000000-0000-0000-0000-000000000026", "Prosecution", tt.status, 10, 3, 2)
 		score := svc.ruleBasedFactorScore(ctx, pat, DimensionLegalValue, "prosecution_strength", assessCtx)
 		if score != tt.expected {
 			t.Errorf("prosecution_strength(%s) = %.2f, want %.2f", tt.status, score, tt.expected)
@@ -2376,14 +2381,14 @@ func TestRuleLegalFactor_RemainingLife(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// 3 years old → 17/20 remaining → ~85
-	pat := makeTestPatent("PRL", "Remaining Life", "granted", 10, 3, 3)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000027", "Remaining Life", "granted", 10, 3, 3)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionLegalValue, "remaining_life_years", assessCtx)
 	if score < 80 || score > 90 {
 		t.Errorf("remaining_life(3yr old) = %.2f, expected ~85", score)
 	}
 
 	// 18 years old → 2/20 remaining → ~10
-	patOld := makeTestPatent("PRL2", "Old Patent", "granted", 10, 3, 18)
+	patOld := makeTestPatent("30000000-0000-0000-0000-000000000028", "Old Patent", "granted", 10, 3, 18)
 	scoreOld := svc.ruleBasedFactorScore(ctx, patOld, DimensionLegalValue, "remaining_life_years", assessCtx)
 	if scoreOld > 15 {
 		t.Errorf("remaining_life(18yr old) = %.2f, expected <= 15", scoreOld)
@@ -2396,14 +2401,14 @@ func TestRuleLegalFactor_FamilyCoverage(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// makeTestPatent has 5 family members → score 75
-	pat := makeTestPatent("PFC", "Family", "granted", 10, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000017", "Family", "granted", 10, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionLegalValue, "family_coverage", assessCtx)
 	if score != 75 {
 		t.Errorf("family_coverage(5 members) = %.2f, want 75", score)
 	}
 
 	// No family
-	patNoFam := makeTestPatent("PFC2", "No Family", "granted", 10, 3, 2)
+	patNoFam := makeTestPatent("30000000-0000-0000-0000-000000000018", "No Family", "granted", 10, 3, 2)
 	scoreNoFam := svc.ruleBasedFactorScore(ctx, patNoFam, DimensionLegalValue, "family_coverage", assessCtx)
 	if scoreNoFam != 20 {
 		t.Errorf("family_coverage(0 members) = %.2f, want 20", scoreNoFam)
@@ -2419,7 +2424,7 @@ func TestRuleCommercialFactor_MarketRelevance(t *testing.T) {
 		MaxPatentLifeYrs: 20,
 		TechFocusAreas:   []string{"distributed", "cache", "performance"},
 	}
-	pat := makeTestPatent("PMR", "Distributed Cache System", "granted", 10, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000022", "Distributed Cache System", "granted", 10, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionCommercialValue, "market_relevance", assessCtx)
 	if score < 60 {
 		t.Errorf("market_relevance with matching areas = %.2f, expected >= 60", score)
@@ -2439,28 +2444,28 @@ func TestRuleStrategicFactor_TechTrajectory(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// Recent patent (0.5 years ago) → high trajectory alignment
-	patRecent := makeTestPatent("PTT1", "Recent Tech", "granted", 10, 3, 0.5)
+	patRecent := makeTestPatent("30000000-0000-0000-0000-000000000037", "Recent Tech", "granted", 10, 3, 0.5)
 	scoreRecent := svc.ruleBasedFactorScore(ctx, patRecent, DimensionStrategicValue, "technology_trajectory_alignment", assessCtx)
 	if scoreRecent != 90 {
 		t.Errorf("tech_trajectory(0.5yr) = %.2f, want 90", scoreRecent)
 	}
 
 	// 3 years old → 75
-	pat3yr := makeTestPatent("PTT2", "3yr Tech", "granted", 10, 3, 3)
+	pat3yr := makeTestPatent("30000000-0000-0000-0000-000000000038", "3yr Tech", "granted", 10, 3, 3)
 	score3yr := svc.ruleBasedFactorScore(ctx, pat3yr, DimensionStrategicValue, "technology_trajectory_alignment", assessCtx)
 	if score3yr != 75 {
 		t.Errorf("tech_trajectory(3yr) = %.2f, want 75", score3yr)
 	}
 
 	// 7 years old → 55
-	pat7yr := makeTestPatent("PTT3", "7yr Tech", "granted", 10, 3, 7)
+	pat7yr := makeTestPatent("30000000-0000-0000-0000-000000000039", "7yr Tech", "granted", 10, 3, 7)
 	score7yr := svc.ruleBasedFactorScore(ctx, pat7yr, DimensionStrategicValue, "technology_trajectory_alignment", assessCtx)
 	if score7yr != 55 {
 		t.Errorf("tech_trajectory(7yr) = %.2f, want 55", score7yr)
 	}
 
 	// 15 years old → 35
-	pat15yr := makeTestPatent("PTT4", "15yr Tech", "granted", 10, 3, 15)
+	pat15yr := makeTestPatent("30000000-0000-0000-0000-000000000040", "15yr Tech", "granted", 10, 3, 15)
 	score15yr := svc.ruleBasedFactorScore(ctx, pat15yr, DimensionStrategicValue, "technology_trajectory_alignment", assessCtx)
 	if score15yr != 35 {
 		t.Errorf("tech_trajectory(15yr) = %.2f, want 35", score15yr)
@@ -2473,14 +2478,14 @@ func TestRuleStrategicFactor_BlockingPower(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// 3 independent claims + 4 IPC classes → 40 + 30 + 20 = 90
-	pat := makeTestPatent("PBP", "Blocking", "granted", 15, 4, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000009", "Blocking", "granted", 15, 4, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionStrategicValue, "blocking_power", assessCtx)
 	if score < 70 {
 		t.Errorf("blocking_power(3 indep, 4 ipc) = %.2f, expected >= 70", score)
 	}
 
 	// Minimal patent: 1 claim (independent), 1 IPC → 40 + 10 + 5 = 55
-	patMin := makeTestPatent("PBP2", "Minimal", "granted", 1, 1, 2)
+	patMin := makeTestPatent("30000000-0000-0000-0000-000000000010", "Minimal", "granted", 1, 1, 2)
 	scoreMin := svc.ruleBasedFactorScore(ctx, patMin, DimensionStrategicValue, "blocking_power", assessCtx)
 	if scoreMin < 50 || scoreMin > 60 {
 		t.Errorf("blocking_power(1 indep, 1 ipc) = %.2f, expected ~55", scoreMin)
@@ -2493,14 +2498,14 @@ func TestRuleStrategicFactor_NegotiationLeverage(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// Granted + 5 family members + 20 claims → 30 + 25 + 25 + 15 = 95
-	pat := makeTestPatent("PNL", "Leverage", "granted", 20, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000023", "Leverage", "granted", 20, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionStrategicValue, "negotiation_leverage", assessCtx)
 	if score < 80 {
 		t.Errorf("negotiation_leverage(granted, 5 fam, 20 claims) = %.2f, expected >= 80", score)
 	}
 
 	// Pending + no family + few claims → low leverage
-	patWeak := makeTestPatent("PNL2", "Weak Leverage", "pending", 3, 1, 2)
+	patWeak := makeTestPatent("30000000-0000-0000-0000-000000000024", "Weak Leverage", "pending", 3, 1, 2)
 	scoreWeak := svc.ruleBasedFactorScore(ctx, patWeak, DimensionStrategicValue, "negotiation_leverage", assessCtx)
 	if scoreWeak > 40 {
 		t.Errorf("negotiation_leverage(pending, 0 fam, 3 claims) = %.2f, expected <= 40", scoreWeak)
@@ -2516,7 +2521,7 @@ func TestRuleStrategicFactor_CompetitiveDifferentiation(t *testing.T) {
 		MaxPatentLifeYrs: 20,
 		Competitors:      []string{"distributed", "latency"},
 	}
-	pat := makeTestPatent("PCD", "Competitive", "granted", 10, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000011", "Competitive", "granted", 10, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionStrategicValue, "competitive_differentiation", assessCtx)
 	if score < 70 {
 		t.Errorf("competitive_diff with matching competitors = %.2f, expected >= 70", score)
@@ -2548,7 +2553,7 @@ func TestRuleCommercialFactor_ProductCoverage(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		pat := makeTestPatent("PPC", "Product", "granted", tt.claimCount, 3, 2)
+		pat := makeTestPatent("30000000-0000-0000-0000-000000000025", "Product", "granted", tt.claimCount, 3, 2)
 		score := svc.ruleBasedFactorScore(ctx, pat, DimensionCommercialValue, "product_coverage", assessCtx)
 		if score < tt.minScore || score > tt.maxScore {
 			t.Errorf("product_coverage(claims=%d) = %.2f, want [%.0f, %.0f]", tt.claimCount, score, tt.minScore, tt.maxScore)
@@ -2562,7 +2567,7 @@ func TestRuleCommercialFactor_LicensingPotential(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// Granted + many claims + large family → high licensing potential
-	pat := makeTestPatent("PLP", "Licensing", "granted", 15, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000020", "Licensing", "granted", 15, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionCommercialValue, "licensing_potential", assessCtx)
 	// 50 + 20 (granted) + 15 (>10 claims) + 10 (>3 family) = 95
 	if score < 85 {
@@ -2570,7 +2575,7 @@ func TestRuleCommercialFactor_LicensingPotential(t *testing.T) {
 	}
 
 	// Pending + few claims + no family → low
-	patLow := makeTestPatent("PLP2", "Low License", "pending", 3, 1, 2)
+	patLow := makeTestPatent("30000000-0000-0000-0000-000000000021", "Low License", "pending", 3, 1, 2)
 	scoreLow := svc.ruleBasedFactorScore(ctx, patLow, DimensionCommercialValue, "licensing_potential", assessCtx)
 	if scoreLow > 55 {
 		t.Errorf("licensing_potential(pending, 3 claims, 0 fam) = %.2f, expected <= 55", scoreLow)
@@ -2583,7 +2588,7 @@ func TestRuleCommercialFactor_CostOfDesignAround(t *testing.T) {
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
 	// Many IPCs + many claims → hard to design around
-	pat := makeTestPatent("PCDA", "Design Around", "granted", 20, 5, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000012", "Design Around", "granted", 20, 5, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionCommercialValue, "cost_of_design_around", assessCtx)
 	// 40 + 5*8 + 20*1.5 = 40 + 40 + 30 = 110 → clamped to 100
 	if score != 100 {
@@ -2591,7 +2596,7 @@ func TestRuleCommercialFactor_CostOfDesignAround(t *testing.T) {
 	}
 
 	// Minimal patent
-	patMin := makeTestPatent("PCDA2", "Easy Around", "granted", 2, 1, 2)
+	patMin := makeTestPatent("30000000-0000-0000-0000-000000000013", "Easy Around", "granted", 2, 1, 2)
 	scoreMin := svc.ruleBasedFactorScore(ctx, patMin, DimensionCommercialValue, "cost_of_design_around", assessCtx)
 	// 40 + 1*8 + 2*1.5 = 40 + 8 + 3 = 51
 	if scoreMin < 45 || scoreMin > 55 {
@@ -2604,7 +2609,7 @@ func TestRuleBasedFactorScore_UnknownDimension(t *testing.T) {
 	ctx := context.Background()
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
-	pat := makeTestPatent("PU", "Unknown", "granted", 10, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000041", "Unknown", "granted", 10, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, AssessmentDimension("unknown_dim"), "any_factor", assessCtx)
 	if score != 50 {
 		t.Errorf("unknown dimension score = %.2f, want 50 (neutral)", score)
@@ -2616,7 +2621,7 @@ func TestRuleBasedFactorScore_UnknownFactor(t *testing.T) {
 	ctx := context.Background()
 	assessCtx := &AssessmentContext{MaxPatentLifeYrs: 20}
 
-	pat := makeTestPatent("PUF", "Unknown Factor", "granted", 10, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000042", "Unknown Factor", "granted", 10, 3, 2)
 	score := svc.ruleBasedFactorScore(ctx, pat, DimensionTechnicalValue, "nonexistent_factor", assessCtx)
 	if score != 50 {
 		t.Errorf("unknown factor score = %.2f, want 50 (neutral)", score)
@@ -2629,12 +2634,12 @@ func TestRuleBasedFactorScore_UnknownFactor(t *testing.T) {
 
 func TestComputeCitationImpact_WithRepo(t *testing.T) {
 	citationRepo := newMockCitationRepo()
-	citationRepo.forwardCounts["P_CIT"] = 40
+	citationRepo.forwardCounts["30000000-0000-0000-0000-000000000049"] = 40
 	citationRepo.maxInDomain["G06F17/00"] = 100
 
 	svc := buildTestService(nil, nil, nil, nil, citationRepo, nil).(*valuationServiceImpl)
 
-	pat := makeTestPatent("P_CIT", "Citation Test", "granted", 10, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000049", "Citation Test", "granted", 10, 3, 2)
 	score := svc.computeCitationImpact(context.Background(), pat)
 	// 40/100 * 100 = 40
 	if score != 40 {
@@ -2645,7 +2650,7 @@ func TestComputeCitationImpact_WithRepo(t *testing.T) {
 func TestComputeCitationImpact_NilRepo(t *testing.T) {
 	svc := buildTestService(nil, nil, nil, nil, nil, nil).(*valuationServiceImpl)
 
-	pat := makeTestPatent("P_NOCIT", "No Citation Repo", "granted", 10, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000062", "No Citation Repo", "granted", 10, 3, 2)
 	score := svc.computeCitationImpact(context.Background(), pat)
 	if score != 50 {
 		t.Errorf("citation impact without repo = %.2f, want 50 (neutral)", score)
@@ -2658,7 +2663,7 @@ func TestComputeCitationImpact_RepoError(t *testing.T) {
 
 	svc := buildTestService(nil, nil, nil, nil, citationRepo, nil).(*valuationServiceImpl)
 
-	pat := makeTestPatent("P_CITERR", "Citation Error", "granted", 10, 3, 2)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000050", "Citation Error", "granted", 10, 3, 2)
 	score := svc.computeCitationImpact(context.Background(), pat)
 	if score != 50 {
 		t.Errorf("citation impact on error = %.2f, want 50 (neutral)", score)
@@ -2851,7 +2856,7 @@ func TestGenerateRecommendationsFromRecord(t *testing.T) {
 
 	record := &AssessmentRecord{
 		ID:           "REC_GEN",
-		PatentID:     "P_GEN",
+		PatentID:     "30000000-0000-0000-0000-000000000058",
 		OverallScore: 92,
 		Tier:         TierS,
 		DimensionScores: map[AssessmentDimension]float64{
@@ -2886,11 +2891,11 @@ func TestBuildPortfolioSummary(t *testing.T) {
 	svc := buildTestService(nil, nil, nil, nil, nil, nil).(*valuationServiceImpl)
 
 	assessments := []*SinglePatentAssessmentResponse{
-		{PatentID: "P1", OverallScore: &OverallValuation{Score: 95, Tier: TierS}},
-		{PatentID: "P2", OverallScore: &OverallValuation{Score: 82, Tier: TierA}},
-		{PatentID: "P3", OverallScore: &OverallValuation{Score: 70, Tier: TierB}},
-		{PatentID: "P4", OverallScore: &OverallValuation{Score: 55, Tier: TierC}},
-		{PatentID: "P5", OverallScore: &OverallValuation{Score: 30, Tier: TierD}},
+		{PatentID: "30000000-0000-0000-0000-000000000002", OverallScore: &OverallValuation{Score: 95, Tier: TierS}},
+		{PatentID: "30000000-0000-0000-0000-000000000004", OverallScore: &OverallValuation{Score: 82, Tier: TierA}},
+		{PatentID: "30000000-0000-0000-0000-000000000006", OverallScore: &OverallValuation{Score: 70, Tier: TierB}},
+		{PatentID: "30000000-0000-0000-0000-000000000007", OverallScore: &OverallValuation{Score: 55, Tier: TierC}},
+		{PatentID: "30000000-0000-0000-0000-000000000008", OverallScore: &OverallValuation{Score: 30, Tier: TierD}},
 	}
 
 	assessCtx := &AssessmentContext{
@@ -2948,9 +2953,9 @@ func TestBuildPortfolioSummary_NoGaps(t *testing.T) {
 	svc := buildTestService(nil, nil, nil, nil, nil, nil).(*valuationServiceImpl)
 
 	assessments := []*SinglePatentAssessmentResponse{
-		{PatentID: "P1", OverallScore: &OverallValuation{Score: 95, Tier: TierS}},
-		{PatentID: "P2", OverallScore: &OverallValuation{Score: 85, Tier: TierA}},
-		{PatentID: "P3", OverallScore: &OverallValuation{Score: 92, Tier: TierS}},
+		{PatentID: "30000000-0000-0000-0000-000000000002", OverallScore: &OverallValuation{Score: 95, Tier: TierS}},
+		{PatentID: "30000000-0000-0000-0000-000000000004", OverallScore: &OverallValuation{Score: 85, Tier: TierA}},
+		{PatentID: "30000000-0000-0000-0000-000000000006", OverallScore: &OverallValuation{Score: 92, Tier: TierS}},
 	}
 
 	assessCtx := &AssessmentContext{
@@ -2973,11 +2978,11 @@ func TestAnalyzeCostOptimization(t *testing.T) {
 	svc := buildTestService(nil, nil, nil, nil, nil, nil).(*valuationServiceImpl)
 
 	assessments := []*SinglePatentAssessmentResponse{
-		{PatentID: "P_S", OverallScore: &OverallValuation{Score: 95, Tier: TierS}},
-		{PatentID: "P_A", OverallScore: &OverallValuation{Score: 85, Tier: TierA}},
-		{PatentID: "P_B", OverallScore: &OverallValuation{Score: 70, Tier: TierB}},
-		{PatentID: "P_C", OverallScore: &OverallValuation{Score: 55, Tier: TierC}},
-		{PatentID: "P_D", OverallScore: &OverallValuation{Score: 30, Tier: TierD}},
+		{PatentID: "30000000-0000-0000-0000-000000000068", OverallScore: &OverallValuation{Score: 95, Tier: TierS}},
+		{PatentID: "30000000-0000-0000-0000-000000000043", OverallScore: &OverallValuation{Score: 85, Tier: TierA}},
+		{PatentID: "30000000-0000-0000-0000-000000000045", OverallScore: &OverallValuation{Score: 70, Tier: TierB}},
+		{PatentID: "30000000-0000-0000-0000-000000000048", OverallScore: &OverallValuation{Score: 55, Tier: TierC}},
+		{PatentID: "30000000-0000-0000-0000-000000000053", OverallScore: &OverallValuation{Score: 30, Tier: TierD}},
 	}
 
 	assessCtx := &AssessmentContext{CurrencyCode: "CNY"}
@@ -3009,29 +3014,29 @@ func TestAnalyzeCostOptimization(t *testing.T) {
 		actionMap[rec.PatentID] = rec.Action
 	}
 
-	if actionMap["P_S"] != CostContinueMaintain {
-		t.Errorf("P_S action = %s, want continue_maintain", actionMap["P_S"])
+	if actionMap["30000000-0000-0000-0000-000000000068"] != CostContinueMaintain {
+		t.Errorf("P_S action = %s, want continue_maintain", actionMap["30000000-0000-0000-0000-000000000068"])
 	}
-	if actionMap["P_A"] != CostContinueMaintain {
-		t.Errorf("P_A action = %s, want continue_maintain", actionMap["P_A"])
+	if actionMap["30000000-0000-0000-0000-000000000043"] != CostContinueMaintain {
+		t.Errorf("P_A action = %s, want continue_maintain", actionMap["30000000-0000-0000-0000-000000000043"])
 	}
-	if actionMap["P_B"] != CostContinueMaintain {
-		t.Errorf("P_B action = %s, want continue_maintain", actionMap["P_B"])
+	if actionMap["30000000-0000-0000-0000-000000000045"] != CostContinueMaintain {
+		t.Errorf("P_B action = %s, want continue_maintain", actionMap["30000000-0000-0000-0000-000000000045"])
 	}
-	if actionMap["P_C"] != CostReduceScope {
-		t.Errorf("P_C action = %s, want reduce_scope", actionMap["P_C"])
+	if actionMap["30000000-0000-0000-0000-000000000048"] != CostReduceScope {
+		t.Errorf("P_C action = %s, want reduce_scope", actionMap["30000000-0000-0000-0000-000000000048"])
 	}
-	if actionMap["P_D"] != CostAbandon {
-		t.Errorf("P_D action = %s, want abandon", actionMap["P_D"])
+	if actionMap["30000000-0000-0000-0000-000000000053"] != CostAbandon {
+		t.Errorf("P_D action = %s, want abandon", actionMap["30000000-0000-0000-0000-000000000053"])
 	}
 
 	// Verify savings come from C (40%) and D (100%)
 	var cSaving, dSaving float64
 	for _, rec := range result.Recommendations {
-		if rec.PatentID == "P_C" {
+		if rec.PatentID == "30000000-0000-0000-0000-000000000048" {
 			cSaving = rec.EstimatedSaving
 		}
-		if rec.PatentID == "P_D" {
+		if rec.PatentID == "30000000-0000-0000-0000-000000000053" {
 			dSaving = rec.EstimatedSaving
 		}
 	}
@@ -3065,8 +3070,8 @@ func TestAnalyzeCostOptimization_AllHighTier(t *testing.T) {
 	svc := buildTestService(nil, nil, nil, nil, nil, nil).(*valuationServiceImpl)
 
 	assessments := []*SinglePatentAssessmentResponse{
-		{PatentID: "P1", OverallScore: &OverallValuation{Score: 95, Tier: TierS}},
-		{PatentID: "P2", OverallScore: &OverallValuation{Score: 92, Tier: TierS}},
+		{PatentID: "30000000-0000-0000-0000-000000000002", OverallScore: &OverallValuation{Score: 95, Tier: TierS}},
+		{PatentID: "30000000-0000-0000-0000-000000000004", OverallScore: &OverallValuation{Score: 92, Tier: TierS}},
 	}
 
 	result := svc.analyzeCostOptimization(assessments, &AssessmentContext{CurrencyCode: "CNY"})
@@ -3083,8 +3088,8 @@ func TestAnalyzeCostOptimization_AllLowTier(t *testing.T) {
 	svc := buildTestService(nil, nil, nil, nil, nil, nil).(*valuationServiceImpl)
 
 	assessments := []*SinglePatentAssessmentResponse{
-		{PatentID: "PD1", OverallScore: &OverallValuation{Score: 20, Tier: TierD}},
-		{PatentID: "PD2", OverallScore: &OverallValuation{Score: 15, Tier: TierD}},
+		{PatentID: "30000000-0000-0000-0000-000000000015", OverallScore: &OverallValuation{Score: 20, Tier: TierD}},
+		{PatentID: "30000000-0000-0000-0000-000000000016", OverallScore: &OverallValuation{Score: 15, Tier: TierD}},
 	}
 
 	result := svc.analyzeCostOptimization(assessments, &AssessmentContext{CurrencyCode: "CNY"})
@@ -3105,7 +3110,7 @@ func TestExportAssessment_JSON_V2(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
 		ID:           "EXP_JSON",
-		PatentID:     "P_EXP",
+		PatentID:     "30000000-0000-0000-0000-000000000056",
 		OverallScore: 75,
 		Tier:         TierB,
 		DimensionScores: map[AssessmentDimension]float64{
@@ -3135,7 +3140,7 @@ func TestExportAssessment_JSON_V2(t *testing.T) {
 	if parsed["id"] != "EXP_JSON" {
 		t.Errorf("exported id = %v, want EXP_JSON", parsed["id"])
 	}
-	if parsed["patent_id"] != "P_EXP" {
+	if parsed["patent_id"] != "30000000-0000-0000-0000-000000000056" {
 		t.Errorf("exported patent_id = %v, want P_EXP", parsed["patent_id"])
 	}
 }
@@ -3144,7 +3149,7 @@ func TestExportAssessment_CSV_V2(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
 		ID:           "EXP_CSV",
-		PatentID:     "P_CSV",
+		PatentID:     "30000000-0000-0000-0000-000000000052",
 		OverallScore: 68,
 		Tier:         TierB,
 		DimensionScores: map[AssessmentDimension]float64{
@@ -3176,7 +3181,7 @@ func TestExportAssessment_CSV_V2(t *testing.T) {
 	if !contains(csvStr, "EXP_CSV") {
 		t.Error("CSV missing assessment ID")
 	}
-	if !contains(csvStr, "P_CSV") {
+	if !contains(csvStr, "30000000-0000-0000-0000-000000000052") {
 		t.Error("CSV missing patent ID")
 	}
 }
@@ -3185,7 +3190,7 @@ func TestExportAssessment_NotFound_V2(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	svc := buildTestService(nil, nil, assessmentRepo, nil, nil, nil)
 
-	_, err := svc.ExportAssessment(context.Background(), "NONEXISTENT", ExportJSON)
+	_, err := svc.ExportAssessment(context.Background(), "30000000-0000-0000-0000-000000000001", ExportJSON)
 	if err == nil {
 		t.Fatal("expected error for non-existent assessment")
 	}
@@ -3204,7 +3209,7 @@ func TestExportAssessment_UnsupportedFormat_V2(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
 		ID:           "EXP_UNK",
-		PatentID:     "P_UNK",
+		PatentID:     "30000000-0000-0000-0000-000000000070",
 		OverallScore: 70,
 		Tier:         TierB,
 		AssessedAt:   time.Now(),
@@ -3228,7 +3233,7 @@ func TestRecommendActions_Success(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	rec := &AssessmentRecord{
 		ID:           "RA_001",
-		PatentID:     "P_RA",
+		PatentID:     "30000000-0000-0000-0000-000000000066",
 		OverallScore: 45,
 		Tier:         TierD,
 		DimensionScores: map[AssessmentDimension]float64{
@@ -3277,7 +3282,7 @@ func TestRecommendActions_NotFound_V2(t *testing.T) {
 	assessmentRepo := newMockAssessmentRepo()
 	svc := buildTestService(nil, nil, assessmentRepo, nil, nil, nil)
 
-	_, err := svc.RecommendActions(context.Background(), "NONEXISTENT")
+	_, err := svc.RecommendActions(context.Background(), "30000000-0000-0000-0000-000000000001")
 	if err == nil {
 		t.Fatal("expected error for non-existent assessment")
 	}
@@ -3430,8 +3435,8 @@ func TestGenerateRecommendations_CrossDimensional_FileNew(t *testing.T) {
 
 func TestAssessPatent_ContextCancelled(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P_CTX", "Context Cancel", "granted", 10, 3, 2)
-	patentRepo.patents["P_CTX"] = pat
+	pat := makeTestPatent("20000000-0000-0000-0000-000000000005", "Context Cancel", "granted", 10, 3, 2)
+	patentRepo.patents["20000000-0000-0000-0000-000000000005"] = pat
 
 	cache := newMockCache()
 	cache.err = fmt.Errorf("cache miss")
@@ -3441,7 +3446,7 @@ func TestAssessPatent_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P_CTX"}
+	req := &SinglePatentAssessmentRequest{PatentID: "20000000-0000-0000-0000-000000000005"}
 	_, err := svc.AssessPatent(ctx, req)
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
@@ -3479,18 +3484,18 @@ func TestAssessPortfolio_ContextCancelled(t *testing.T) {
 
 func TestAssessPatent_ZeroClaims(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P_ZERO", "Zero Claims", "granted", 0, 0, 5)
+	pat := makeTestPatent("20000000-0000-0000-0000-000000000001", "Zero Claims", "granted", 0, 0, 5)
 	pat.Claims = nil
 	pat.IPCCodes = nil
 	pat.Abstract = ""
-	patentRepo.patents["P_ZERO"] = pat
+	patentRepo.patents["20000000-0000-0000-0000-000000000001"] = pat
 
 	cache := newMockCache()
 	cache.err = fmt.Errorf("cache miss")
 
 	svc := buildTestService(patentRepo, nil, nil, nil, nil, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P_ZERO"}
+	req := &SinglePatentAssessmentRequest{PatentID: "20000000-0000-0000-0000-000000000001"}
 	resp, err := svc.AssessPatent(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error for zero-claims patent: %v", err)
@@ -3506,16 +3511,16 @@ func TestAssessPatent_ZeroClaims(t *testing.T) {
 
 func TestAssessPatent_ZeroFilingDate(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P_NODATE", "No Date", "granted", 10, 3, 0)
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000063", "No Date", "granted", 10, 3, 0)
 	pat.FilingDate = nil // zero value
-	patentRepo.patents["P_NODATE"] = pat
+	patentRepo.patents["30000000-0000-0000-0000-000000000063"] = pat
 
 	cache := newMockCache()
 	cache.err = fmt.Errorf("cache miss")
 
 	svc := buildTestService(patentRepo, nil, nil, nil, nil, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P_NODATE"}
+	req := &SinglePatentAssessmentRequest{PatentID: "30000000-0000-0000-0000-000000000063"}
 	resp, err := svc.AssessPatent(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -3527,15 +3532,15 @@ func TestAssessPatent_ZeroFilingDate(t *testing.T) {
 
 func TestAssessPatent_ExpiredPatent(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P_EXP", "Expired Patent", "expired", 10, 3, 25) // 25 years ago
-	patentRepo.patents["P_EXP"] = pat
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000056", "Expired Patent", "expired", 10, 3, 25) // 25 years ago
+	patentRepo.patents["30000000-0000-0000-0000-000000000056"] = pat
 
 	cache := newMockCache()
 	cache.err = fmt.Errorf("cache miss")
 
 	svc := buildTestService(patentRepo, nil, nil, nil, nil, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P_EXP"}
+	req := &SinglePatentAssessmentRequest{PatentID: "30000000-0000-0000-0000-000000000056"}
 	resp, err := svc.AssessPatent(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -3552,15 +3557,15 @@ func TestAssessPatent_ExpiredPatent(t *testing.T) {
 
 func TestAssessPatent_RejectedPatent(t *testing.T) {
 	patentRepo := newMockPatentRepo()
-	pat := makeTestPatent("P_REJ", "Rejected Patent", "rejected", 10, 3, 3)
-	patentRepo.patents["P_REJ"] = pat
+	pat := makeTestPatent("30000000-0000-0000-0000-000000000067", "Rejected Patent", "rejected", 10, 3, 3)
+	patentRepo.patents["30000000-0000-0000-0000-000000000067"] = pat
 
 	cache := newMockCache()
 	cache.err = fmt.Errorf("cache miss")
 
 	svc := buildTestService(patentRepo, nil, nil, nil, nil, cache)
 
-	req := &SinglePatentAssessmentRequest{PatentID: "P_REJ"}
+	req := &SinglePatentAssessmentRequest{PatentID: "30000000-0000-0000-0000-000000000067"}
 	resp, err := svc.AssessPatent(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

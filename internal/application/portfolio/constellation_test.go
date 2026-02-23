@@ -157,6 +157,157 @@ func (m *mockPortfolio) toPortfolio() *domainportfolio.Portfolio {
 }
 
 // -----------------------------------------------------------------------
+// Mock: Portfolio Repository
+// -----------------------------------------------------------------------
+
+type mockPortfolioRepoConstellation struct {
+	portfolios map[string]*domainportfolio.Portfolio
+	err        error
+}
+
+func newMockPortfolioRepoConstellation() *mockPortfolioRepoConstellation {
+	return &mockPortfolioRepoConstellation{portfolios: make(map[string]*domainportfolio.Portfolio)}
+}
+
+func (m *mockPortfolioRepoConstellation) GetByID(ctx context.Context, id uuid.UUID) (*domainportfolio.Portfolio, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	p, ok := m.portfolios[id.String()]
+	if !ok {
+		return nil, fmt.Errorf("portfolio %s not found", id.String())
+	}
+	return p, nil
+}
+
+// Stub remaining interface methods
+func (m *mockPortfolioRepoConstellation) Create(ctx context.Context, p *domainportfolio.Portfolio) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) Update(ctx context.Context, p *domainportfolio.Portfolio) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) List(ctx context.Context, ownerID uuid.UUID, status *domainportfolio.Status, limit, offset int) ([]*domainportfolio.Portfolio, int64, error) {
+	return nil, 0, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetByOwner(ctx context.Context, ownerID uuid.UUID) ([]*domainportfolio.Portfolio, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) AddPatent(ctx context.Context, portfolioID, patentID uuid.UUID, role string, addedBy uuid.UUID) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) RemovePatent(ctx context.Context, portfolioID, patentID uuid.UUID) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetPatents(ctx context.Context, portfolioID uuid.UUID, role *string, limit, offset int) ([]*domainpatent.Patent, int64, error) {
+	return nil, 0, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) IsPatentInPortfolio(ctx context.Context, portfolioID, patentID uuid.UUID) (bool, error) {
+	return false, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) BatchAddPatents(ctx context.Context, portfolioID uuid.UUID, patentIDs []uuid.UUID, role string, addedBy uuid.UUID) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetPortfoliosByPatent(ctx context.Context, patentID uuid.UUID) ([]*domainportfolio.Portfolio, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) CreateValuation(ctx context.Context, v *domainportfolio.Valuation) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetLatestValuation(ctx context.Context, patentID uuid.UUID) (*domainportfolio.Valuation, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetValuationHistory(ctx context.Context, patentID uuid.UUID, limit int) ([]*domainportfolio.Valuation, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetValuationsByPortfolio(ctx context.Context, portfolioID uuid.UUID) ([]*domainportfolio.Valuation, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetValuationDistribution(ctx context.Context, portfolioID uuid.UUID) (map[domainportfolio.ValuationTier]int64, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) BatchCreateValuations(ctx context.Context, valuations []*domainportfolio.Valuation) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) CreateHealthScore(ctx context.Context, score *domainportfolio.HealthScore) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetLatestHealthScore(ctx context.Context, portfolioID uuid.UUID) (*domainportfolio.HealthScore, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetHealthScoreHistory(ctx context.Context, portfolioID uuid.UUID, limit int) ([]*domainportfolio.HealthScore, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetHealthScoreTrend(ctx context.Context, portfolioID uuid.UUID, startDate, endDate time.Time) ([]*domainportfolio.HealthScore, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) CreateSuggestion(ctx context.Context, s *domainportfolio.OptimizationSuggestion) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetSuggestions(ctx context.Context, portfolioID uuid.UUID, status *string, limit, offset int) ([]*domainportfolio.OptimizationSuggestion, int64, error) {
+	return nil, 0, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) UpdateSuggestionStatus(ctx context.Context, id uuid.UUID, status string, resolvedBy uuid.UUID) error {
+	return m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetPendingSuggestionCount(ctx context.Context, portfolioID uuid.UUID) (int64, error) {
+	return 0, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetPortfolioSummary(ctx context.Context, portfolioID uuid.UUID) (*domainportfolio.Summary, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetJurisdictionCoverage(ctx context.Context, portfolioID uuid.UUID) (map[string]int64, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetTechDomainCoverage(ctx context.Context, portfolioID uuid.UUID) (map[string]int64, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) GetExpiryTimeline(ctx context.Context, portfolioID uuid.UUID) ([]*domainportfolio.ExpiryTimelineEntry, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) ComparePortfolios(ctx context.Context, portfolioIDs []uuid.UUID) ([]*domainportfolio.ComparisonResult, error) {
+	return nil, m.err
+}
+
+func (m *mockPortfolioRepoConstellation) WithTx(ctx context.Context, fn func(domainportfolio.PortfolioRepository) error) error {
+	return fn(m)
+}
+
+var _ domainportfolio.PortfolioRepository = (*mockPortfolioRepoConstellation)(nil)
+
+// -----------------------------------------------------------------------
 // Mock: Patent Repository
 // -----------------------------------------------------------------------
 
@@ -565,6 +716,7 @@ func (m *mockGNNInference) SearchSimilar(ctx context.Context, req *molpatent_gnn
 func buildTestConfig(overrides ...func(*ConstellationServiceConfig)) ConstellationServiceConfig {
 	patentRepo := newMockPatentRepoConstellation()
 	molRepo := newMockMoleculeRepo()
+	portfolioRepo := newMockPortfolioRepoConstellation()
 
 	// Seed test data: 3 patents, each with 1 molecule.
 	patents := []*domainpatent.Patent{
@@ -609,15 +761,19 @@ func buildTestConfig(overrides ...func(*ConstellationServiceConfig)) Constellati
 	// Use toPortfolio() helper
 	portfolioForService := (&mockPortfolio{id: "00000000-0000-0000-0000-000000000001", name: "Test Portfolio"}).toPortfolio()
 	
+	// Seed portfolio repository
+	portfolioRepo.portfolios["00000000-0000-0000-0000-000000000001"] = portfolioForService
+	
 	cfg := ConstellationServiceConfig{
-		PortfolioService:   &mockPortfolioService{portfolio: portfolioForService},
-		MoleculeService:    &mockMoleculeService{},
-		PatentRepository:   patentRepo,
-		MoleculeRepository: molRepo,
-		GNNInference:       &mockGNNInference{},
-		Logger:             &mockLoggerConstellation{},
-		Cache:              newMockConstellationCache(),
-		CacheTTL:           5 * time.Minute,
+		PortfolioService:    &mockPortfolioService{portfolio: portfolioForService},
+		PortfolioRepository: portfolioRepo,
+		MoleculeService:     &mockMoleculeService{},
+		PatentRepository:    patentRepo,
+		MoleculeRepository:  molRepo,
+		GNNInference:        &mockGNNInference{},
+		Logger:              &mockLoggerConstellation{},
+		Cache:               newMockConstellationCache(),
+		CacheTTL:            5 * time.Minute,
 	}
 
 	for _, override := range overrides {
