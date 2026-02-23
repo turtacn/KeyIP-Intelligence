@@ -141,8 +141,17 @@ type mockPortfolio struct {
 
 // Helper to convert mockPortfolio to actual Portfolio struct for testing
 func (m *mockPortfolio) toPortfolio() *domainportfolio.Portfolio {
+	// Generate valid UUID from string ID for testing
+	var portfolioID uuid.UUID
+	if parsedID, err := uuid.Parse(m.id); err == nil {
+		portfolioID = parsedID
+	} else {
+		// If not a valid UUID, generate a new one
+		portfolioID = uuid.New()
+	}
+	
 	return &domainportfolio.Portfolio{
-		ID:   uuid.MustParse(m.id),
+		ID:   portfolioID,
 		Name: m.name,
 	}
 }
@@ -332,21 +341,32 @@ type mockPatent struct {
 
 // Helper to convert mockPatent to actual Patent struct for testing
 func (m *mockPatent) toPatent() *domainpatent.Patent {
-	status := domainpatent.PatentStatusActive
+	status := domainpatent.PatentStatusGranted
 	if m.legalStatus == "pending" {
-		status = domainpatent.PatentStatusPending
+		status = domainpatent.PatentStatusFiled
 	}
 	
+	// Generate valid UUID from string ID for testing
+	var patentID uuid.UUID
+	if parsedID, err := uuid.Parse(m.id); err == nil {
+		patentID = parsedID
+	} else {
+		// If not a valid UUID, generate a new one (deterministic for testing)
+		patentID = uuid.New()
+	}
+	
+	filingDate := m.filingDate
+	
 	return &domainpatent.Patent{
-		ID:               uuid.MustParse(m.id),
+		ID:               patentID,
 		PatentNumber:     m.number,
 		Title:            "Test Patent",
-		Jurisdiction:     domainpatent.PatentOfficeUSPTO,
+		Office:           domainpatent.OfficeUSPTO,
 		Status:           status,
-		Assignee:         m.assignee,
-		FilingDate:       domainpatent.PatentDate{Time: m.filingDate},
-		TechDomains:      []string{m.techDomain},
-		MoleculeRefs:     m.moleculeIDs,
+		AssigneeName:     m.assignee,
+		FilingDate:       &filingDate,
+		IPCCodes:         []string{m.techDomain},
+		MoleculeIDs:      m.moleculeIDs,
 	}
 }
 
@@ -464,8 +484,17 @@ type mockMolecule struct {
 
 // Helper to convert mockMolecule to actual Molecule struct for testing
 func (m *mockMolecule) toMolecule() *domainmol.Molecule {
+	// Generate valid UUID from string ID for testing
+	var moleculeID uuid.UUID
+	if parsedID, err := uuid.Parse(m.id); err == nil {
+		moleculeID = parsedID
+	} else {
+		// If not a valid UUID, generate a new one
+		moleculeID = uuid.New()
+	}
+	
 	return &domainmol.Molecule{
-		ID:     m.id,
+		ID:     moleculeID,
 		SMILES: m.smiles,
 	}
 }
@@ -538,47 +567,50 @@ func buildTestConfig(overrides ...func(*ConstellationServiceConfig)) Constellati
 	molRepo := newMockMoleculeRepo()
 
 	// Seed test data: 3 patents, each with 1 molecule.
-	patents := []domainpatent.Patent{
-		&mockPatent{
+	patents := []*domainpatent.Patent{
+		(&mockPatent{
 			id: "pat-1", number: "US1234", techDomain: "A61K", legalStatus: "granted",
 			assignee: "OwnCorp", filingDate: time.Date(2020, 3, 15, 0, 0, 0, 0, time.UTC),
 			valueScore: 8.5, moleculeIDs: []string{"mol-1"},
-		},
-		&mockPatent{
+		}).toPatent(),
+		(&mockPatent{
 			id: "pat-2", number: "US5678", techDomain: "C07D", legalStatus: "granted",
 			assignee: "OwnCorp", filingDate: time.Date(2021, 7, 20, 0, 0, 0, 0, time.UTC),
 			valueScore: 7.2, moleculeIDs: []string{"mol-2"},
-		},
-		&mockPatent{
+		}).toPatent(),
+		(&mockPatent{
 			id: "pat-3", number: "US9012", techDomain: "A61K", legalStatus: "pending",
 			assignee: "OwnCorp", filingDate: time.Date(2023, 1, 10, 0, 0, 0, 0, time.UTC),
 			valueScore: 9.1, moleculeIDs: []string{"mol-3"},
-		},
+		}).toPatent(),
 	}
 	patentRepo.byPortfolio["portfolio-1"] = patents
 
 	// Competitor patents.
-	compPatents := []domainpatent.Patent{
-		&mockPatent{
+	compPatents := []*domainpatent.Patent{
+		(&mockPatent{
 			id: "comp-1", number: "EP1111", techDomain: "A61K", legalStatus: "granted",
 			assignee: "CompetitorInc", filingDate: time.Date(2019, 5, 1, 0, 0, 0, 0, time.UTC),
 			valueScore: 6.0, moleculeIDs: []string{"mol-c1"},
-		},
-		&mockPatent{
+		}).toPatent(),
+		(&mockPatent{
 			id: "comp-2", number: "EP2222", techDomain: "G16B", legalStatus: "granted",
 			assignee: "CompetitorInc", filingDate: time.Date(2022, 11, 1, 0, 0, 0, 0, time.UTC),
 			valueScore: 8.0, moleculeIDs: []string{"mol-c2"},
-		},
+		}).toPatent(),
 	}
 	patentRepo.byAssignee["CompetitorInc"] = compPatents
 
 	// Molecules.
-	molRepo.molecules["mol-1"] = &mockMolecule{id: "mol-1", smiles: "CCO"}
-	molRepo.molecules["mol-2"] = &mockMolecule{id: "mol-2", smiles: "c1ccccc1"}
-	molRepo.molecules["mol-3"] = &mockMolecule{id: "mol-3", smiles: "CC(=O)O"}
+	molRepo.molecules["mol-1"] = (&mockMolecule{id: "mol-1", smiles: "CCO"}).toMolecule()
+	molRepo.molecules["mol-2"] = (&mockMolecule{id: "mol-2", smiles: "c1ccccc1"}).toMolecule()
+	molRepo.molecules["mol-3"] = (&mockMolecule{id: "mol-3", smiles: "CC(=O)O"}).toMolecule()
 
+	// Use toPortfolio() helper
+	portfolioForService := (&mockPortfolio{id: "portfolio-1", name: "Test Portfolio"}).toPortfolio()
+	
 	cfg := ConstellationServiceConfig{
-		PortfolioService:   &mockPortfolioService{portfolio: &mockPortfolio{id: "portfolio-1", name: "Test Portfolio"}},
+		PortfolioService:   &mockPortfolioService{portfolio: portfolioForService},
 		MoleculeService:    &mockMoleculeService{},
 		PatentRepository:   patentRepo,
 		MoleculeRepository: molRepo,
