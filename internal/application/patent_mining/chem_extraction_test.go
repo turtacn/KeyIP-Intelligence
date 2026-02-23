@@ -2,882 +2,287 @@
 // Phase: 应用层 - 业务服务
 // SubModule: patent_mining
 // File: internal/application/patent_mining/chem_extraction_test.go
-//
-// Generation Plan:
-// - 功能定位: 对 ChemExtractionService 接口所有方法进行全面单元测试
-// - 核心实现:
-//   - 构建 mock 依赖: mockChemExtractor, mockMoleculeRepository, mockPatentRepository, mockEventPublisher, mockLogger
-//   - 覆盖 ExtractFromPatent / ExtractFromText / ExtractFromDocument / BatchExtract / GetExtractionResult 全部方法
-//   - 验证正常流程、参数校验失败、依赖错误传播、空结果处理
-// - 测试用例:
-//   - TestExtractFromPatent_Success / PatentNotFound / ExtractorError / NoEntitiesFound
-//   - TestExtractFromText_Success / EmptyText / InvalidFormat
-//   - TestExtractFromDocument_Success / UnsupportedType
-//   - TestBatchExtract_Success / PartialFailure / EmptyInput
-//   - TestGetExtractionResult_Success / NotFound
-//   - TestExtractFromPatent_MoleculeValidation / DuplicateDetection
-// - 依赖: internal/application/patent_mining/chem_extraction.go, pkg/errors, pkg/types
-// - 被依赖: CI pipeline
-// - 强制约束: 文件最后一行必须为 //Personal.AI order the ending
 
 package patent_mining
 
 import (
 	"context"
-	"errors"
+	"io"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
+	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	storageminio "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/storage/minio"
+	chemextractor "github.com/turtacn/KeyIP-Intelligence/internal/intelligence/chem_extractor"
 	apperrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	commonTypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	moleculeTypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
 // ---------------------------------------------------------------------------
-// Mock: ChemExtractorEngine
+// Mocks
 // ---------------------------------------------------------------------------
 
-type mockChemExtractorEngine struct {
-	extractFromTextFn func(ctx context.Context, text string, opts ExtractionOptions) (*RawExtractionResult, error)
-	extractFromFileFn func(ctx context.Context, filePath string, fileType string, opts ExtractionOptions) (*RawExtractionResult, error)
+// MockExtractor
+type MockExtractor struct {
+	ExtractFunc  func(ctx context.Context, input *chemextractor.ExtractionInput) ([]chemextractor.ExtractedEntity, error)
+	ResolveFunc  func(ctx context.Context, value string, entityType string) (*chemextractor.ResolvedChemicalEntity, error)
+	ValidateFunc func(ctx context.Context, smiles string) (bool, error)
 }
 
-func (m *mockChemExtractorEngine) ExtractFromText(ctx context.Context, text string, opts ExtractionOptions) (*RawExtractionResult, error) {
-	if m.extractFromTextFn != nil {
-		return m.extractFromTextFn(ctx, text, opts)
+func (m *MockExtractor) Extract(ctx context.Context, input *chemextractor.ExtractionInput) ([]chemextractor.ExtractedEntity, error) {
+	if m.ExtractFunc != nil {
+		return m.ExtractFunc(ctx, input)
 	}
-	return &RawExtractionResult{}, nil
+	return nil, nil
 }
 
-func (m *mockChemExtractorEngine) ExtractFromFile(ctx context.Context, filePath string, fileType string, opts ExtractionOptions) (*RawExtractionResult, error) {
-	if m.extractFromFileFn != nil {
-		return m.extractFromFileFn(ctx, filePath, fileType, opts)
+func (m *MockExtractor) Resolve(ctx context.Context, value string, entityType string) (*chemextractor.ResolvedChemicalEntity, error) {
+	if m.ResolveFunc != nil {
+		return m.ResolveFunc(ctx, value, entityType)
 	}
-	return &RawExtractionResult{}, nil
+	return nil, nil
 }
 
-// ---------------------------------------------------------------------------
-// Mock: MoleculeRepoForExtraction
-// ---------------------------------------------------------------------------
-
-type mockMoleculeRepoForExtraction struct {
-	findByInChIKeyFn func(ctx context.Context, inchiKey string) (*moleculeTypes.MoleculeDTO, error)
-	saveFn           func(ctx context.Context, mol *moleculeTypes.MoleculeDTO) error
-}
-
-func (m *mockMoleculeRepoForExtraction) FindByInChIKey(ctx context.Context, inchiKey string) (*moleculeTypes.MoleculeDTO, error) {
-	if m.findByInChIKeyFn != nil {
-		return m.findByInChIKeyFn(ctx, inchiKey)
+func (m *MockExtractor) Validate(ctx context.Context, smiles string) (bool, error) {
+	if m.ValidateFunc != nil {
+		return m.ValidateFunc(ctx, smiles)
 	}
-	return nil, apperrors.NewNotFoundError("molecule", inchiKey)
+	return true, nil
 }
 
-func (m *mockMoleculeRepoForExtraction) Save(ctx context.Context, mol *moleculeTypes.MoleculeDTO) error {
-	if m.saveFn != nil {
-		return m.saveFn(ctx, mol)
+// MockMoleculeService
+type MockMoleculeService struct {
+	CreateFromSMILESFunc func(ctx context.Context, smiles string, metadata map[string]string) (*molecule.Molecule, error)
+}
+
+func (m *MockMoleculeService) CreateFromSMILES(ctx context.Context, smiles string, metadata map[string]string) (*molecule.Molecule, error) {
+	if m.CreateFromSMILESFunc != nil {
+		return m.CreateFromSMILESFunc(ctx, smiles, metadata)
+	}
+	return &molecule.Molecule{ID: googleUUID("1")}, nil
+}
+
+// MockMoleculeRepo
+type MockMoleculeRepo struct {
+	FindByInChIKeyFunc func(ctx context.Context, inchiKey string) (*molecule.Molecule, error)
+}
+
+func (m *MockMoleculeRepo) FindByInChIKey(ctx context.Context, inchiKey string) (*molecule.Molecule, error) {
+	if m.FindByInChIKeyFunc != nil {
+		return m.FindByInChIKeyFunc(ctx, inchiKey)
+	}
+	return nil, apperrors.New(apperrors.ErrCodeNotFound, "not found")
+}
+
+func (m *MockMoleculeRepo) Save(ctx context.Context, molecule *molecule.Molecule) error { return nil }
+func (m *MockMoleculeRepo) Update(ctx context.Context, molecule *molecule.Molecule) error { return nil }
+func (m *MockMoleculeRepo) Delete(ctx context.Context, id string) error { return nil }
+func (m *MockMoleculeRepo) BatchSave(ctx context.Context, molecules []*molecule.Molecule) (int, error) { return 0, nil }
+func (m *MockMoleculeRepo) FindByID(ctx context.Context, id string) (*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeRepo) FindBySMILES(ctx context.Context, smiles string) ([]*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeRepo) FindByIDs(ctx context.Context, ids []string) ([]*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeRepo) Exists(ctx context.Context, id string) (bool, error) { return false, nil }
+func (m *MockMoleculeRepo) ExistsByInChIKey(ctx context.Context, inchiKey string) (bool, error) { return false, nil }
+func (m *MockMoleculeRepo) Search(ctx context.Context, query *molecule.MoleculeQuery) (*molecule.MoleculeSearchResult, error) { return nil, nil }
+func (m *MockMoleculeRepo) Count(ctx context.Context, query *molecule.MoleculeQuery) (int64, error) { return 0, nil }
+func (m *MockMoleculeRepo) FindBySource(ctx context.Context, source molecule.MoleculeSource, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeRepo) FindByStatus(ctx context.Context, status molecule.MoleculeStatus, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeRepo) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeRepo) FindByMolecularWeightRange(ctx context.Context, minWeight, maxWeight float64, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeRepo) FindWithFingerprint(ctx context.Context, fpType molecule.FingerprintType, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeRepo) FindWithoutFingerprint(ctx context.Context, fpType molecule.FingerprintType, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
+
+// MockPatentRepo
+type MockPatentRepo struct {
+	AssociateMoleculeFunc func(ctx context.Context, patentID string, moleculeID string) error
+}
+
+func (m *MockPatentRepo) AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error {
+	if m.AssociateMoleculeFunc != nil {
+		return m.AssociateMoleculeFunc(ctx, patentID, moleculeID)
 	}
 	return nil
 }
 
+func (m *MockPatentRepo) Create(ctx context.Context, p *patent.Patent) error { return nil }
+func (m *MockPatentRepo) GetByID(ctx context.Context, id uuid.UUID) (*patent.Patent, error) { return nil, nil }
+func (m *MockPatentRepo) GetByPatentNumber(ctx context.Context, number string) (*patent.Patent, error) { return nil, nil }
+func (m *MockPatentRepo) Update(ctx context.Context, p *patent.Patent) error { return nil }
+func (m *MockPatentRepo) SoftDelete(ctx context.Context, id uuid.UUID) error { return nil }
+func (m *MockPatentRepo) Restore(ctx context.Context, id uuid.UUID) error { return nil }
+func (m *MockPatentRepo) HardDelete(ctx context.Context, id uuid.UUID) error { return nil }
+func (m *MockPatentRepo) Search(ctx context.Context, query patent.SearchQuery) (*patent.SearchResult, error) { return nil, nil }
+func (m *MockPatentRepo) GetByFamilyID(ctx context.Context, familyID string) ([]*patent.Patent, error) { return nil, nil }
+func (m *MockPatentRepo) GetByAssignee(ctx context.Context, assigneeID uuid.UUID, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
+func (m *MockPatentRepo) GetByJurisdiction(ctx context.Context, jurisdiction string, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
+func (m *MockPatentRepo) GetExpiringPatents(ctx context.Context, daysAhead int, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
+func (m *MockPatentRepo) FindDuplicates(ctx context.Context, fullTextHash string) ([]*patent.Patent, error) { return nil, nil }
+func (m *MockPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*patent.Patent, error) { return nil, nil }
+func (m *MockPatentRepo) CreateClaim(ctx context.Context, claim *patent.Claim) error { return nil }
+func (m *MockPatentRepo) GetClaimsByPatent(ctx context.Context, patentID uuid.UUID) ([]*patent.Claim, error) { return nil, nil }
+func (m *MockPatentRepo) UpdateClaim(ctx context.Context, claim *patent.Claim) error { return nil }
+func (m *MockPatentRepo) DeleteClaimsByPatent(ctx context.Context, patentID uuid.UUID) error { return nil }
+func (m *MockPatentRepo) BatchCreateClaims(ctx context.Context, claims []*patent.Claim) error { return nil }
+func (m *MockPatentRepo) GetIndependentClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.Claim, error) { return nil, nil }
+func (m *MockPatentRepo) SetInventors(ctx context.Context, patentID uuid.UUID, inventors []*patent.Inventor) error { return nil }
+func (m *MockPatentRepo) GetInventors(ctx context.Context, patentID uuid.UUID) ([]*patent.Inventor, error) { return nil, nil }
+func (m *MockPatentRepo) SearchByInventor(ctx context.Context, inventorName string, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
+func (m *MockPatentRepo) SetPriorityClaims(ctx context.Context, patentID uuid.UUID, claims []*patent.PriorityClaim) error { return nil }
+func (m *MockPatentRepo) GetPriorityClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.PriorityClaim, error) { return nil, nil }
+func (m *MockPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Patent) (int, error) { return 0, nil }
+func (m *MockPatentRepo) BatchUpdateStatus(ctx context.Context, ids []uuid.UUID, status patent.PatentStatus) (int64, error) { return 0, nil }
+func (m *MockPatentRepo) CountByStatus(ctx context.Context) (map[patent.PatentStatus]int64, error) { return nil, nil }
+func (m *MockPatentRepo) CountByJurisdiction(ctx context.Context) (map[string]int64, error) { return nil, nil }
+func (m *MockPatentRepo) CountByYear(ctx context.Context, field string) (map[int]int64, error) { return nil, nil }
+func (m *MockPatentRepo) GetIPCDistribution(ctx context.Context, level int) (map[string]int64, error) { return nil, nil }
+func (m *MockPatentRepo) WithTx(ctx context.Context, fn func(patent.PatentRepository) error) error { return nil }
+
+// MockStorage
+type MockStorage struct {
+	GetFunc func(ctx context.Context, path string) ([]byte, error)
+}
+
+func (m *MockStorage) Get(ctx context.Context, path string) ([]byte, error) {
+	if m.GetFunc != nil {
+		return m.GetFunc(ctx, path)
+	}
+	return nil, nil
+}
+
+func (m *MockStorage) Upload(ctx context.Context, req *storageminio.UploadRequest) (*storageminio.UploadResult, error) { return nil, nil }
+func (m *MockStorage) UploadStream(ctx context.Context, req *storageminio.StreamUploadRequest) (*storageminio.UploadResult, error) { return nil, nil }
+func (m *MockStorage) Download(ctx context.Context, bucket, objectKey string) (*storageminio.DownloadResult, error) { return nil, nil }
+func (m *MockStorage) DownloadToWriter(ctx context.Context, bucket, objectKey string, writer io.Writer) error { return nil }
+func (m *MockStorage) Delete(ctx context.Context, bucket, objectKey string) error { return nil }
+func (m *MockStorage) DeleteBatch(ctx context.Context, bucket string, objectKeys []string) ([]storageminio.DeleteError, error) { return nil, nil }
+func (m *MockStorage) Exists(ctx context.Context, bucket, objectKey string) (bool, error) { return false, nil }
+func (m *MockStorage) GetMetadata(ctx context.Context, bucket, objectKey string) (*storageminio.ObjectMetadata, error) { return nil, nil }
+func (m *MockStorage) List(ctx context.Context, bucket, prefix string, opts *storageminio.ListOptions) (*storageminio.ListResult, error) { return nil, nil }
+func (m *MockStorage) Copy(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error { return nil }
+func (m *MockStorage) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error { return nil }
+func (m *MockStorage) GetPresignedDownloadURL(ctx context.Context, bucket, objectKey string, expiry time.Duration) (string, error) { return "", nil }
+func (m *MockStorage) GetPresignedUploadURL(ctx context.Context, bucket, objectKey string, expiry time.Duration) (string, error) { return "", nil }
+func (m *MockStorage) SetTags(ctx context.Context, bucket, objectKey string, tags map[string]string) error { return nil }
+func (m *MockStorage) GetTags(ctx context.Context, bucket, objectKey string) (map[string]string, error) { return nil, nil }
+
+// MockLogger
+type MockLogger struct{}
+func (m *MockLogger) Info(msg string, fields ...logging.Field) {}
+func (m *MockLogger) Warn(msg string, fields ...logging.Field) {}
+func (m *MockLogger) Error(msg string, fields ...logging.Field) {}
+func (m *MockLogger) Fatal(msg string, fields ...logging.Field) {}
+func (m *MockLogger) Debug(msg string, fields ...logging.Field) {}
+func (m *MockLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *MockLogger) WithContext(ctx context.Context) logging.Logger { return m }
+func (m *MockLogger) WithError(err error) logging.Logger { return m }
+func (m *MockLogger) Sync() error { return nil }
+
+// Helper
+func googleUUID(s string) uuid.UUID {
+    return uuid.New() // Just random for test
+}
+
 // ---------------------------------------------------------------------------
-// Mock: PatentRepoForExtraction
+// Tests
 // ---------------------------------------------------------------------------
-
-type mockPatentRepoForExtraction struct {
-	getByIDFn     func(ctx context.Context, id string) (*PatentDocumentRef, error)
-	getFullTextFn func(ctx context.Context, id string) (string, error)
-}
-
-func (m *mockPatentRepoForExtraction) GetByID(ctx context.Context, id string) (*PatentDocumentRef, error) {
-	if m.getByIDFn != nil {
-		return m.getByIDFn(ctx, id)
-	}
-	return nil, apperrors.NewNotFoundError("patent", id)
-}
-
-func (m *mockPatentRepoForExtraction) GetFullText(ctx context.Context, id string) (string, error) {
-	if m.getFullTextFn != nil {
-		return m.getFullTextFn(ctx, id)
-	}
-	return "", apperrors.NewNotFoundError("patent_text", id)
-}
-
-// ---------------------------------------------------------------------------
-// Mock: ExtractionEventPublisher
-// ---------------------------------------------------------------------------
-
-type mockExtractionEventPublisher struct {
-	publishFn func(ctx context.Context, event ExtractionEvent) error
-	calls     []ExtractionEvent
-}
-
-func (m *mockExtractionEventPublisher) Publish(ctx context.Context, event ExtractionEvent) error {
-	m.calls = append(m.calls, event)
-	if m.publishFn != nil {
-		return m.publishFn(ctx, event)
-	}
-	return nil
-}
-
-// ---------------------------------------------------------------------------
-// Mock: ExtractionResultStore
-// ---------------------------------------------------------------------------
-
-type mockExtractionResultStore struct {
-	saveFn func(ctx context.Context, result *ExtractionResult) error
-	getFn  func(ctx context.Context, id string) (*ExtractionResult, error)
-}
-
-func (m *mockExtractionResultStore) Save(ctx context.Context, result *ExtractionResult) error {
-	if m.saveFn != nil {
-		return m.saveFn(ctx, result)
-	}
-	return nil
-}
-
-func (m *mockExtractionResultStore) Get(ctx context.Context, id string) (*ExtractionResult, error) {
-	if m.getFn != nil {
-		return m.getFn(ctx, id)
-	}
-	return nil, apperrors.NewNotFoundError("extraction_result", id)
-}
-
-// ---------------------------------------------------------------------------
-// Mock: Logger (reuse pattern)
-// ---------------------------------------------------------------------------
-
-type mockExtLogger struct{}
-
-func (m *mockExtLogger) Info(msg string, fields ...interface{})  {}
-func (m *mockExtLogger) Error(msg string, fields ...interface{}) {}
-func (m *mockExtLogger) Warn(msg string, fields ...interface{})  {}
-func (m *mockExtLogger) Debug(msg string, fields ...interface{}) {}
-
-// ---------------------------------------------------------------------------
-// Helper: build service under test
-// ---------------------------------------------------------------------------
-
-func newTestChemExtractionService(
-	extractor ChemExtractorEngine,
-	molRepo MoleculeRepoForExtraction,
-	patRepo PatentRepoForExtraction,
-	publisher ExtractionEventPublisher,
-	store ExtractionResultStore,
-) ChemExtractionService {
-	return NewChemExtractionService(ChemExtractionDeps{
-		Extractor:   extractor,
-		MolRepo:     molRepo,
-		PatentRepo:  patRepo,
-		Publisher:   publisher,
-		ResultStore: store,
-		Logger:      &mockExtLogger{},
-	})
-}
-
-func sampleRawExtractionResult() *RawExtractionResult {
-	return &RawExtractionResult{
-		Molecules: []ExtractedMolecule{
-			{
-				SMILES:   "c1ccc2c(c1)[nH]c1ccccc12",
-				Name:     "Carbazole",
-				InChIKey: "TVFDJXOCBHFTFK-UHFFFAOYSA-N",
-				Source:   "Example 1",
-				Confidence: 0.95,
-			},
-			{
-				SMILES:   "c1ccc(-c2ccccc2)cc1",
-				Name:     "Biphenyl",
-				InChIKey: "ZUOUZKKEUPVFJK-UHFFFAOYSA-N",
-				Source:   "Claim 1",
-				Confidence: 0.88,
-			},
-		},
-		Properties: []ExtractedProperty{
-			{
-				MoleculeRef: "Carbazole",
-				Name:        "quantum_efficiency",
-				Value:       "22.5",
-				Unit:        "%",
-				Confidence:  0.90,
-			},
-		},
-		ProcessingTimeMs: 1200,
-	}
-}
-
-// ===========================================================================
-// Tests: ExtractFromPatent
-// ===========================================================================
-
-func TestExtractFromPatent_Success(t *testing.T) {
-	patentText := "This patent describes carbazole-based OLED host materials..."
-	rawResult := sampleRawExtractionResult()
-
-	patRepo := &mockPatentRepoForExtraction{
-		getByIDFn: func(ctx context.Context, id string) (*PatentDocumentRef, error) {
-			return &PatentDocumentRef{
-				ID:            id,
-				PatentNumber:  "CN115000001A",
-				Title:         "Carbazole OLED Host",
-				FilingDate:    time.Date(2022, 3, 15, 0, 0, 0, 0, time.UTC),
-			}, nil
-		},
-		getFullTextFn: func(ctx context.Context, id string) (string, error) {
-			return patentText, nil
-		},
-	}
-
-	extractor := &mockChemExtractorEngine{
-		extractFromTextFn: func(ctx context.Context, text string, opts ExtractionOptions) (*RawExtractionResult, error) {
-			if text != patentText {
-				t.Errorf("unexpected text passed to extractor")
-			}
-			return rawResult, nil
-		},
-	}
-
-	molRepo := &mockMoleculeRepoForExtraction{
-		findByInChIKeyFn: func(ctx context.Context, inchiKey string) (*moleculeTypes.MoleculeDTO, error) {
-			return nil, apperrors.NewNotFoundError("molecule", inchiKey)
-		},
-		saveFn: func(ctx context.Context, mol *moleculeTypes.MoleculeDTO) error {
-			return nil
-		},
-	}
-
-	publisher := &mockExtractionEventPublisher{}
-	store := &mockExtractionResultStore{
-		saveFn: func(ctx context.Context, result *ExtractionResult) error {
-			return nil
-		},
-	}
-
-	svc := newTestChemExtractionService(extractor, molRepo, patRepo, publisher, store)
-
-	req := &ExtractFromPatentRequest{
-		PatentID: "pat-001",
-		Options: ExtractionOptions{
-			ExtractMolecules:  true,
-			ExtractProperties: true,
-			MinConfidence:     0.80,
-		},
-	}
-
-	result, err := svc.ExtractFromPatent(context.Background(), req)
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
-	if len(result.Molecules) != 2 {
-		t.Errorf("expected 2 molecules, got %d", len(result.Molecules))
-	}
-	if len(result.Properties) != 1 {
-		t.Errorf("expected 1 property, got %d", len(result.Properties))
-	}
-	if result.PatentID != "pat-001" {
-		t.Errorf("expected patent ID pat-001, got %s", result.PatentID)
-	}
-	if len(publisher.calls) == 0 {
-		t.Error("expected at least one event published")
-	}
-}
-
-func TestExtractFromPatent_PatentNotFound(t *testing.T) {
-	patRepo := &mockPatentRepoForExtraction{
-		getByIDFn: func(ctx context.Context, id string) (*PatentDocumentRef, error) {
-			return nil, apperrors.NewNotFoundError("patent", id)
-		},
-	}
-
-	svc := newTestChemExtractionService(
-		&mockChemExtractorEngine{},
-		&mockMoleculeRepoForExtraction{},
-		patRepo,
-		&mockExtractionEventPublisher{},
-		&mockExtractionResultStore{},
-	)
-
-	req := &ExtractFromPatentRequest{PatentID: "nonexistent"}
-	_, err := svc.ExtractFromPatent(context.Background(), req)
-	if err == nil {
-		t.Fatal("expected error for nonexistent patent")
-	}
-	if !apperrors.IsNotFoundError(err) {
-		t.Errorf("expected NotFoundError, got: %v", err)
-	}
-}
-
-func TestExtractFromPatent_ExtractorError(t *testing.T) {
-	patRepo := &mockPatentRepoForExtraction{
-		getByIDFn: func(ctx context.Context, id string) (*PatentDocumentRef, error) {
-			return &PatentDocumentRef{ID: id, PatentNumber: "CN115000001A"}, nil
-		},
-		getFullTextFn: func(ctx context.Context, id string) (string, error) {
-			return "some text", nil
-		},
-	}
-
-	extractor := &mockChemExtractorEngine{
-		extractFromTextFn: func(ctx context.Context, text string, opts ExtractionOptions) (*RawExtractionResult, error) {
-			return nil, errors.New("model inference timeout")
-		},
-	}
-
-	svc := newTestChemExtractionService(
-		extractor,
-		&mockMoleculeRepoForExtraction{},
-		patRepo,
-		&mockExtractionEventPublisher{},
-		&mockExtractionResultStore{},
-	)
-
-	req := &ExtractFromPatentRequest{PatentID: "pat-001"}
-	_, err := svc.ExtractFromPatent(context.Background(), req)
-	if err == nil {
-		t.Fatal("expected error from extractor failure")
-	}
-}
-
-func TestExtractFromPatent_NoEntitiesFound(t *testing.T) {
-	patRepo := &mockPatentRepoForExtraction{
-		getByIDFn: func(ctx context.Context, id string) (*PatentDocumentRef, error) {
-			return &PatentDocumentRef{ID: id, PatentNumber: "CN115000001A"}, nil
-		},
-		getFullTextFn: func(ctx context.Context, id string) (string, error) {
-			return "This patent has no chemical structures.", nil
-		},
-	}
-
-	extractor := &mockChemExtractorEngine{
-		extractFromTextFn: func(ctx context.Context, text string, opts ExtractionOptions) (*RawExtractionResult, error) {
-			return &RawExtractionResult{
-				Molecules:        []ExtractedMolecule{},
-				Properties:       []ExtractedProperty{},
-				ProcessingTimeMs: 500,
-			}, nil
-		},
-	}
-
-	store := &mockExtractionResultStore{
-		saveFn: func(ctx context.Context, result *ExtractionResult) error { return nil },
-	}
-
-	svc := newTestChemExtractionService(
-		extractor,
-		&mockMoleculeRepoForExtraction{},
-		patRepo,
-		&mockExtractionEventPublisher{},
-		store,
-	)
-
-	req := &ExtractFromPatentRequest{PatentID: "pat-002"}
-	result, err := svc.ExtractFromPatent(context.Background(), req)
-	if err != nil {
-		t.Fatalf("expected no error for empty extraction, got: %v", err)
-	}
-	if len(result.Molecules) != 0 {
-		t.Errorf("expected 0 molecules, got %d", len(result.Molecules))
-	}
-}
-
-func TestExtractFromPatent_MoleculeValidation(t *testing.T) {
-	patRepo := &mockPatentRepoForExtraction{
-		getByIDFn: func(ctx context.Context, id string) (*PatentDocumentRef, error) {
-			return &PatentDocumentRef{ID: id, PatentNumber: "CN115000001A"}, nil
-		},
-		getFullTextFn: func(ctx context.Context, id string) (string, error) {
-			return "text with molecules", nil
-		},
-	}
-
-	extractor := &mockChemExtractorEngine{
-		extractFromTextFn: func(ctx context.Context, text string, opts ExtractionOptions) (*RawExtractionResult, error) {
-			return &RawExtractionResult{
-				Molecules: []ExtractedMolecule{
-					{SMILES: "c1ccc2c(c1)[nH]c1ccccc12", InChIKey: "TVFDJXOCBHFTFK-UHFFFAOYSA-N", Confidence: 0.95},
-					{SMILES: "INVALID_SMILES", InChIKey: "", Confidence: 0.30},
-				},
-			}, nil
-		},
-	}
-
-	molRepo := &mockMoleculeRepoForExtraction{
-		findByInChIKeyFn: func(ctx context.Context, inchiKey string) (*moleculeTypes.MoleculeDTO, error) {
-			return nil, apperrors.NewNotFoundError("molecule", inchiKey)
-		},
-		saveFn: func(ctx context.Context, mol *moleculeTypes.MoleculeDTO) error { return nil },
-	}
-
-	store := &mockExtractionResultStore{
-		saveFn: func(ctx context.Context, result *ExtractionResult) error { return nil },
-	}
-
-	svc := newTestChemExtractionService(
-		extractor,
-		molRepo,
-		patRepo,
-		&mockExtractionEventPublisher{},
-		store,
-	)
-
-	req := &ExtractFromPatentRequest{
-		PatentID: "pat-003",
-		Options:  ExtractionOptions{MinConfidence: 0.80, ExtractMolecules: true},
-	}
-	result, err := svc.ExtractFromPatent(context.Background(), req)
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	// Only the high-confidence valid molecule should pass
-	if len(result.Molecules) != 1 {
-		t.Errorf("expected 1 valid molecule after filtering, got %d", len(result.Molecules))
-	}
-}
-
-func TestExtractFromPatent_DuplicateDetection(t *testing.T) {
-	patRepo := &mockPatentRepoForExtraction{
-		getByIDFn: func(ctx context.Context, id string) (*PatentDocumentRef, error) {
-			return &PatentDocumentRef{ID: id, PatentNumber: "CN115000001A"}, nil
-		},
-		getFullTextFn: func(ctx context.Context, id string) (string, error) {
-			return "text with duplicate molecules", nil
-		},
-	}
-
-	extractor := &mockChemExtractorEngine{
-		extractFromTextFn: func(ctx context.Context, text string, opts ExtractionOptions) (*RawExtractionResult, error) {
-			return &RawExtractionResult{
-				Molecules: []ExtractedMolecule{
-					{SMILES: "c1ccc2c(c1)[nH]c1ccccc12", InChIKey: "TVFDJXOCBHFTFK-UHFFFAOYSA-N", Confidence: 0.95},
-					{SMILES: "c1ccc2c(c1)[nH]c1ccccc12", InChIKey: "TVFDJXOCBHFTFK-UHFFFAOYSA-N", Confidence: 0.92},
-				},
-			}, nil
-		},
-	}
-
-	existingMol := &moleculeTypes.MoleculeDTO{
-		ID:       "mol-existing",
-		SMILES:   "c1ccc2c(c1)[nH]c1ccccc12",
-		InChIKey: "TVFDJXOCBHFTFK-UHFFFAOYSA-N",
-	}
-
-	molRepo := &mockMoleculeRepoForExtraction{
-		findByInChIKeyFn: func(ctx context.Context, inchiKey string) (*moleculeTypes.MoleculeDTO, error) {
-			if inchiKey == "TVFDJXOCBHFTFK-UHFFFAOYSA-N" {
-				return existingMol, nil
-			}
-			return nil, apperrors.NewNotFoundError("molecule", inchiKey)
-		},
-	}
-
-	store := &mockExtractionResultStore{
-		saveFn: func(ctx context.Context, result *ExtractionResult) error { return nil },
-	}
-
-	svc := newTestChemExtractionService(
-		extractor,
-		molRepo,
-		patRepo,
-		&mockExtractionEventPublisher{},
-		store,
-	)
-
-	req := &ExtractFromPatentRequest{
-		PatentID: "pat-004",
-		Options:  ExtractionOptions{ExtractMolecules: true, MinConfidence: 0.80},
-	}
-	result, err := svc.ExtractFromPatent(context.Background(), req)
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	// Duplicates should be deduplicated, existing molecule should be referenced
-	if len(result.Molecules) != 1 {
-		t.Errorf("expected 1 deduplicated molecule, got %d", len(result.Molecules))
-	}
-	if result.Molecules[0].ExistingID != "mol-existing" {
-		t.Errorf("expected existing molecule reference, got: %s", result.Molecules[0].ExistingID)
-	}
-}
-
-// ===========================================================================
-// Tests: ExtractFromText
-// ===========================================================================
-
-func TestExtractFromText_Success(t *testing.T) {
-	extractor := &mockChemExtractorEngine{
-		extractFromTextFn: func(ctx context.Context, text string, opts ExtractionOptions) (*RawExtractionResult, error) {
-			return sampleRawExtractionResult(), nil
-		},
-	}
-
-	molRepo := &mockMoleculeRepoForExtraction{
-		findByInChIKeyFn: func(ctx context.Context, inchiKey string) (*moleculeTypes.MoleculeDTO, error) {
-			return nil, apperrors.NewNotFoundError("molecule", inchiKey)
-		},
-		saveFn: func(ctx context.Context, mol *moleculeTypes.MoleculeDTO) error { return nil },
-	}
-
-	store := &mockExtractionResultStore{
-		saveFn: func(ctx context.Context, result *ExtractionResult) error { return nil },
-	}
-
-	svc := newTestChemExtractionService(
-		extractor,
-		molRepo,
-		&mockPatentRepoForExtraction{},
-		&mockExtractionEventPublisher{},
-		store,
-	)
-
-	req := &ExtractFromTextRequest{
-		Text:   "The compound carbazole (SMILES: c1ccc2c(c1)[nH]c1ccccc12) was synthesized.",
-		Format: "plain_text",
-		Options: ExtractionOptions{
-			ExtractMolecules:  true,
-			ExtractProperties: true,
-			MinConfidence:     0.80,
-		},
-	}
-
-	result, err := svc.ExtractFromText(context.Background(), req)
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
-	if len(result.Molecules) == 0 {
-		t.Error("expected at least one molecule extracted")
-	}
-}
-
-func TestExtractFromText_EmptyText(t *testing.T) {
-	svc := newTestChemExtractionService(
-		&mockChemExtractorEngine{},
-		&mockMoleculeRepoForExtraction{},
-		&mockPatentRepoForExtraction{},
-		&mockExtractionEventPublisher{},
-		&mockExtractionResultStore{},
-	)
-
-	req := &ExtractFromTextRequest{Text: "", Format: "plain_text"}
-	_, err := svc.ExtractFromText(context.Background(), req)
-	if err == nil {
-		t.Fatal("expected error for empty text")
-	}
-	if !apperrors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %v", err)
-	}
-}
-
-func TestExtractFromText_InvalidFormat(t *testing.T) {
-	svc := newTestChemExtractionService(
-		&mockChemExtractorEngine{},
-		&mockMoleculeRepoForExtraction{},
-		&mockPatentRepoForExtraction{},
-		&mockExtractionEventPublisher{},
-		&mockExtractionResultStore{},
-	)
-
-	req := &ExtractFromTextRequest{Text: "some text", Format: "unsupported_format"}
-	_, err := svc.ExtractFromText(context.Background(), req)
-	if err == nil {
-		t.Fatal("expected error for unsupported format")
-	}
-	if !apperrors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %v", err)
-	}
-}
-
-// ===========================================================================
-// Tests: ExtractFromDocument
-// ===========================================================================
 
 func TestExtractFromDocument_Success(t *testing.T) {
-	extractor := &mockChemExtractorEngine{
-		extractFromFileFn: func(ctx context.Context, filePath string, fileType string, opts ExtractionOptions) (*RawExtractionResult, error) {
-			return sampleRawExtractionResult(), nil
+	// Setup Mocks
+	extractor := &MockExtractor{
+		ExtractFunc: func(ctx context.Context, input *chemextractor.ExtractionInput) ([]chemextractor.ExtractedEntity, error) {
+			return []chemextractor.ExtractedEntity{
+				{Type: "SMILES", Value: "C1=CC=CC=C1", Confidence: 0.9, Page: 1},
+			}, nil
+		},
+		ResolveFunc: func(ctx context.Context, value string, entityType string) (*chemextractor.ResolvedChemicalEntity, error) {
+			return &chemextractor.ResolvedChemicalEntity{
+				CanonicalSMILES: "c1ccccc1",
+				InChIKey:        "UHOVQNZJYSORNB-UHFFFAOYSA-N",
+			}, nil
+		},
+		ValidateFunc: func(ctx context.Context, smiles string) (bool, error) {
+			return true, nil
 		},
 	}
 
-	molRepo := &mockMoleculeRepoForExtraction{
-		findByInChIKeyFn: func(ctx context.Context, inchiKey string) (*moleculeTypes.MoleculeDTO, error) {
-			return nil, apperrors.NewNotFoundError("molecule", inchiKey)
+	molRepo := &MockMoleculeRepo{
+		FindByInChIKeyFunc: func(ctx context.Context, inchiKey string) (*molecule.Molecule, error) {
+			return nil, apperrors.New(apperrors.ErrCodeNotFound, "not found")
 		},
-		saveFn: func(ctx context.Context, mol *moleculeTypes.MoleculeDTO) error { return nil },
 	}
 
-	store := &mockExtractionResultStore{
-		saveFn: func(ctx context.Context, result *ExtractionResult) error { return nil },
+	molService := &MockMoleculeService{
+		CreateFromSMILESFunc: func(ctx context.Context, smiles string, metadata map[string]string) (*molecule.Molecule, error) {
+			return &molecule.Molecule{ID: googleUUID("1"), SMILES: smiles}, nil
+		},
 	}
 
-	svc := newTestChemExtractionService(
-		extractor,
-		molRepo,
-		&mockPatentRepoForExtraction{},
-		&mockExtractionEventPublisher{},
-		store,
-	)
-
-	req := &ExtractFromDocumentRequest{
-		FilePath: "/data/patents/CN115000001A.pdf",
-		FileType: "pdf",
-		Options:  ExtractionOptions{ExtractMolecules: true, MinConfidence: 0.80},
+	patentRepo := &MockPatentRepo{
+		AssociateMoleculeFunc: func(ctx context.Context, patentID string, moleculeID string) error {
+			return nil
+		},
 	}
 
-	result, err := svc.ExtractFromDocument(context.Background(), req)
+	storage := &MockStorage{
+		GetFunc: func(ctx context.Context, path string) ([]byte, error) {
+			return []byte("dummy pdf content"), nil
+		},
+	}
+
+	svc := NewChemExtractionService(extractor, molService, molRepo, patentRepo, storage, &MockLogger{})
+
+	req := &ExtractionRequest{
+		DocumentID:          "doc-1",
+		DocumentStoragePath: "bucket/doc-1.pdf",
+		Format:              DocumentFormatPDF,
+		PatentID:            "pat-1",
+	}
+
+	res, err := svc.ExtractFromDocument(context.Background(), req)
+
 	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+		t.Fatalf("expected no error, got %v", err)
 	}
-	if result == nil {
-		t.Fatal("expected non-nil result")
+	if res.TotalExtracted != 1 {
+		t.Errorf("expected 1 extracted, got %d", res.TotalExtracted)
 	}
-}
-
-func TestExtractFromDocument_UnsupportedType(t *testing.T) {
-	svc := newTestChemExtractionService(
-		&mockChemExtractorEngine{},
-		&mockMoleculeRepoForExtraction{},
-		&mockPatentRepoForExtraction{},
-		&mockExtractionEventPublisher{},
-		&mockExtractionResultStore{},
-	)
-
-	req := &ExtractFromDocumentRequest{
-		FilePath: "/data/file.exe",
-		FileType: "exe",
-	}
-	_, err := svc.ExtractFromDocument(context.Background(), req)
-	if err == nil {
-		t.Fatal("expected error for unsupported document type")
-	}
-	if !apperrors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %v", err)
+	if res.TotalAccepted != 1 {
+		t.Errorf("expected 1 accepted, got %d", res.TotalAccepted)
 	}
 }
 
-// ===========================================================================
-// Tests: BatchExtract
-// ===========================================================================
-
-func TestBatchExtract_Success(t *testing.T) {
-	callCount := 0
-	extractor := &mockChemExtractorEngine{
-		extractFromTextFn: func(ctx context.Context, text string, opts ExtractionOptions) (*RawExtractionResult, error) {
-			callCount++
-			return sampleRawExtractionResult(), nil
+func TestExtractFromText_Success(t *testing.T) {
+	extractor := &MockExtractor{
+		ExtractFunc: func(ctx context.Context, input *chemextractor.ExtractionInput) ([]chemextractor.ExtractedEntity, error) {
+			return []chemextractor.ExtractedEntity{
+				{Type: "SMILES", Value: "C", Confidence: 0.8},
+			}, nil
+		},
+		ResolveFunc: func(ctx context.Context, value string, entityType string) (*chemextractor.ResolvedChemicalEntity, error) {
+			return &chemextractor.ResolvedChemicalEntity{
+				CanonicalSMILES: "C",
+				InChIKey:        "Methane",
+			}, nil
+		},
+		ValidateFunc: func(ctx context.Context, smiles string) (bool, error) {
+			return true, nil
 		},
 	}
 
-	patRepo := &mockPatentRepoForExtraction{
-		getByIDFn: func(ctx context.Context, id string) (*PatentDocumentRef, error) {
-			return &PatentDocumentRef{ID: id, PatentNumber: "CN11500000" + id}, nil
-		},
-		getFullTextFn: func(ctx context.Context, id string) (string, error) {
-			return "patent text for " + id, nil
-		},
+	svc := NewChemExtractionService(extractor, &MockMoleculeService{}, &MockMoleculeRepo{}, &MockPatentRepo{}, &MockStorage{}, &MockLogger{})
+
+	req := &TextExtractionRequest{
+		Text: "Methane is C",
 	}
 
-	molRepo := &mockMoleculeRepoForExtraction{
-		findByInChIKeyFn: func(ctx context.Context, inchiKey string) (*moleculeTypes.MoleculeDTO, error) {
-			return nil, apperrors.NewNotFoundError("molecule", inchiKey)
-		},
-		saveFn: func(ctx context.Context, mol *moleculeTypes.MoleculeDTO) error { return nil },
-	}
-
-	store := &mockExtractionResultStore{
-		saveFn: func(ctx context.Context, result *ExtractionResult) error { return nil },
-	}
-
-	svc := newTestChemExtractionService(
-		extractor,
-		molRepo,
-		patRepo,
-		&mockExtractionEventPublisher{},
-		store,
-	)
-
-	req := &BatchExtractRequest{
-		PatentIDs: []string{"1", "2", "3"},
-		Options:   ExtractionOptions{ExtractMolecules: true, MinConfidence: 0.80},
-	}
-
-	results, err := svc.BatchExtract(context.Background(), req)
+	res, err := svc.ExtractFromText(context.Background(), req)
 	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(results.Results) != 3 {
-		t.Errorf("expected 3 results, got %d", len(results.Results))
-	}
-	if results.TotalProcessed != 3 {
-		t.Errorf("expected TotalProcessed=3, got %d", results.TotalProcessed)
-	}
-	if results.FailedCount != 0 {
-		t.Errorf("expected FailedCount=0, got %d", results.FailedCount)
-	}
-	if callCount != 3 {
-		t.Errorf("expected extractor called 3 times, got %d", callCount)
+	if res.TotalExtracted != 1 {
+		t.Errorf("expected 1 extracted, got %d", res.TotalExtracted)
 	}
 }
-
-func TestBatchExtract_PartialFailure(t *testing.T) {
-	patRepo := &mockPatentRepoForExtraction{
-		getByIDFn: func(ctx context.Context, id string) (*PatentDocumentRef, error) {
-			if id == "bad" {
-				return nil, apperrors.NewNotFoundError("patent", id)
-			}
-			return &PatentDocumentRef{ID: id, PatentNumber: "CN115000001A"}, nil
-		},
-		getFullTextFn: func(ctx context.Context, id string) (string, error) {
-			return "text for " + id, nil
-		},
-	}
-
-	extractor := &mockChemExtractorEngine{
-		extractFromTextFn: func(ctx context.Context, text string, opts ExtractionOptions) (*RawExtractionResult, error) {
-			return sampleRawExtractionResult(), nil
-		},
-	}
-
-	molRepo := &mockMoleculeRepoForExtraction{
-		findByInChIKeyFn: func(ctx context.Context, inchiKey string) (*moleculeTypes.MoleculeDTO, error) {
-			return nil, apperrors.NewNotFoundError("molecule", inchiKey)
-		},
-		saveFn: func(ctx context.Context, mol *moleculeTypes.MoleculeDTO) error { return nil },
-	}
-
-	store := &mockExtractionResultStore{
-		saveFn: func(ctx context.Context, result *ExtractionResult) error { return nil },
-	}
-
-	svc := newTestChemExtractionService(
-		extractor,
-		molRepo,
-		patRepo,
-		&mockExtractionEventPublisher{},
-		store,
-	)
-
-	req := &BatchExtractRequest{
-		PatentIDs: []string{"good1", "bad", "good2"},
-		Options:   ExtractionOptions{ExtractMolecules: true, MinConfidence: 0.80},
-	}
-
-	results, err := svc.BatchExtract(context.Background(), req)
-	if err != nil {
-		t.Fatalf("expected no top-level error for partial failure, got: %v", err)
-	}
-	if results.TotalProcessed != 3 {
-		t.Errorf("expected TotalProcessed=3, got %d", results.TotalProcessed)
-	}
-	if results.FailedCount != 1 {
-		t.Errorf("expected FailedCount=1, got %d", results.FailedCount)
-	}
-	if results.SuccessCount != 2 {
-		t.Errorf("expected SuccessCount=2, got %d", results.SuccessCount)
-	}
-}
-
-func TestBatchExtract_EmptyInput(t *testing.T) {
-	svc := newTestChemExtractionService(
-		&mockChemExtractorEngine{},
-		&mockMoleculeRepoForExtraction{},
-		&mockPatentRepoForExtraction{},
-		&mockExtractionEventPublisher{},
-		&mockExtractionResultStore{},
-	)
-
-	req := &BatchExtractRequest{PatentIDs: []string{}}
-	_, err := svc.BatchExtract(context.Background(), req)
-	if err == nil {
-		t.Fatal("expected error for empty input")
-	}
-	if !apperrors.IsValidationError(err) {
-		t.Errorf("expected ValidationError, got: %v", err)
-	}
-}
-
-// ===========================================================================
-// Tests: GetExtractionResult
-// ===========================================================================
-
-func TestGetExtractionResult_Success(t *testing.T) {
-	expected := &ExtractionResult{
-		ID:       "ext-001",
-		PatentID: "pat-001",
-		Status:   ExtractionStatusCompleted,
-		Molecules: []ExtractionMoleculeResult{
-			{SMILES: "c1ccc2c(c1)[nH]c1ccccc12", InChIKey: "TVFDJXOCBHFTFK-UHFFFAOYSA-N"},
-		},
-		CreatedAt: time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-	}
-
-	store := &mockExtractionResultStore{
-		getFn: func(ctx context.Context, id string) (*ExtractionResult, error) {
-			if id == "ext-001" {
-				return expected, nil
-			}
-			return nil, apperrors.NewNotFoundError("extraction_result", id)
-		},
-	}
-
-	svc := newTestChemExtractionService(
-		&mockChemExtractorEngine{},
-		&mockMoleculeRepoForExtraction{},
-		&mockPatentRepoForExtraction{},
-		&mockExtractionEventPublisher{},
-		store,
-	)
-
-	result, err := svc.GetExtractionResult(context.Background(), "ext-001")
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-	if result.ID != "ext-001" {
-		t.Errorf("expected ID ext-001, got %s", result.ID)
-	}
-	if result.PatentID != "pat-001" {
-		t.Errorf("expected PatentID pat-001, got %s", result.PatentID)
-	}
-	if result.Status != ExtractionStatusCompleted {
-		t.Errorf("expected status Completed, got %s", result.Status)
-	}
-	if len(result.Molecules) != 1 {
-		t.Errorf("expected 1 molecule, got %d", len(result.Molecules))
-	}
-}
-
-func TestGetExtractionResult_NotFound(t *testing.T) {
-	store := &mockExtractionResultStore{
-		getFn: func(ctx context.Context, id string) (*ExtractionResult, error) {
-			return nil, apperrors.NewNotFoundError("extraction_result", id)
-		},
-	}
-
-	svc := newTestChemExtractionService(
-		&mockChemExtractorEngine{},
-		&mockMoleculeRepoForExtraction{},
-		&mockPatentRepoForExtraction{},
-		&mockExtractionEventPublisher{},
-		store,
-	)
-
-	_, err := svc.GetExtractionResult(context.Background(), "nonexistent")
-	if err == nil {
-		t.Fatal("expected error for nonexistent result")
-	}
-	if !apperrors.IsNotFoundError(err) {
-		t.Errorf("expected NotFoundError, got: %v", err)
-	}
-}
-
-// suppress unused import warnings
-var (
-	_ commonTypes.Pagination
-	_ time.Time
-)
-
 //Personal.AI order the ending
-

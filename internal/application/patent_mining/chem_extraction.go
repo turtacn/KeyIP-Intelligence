@@ -45,12 +45,11 @@ import (
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
-	chemextractor "github.com/turtacn/KeyIP-Intelligence/internal/intelligence/chem_extractor"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	storageminio "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/storage/minio"
+	chemextractor "github.com/turtacn/KeyIP-Intelligence/internal/intelligence/chem_extractor"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	moltypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
 
 // DefaultConfidenceThreshold is the minimum confidence score for an extracted entity
@@ -316,16 +315,19 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 	threshold := effectiveThreshold(req.ConfidenceThreshold)
 
 	s.logger.Info("starting document extraction",
-		"document_id", req.DocumentID,
-		"format", req.Format,
-		"threshold", threshold,
+		logging.String("document_id", req.DocumentID),
+		logging.String("format", string(req.Format)),
+		logging.Float64("threshold", threshold),
 	)
 
 	// 1. Fetch document bytes from object storage.
 	docBytes, err := s.storage.Get(ctx, req.DocumentStoragePath)
 	if err != nil {
-		s.logger.Error("failed to fetch document from storage", "path", req.DocumentStoragePath, "error", err)
-		return nil, errors.Wrap(err, "failed to fetch document from storage")
+		s.logger.Error("failed to fetch document from storage",
+			logging.String("path", req.DocumentStoragePath),
+			logging.Error(err),
+		)
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to fetch document from storage")
 	}
 
 	// 2. Invoke intelligence-layer extractor.
@@ -336,13 +338,16 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 	}
 	rawEntities, err := s.extractor.Extract(ctx, extractorReq)
 	if err != nil {
-		s.logger.Error("intelligence extractor failed", "document_id", req.DocumentID, "error", err)
-		return nil, errors.Wrap(err, "chemical extraction failed")
+		s.logger.Error("intelligence extractor failed",
+			logging.String("document_id", req.DocumentID),
+			logging.Error(err),
+		)
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "chemical extraction failed")
 	}
 
 	// 3. Process each raw entity: standardize, validate, deduplicate, persist.
 	result := &ExtractionResult{
-		RequestID:  commontypes.NewID(),
+		RequestID:  string(commontypes.NewID()),
 		DocumentID: req.DocumentID,
 		ExtractedAt: time.Now(),
 	}
@@ -370,7 +375,10 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 		resolved, err := s.extractor.Resolve(ctx, raw.Value, raw.Type)
 		if err != nil {
 			s.logger.Warn("failed to resolve entity, marking for review",
-				"raw", raw.Value, "type", raw.Type, "error", err)
+				logging.String("raw", raw.Value),
+				logging.String("type", raw.Type),
+				logging.Error(err),
+			)
 			entity.ReviewStatus = ReviewStatusNeedsReview
 			result.TotalReview++
 			result.Entities = append(result.Entities, entity)
@@ -382,7 +390,9 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 		// Validate chemical structure.
 		if valid, vErr := s.extractor.Validate(ctx, resolved.CanonicalSMILES); vErr != nil || !valid {
 			s.logger.Warn("entity failed validation, marking for review",
-				"canonical", resolved.CanonicalSMILES, "error", vErr)
+				logging.String("canonical", resolved.CanonicalSMILES),
+				logging.Error(vErr),
+			)
 			entity.ReviewStatus = ReviewStatusNeedsReview
 			result.TotalReview++
 			result.Entities = append(result.Entities, entity)
@@ -402,12 +412,15 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 		// Deduplicate against existing repository.
 		existing, err := s.molRepo.FindByInChIKey(ctx, resolved.InChIKey)
 		if err != nil && !errors.IsNotFound(err) {
-			s.logger.Error("repository lookup failed", "inchi_key", resolved.InChIKey, "error", err)
-			return nil, errors.Wrap(err, "molecule repository lookup failed")
+			s.logger.Error("repository lookup failed",
+				logging.String("inchi_key", resolved.InChIKey),
+				logging.Error(err),
+			)
+			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "molecule repository lookup failed")
 		}
 		if existing != nil {
 			entity.IsDuplicate = true
-			entity.MoleculeID = existing.ID
+			entity.MoleculeID = existing.ID.String()
 			entity.ReviewStatus = ReviewStatusAccepted
 			result.TotalDuplicated++
 		} else {
@@ -418,13 +431,16 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 				"extraction_id":  result.RequestID,
 			})
 			if createErr != nil {
-				s.logger.Error("failed to persist molecule", "smiles", resolved.CanonicalSMILES, "error", createErr)
+				s.logger.Error("failed to persist molecule",
+					logging.String("smiles", resolved.CanonicalSMILES),
+					logging.Error(createErr),
+				)
 				entity.ReviewStatus = ReviewStatusNeedsReview
 				result.TotalReview++
 				result.Entities = append(result.Entities, entity)
 				continue
 			}
-			entity.MoleculeID = mol.ID
+			entity.MoleculeID = mol.ID.String()
 			entity.ReviewStatus = ReviewStatusAccepted
 			result.TotalAccepted++
 		}
@@ -433,7 +449,10 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 		if req.PatentID != "" && entity.MoleculeID != "" {
 			if assocErr := s.patentRepo.AssociateMolecule(ctx, req.PatentID, entity.MoleculeID); assocErr != nil {
 				s.logger.Warn("failed to associate molecule with patent",
-					"patent_id", req.PatentID, "molecule_id", entity.MoleculeID, "error", assocErr)
+					logging.String("patent_id", req.PatentID),
+					logging.String("molecule_id", entity.MoleculeID),
+					logging.Error(assocErr),
+				)
 				// Non-fatal: extraction still succeeds.
 			}
 		}
@@ -445,12 +464,12 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 	result.DurationMs = time.Since(start).Milliseconds()
 
 	s.logger.Info("document extraction completed",
-		"document_id", req.DocumentID,
-		"total_extracted", result.TotalExtracted,
-		"total_accepted", result.TotalAccepted,
-		"total_duplicated", result.TotalDuplicated,
-		"total_review", result.TotalReview,
-		"duration_ms", result.DurationMs,
+		logging.String("document_id", req.DocumentID),
+		logging.Int("total_extracted", result.TotalExtracted),
+		logging.Int("total_accepted", result.TotalAccepted),
+		logging.Int("total_duplicated", result.TotalDuplicated),
+		logging.Int("total_review", result.TotalReview),
+		logging.Int64("duration_ms", result.DurationMs),
 	)
 
 	return result, nil
@@ -465,7 +484,10 @@ func (s *chemExtractionServiceImpl) ExtractFromText(ctx context.Context, req *Te
 	start := time.Now()
 	threshold := effectiveThreshold(req.ConfidenceThreshold)
 
-	s.logger.Info("starting text extraction", "text_length", len(req.Text), "threshold", threshold)
+	s.logger.Info("starting text extraction",
+		logging.Int("text_length", len(req.Text)),
+		logging.Float64("threshold", threshold),
+	)
 
 	// Invoke NER on raw text.
 	nerReq := &chemextractor.ExtractionInput{
@@ -475,12 +497,12 @@ func (s *chemExtractionServiceImpl) ExtractFromText(ctx context.Context, req *Te
 	}
 	rawEntities, err := s.extractor.Extract(ctx, nerReq)
 	if err != nil {
-		s.logger.Error("text extraction failed", "error", err)
-		return nil, errors.Wrap(err, "text chemical extraction failed")
+		s.logger.Error("text extraction failed", logging.Error(err))
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "text chemical extraction failed")
 	}
 
 	result := &ExtractionResult{
-		RequestID:   commontypes.NewID(),
+		RequestID:   string(commontypes.NewID()),
 		ExtractedAt: time.Now(),
 	}
 
@@ -533,8 +555,8 @@ func (s *chemExtractionServiceImpl) ExtractFromText(ctx context.Context, req *Te
 	result.DurationMs = time.Since(start).Milliseconds()
 
 	s.logger.Info("text extraction completed",
-		"total_extracted", result.TotalExtracted,
-		"duration_ms", result.DurationMs,
+		logging.Int("total_extracted", result.TotalExtracted),
+		logging.Int64("duration_ms", result.DurationMs),
 	)
 
 	return result, nil
@@ -549,7 +571,7 @@ func (s *chemExtractionServiceImpl) BatchExtract(ctx context.Context, req *Batch
 
 	for i := range req.Documents {
 		if err := validateExtractionRequest(&req.Documents[i]); err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("document[%d] validation failed", i))
+			return nil, errors.Wrap(err, errors.ErrCodeValidation, fmt.Sprintf("document[%d] validation failed", i))
 		}
 		if req.ConfidenceThreshold > 0 && req.Documents[i].ConfidenceThreshold == 0 {
 			req.Documents[i].ConfidenceThreshold = req.ConfidenceThreshold
@@ -558,7 +580,7 @@ func (s *chemExtractionServiceImpl) BatchExtract(ctx context.Context, req *Batch
 
 	now := time.Now()
 	job := &ExtractionJob{
-		JobID:          commontypes.NewID(),
+		JobID:          string(commontypes.NewID()),
 		Status:         JobStatusPending,
 		TotalDocuments: len(req.Documents),
 		CreatedAt:      now,
@@ -569,7 +591,10 @@ func (s *chemExtractionServiceImpl) BatchExtract(ctx context.Context, req *Batch
 	s.jobs[job.JobID] = job
 	s.jobsMu.Unlock()
 
-	s.logger.Info("batch extraction job created", "job_id", job.JobID, "total_documents", job.TotalDocuments)
+	s.logger.Info("batch extraction job created",
+		logging.String("job_id", job.JobID),
+		logging.Int("total_documents", job.TotalDocuments),
+	)
 
 	// Launch background processing. We detach from the request context to allow
 	// the job to outlive the HTTP request, but respect a generous timeout.
@@ -593,9 +618,9 @@ func (s *chemExtractionServiceImpl) runBatchJob(job *ExtractionJob, docs []Extra
 		s.jobsMu.Lock()
 		if err != nil {
 			s.logger.Error("batch extraction: document failed",
-				"job_id", job.JobID,
-				"document_id", docs[i].DocumentID,
-				"error", err,
+				logging.String("job_id", job.JobID),
+				logging.String("document_id", docs[i].DocumentID),
+				logging.Error(err),
 			)
 			job.FailedCount++
 		} else {
@@ -619,9 +644,9 @@ func (s *chemExtractionServiceImpl) runBatchJob(job *ExtractionJob, docs []Extra
 	s.jobsMu.Unlock()
 
 	s.logger.Info("batch extraction job completed",
-		"job_id", job.JobID,
-		"processed", job.ProcessedCount,
-		"failed", job.FailedCount,
+		logging.String("job_id", job.JobID),
+		logging.Int("processed", job.ProcessedCount),
+		logging.Int("failed", job.FailedCount),
 	)
 }
 

@@ -191,6 +191,29 @@ func (r *postgresPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID st
 	return scanPatents(rows)
 }
 
+func (r *postgresPatentRepo) AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error {
+	pID, err := uuid.Parse(patentID)
+	if err != nil {
+		return errors.NewInvalidInputError("invalid patent ID format")
+	}
+	mID, err := uuid.Parse(moleculeID)
+	if err != nil {
+		return errors.NewInvalidInputError("invalid molecule ID format")
+	}
+
+	// Assuming a join table patent_molecule_relations exists
+	query := `
+		INSERT INTO patent_molecule_relations (patent_id, molecule_id, created_at, updated_at, relation_type, confidence)
+		VALUES ($1, $2, NOW(), NOW(), 'extracted', 1.0)
+		ON CONFLICT (patent_id, molecule_id) DO UPDATE SET updated_at = NOW()
+	`
+	_, err = r.executor().ExecContext(ctx, query, pID, mID)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to associate molecule with patent")
+	}
+	return nil
+}
+
 // Claims
 
 func (r *postgresPatentRepo) CreateClaim(ctx context.Context, claim *patent.Claim) error {

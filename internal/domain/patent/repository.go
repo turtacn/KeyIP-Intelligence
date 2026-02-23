@@ -26,6 +26,7 @@ type PatentRepository interface {
 	GetExpiringPatents(ctx context.Context, daysAhead int, limit, offset int) ([]*Patent, int64, error)
 	FindDuplicates(ctx context.Context, fullTextHash string) ([]*Patent, error)
 	FindByMoleculeID(ctx context.Context, moleculeID string) ([]*Patent, error)
+	AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error
 
 	// Claims
 	CreateClaim(ctx context.Context, claim *Claim) error
@@ -57,5 +58,8 @@ type PatentRepository interface {
 	// Transaction
 	WithTx(ctx context.Context, fn func(PatentRepository) error) error
 }
+
+// Repository alias for PatentRepository
+type Repository = PatentRepository
 
 //Personal.AI order the ending

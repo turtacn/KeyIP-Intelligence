@@ -217,6 +217,10 @@ func NewValidation(message string, args ...interface{}) *AppError {
 	return New(ErrCodeValidation, message)
 }
 
+func NewValidationError(field, message string) *AppError {
+	return New(ErrCodeValidation, message).WithDetail(field)
+}
+
 func NewInternal(format string, args ...interface{}) *AppError {
 	return Newf(ErrCodeInternal, format, args...)
 }

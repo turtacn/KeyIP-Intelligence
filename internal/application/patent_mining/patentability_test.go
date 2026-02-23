@@ -72,14 +72,14 @@ func (m *mockMolRepoForPatentability) GetByID(ctx context.Context, id string) (*
 	if m.getByIDFn != nil {
 		return m.getByIDFn(ctx, id)
 	}
-	return nil, apperrors.NewNotFoundError("molecule", id)
+	return nil, apperrors.ErrNotFound("molecule", id)
 }
 
 func (m *mockMolRepoForPatentability) GetBySMILES(ctx context.Context, smiles string) (*MoleculeRef, error) {
 	if m.getBySMILESFn != nil {
 		return m.getBySMILESFn(ctx, smiles)
 	}
-	return nil, apperrors.NewNotFoundError("molecule", smiles)
+	return nil, apperrors.ErrNotFound("molecule", smiles)
 }
 
 type mockAssessmentReportStore struct {
@@ -98,7 +98,7 @@ func (m *mockAssessmentReportStore) Get(ctx context.Context, id string) (*Patent
 	if m.getFn != nil {
 		return m.getFn(ctx, id)
 	}
-	return nil, apperrors.NewNotFoundError("assessment", id)
+	return nil, apperrors.ErrNotFound("assessment", id)
 }
 
 type mockPatentabilityLogger struct{}
@@ -242,7 +242,7 @@ func TestAssessMolecule_BySMILES(t *testing.T) {
 func TestAssessMolecule_MoleculeNotFound(t *testing.T) {
 	molRepo := &mockMolRepoForPatentability{
 		getByIDFn: func(ctx context.Context, id string) (*MoleculeRef, error) {
-			return nil, apperrors.NewNotFoundError("molecule", id)
+			return nil, apperrors.ErrNotFound("molecule", id)
 		},
 	}
 
@@ -464,7 +464,7 @@ func TestBatchAssess_PartialFailure(t *testing.T) {
 	molRepo := &mockMolRepoForPatentability{
 		getByIDFn: func(ctx context.Context, id string) (*MoleculeRef, error) {
 			if id == "bad" {
-				return nil, apperrors.NewNotFoundError("molecule", id)
+				return nil, apperrors.ErrNotFound("molecule", id)
 			}
 			return &MoleculeRef{ID: id, SMILES: "c1ccccc1"}, nil
 		},
@@ -512,7 +512,7 @@ func TestGetAssessmentReport_Success(t *testing.T) {
 			if id == "assess-001" {
 				return expected, nil
 			}
-			return nil, apperrors.NewNotFoundError("assessment", id)
+			return nil, apperrors.ErrNotFound("assessment", id)
 		},
 	}
 

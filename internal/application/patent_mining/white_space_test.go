@@ -81,7 +81,7 @@ func (m *mockWhiteSpaceReportStore) Get(ctx context.Context, id string) (*WhiteS
 	if m.getFn != nil {
 		return m.getFn(ctx, id)
 	}
-	return nil, apperrors.NewNotFoundError("ws_report", id)
+	return nil, apperrors.ErrNotFound("ws_report", id)
 }
 
 func (m *mockWhiteSpaceReportStore) ListRecent(ctx context.Context, limit int) ([]WhiteSpaceAnalysisResult, error) {
@@ -210,7 +210,7 @@ func TestAnalyzeByTechField_EmptyField(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty tech field")
 	}
-	if !apperrors.IsValidationError(err) {
+	if !apperrors.IsValidation(err) {
 		t.Errorf("expected ValidationError, got: %v", err)
 	}
 }
@@ -378,7 +378,7 @@ func TestAnalyzeByPropertyRange_EmptyProperty(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty property name")
 	}
-	if !apperrors.IsValidationError(err) {
+	if !apperrors.IsValidation(err) {
 		t.Errorf("expected ValidationError, got: %v", err)
 	}
 }
@@ -396,7 +396,7 @@ func TestAnalyzeByPropertyRange_InvalidRange(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for min >= max")
 	}
-	if !apperrors.IsValidationError(err) {
+	if !apperrors.IsValidation(err) {
 		t.Errorf("expected ValidationError, got: %v", err)
 	}
 }
@@ -523,7 +523,7 @@ func TestGetAnalysisReport_Success(t *testing.T) {
 			if id == "ws-001" {
 				return expected, nil
 			}
-			return nil, apperrors.NewNotFoundError("ws_report", id)
+			return nil, apperrors.ErrNotFound("ws_report", id)
 		},
 	}
 
@@ -548,7 +548,7 @@ func TestGetAnalysisReport_NotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nonexistent report")
 	}
-	if !apperrors.IsNotFoundError(err) {
+	if !apperrors.IsNotFound(err) {
 		t.Errorf("expected NotFoundError, got: %v", err)
 	}
 }
@@ -560,7 +560,7 @@ func TestGetAnalysisReport_EmptyID(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for empty ID")
 	}
-	if !apperrors.IsValidationError(err) {
+	if !apperrors.IsValidation(err) {
 		t.Errorf("expected ValidationError, got: %v", err)
 	}
 }
