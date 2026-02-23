@@ -1864,21 +1864,6 @@ func computeClaimRiskScore(assessment *infringe_net.AssessmentResult, similarity
 	return score
 }
 
-// ... rest of the file (aggregateRiskResponse, etc. - logging fixed earlier) ...
-// Since I need to write full file, I will append the rest.
-// aggregateRiskResponse
-// buildNoneRiskResponse
-// persistRecord
-// publishRiskEvent
-// computeBatchStats
-// determineFTOConclusion
-// formatJurisdictionSummary
-// generateFTOActions
-// generateRiskSummary
-// ipcToDomain
-// appendUnique
-// compile check
-
 // ---------------------------------------------------------------------------
 // Internal: Risk Aggregation
 // ---------------------------------------------------------------------------
