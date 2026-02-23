@@ -1,6 +1,8 @@
 import { http, HttpResponse } from 'msw';
 import molecules from '../data/molecules.json';
 
+const typedMolecules = molecules as any[];
+
 export const moleculeHandlers = [
   http.get('/api/openapi/v1/molecules', ({ request }) => {
     const url = new URL(request.url);
@@ -9,7 +11,7 @@ export const moleculeHandlers = [
 
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
-    const paginatedData = molecules.slice(start, end);
+    const paginatedData = typedMolecules.slice(start, end);
 
     return HttpResponse.json({
       code: 0,
@@ -18,14 +20,14 @@ export const moleculeHandlers = [
       pagination: {
         page,
         pageSize,
-        total: molecules.length
+        total: typedMolecules.length
       }
     });
   }),
 
   http.get('/api/openapi/v1/molecules/:id', ({ params }) => {
     const { id } = params;
-    const molecule = molecules.find(m => m.id === id);
+    const molecule = typedMolecules.find((m: any) => m.id === id);
 
     if (!molecule) {
       return HttpResponse.json({

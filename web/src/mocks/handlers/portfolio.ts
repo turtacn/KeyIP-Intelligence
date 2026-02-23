@@ -1,12 +1,14 @@
 import { http, HttpResponse } from 'msw';
 import portfolio from '../data/portfolio.json';
 
+const typedPortfolio = portfolio as any;
+
 export const portfolioHandlers = [
   http.get('/api/openapi/v1/portfolio/summary', () => {
     return HttpResponse.json({
       code: 0,
       message: 'success',
-      data: portfolio.summary
+      data: typedPortfolio.summary
     });
   }),
 
@@ -14,7 +16,7 @@ export const portfolioHandlers = [
       return HttpResponse.json({
         code: 0,
         message: 'success',
-        data: portfolio.scores
+        data: typedPortfolio.scores
       });
     }),
 
@@ -22,7 +24,7 @@ export const portfolioHandlers = [
     return HttpResponse.json({
       code: 0,
       message: 'success',
-      data: portfolio.coverage
+      data: typedPortfolio.coverage
     });
   })
 ];

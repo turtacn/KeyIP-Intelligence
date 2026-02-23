@@ -8,7 +8,7 @@ const LiveFeed: React.FC = () => {
   const [feedItems, setFeedItems] = useState<Partial<InfringementAlert>[]>([]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
 
     if (isPlaying) {
       interval = setInterval(() => {

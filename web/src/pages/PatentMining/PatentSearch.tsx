@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import DataTable, { Column } from '../../components/ui/DataTable';
-import { Search, Filter, Calendar, Type } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { patentService } from '../../services/patent.service';
 import { Patent } from '../../types/domain';
 

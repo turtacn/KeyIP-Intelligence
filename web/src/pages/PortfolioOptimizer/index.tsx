@@ -35,6 +35,10 @@ const PortfolioOptimizer: React.FC = () => {
     );
   }
 
+  // Type assertion for mock data structure compatibility
+  const coverageData = (coverage.data || {}) as { [key: string]: number };
+  const scoresData = (scores.data || {}) as unknown as { [key: string]: number };
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Sticky Sub-nav */}
@@ -74,7 +78,7 @@ const PortfolioOptimizer: React.FC = () => {
             </div>
             <PanoramaView summary={summary.data} loading={summary.loading} />
             <div className="mt-6">
-              <CoverageTreemap data={coverage.data || {}} scores={scores.data || {}} />
+              <CoverageTreemap data={coverageData} scores={scoresData} />
             </div>
           </div>
 

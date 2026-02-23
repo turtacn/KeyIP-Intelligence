@@ -26,7 +26,7 @@ const CoverageTreemap: React.FC<CoverageTreemapProps> = ({ data, scores }) => {
           // Intensity: 0 -> bg-blue-100, 100 -> bg-blue-900
           // We'll use opacity on a base color for simplicity and Tailwind classes
 
-          let bgColorClass = 'bg-blue-500';
+          // Removed unused bgColorClass
           let opacity = 0.2 + (score / 100) * 0.8;
 
           return (
