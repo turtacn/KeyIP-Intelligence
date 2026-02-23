@@ -55,7 +55,7 @@ func (m *mockTemplateRepository) Get(ctx context.Context, id string) (*Template,
 	if t, ok := m.data[id]; ok {
 		return t, nil
 	}
-	return nil, errors.NewError(errors.ErrNotFound, "template not found")
+	return nil, errors.New(errors.ErrNotFound, "template not found")
 }
 
 func (m *mockTemplateRepository) List(ctx context.Context, opts *ListTemplateOptions) ([]TemplateMeta, int64, error) {
@@ -99,7 +99,7 @@ func (m *mockTemplateRepository) Update(ctx context.Context, tmpl *Template) err
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.data[tmpl.ID]; !ok {
-		return errors.NewError(errors.ErrNotFound, "not found")
+		return errors.New(errors.ErrNotFound, "not found")
 	}
 	m.data[tmpl.ID] = tmpl
 	return nil
@@ -364,7 +364,7 @@ func assertFileNameFormat(t *testing.T, fileName string, reportType string, form
 	}
 }
 
-func assertErrCodeTmpl(t *testing.T, err error, code string) {
+func assertErrCodeTmpl(t *testing.T, err error, code errors.ErrorCode) {
 	t.Helper()
 	if err == nil {
 		t.Fatalf("Expected error code %s, got nil", code)
@@ -583,7 +583,7 @@ func TestRender_InvalidTemplateID(t *testing.T) {
 	engine, _ := newTestTemplateEngine(t)
 	req := &RenderRequest{TemplateID: "non-existent", Data: &ReportData{}, OutputFormat: "HTML"}
 	_, err := engine.Render(context.Background(), req)
-	assertErrCodeTmpl(t, err, errors.ErrNotFound)
+	assertErrCodeTmpl(t, err, errors.ErrCodeNotFound)
 }
 
 func TestRender_NilData(t *testing.T) {
@@ -795,7 +795,7 @@ func TestGetTemplate_Success_NotFound(t *testing.T) {
 	if err != nil || tmpl.Content != "c1" { t.Errorf("Failed to get template") }
 
 	_, err = engine.GetTemplate(context.Background(), "t2")
-	assertErrCodeTmpl(t, err, errors.ErrNotFound)
+	assertErrCodeTmpl(t, err, errors.ErrCodeNotFound)
 }
 
 func TestRegisterTemplate_Success_Duplicate_Invalid(t *testing.T) {
@@ -835,7 +835,7 @@ func TestUpdateTemplate_Success_NotFound(t *testing.T) {
 
 	tmplMissing := &Template{ID: "miss", Format: HTMLTemplate, Content: "new"}
 	err = engine.UpdateTemplate(context.Background(), tmplMissing)
-	assertErrCodeTmpl(t, err, errors.ErrNotFound)
+	assertErrCodeTmpl(t, err, errors.ErrCodeNotFound)
 }
 
 func TestDeleteTemplate_Success(t *testing.T) {
@@ -848,7 +848,7 @@ func TestDeleteTemplate_Success(t *testing.T) {
 	if err != nil { t.Fatalf("Delete failed: %v", err) }
 
 	_, err = m.repo.Get(context.Background(), "del-1")
-	assertErrCodeTmpl(t, err, errors.ErrNotFound)
+	assertErrCodeTmpl(t, err, errors.ErrCodeNotFound)
 }
 
 func TestDeleteTemplate_BuiltIn_InUse(t *testing.T) {

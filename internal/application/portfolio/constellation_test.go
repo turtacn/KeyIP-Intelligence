@@ -84,23 +84,46 @@ func (m *mockConstellationCache) Delete(ctx context.Context, key string) error {
 // -----------------------------------------------------------------------
 
 type mockPortfolioService struct {
-	portfolio   domainportfolio.Portfolio
+	portfolio   *domainportfolio.Portfolio
 	getByIDErr  error
 }
 
-func (m *mockPortfolioService) GetByID(ctx context.Context, id string) (domainportfolio.Portfolio, error) {
-	if m.getByIDErr != nil {
-		return nil, m.getByIDErr
-	}
-	return m.portfolio, nil
+// Implement all methods from PortfolioService interface
+func (m *mockPortfolioService) CreatePortfolio(ctx context.Context, name, ownerID string, techDomains []string) (*domainportfolio.Portfolio, error) {
+	return nil, nil
 }
 
-// Stub remaining interface methods.
-func (m *mockPortfolioService) Create(ctx context.Context, p domainportfolio.Portfolio) error { return nil }
-func (m *mockPortfolioService) Update(ctx context.Context, p domainportfolio.Portfolio) error { return nil }
-func (m *mockPortfolioService) Delete(ctx context.Context, id string) error                  { return nil }
-func (m *mockPortfolioService) List(ctx context.Context) ([]domainportfolio.Portfolio, error) { return nil, nil }
-func (m *mockPortfolioService) ActivatePortfolio(ctx context.Context, id string) error       { return nil }
+func (m *mockPortfolioService) AddPatentsToPortfolio(ctx context.Context, portfolioID string, patentIDs []string) error {
+	return nil
+}
+
+func (m *mockPortfolioService) RemovePatentsFromPortfolio(ctx context.Context, portfolioID string, patentIDs []string) error {
+	return nil
+}
+
+func (m *mockPortfolioService) ActivatePortfolio(ctx context.Context, portfolioID string) error {
+	return nil
+}
+
+func (m *mockPortfolioService) ArchivePortfolio(ctx context.Context, portfolioID string) error {
+	return nil
+}
+
+func (m *mockPortfolioService) CalculateHealthScore(ctx context.Context, portfolioID string) (*domainportfolio.HealthScore, error) {
+	return nil, nil
+}
+
+func (m *mockPortfolioService) ComparePortfolios(ctx context.Context, portfolioIDs []string) ([]*domainportfolio.PortfolioComparison, error) {
+	return nil, nil
+}
+
+func (m *mockPortfolioService) IdentifyGaps(ctx context.Context, portfolioID string, targetDomains []string) ([]*domainportfolio.GapInfo, error) {
+	return nil, nil
+}
+
+func (m *mockPortfolioService) GetOverlapAnalysis(ctx context.Context, portfolioID1, portfolioID2 string) (*domainportfolio.OverlapResult, error) {
+	return nil, nil
+}
 
 var _ domainportfolio.Service = (*mockPortfolioService)(nil)
 

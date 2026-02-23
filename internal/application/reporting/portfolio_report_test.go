@@ -558,7 +558,7 @@ func TestListReports_Success(t *testing.T) {
 
 	if res.Pagination.Total != 15 { t.Errorf("Expected 15 total reports, got %d", res.Pagination.Total) }
 	// In a real DB mock, it would paginate. Our simple map mock returns all 15, but we check logic.
-	if len(res.Data) != 15 { t.Errorf("Mock returns all, expected 15") }
+	if len(res.Items) != 15 { t.Errorf("Mock returns all, expected 15") }
 }
 
 func TestListReports_FilterByType(t *testing.T) {
@@ -573,7 +573,7 @@ func TestListReports_FilterByType(t *testing.T) {
 	res, _ := svc.ListReports(context.Background(), "P1", opts)
 
 	if res.Pagination.Total != 1 { t.Errorf("Expected 1 filtered result") }
-	if res.Data[0].Type != TypeFullReport { t.Errorf("Filter failed") }
+	if res.Items[0].Type != TypeFullReport { t.Errorf("Filter failed") }
 }
 
 func TestExportReport_SameFormat(t *testing.T) {
