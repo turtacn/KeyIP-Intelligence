@@ -605,29 +605,23 @@ func (s *constellationServiceImpl) CompareWithCompetitor(ctx context.Context, re
 	)
 
 	// Load own patents.
-	ownPatentPtrs, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
+	ownPatents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to load own patents")
-	}
-	
-	// Convert to value types
-	ownPatents := make([]domainpatent.Patent, len(ownPatentPtrs))
-	for i, p := range ownPatentPtrs {
-		ownPatents[i] = *p
 	}
 
 	// Load competitor patents.
 	// TODO: Implement competitor patent loading when batch retrieval methods are available
-	var compPatents []domainpatent.Patent
+	var compPatents []*domainpatent.Patent
 	// Placeholder: competitor patent loading will require repository method implementation
 	if len(req.CompetitorIDs) > 0 {
 		// Need: FindByIDs or BatchGetByID method
 		// For now, return empty to avoid compilation error
-		compPatents = []domainpatent.Patent{}
+		compPatents = []*domainpatent.Patent{}
 	} else {
 		// Need: FindByAssigneeName or SearchByAssignee method
 		// For now, return empty to avoid compilation error  
-		compPatents = []domainpatent.Patent{}
+		compPatents = []*domainpatent.Patent{}
 	}
 
 	// Filter by tech domains if specified.
@@ -1470,9 +1464,9 @@ func resolveDomainName(code string) string {
 }
 
 // filterByTechDomains filters patents to only those matching specified tech domains.
-func filterByTechDomains(patents []domainpatent.Patent, domains []string) []domainpatent.Patent {
+func filterByTechDomains(patents []*domainpatent.Patent, domains []string) []*domainpatent.Patent {
 	domainSet := toStringSet(domains)
-	filtered := make([]domainpatent.Patent, 0, len(patents))
+	filtered := make([]*domainpatent.Patent, 0, len(patents))
 	for _, p := range patents {
 		if _, ok := domainSet[p.GetPrimaryTechDomain()]; ok {
 			filtered = append(filtered, p)
@@ -1482,8 +1476,8 @@ func filterByTechDomains(patents []domainpatent.Patent, domains []string) []doma
 }
 
 // groupByDomain groups patents by their primary technology domain.
-func groupByDomain(patents []domainpatent.Patent) map[string][]domainpatent.Patent {
-	result := make(map[string][]domainpatent.Patent)
+func groupByDomain(patents []*domainpatent.Patent) map[string][]*domainpatent.Patent {
+	result := make(map[string][]*domainpatent.Patent)
 	for _, p := range patents {
 		domain := p.GetPrimaryTechDomain()
 		if domain == "" {
@@ -1495,7 +1489,7 @@ func groupByDomain(patents []domainpatent.Patent) map[string][]domainpatent.Pate
 }
 
 // mergeKeys returns a sorted, deduplicated list of all keys from two maps.
-func mergeKeys(a, b map[string][]domainpatent.Patent) []string {
+func mergeKeys(a, b map[string][]*domainpatent.Patent) []string {
 	seen := make(map[string]struct{})
 	for k := range a {
 		seen[k] = struct{}{}
@@ -1513,7 +1507,7 @@ func mergeKeys(a, b map[string][]domainpatent.Patent) []string {
 
 // computeZoneStrength calculates a strength score for a set of patents in a zone.
 // The score considers patent count, recency, and value scores.
-func computeZoneStrength(patents []domainpatent.Patent) float64 {
+func computeZoneStrength(patents []*domainpatent.Patent) float64 {
 	if len(patents) == 0 {
 		return 0.0
 	}
@@ -1551,7 +1545,7 @@ func computeZoneStrength(patents []domainpatent.Patent) float64 {
 // computeStrengthIndex calculates an overall competitive strength index.
 // Positive values indicate own advantage, negative values indicate competitor advantage.
 // Range is approximately [-1.0, 1.0].
-func computeStrengthIndex(ownPatents, compPatents []domainpatent.Patent, overlapZones []OverlapZone) float64 {
+func computeStrengthIndex(ownPatents, compPatents []*domainpatent.Patent, overlapZones []OverlapZone) float64 {
 	ownCount := float64(len(ownPatents))
 	compCount := float64(len(compPatents))
 

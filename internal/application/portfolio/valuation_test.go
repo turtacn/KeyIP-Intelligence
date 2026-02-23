@@ -14,6 +14,7 @@ import (
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	pkgerrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -58,6 +59,12 @@ func (m *mockPatentRepo) FindByIDs(ctx context.Context, ids []string) ([]*patent
 }
 func (m *mockPatentRepo) Search(ctx context.Context, query string, limit, offset int) ([]*patent.Patent, int, error) {
 	return nil, 0, nil
+}
+func (m *mockPatentRepo) AssociateMolecule(ctx context.Context, patentID, moleculeID string) error {
+	return m.err
+}
+func (m *mockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string) ([]*patent.Patent, error) {
+	return nil, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -277,12 +284,12 @@ func (m *mockCache) Delete(ctx context.Context, key string) error {
 
 type mockLogger struct{}
 
-func (mockLogger) Debug(msg string, keysAndValues ...interface{}) {}
-func (mockLogger) Info(msg string, keysAndValues ...interface{})  {}
-func (mockLogger) Warn(msg string, keysAndValues ...interface{})  {}
-func (mockLogger) Error(msg string, keysAndValues ...interface{}) {}
-func (mockLogger) Fatal(msg string, keysAndValues ...interface{}) {}
-func (mockLogger) With(keysAndValues ...interface{}) interface{}  { return mockLogger{} }
+func (mockLogger) Debug(msg string, fields ...logging.Field) {}
+func (mockLogger) Info(msg string, fields ...logging.Field)  {}
+func (mockLogger) Warn(msg string, fields ...logging.Field)  {}
+func (mockLogger) Error(msg string, fields ...logging.Field) {}
+func (mockLogger) Fatal(msg string, fields ...logging.Field) {}
+func (mockLogger) With(fields ...logging.Field) logging.Logger { return mockLogger{} }
 
 // ---------------------------------------------------------------------------
 // Mock: Domain Services (minimal stubs)

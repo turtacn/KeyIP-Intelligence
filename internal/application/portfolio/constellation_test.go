@@ -1368,15 +1368,15 @@ func TestComputeBoundingBox(t *testing.T) {
 }
 
 func TestComputeZoneStrength(t *testing.T) {
-	patents := []domainpatent.Patent{
-		&mockPatent{
+	patents := []*domainpatent.Patent{
+		(&mockPatent{
 			valueScore: 8.0,
 			filingDate: time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC),
-		},
-		&mockPatent{
+		}).toPatent(),
+		(&mockPatent{
 			valueScore: 6.0,
 			filingDate: time.Date(2018, 6, 1, 0, 0, 0, 0, time.UTC),
-		},
+		}).toPatent(),
 	}
 
 	strength := computeZoneStrength(patents)
@@ -1391,11 +1391,11 @@ func TestComputeZoneStrength(t *testing.T) {
 }
 
 func TestComputeStrengthIndex_Balanced(t *testing.T) {
-	own := []domainpatent.Patent{
-		&mockPatent{valueScore: 5.0},
+	own := []*domainpatent.Patent{
+		(&mockPatent{valueScore: 5.0}).toPatent(),
 	}
-	comp := []domainpatent.Patent{
-		&mockPatent{valueScore: 5.0},
+	comp := []*domainpatent.Patent{
+		(&mockPatent{valueScore: 5.0}).toPatent(),
 	}
 	overlap := []OverlapZone{
 		{OwnCount: 1, CompCount: 1},
@@ -1409,13 +1409,13 @@ func TestComputeStrengthIndex_Balanced(t *testing.T) {
 }
 
 func TestComputeStrengthIndex_OwnAdvantage(t *testing.T) {
-	own := []domainpatent.Patent{
-		&mockPatent{valueScore: 10.0},
-		&mockPatent{valueScore: 10.0},
-		&mockPatent{valueScore: 10.0},
+	own := []*domainpatent.Patent{
+		(&mockPatent{valueScore: 10.0}).toPatent(),
+		(&mockPatent{valueScore: 10.0}).toPatent(),
+		(&mockPatent{valueScore: 10.0}).toPatent(),
 	}
-	comp := []domainpatent.Patent{
-		&mockPatent{valueScore: 2.0},
+	comp := []*domainpatent.Patent{
+		(&mockPatent{valueScore: 2.0}).toPatent(),
 	}
 
 	index := computeStrengthIndex(own, comp, nil)
@@ -1482,11 +1482,11 @@ func TestWithDensityRange_Bounds(t *testing.T) {
 }
 
 func TestFilterByTechDomains(t *testing.T) {
-	patents := []domainpatent.Patent{
-		&mockPatent{id: "p1", techDomain: "A61K"},
-		&mockPatent{id: "p2", techDomain: "C07D"},
-		&mockPatent{id: "p3", techDomain: "A61K"},
-		&mockPatent{id: "p4", techDomain: "G16B"},
+	patents := []*domainpatent.Patent{
+		(&mockPatent{id: "p1", techDomain: "A61K"}).toPatent(),
+		(&mockPatent{id: "p2", techDomain: "C07D"}).toPatent(),
+		(&mockPatent{id: "p3", techDomain: "A61K"}).toPatent(),
+		(&mockPatent{id: "p4", techDomain: "G16B"}).toPatent(),
 	}
 
 	filtered := filterByTechDomains(patents, []string{"A61K", "G16B"})
@@ -1502,11 +1502,11 @@ func TestFilterByTechDomains(t *testing.T) {
 }
 
 func TestGroupByDomain(t *testing.T) {
-	patents := []domainpatent.Patent{
-		&mockPatent{id: "p1", techDomain: "A61K"},
-		&mockPatent{id: "p2", techDomain: "C07D"},
-		&mockPatent{id: "p3", techDomain: "A61K"},
-		&mockPatent{id: "p4", techDomain: ""},
+	patents := []*domainpatent.Patent{
+		(&mockPatent{id: "p1", techDomain: "A61K"}).toPatent(),
+		(&mockPatent{id: "p2", techDomain: "C07D"}).toPatent(),
+		(&mockPatent{id: "p3", techDomain: "A61K"}).toPatent(),
+		(&mockPatent{id: "p4", techDomain: ""}).toPatent(),
 	}
 
 	groups := groupByDomain(patents)
@@ -1522,11 +1522,11 @@ func TestGroupByDomain(t *testing.T) {
 }
 
 func TestMergeKeys(t *testing.T) {
-	a := map[string][]domainpatent.Patent{
+	a := map[string][]*domainpatent.Patent{
 		"A61K": {},
 		"C07D": {},
 	}
-	b := map[string][]domainpatent.Patent{
+	b := map[string][]*domainpatent.Patent{
 		"A61K": {},
 		"G16B": {},
 	}
