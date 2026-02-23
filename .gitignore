@@ -141,3 +141,6 @@ trace.out
 # -------------------------
 .golangci-lint/
 
+web/dist/
+web/node_modules/
+web/coverage/
