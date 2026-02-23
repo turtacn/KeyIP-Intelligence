@@ -23,7 +23,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/uuid"
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
+	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -167,17 +169,11 @@ type CalendarService interface {
 
 type calendarServiceImpl struct {
 	lifecycleSvc  domainLifecycle.Service
-	lifecycleRepo domainLifecycle.Repository
+	lifecycleRepo domainLifecycle.LifecycleRepository
 	patentRepo    patentRepoPort
 	cache         CachePort
 	logger        Logger
 	defaultTZ     string
-}
-
-// patentRepoPort is the minimal patent repository interface needed here.
-type patentRepoPort interface {
-	GetByID(ctx context.Context, id string) (*domainPatentRecord, error)
-	ListByPortfolio(ctx context.Context, portfolioID string) ([]domainPatentRecord, error)
 }
 
 // CalendarServiceConfig holds tunables.
@@ -188,7 +184,7 @@ type CalendarServiceConfig struct {
 // NewCalendarService constructs a CalendarService.
 func NewCalendarService(
 	lifecycleSvc domainLifecycle.Service,
-	lifecycleRepo domainLifecycle.Repository,
+	lifecycleRepo domainLifecycle.LifecycleRepository,
 	patentRepo patentRepoPort,
 	cache CachePort,
 	logger Logger,
@@ -233,7 +229,12 @@ func (s *calendarServiceImpl) GetCalendarView(ctx context.Context, req *Calendar
 	var allEvents []CalendarEvent
 
 	for _, pid := range patentIDs {
-		patent, fetchErr := s.patentRepo.GetByID(ctx, pid)
+		uid, err := uuid.Parse(pid)
+		if err != nil {
+			s.logger.Warn("calendar: skipping invalid patent_id", "patent_id", pid, "error", err)
+			continue
+		}
+		patent, fetchErr := s.patentRepo.GetByID(ctx, uid)
 		if fetchErr != nil {
 			s.logger.Warn("calendar: skipping patent", "patent_id", pid, "error", fetchErr)
 			continue
@@ -317,7 +318,12 @@ func (s *calendarServiceImpl) AddEvent(ctx context.Context, req *AddEventRequest
 		return nil, errors.NewValidation("calendar.add", "due_date is required")
 	}
 
-	patent, err := s.patentRepo.GetByID(ctx, req.PatentID)
+	patentID, err := uuid.Parse(req.PatentID)
+	if err != nil {
+		return nil, errors.NewValidation("calendar.add", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
+	}
+
+	patent, err := s.patentRepo.GetByID(ctx, patentID)
 	if err != nil {
 		return nil, errors.NewNotFound("calendar.add", fmt.Sprintf("patent %s not found", req.PatentID))
 	}
@@ -477,16 +483,6 @@ func (s *calendarServiceImpl) GetUpcomingDeadlines(ctx context.Context, portfoli
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-// domainPatentRecord is a minimal patent record abstraction used by calendar.
-type domainPatentRecord struct {
-	ID           string
-	PatentNumber string
-	Title        string
-	Jurisdiction string
-	FilingDate   time.Time
-	GrantDate    time.Time
-}
-
 func (s *calendarServiceImpl) resolvePatentIDs(ctx context.Context, portfolioID string, explicitIDs []string) ([]string, error) {
 	if len(explicitIDs) > 0 {
 		return explicitIDs, nil
@@ -500,7 +496,7 @@ func (s *calendarServiceImpl) resolvePatentIDs(ctx context.Context, portfolioID 
 	}
 	ids := make([]string, 0, len(patents))
 	for _, p := range patents {
-		ids = append(ids, p.ID)
+		ids = append(ids, p.ID.String())
 	}
 	return ids, nil
 }
@@ -531,7 +527,7 @@ func (s *calendarServiceImpl) eventTypeMatch(t CalendarEventType, filter []Calen
 
 func (s *calendarServiceImpl) generateEventsForPatent(
 	ctx context.Context,
-	patent *domainPatentRecord,
+	patent *domainPatent.Patent,
 	jurisdiction domainLifecycle.Jurisdiction,
 	start, end time.Time,
 	tz string,
@@ -539,12 +535,18 @@ func (s *calendarServiceImpl) generateEventsForPatent(
 	var events []CalendarEvent
 	now := time.Now()
 
+	// Ensure filing date is available
+	if patent.FilingDate == nil {
+		return nil, errors.NewValidation("calendar", fmt.Sprintf("patent %s missing filing date", patent.PatentNumber))
+	}
+	filingDate := *patent.FilingDate
+
 	// Generate annuity due events
 	maxYears := jurisdictionMaxLife(jurisdiction)
-	filingYear := patent.FilingDate.Year()
+	filingYear := filingDate.Year()
 
 	for year := 1; year <= maxYears; year++ {
-		dueDate := annuityDueDate(patent.FilingDate, year, jurisdiction)
+		dueDate := annuityDueDate(filingDate, year, jurisdiction)
 		if dueDate.Before(start) || dueDate.After(end) {
 			continue
 		}
@@ -553,8 +555,8 @@ func (s *calendarServiceImpl) generateEventsForPatent(
 		priority := classifyDeadlinePriority(dueDate, now)
 
 		events = append(events, CalendarEvent{
-			ID:           fmt.Sprintf("ann-%s-%d", patent.ID, year),
-			PatentID:     patent.ID,
+			ID:           fmt.Sprintf("ann-%s-%d", patent.ID.String(), year),
+			PatentID:     patent.ID.String(),
 			PatentNumber: patent.PatentNumber,
 			Title:        fmt.Sprintf("Year %d Annuity Due - %s", year, patent.PatentNumber),
 			Description:  fmt.Sprintf("Annual maintenance fee year %d for patent %s in %s", year, patent.PatentNumber, jurisdiction),
@@ -578,11 +580,11 @@ func (s *calendarServiceImpl) generateEventsForPatent(
 
 	// Generate PCT deadline if applicable
 	if jurisdiction == domainLifecycle.JurisdictionCN {
-		pctDeadline := patent.FilingDate.AddDate(0, 30, 0)
+		pctDeadline := filingDate.AddDate(0, 30, 0)
 		if !pctDeadline.Before(start) && !pctDeadline.After(end) {
 			events = append(events, CalendarEvent{
-				ID:           fmt.Sprintf("pct-%s", patent.ID),
-				PatentID:     patent.ID,
+				ID:           fmt.Sprintf("pct-%s", patent.ID.String()),
+				PatentID:     patent.ID.String(),
 				PatentNumber: patent.PatentNumber,
 				Title:        fmt.Sprintf("PCT National Phase Deadline - %s", patent.PatentNumber),
 				Description:  "30-month deadline for PCT national phase entry",
@@ -601,11 +603,11 @@ func (s *calendarServiceImpl) generateEventsForPatent(
 	}
 
 	// Paris Convention priority deadline (12 months from filing)
-	parisDeadline := patent.FilingDate.AddDate(1, 0, 0)
+	parisDeadline := filingDate.AddDate(1, 0, 0)
 	if !parisDeadline.Before(start) && !parisDeadline.After(end) {
 		events = append(events, CalendarEvent{
-			ID:           fmt.Sprintf("paris-%s", patent.ID),
-			PatentID:     patent.ID,
+			ID:           fmt.Sprintf("paris-%s", patent.ID.String()),
+			PatentID:     patent.ID.String(),
 			PatentNumber: patent.PatentNumber,
 			Title:        fmt.Sprintf("Paris Convention Priority Deadline - %s", patent.PatentNumber),
 			Description:  "12-month priority deadline under Paris Convention",
@@ -699,7 +701,6 @@ func jurisdictionMaxLife(j domainLifecycle.Jurisdiction) int {
 }
 
 func mapDomainCustomEvent(de domainLifecycle.CustomEvent, tz string) CalendarEvent {
-	now := time.Now()
 	return CalendarEvent{
 		ID:           de.ID,
 		PatentID:     de.PatentID,
@@ -717,7 +718,6 @@ func mapDomainCustomEvent(de domainLifecycle.CustomEvent, tz string) CalendarEve
 		CreatedAt:    de.CreatedAt,
 		UpdatedAt:    de.UpdatedAt,
 	}
-	_ = now
 }
 
 func toDomainCustomEvent(ev *CalendarEvent) *domainLifecycle.CustomEvent {
@@ -777,4 +777,3 @@ func buildICalData(events []CalendarEvent) []byte {
 }
 
 //Personal.AI order the ending
-

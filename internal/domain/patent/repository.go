@@ -19,6 +19,7 @@ type PatentRepository interface {
 
 	// Search
 	Search(ctx context.Context, query SearchQuery) (*SearchResult, error)
+	ListByPortfolio(ctx context.Context, portfolioID string) ([]*Patent, error)
 	GetByFamilyID(ctx context.Context, familyID string) ([]*Patent, error)
 	GetByAssignee(ctx context.Context, assigneeID uuid.UUID, limit, offset int) ([]*Patent, int64, error)
 	GetByJurisdiction(ctx context.Context, jurisdiction string, limit, offset int) ([]*Patent, int64, error)

@@ -7,7 +7,6 @@ package lifecycle
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -19,88 +18,7 @@ import (
 // Mock implementations for calendar tests
 // ---------------------------------------------------------------------------
 
-type mockCalendarPatentRepo struct {
-	patents map[string]*domainPatentRecord
-}
-
-func newMockCalendarPatentRepo(records ...*domainPatentRecord) *mockCalendarPatentRepo {
-	m := &mockCalendarPatentRepo{patents: make(map[string]*domainPatentRecord)}
-	for _, r := range records {
-		m.patents[r.ID] = r
-	}
-	return m
-}
-
-func (m *mockCalendarPatentRepo) GetByID(_ context.Context, id string) (*domainPatentRecord, error) {
-	p, ok := m.patents[id]
-	if !ok {
-		return nil, fmt.Errorf("patent %s not found", id)
-	}
-	return p, nil
-}
-
-func (m *mockCalendarPatentRepo) ListByPortfolio(_ context.Context, portfolioID string) ([]domainPatentRecord, error) {
-	var result []domainPatentRecord
-	for _, p := range m.patents {
-		result = append(result, *p)
-	}
-	return result, nil
-}
-
-type mockCalendarLifecycleRepo struct {
-	customEvents []domainLifecycle.CustomEvent
-	savedEvents  []*domainLifecycle.CustomEvent
-}
-
-func (m *mockCalendarLifecycleRepo) GetCustomEvents(_ context.Context, patentIDs []string, start, end time.Time) ([]domainLifecycle.CustomEvent, error) {
-	return m.customEvents, nil
-}
-
-func (m *mockCalendarLifecycleRepo) SaveCustomEvent(_ context.Context, ev *domainLifecycle.CustomEvent) error {
-	m.savedEvents = append(m.savedEvents, ev)
-	return nil
-}
-
-func (m *mockCalendarLifecycleRepo) UpdateEventStatus(_ context.Context, eventID string, status string) error {
-	return nil
-}
-
-func (m *mockCalendarLifecycleRepo) DeleteEvent(_ context.Context, eventID string) error {
-	return nil
-}
-
-// Satisfy the full domainLifecycle.Repository interface with stubs
-func (m *mockCalendarLifecycleRepo) GetByPatentID(_ context.Context, _ string) (*domainLifecycle.LifecycleRecord, error) {
-	return nil, nil
-}
-func (m *mockCalendarLifecycleRepo) Save(_ context.Context, _ *domainLifecycle.LifecycleRecord) error {
-	return nil
-}
-func (m *mockCalendarLifecycleRepo) ListByPortfolio(_ context.Context, _ string) ([]domainLifecycle.LifecycleRecord, error) {
-	return nil, nil
-}
-func (m *mockCalendarLifecycleRepo) GetPaymentRecords(_ context.Context, _ string) ([]domainLifecycle.PaymentRecord, error) {
-	return nil, nil
-}
-func (m *mockCalendarLifecycleRepo) SavePaymentRecord(_ context.Context, _ *domainLifecycle.PaymentRecord) error {
-	return nil
-}
-
-type mockCalendarLifecycleSvc struct{}
-
-func (m *mockCalendarLifecycleSvc) CalculateAnnuityFee(_ context.Context, _ string, _ domainLifecycle.Jurisdiction, _ time.Time) (*domainLifecycle.AnnuityFeeResult, error) {
-	return &domainLifecycle.AnnuityFeeResult{
-		Fee:            900.0,
-		YearNumber:     3,
-		DueDate:        time.Now().AddDate(0, 3, 0),
-		GracePeriodEnd: time.Now().AddDate(0, 9, 0),
-		Status:         "pending",
-	}, nil
-}
-
-func (m *mockCalendarLifecycleSvc) GetLegalStatus(_ context.Context, _ string) (*domainLifecycle.LegalStatus, error) {
-	return nil, nil
-}
+// Mock implementations removed. Use shared mocks from common_test.go.
 
 // ---------------------------------------------------------------------------
 // Helper to build test calendar service
@@ -108,17 +26,22 @@ func (m *mockCalendarLifecycleSvc) GetLegalStatus(_ context.Context, _ string) (
 
 func newTestCalendarService(opts ...func(*testCalendarOpts)) CalendarService {
 	o := &testCalendarOpts{
-		lifecycleSvc: &mockCalendarLifecycleSvc{},
-		lifecycleRepo: &mockCalendarLifecycleRepo{},
-		patentRepo: newMockCalendarPatentRepo(&domainPatentRecord{
-			ID: "pat-001", PatentNumber: "CN202310001234.5",
-			Title: "Test Patent", Jurisdiction: "CN",
-			FilingDate: time.Now().AddDate(-3, 0, 0),
-		}),
-		cache:  newMockCache(),
-		logger: mockLogger{},
-		cfg:    CalendarServiceConfig{DefaultTimezone: "Asia/Shanghai"},
+		lifecycleSvc:  &mockLifecycleService{},
+		lifecycleRepo: &mockLifecycleRepo{},
+		patentRepo:    newMockPatentRepo(),
+		cache:         newMockCache(),
+		logger:        &mockLogger{},
+		cfg:           CalendarServiceConfig{DefaultTimezone: "Asia/Shanghai"},
 	}
+
+	// Set default patents
+	fd := time.Now().AddDate(-3, 0, 0)
+	o.patentRepo.patents["00000000-0000-0000-0000-000000000001"] = &mockPatentInfo{
+		ID: "00000000-0000-0000-0000-000000000001", PatentNumber: "CN202310001234.5",
+		Title: "Test Patent", Jurisdiction: "CN",
+		FilingDate: fd,
+	}
+
 	for _, fn := range opts {
 		fn(o)
 	}
@@ -130,8 +53,8 @@ func newTestCalendarService(opts ...func(*testCalendarOpts)) CalendarService {
 
 type testCalendarOpts struct {
 	lifecycleSvc  domainLifecycle.Service
-	lifecycleRepo domainLifecycle.Repository
-	patentRepo    patentRepoPort
+	lifecycleRepo domainLifecycle.LifecycleRepository
+	patentRepo    *mockPatentRepo
 	cache         CachePort
 	logger        Logger
 	cfg           CalendarServiceConfig
@@ -147,7 +70,7 @@ func TestGetCalendarView_Success(t *testing.T) {
 
 	now := time.Now()
 	view, err := svc.GetCalendarView(ctx, &CalendarViewRequest{
-		PatentIDs: []string{"pat-001"},
+		PatentIDs: []string{"00000000-0000-0000-0000-000000000001"},
 		StartDate: now.AddDate(-1, 0, 0),
 		EndDate:   now.AddDate(5, 0, 0),
 	})
@@ -208,15 +131,16 @@ func TestGetCalendarView_FilterByEventType(t *testing.T) {
 
 func TestGetCalendarView_FilterByJurisdiction(t *testing.T) {
 	svc := newTestCalendarService(func(o *testCalendarOpts) {
-		o.patentRepo = newMockCalendarPatentRepo(
-			&domainPatentRecord{ID: "pat-cn", PatentNumber: "CN001", Title: "CN Patent", Jurisdiction: "CN", FilingDate: time.Now().AddDate(-2, 0, 0)},
-			&domainPatentRecord{ID: "pat-us", PatentNumber: "US001", Title: "US Patent", Jurisdiction: "US", FilingDate: time.Now().AddDate(-2, 0, 0)},
+		fd := time.Now().AddDate(-2, 0, 0)
+		o.patentRepo = newMockPatentRepo(
+			&mockPatentInfo{ID: "00000000-0000-0000-0000-000000000001", PatentNumber: "CN001", Title: "CN Patent", Jurisdiction: "CN", FilingDate: fd},
+			&mockPatentInfo{ID: "00000000-0000-0000-0000-000000000002", PatentNumber: "US001", Title: "US Patent", Jurisdiction: "US", FilingDate: fd},
 		)
 	})
 
 	now := time.Now()
 	view, err := svc.GetCalendarView(context.Background(), &CalendarViewRequest{
-		PatentIDs:     []string{"pat-cn", "pat-us"},
+		PatentIDs:     []string{"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"},
 		Jurisdictions: []domainLifecycle.Jurisdiction{domainLifecycle.JurisdictionCN},
 		StartDate:     now.AddDate(-1, 0, 0),
 		EndDate:       now.AddDate(5, 0, 0),
@@ -236,10 +160,16 @@ func TestGetCalendarView_FilterByJurisdiction(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAddEvent_Success(t *testing.T) {
-	svc := newTestCalendarService()
+	var savedEvent *domainLifecycle.CustomEvent
+	svc := newTestCalendarService(func(o *testCalendarOpts) {
+		o.lifecycleRepo.(*mockLifecycleRepo).saveCustomEventFn = func(ctx context.Context, event *domainLifecycle.CustomEvent) error {
+			savedEvent = event
+			return nil
+		}
+	})
 
 	event, err := svc.AddEvent(context.Background(), &AddEventRequest{
-		PatentID: "pat-001",
+		PatentID: "00000000-0000-0000-0000-000000000001",
 		Title:    "Custom Milestone",
 		DueDate:  time.Now().AddDate(0, 3, 0),
 	})
@@ -257,6 +187,9 @@ func TestAddEvent_Success(t *testing.T) {
 	}
 	if len(event.Reminders) == 0 {
 		t.Error("expected default reminders to be set")
+	}
+	if savedEvent == nil {
+		t.Error("expected event to be saved via repository")
 	}
 }
 
@@ -359,7 +292,7 @@ func TestExportICal_Success(t *testing.T) {
 	now := time.Now()
 
 	data, err := svc.ExportICal(context.Background(), &ICalExportRequest{
-		PatentIDs: []string{"pat-001"},
+		PatentIDs: []string{"00000000-0000-0000-0000-000000000001"},
 		StartDate: now.AddDate(-1, 0, 0),
 		EndDate:   now.AddDate(5, 0, 0),
 	})

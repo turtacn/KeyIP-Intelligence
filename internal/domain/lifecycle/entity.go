@@ -6,6 +6,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// Jurisdiction represents a legal jurisdiction (e.g., CN, US).
+type Jurisdiction string
+
+const (
+	JurisdictionCN Jurisdiction = "CN"
+	JurisdictionUS Jurisdiction = "US"
+	JurisdictionEP Jurisdiction = "EP"
+	JurisdictionJP Jurisdiction = "JP"
+	JurisdictionKR Jurisdiction = "KR"
+)
+
 // AnnuityStatus represents the status of an annuity payment.
 type AnnuityStatus string
 
@@ -156,6 +167,116 @@ type DashboardStats struct {
 	RecentEvents      int64 `json:"recent_events"`
 	TotalCostYTD      int64 `json:"total_cost_ytd"`
 }
+
+// PaymentRecord represents a persisted payment entry.
+type PaymentRecord struct {
+	ID           string       `json:"id"`
+	PatentID     string       `json:"patent_id"`
+	Jurisdiction Jurisdiction `json:"jurisdiction"`
+	YearNumber   int          `json:"year_number"`
+	Amount       float64      `json:"amount"`
+	Currency     string       `json:"currency"`
+	PaidDate     time.Time    `json:"paid_date"`
+	PaymentRef   string       `json:"payment_ref"`
+	PaidBy       string       `json:"paid_by"`
+	Notes        string       `json:"notes"`
+	RecordedAt   time.Time    `json:"recorded_at"`
+}
+
+// PaymentQuery defines the criteria for querying payments.
+type PaymentQuery struct {
+	PatentID     string       `json:"patent_id,omitempty"`
+	PortfolioID  string       `json:"portfolio_id,omitempty"`
+	Jurisdiction Jurisdiction `json:"jurisdiction,omitempty"`
+	StartDate    time.Time    `json:"start_date,omitempty"`
+	EndDate      time.Time    `json:"end_date,omitempty"`
+	Offset       int          `json:"offset,omitempty"`
+	Limit        int          `json:"limit,omitempty"`
+}
+
+// SubscriptionEntity represents a subscription for status updates.
+type SubscriptionEntity struct {
+	ID            string       `json:"id"`
+	PatentIDs     []string     `json:"patent_ids,omitempty"`
+	PortfolioID   string       `json:"portfolio_id,omitempty"`
+	StatusFilters []string     `json:"status_filters,omitempty"`
+	Channels      []string     `json:"channels"`
+	Recipient     string       `json:"recipient"`
+	Active        bool         `json:"active"`
+	CreatedAt     time.Time    `json:"created_at"`
+}
+
+// CustomEvent represents a user-defined calendar event.
+type CustomEvent struct {
+	ID           string            `json:"id"`
+	PatentID     string            `json:"patent_id"`
+	PatentNumber string            `json:"patent_number"`
+	Title        string            `json:"title"`
+	Description  string            `json:"description"`
+	EventType    string            `json:"event_type"`
+	Jurisdiction Jurisdiction      `json:"jurisdiction"`
+	EventDate    time.Time         `json:"event_date"`
+	DueDate      time.Time         `json:"due_date"`
+	Priority     string            `json:"priority"`
+	Status       string            `json:"status"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
+}
+
+// LegalStatusEntity represents the persistent legal status of a patent.
+type LegalStatusEntity struct {
+	PatentID                string       `json:"patent_id"`
+	Jurisdiction            string       `json:"jurisdiction"`
+	Status                  string       `json:"status"`
+	PreviousStatus          string       `json:"previous_status"`
+	EffectiveDate           time.Time    `json:"effective_date"`
+	NextAction              string       `json:"next_action,omitempty"`
+	NextDeadline            *time.Time   `json:"next_deadline,omitempty"`
+	RemoteStatus            string       `json:"remote_status"`
+	LastSyncAt              *time.Time   `json:"last_sync_at"`
+	ConsecutiveSyncFailures int          `json:"consecutive_sync_failures"`
+	RawData                 map[string]any `json:"raw_data,omitempty"`
+}
+
+// StatusHistoryEntity represents a historical status change.
+type StatusHistoryEntity struct {
+	EventID     string    `json:"event_id"`
+	PatentID    string    `json:"patent_id"`
+	FromStatus  string    `json:"from_status"`
+	ToStatus    string    `json:"to_status"`
+	EventDate   time.Time `json:"event_date"`
+	Source      string    `json:"source"`
+	Description string    `json:"description"`
+}
+
+// AnnuityCalcResult holds the result of domain-level annuity calculation.
+type AnnuityCalcResult struct {
+	Fee            float64
+	YearNumber     int
+	DueDate        time.Time
+	GracePeriodEnd time.Time
+	Status         string
+}
+
+// ScheduleEntry is a single entry in an annuity schedule.
+type ScheduleEntry struct {
+	YearNumber     int
+	Fee            float64
+	DueDate        time.Time
+	GracePeriodEnd time.Time
+	Status         string
+}
+
+// RemoteStatusResult represents the status fetched from a remote source.
+type RemoteStatusResult struct {
+	Status        string
+	EffectiveDate time.Time
+	NextAction    string
+	Source        string
+	Jurisdiction  string
+}
+
 
 //DaysUntilDue calculates days remaining until due date
 func (d *Deadline) DaysUntilDue() int {

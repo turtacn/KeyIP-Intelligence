@@ -22,7 +22,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/uuid"
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
+	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -186,7 +188,7 @@ type DeadlineService interface {
 
 type deadlineServiceImpl struct {
 	lifecycleSvc  domainLifecycle.Service
-	lifecycleRepo domainLifecycle.Repository
+	lifecycleRepo domainLifecycle.LifecycleRepository
 	patentRepo    patentRepoPort
 	cache         CachePort
 	logger        Logger
@@ -200,7 +202,7 @@ type DeadlineServiceConfig struct {
 // NewDeadlineService constructs a DeadlineService.
 func NewDeadlineService(
 	lifecycleSvc domainLifecycle.Service,
-	lifecycleRepo domainLifecycle.Repository,
+	lifecycleRepo domainLifecycle.LifecycleRepository,
 	patentRepo patentRepoPort,
 	cache CachePort,
 	logger Logger,
@@ -238,7 +240,12 @@ func (s *deadlineServiceImpl) ListDeadlines(ctx context.Context, query *Deadline
 	var allDeadlines []Deadline
 
 	for _, pid := range patentIDs {
-		patent, fetchErr := s.patentRepo.GetByID(ctx, pid)
+		uid, err := uuid.Parse(pid)
+		if err != nil {
+			s.logger.Warn("deadline: skipping invalid patent_id", "patent_id", pid, "error", err)
+			continue
+		}
+		patent, fetchErr := s.patentRepo.GetByID(ctx, uid)
 		if fetchErr != nil {
 			s.logger.Warn("deadline: skipping patent", "patent_id", pid, "error", fetchErr)
 			continue
@@ -311,7 +318,12 @@ func (s *deadlineServiceImpl) CreateDeadline(ctx context.Context, req *CreateDea
 		return nil, errors.NewValidation("deadline.create", "due_date is required")
 	}
 
-	patent, err := s.patentRepo.GetByID(ctx, req.PatentID)
+	patentID, err := uuid.Parse(req.PatentID)
+	if err != nil {
+		return nil, errors.NewValidation("deadline.create", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
+	}
+
+	patent, err := s.patentRepo.GetByID(ctx, patentID)
 	if err != nil {
 		return nil, errors.NewNotFound("deadline.create", fmt.Sprintf("patent %s not found", req.PatentID))
 	}
@@ -512,7 +524,12 @@ func (s *deadlineServiceImpl) SyncStatutoryDeadlines(ctx context.Context, patent
 		return 0, errors.NewValidation("deadline.sync", "patent_id is required")
 	}
 
-	patent, err := s.patentRepo.GetByID(ctx, patentID)
+	uid, err := uuid.Parse(patentID)
+	if err != nil {
+		return 0, errors.NewValidation("deadline.sync", fmt.Sprintf("invalid patent_id: %s", patentID))
+	}
+
+	patent, err := s.patentRepo.GetByID(ctx, uid)
 	if err != nil {
 		return 0, errors.NewNotFound("deadline.sync", fmt.Sprintf("patent %s not found", patentID))
 	}
@@ -556,24 +573,29 @@ func (s *deadlineServiceImpl) resolvePatentIDs(ctx context.Context, portfolioID,
 	}
 	ids := make([]string, 0, len(patents))
 	for _, p := range patents {
-		ids = append(ids, p.ID)
+		ids = append(ids, p.ID.String())
 	}
 	return ids, nil
 }
 
 func (s *deadlineServiceImpl) generateDeadlinesForPatent(
-	patent *domainPatentRecord,
+	patent *domainPatent.Patent,
 	jurisdiction domainLifecycle.Jurisdiction,
 	now time.Time,
 ) []Deadline {
 	var deadlines []Deadline
 
+	if patent.FilingDate == nil {
+		return nil
+	}
+	filingDate := *patent.FilingDate
+
 	maxYears := jurisdictionMaxLife(jurisdiction)
 	for year := 1; year <= maxYears; year++ {
-		dueDate := patent.FilingDate.AddDate(year, 0, 0)
+		dueDate := filingDate.AddDate(year, 0, 0)
 		deadlines = append(deadlines, Deadline{
-			ID:            fmt.Sprintf("dl-ann-%s-%d", patent.ID, year),
-			PatentID:      patent.ID,
+			ID:            fmt.Sprintf("dl-ann-%s-%d", patent.ID.String(), year),
+			PatentID:      patent.ID.String(),
 			PatentNumber:  patent.PatentNumber,
 			Title:         fmt.Sprintf("Year %d Annuity - %s", year, patent.PatentNumber),
 			DeadlineType:  DeadlineTypeAnnuityPayment,
@@ -591,10 +613,10 @@ func (s *deadlineServiceImpl) generateDeadlinesForPatent(
 
 	// Examination request deadline (CN: 3 years from filing)
 	if jurisdiction == domainLifecycle.JurisdictionCN {
-		examDeadline := patent.FilingDate.AddDate(3, 0, 0)
+		examDeadline := filingDate.AddDate(3, 0, 0)
 		deadlines = append(deadlines, Deadline{
-			ID:            fmt.Sprintf("dl-exam-%s", patent.ID),
-			PatentID:      patent.ID,
+			ID:            fmt.Sprintf("dl-exam-%s", patent.ID.String()),
+			PatentID:      patent.ID.String(),
 			PatentNumber:  patent.PatentNumber,
 			Title:         fmt.Sprintf("Examination Request Deadline - %s", patent.PatentNumber),
 			DeadlineType:  DeadlineTypeExamRequest,
@@ -610,10 +632,10 @@ func (s *deadlineServiceImpl) generateDeadlinesForPatent(
 	}
 
 	// Paris Convention priority (12 months)
-	parisDeadline := patent.FilingDate.AddDate(1, 0, 0)
+	parisDeadline := filingDate.AddDate(1, 0, 0)
 	deadlines = append(deadlines, Deadline{
-		ID:            fmt.Sprintf("dl-paris-%s", patent.ID),
-		PatentID:      patent.ID,
+		ID:            fmt.Sprintf("dl-paris-%s", patent.ID.String()),
+		PatentID:      patent.ID.String(),
 		PatentNumber:  patent.PatentNumber,
 		Title:         fmt.Sprintf("Paris Convention Priority - %s", patent.PatentNumber),
 		DeadlineType:  DeadlineTypeParisPriority,
@@ -628,10 +650,10 @@ func (s *deadlineServiceImpl) generateDeadlinesForPatent(
 	})
 
 	// PCT national phase (30 months)
-	pctDeadline := patent.FilingDate.AddDate(0, 30, 0)
+	pctDeadline := filingDate.AddDate(0, 30, 0)
 	deadlines = append(deadlines, Deadline{
-		ID:            fmt.Sprintf("dl-pct-%s", patent.ID),
-		PatentID:      patent.ID,
+		ID:            fmt.Sprintf("dl-pct-%s", patent.ID.String()),
+		PatentID:      patent.ID.String(),
 		PatentNumber:  patent.PatentNumber,
 		Title:         fmt.Sprintf("PCT National Phase - %s", patent.PatentNumber),
 		DeadlineType:  DeadlineTypePCTNational,

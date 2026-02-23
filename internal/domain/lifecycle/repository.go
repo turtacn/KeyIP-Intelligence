@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // LifecycleRepository defines the persistence contract for lifecycle domain.
@@ -43,8 +44,32 @@ type LifecycleRepository interface {
 	// Dashboard
 	GetLifecycleDashboard(ctx context.Context, orgID uuid.UUID) (*DashboardStats, error)
 
+	// Payment (Added for AnnuityService)
+	SavePayment(ctx context.Context, payment *PaymentRecord) (*PaymentRecord, error)
+	QueryPayments(ctx context.Context, query *PaymentQuery) ([]PaymentRecord, int64, error)
+
+	// Legal Status (Added for LegalStatusService)
+	GetByPatentID(ctx context.Context, patentID string) (*LegalStatusEntity, error)
+	UpdateStatus(ctx context.Context, patentID string, status string, effectiveDate time.Time) error
+	SaveSubscription(ctx context.Context, sub *SubscriptionEntity) error
+	DeactivateSubscription(ctx context.Context, id string) error
+	GetStatusHistory(ctx context.Context, patentID string, pagination *commontypes.Pagination, from, to *time.Time) ([]*StatusHistoryEntity, error)
+
+	// Custom Event (Added for CalendarService)
+	SaveCustomEvent(ctx context.Context, event *CustomEvent) error
+	GetCustomEvents(ctx context.Context, patentIDs []string, start, end time.Time) ([]CustomEvent, error)
+	UpdateEventStatus(ctx context.Context, eventID string, status string) error
+	DeleteEvent(ctx context.Context, eventID string) error
+
 	// Transaction
 	WithTx(ctx context.Context, fn func(LifecycleRepository) error) error
+}
+
+// Service defines the domain service interface.
+type Service interface {
+	CalculateAnnuityFee(ctx context.Context, patentID string, jurisdiction Jurisdiction, asOf time.Time) (*AnnuityCalcResult, error)
+	GetAnnuitySchedule(ctx context.Context, patentID string, jurisdiction Jurisdiction, start, end time.Time) ([]ScheduleEntry, error)
+	FetchRemoteStatus(ctx context.Context, patentID string) (*RemoteStatusResult, error)
 }
 
 //Personal.AI order the ending
