@@ -1,0 +1,31 @@
+import { http, HttpResponse } from 'msw';
+import alerts from '../data/alerts.json';
+
+export const infringementHandlers = [
+  http.get('/api/openapi/v1/alerts', ({ request }) => {
+    const url = new URL(request.url);
+    const riskLevel = url.searchParams.get('riskLevel');
+    const page = Number(url.searchParams.get('page')) || 1;
+    const pageSize = Number(url.searchParams.get('pageSize')) || 20;
+
+    let filtered = alerts;
+    if (riskLevel) {
+      filtered = filtered.filter(a => a.riskLevel === riskLevel);
+    }
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const paginatedData = filtered.slice(start, end);
+
+    return HttpResponse.json({
+      code: 0,
+      message: 'success',
+      data: paginatedData,
+      pagination: {
+        page,
+        pageSize,
+        total: filtered.length
+      }
+    });
+  })
+];
