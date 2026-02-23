@@ -590,12 +590,28 @@ func makeTestPatent(id, title, status string, claimCount int, ipcCount int, fili
 	// Convert status string to PatentStatus
 	patentStatus := patent.PatentStatusGranted
 	switch status {
+	case "unknown":
+		patentStatus = patent.PatentStatusUnknown
+	case "draft":
+		patentStatus = patent.PatentStatusDraft
 	case "filed":
 		patentStatus = patent.PatentStatusFiled
 	case "published":
 		patentStatus = patent.PatentStatusPublished
-	case "granted":
+	case "pending", "under_examination":
+		patentStatus = patent.PatentStatusUnderExamination
+	case "granted", "active":
 		patentStatus = patent.PatentStatusGranted
+	case "rejected":
+		patentStatus = patent.PatentStatusRejected
+	case "withdrawn":
+		patentStatus = patent.PatentStatusWithdrawn
+	case "expired":
+		patentStatus = patent.PatentStatusExpired
+	case "invalidated":
+		patentStatus = patent.PatentStatusInvalidated
+	case "lapsed":
+		patentStatus = patent.PatentStatusLapsed
 	}
 	
 	// Convert claims to pointers
@@ -2634,12 +2650,13 @@ func TestRuleBasedFactorScore_UnknownFactor(t *testing.T) {
 
 func TestComputeCitationImpact_WithRepo(t *testing.T) {
 	citationRepo := newMockCitationRepo()
-	citationRepo.forwardCounts["30000000-0000-0000-0000-000000000049"] = 40
 	citationRepo.maxInDomain["G06F17/00"] = 100
 
 	svc := buildTestService(nil, nil, nil, nil, citationRepo, nil).(*valuationServiceImpl)
 
 	pat := makeTestPatent("30000000-0000-0000-0000-000000000049", "Citation Test", "granted", 10, 3, 2)
+	// Use actual patent UUID as key
+	citationRepo.forwardCounts[pat.ID.String()] = 40
 	score := svc.computeCitationImpact(context.Background(), pat)
 	// 40/100 * 100 = 40
 	if score != 40 {
@@ -2693,9 +2710,10 @@ func TestComputeCitationImpact_AbsoluteThresholds(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		patID := fmt.Sprintf("P_ABS_%d", tt.fwdCount)
-		citationRepo.forwardCounts[patID] = tt.fwdCount
+		patID := fmt.Sprintf("30000000-0000-0000-0000-%012d", tt.fwdCount+100)
 		pat := makeTestPatent(patID, "Absolute", "granted", 10, 3, 2)
+		// Use the actual UUID string as key (important: must match what computeCitationImpact queries)
+		citationRepo.forwardCounts[pat.ID.String()] = tt.fwdCount
 		score := svc.computeCitationImpact(context.Background(), pat)
 		if score < tt.minScore || score > tt.maxScore {
 			t.Errorf("citation_impact(fwd=%d, max=0) = %.2f, want [%.0f, %.0f]", tt.fwdCount, score, tt.minScore, tt.maxScore)
