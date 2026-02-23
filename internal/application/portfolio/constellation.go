@@ -304,7 +304,7 @@ type constellationServiceImpl struct {
 	moleculeSvc    domainmol.Service
 	patentRepo     domainpatent.Repository
 	moleculeRepo   domainmol.Repository
-	gnnInference   molpatent_gnn.InferenceEngine
+	gnnInference   molpatent_gnn.GNNInferenceService
 	logger         logging.Logger
 	cache          ConstellationCache
 	cacheTTL       time.Duration
@@ -317,7 +317,7 @@ type ConstellationServiceConfig struct {
 	MoleculeService     domainmol.Service
 	PatentRepository    domainpatent.Repository
 	MoleculeRepository  domainmol.Repository
-	GNNInference        molpatent_gnn.InferenceEngine
+	GNNInference        molpatent_gnn.GNNInferenceService
 	Logger              logging.Logger
 	Cache               ConstellationCache
 	CacheTTL            time.Duration

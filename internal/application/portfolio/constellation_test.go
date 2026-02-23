@@ -1266,7 +1266,8 @@ func TestGetCoverageHeatmap_WithDensityRange(t *testing.T) {
 
 func TestGetCoverageHeatmap_GNNReduceError(t *testing.T) {
 	cfg := buildTestConfig(func(c *ConstellationServiceConfig) {
-		c.GNNInference = &mockGNNInference{reduceErr: fmt.Errorf("reduction failed")}
+		// Create a mock with embed error to simulate reduction failure
+		c.GNNInference = &mockGNNInference{embedErr: fmt.Errorf("reduction failed")}
 	})
 	svc, _ := NewConstellationService(cfg)
 
