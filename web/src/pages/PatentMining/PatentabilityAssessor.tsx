@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Search, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import MoleculeViewer from '../../components/ui/MoleculeViewer';
 
 const PatentabilityAssessor: React.FC = () => {
   const [smiles, setSmiles] = useState('');
@@ -46,6 +47,12 @@ const PatentabilityAssessor: React.FC = () => {
               placeholder="e.g., c1ccc2c(c1)c3ccccc3n2-c4ccc(cc4)N(c5ccccc5)c6ccccc6"
               className="w-full h-32 p-3 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+            {smiles && (
+              <div className="mt-2 bg-slate-50 border border-slate-200 rounded p-2">
+                <p className="text-xs text-slate-500 mb-2">Structure Preview:</p>
+                <MoleculeViewer smiles={smiles} width={300} height={150} />
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Technical Description</label>

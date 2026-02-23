@@ -1,0 +1,26 @@
+{
+  "app": {
+    "title": "KeyIP Intelligence",
+    "role": "IP Manager"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "mining": "Patent Mining",
+    "infringement": "Infringement Watch",
+    "portfolio": "Portfolio Optimizer",
+    "lifecycle": "Lifecycle Mgmt",
+    "partners": "Partner Portal"
+  },
+  "dashboard": {
+    "title": "Executive Dashboard",
+    "subtitle": "Real-time overview of your patent portfolio and strategic KPIs.",
+    "export": "Export Report",
+    "add_patent": "Add New Patent",
+    "kpi": {
+      "total_patents": "Total Patents",
+      "active_patents": "Active Patents",
+      "high_risk": "High Risk Alerts",
+      "due_month": "Due This Month"
+    }
+  }
+}

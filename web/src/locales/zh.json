@@ -1,0 +1,26 @@
+{
+  "app": {
+    "title": "KeyIP 智能平台",
+    "role": "知识产权经理"
+  },
+  "nav": {
+    "dashboard": "管理驾驶舱",
+    "mining": "专利挖掘",
+    "infringement": "侵权监测",
+    "portfolio": "组合优化",
+    "lifecycle": "生命周期管理",
+    "partners": "合作伙伴门户"
+  },
+  "dashboard": {
+    "title": "管理驾驶舱",
+    "subtitle": "您的专利组合和战略 KPI 的实时概览。",
+    "export": "导出报告",
+    "add_patent": "新增专利",
+    "kpi": {
+      "total_patents": "专利总数",
+      "active_patents": "有效专利",
+      "high_risk": "高风险预警",
+      "due_month": "本月到期"
+    }
+  }
+}

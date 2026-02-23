@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   Search,
@@ -10,20 +11,22 @@ import {
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
+  const { t } = useTranslation();
+
   const navItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/patent-mining', label: 'Patent Mining', icon: Search },
-    { to: '/infringement-watch', label: 'Infringement Watch', icon: ShieldAlert },
-    { to: '/portfolio', label: 'Portfolio Optimizer', icon: Briefcase },
-    { to: '/lifecycle', label: 'Lifecycle Mgmt', icon: Clock },
-    { to: '/partners', label: 'Partner Portal', icon: Users },
+    { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+    { to: '/patent-mining', label: t('nav.mining'), icon: Search },
+    { to: '/infringement-watch', label: t('nav.infringement'), icon: ShieldAlert },
+    { to: '/portfolio', label: t('nav.portfolio'), icon: Briefcase },
+    { to: '/lifecycle', label: t('nav.lifecycle'), icon: Clock },
+    { to: '/partners', label: t('nav.partners'), icon: Users },
   ];
 
   return (
     <aside className="w-64 bg-slate-900 text-white flex flex-col h-screen fixed left-0 top-0 z-20 transition-all duration-300">
       <div className="h-16 flex items-center px-6 border-b border-slate-800">
         <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-sky-400">
-          KeyIP Intelligence
+          {t('app.title')}
         </span>
       </div>
 
@@ -53,7 +56,7 @@ const Sidebar: React.FC = () => {
           </div>
           <div className="ml-3">
             <p className="text-sm font-medium">John Doe</p>
-            <p className="text-xs text-slate-500">IP Manager</p>
+            <p className="text-xs text-slate-500">{t('app.role')}</p>
           </div>
         </div>
       </div>

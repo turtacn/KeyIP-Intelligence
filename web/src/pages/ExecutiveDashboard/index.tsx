@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDashboard } from '../../hooks/useDashboard';
 import KPICards from './KPICards';
 import TrendChart from './TrendChart';
@@ -12,6 +13,7 @@ import { Download } from 'lucide-react';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
 const ExecutiveDashboard: React.FC = () => {
+  const { t } = useTranslation();
   const { data, loading, error } = useDashboard();
   const [reportGenerating, setReportGenerating] = useState(false);
 
@@ -53,9 +55,9 @@ const ExecutiveDashboard: React.FC = () => {
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Executive Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('dashboard.title')}</h1>
           <p className="text-slate-500 mt-1">
-            Real-time overview of your patent portfolio and strategic KPIs.
+            {t('dashboard.subtitle')}
           </p>
         </div>
         <div className="flex gap-3">
@@ -65,9 +67,9 @@ const ExecutiveDashboard: React.FC = () => {
             onClick={handleGenerateReport}
             isLoading={reportGenerating}
           >
-            Export Report
+            {t('dashboard.export')}
           </Button>
-          <Button variant="primary">Add New Patent</Button>
+          <Button variant="primary">{t('dashboard.add_patent')}</Button>
         </div>
       </div>
 

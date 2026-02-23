@@ -3,6 +3,7 @@ import Card from '../../components/ui/Card';
 import { moleculeService } from '../../services/molecule.service';
 import { Molecule } from '../../types/domain';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import MoleculeViewer from '../../components/ui/MoleculeViewer';
 
 interface MoleculeComparisonProps {
   triggerMoleculeId: string;
@@ -49,11 +50,15 @@ const MoleculeComparison: React.FC<MoleculeComparisonProps> = ({ triggerMolecule
               {triggerMolecule?.id || triggerMoleculeId}
             </span>
           </div>
-          <div className="bg-white p-3 rounded border border-slate-200 font-mono text-xs break-all h-24 overflow-y-auto text-slate-600">
-            {triggerMolecule?.smiles || "Loading..."}
+          <div className="bg-white p-3 rounded border border-slate-200 flex justify-center h-48">
+            {triggerMolecule?.smiles ? (
+              <MoleculeViewer smiles={triggerMolecule.smiles} width={250} height={180} />
+            ) : (
+              <span className="text-slate-400 self-center">No structure available</span>
+            )}
           </div>
-          <div className="mt-2 text-xs text-slate-400">
-            Internal ID: {triggerMolecule?.id}
+          <div className="mt-2 text-xs text-slate-400 font-mono truncate">
+            {triggerMolecule?.smiles}
           </div>
         </div>
 
@@ -79,8 +84,8 @@ const MoleculeComparison: React.FC<MoleculeComparisonProps> = ({ triggerMolecule
               Claim 1 (Markush)
             </span>
           </div>
-          <div className="bg-white p-3 rounded border border-slate-200 font-mono text-xs break-all h-24 overflow-y-auto text-slate-600">
-            {mockPatentMoleculeSmiles}
+          <div className="bg-white p-3 rounded border border-slate-200 flex justify-center h-48">
+            <MoleculeViewer smiles={mockPatentMoleculeSmiles} width={250} height={180} />
           </div>
           <div className="mt-2 text-xs text-slate-400">
             Extracted from Claim 1
