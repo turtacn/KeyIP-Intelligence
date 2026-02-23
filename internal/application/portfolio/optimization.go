@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/uuid"
 	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
@@ -137,16 +138,18 @@ type PatentCostEntry struct {
 // -----------------------------------------------------------------------
 
 type optimizationServiceImpl struct {
-	portfolioSvc domainportfolio.Service
-	patentRepo   domainpatent.Repository
-	logger       logging.Logger
+	portfolioSvc  domainportfolio.Service
+	portfolioRepo domainportfolio.PortfolioRepository
+	patentRepo    domainpatent.Repository
+	logger        logging.Logger
 }
 
 // OptimizationServiceConfig holds configuration for constructing the optimization service.
 type OptimizationServiceConfig struct {
-	PortfolioService domainportfolio.Service
-	PatentRepository domainpatent.Repository
-	Logger           logging.Logger
+	PortfolioService    domainportfolio.Service
+	PortfolioRepository domainportfolio.PortfolioRepository
+	PatentRepository    domainpatent.Repository
+	Logger              logging.Logger
 }
 
 // NewOptimizationService constructs an OptimizationService.
@@ -161,9 +164,10 @@ func NewOptimizationService(cfg OptimizationServiceConfig) (OptimizationService,
 		return nil, errors.NewValidation("OptimizationService requires Logger")
 	}
 	return &optimizationServiceImpl{
-		portfolioSvc: cfg.PortfolioService,
-		patentRepo:   cfg.PatentRepository,
-		logger:       cfg.Logger,
+		portfolioSvc:  cfg.PortfolioService,
+		portfolioRepo: cfg.PortfolioRepository,
+		patentRepo:    cfg.PatentRepository,
+		logger:        cfg.Logger,
 	}, nil
 }
 
@@ -181,24 +185,38 @@ func (s *optimizationServiceImpl) Optimize(ctx context.Context, req *Optimizatio
 		objective = GoalBalanced
 	}
 
-	s.logger.Info(ctx, "starting portfolio optimization",
-		"portfolio_id", req.PortfolioID, "objective", objective)
+	s.logger.Info("starting portfolio optimization",
+		logging.String("portfolio_id", req.PortfolioID),
+		logging.String("objective", string(objective)))
 
-	portfolio, err := s.portfolioSvc.GetByID(ctx, req.PortfolioID)
+	portfolioUUID, err := uuid.Parse(req.PortfolioID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load portfolio")
+		return nil, errors.Wrap(err, errors.ErrCodeValidation, "invalid portfolio ID")
+	}
+
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio")
 	}
 	if portfolio == nil {
 		return nil, errors.NewNotFound("portfolio", req.PortfolioID)
 	}
 
-	patents, err := s.patentRepo.FindByPortfolioID(ctx, req.PortfolioID)
+	patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load patents")
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load patents")
+	}
+
+	// Convert []*Patent to []Patent
+	patentValues := make([]domainpatent.Patent, len(patents))
+	for i, p := range patents {
+		if p != nil {
+			patentValues[i] = *p
+		}
 	}
 
 	// Score each patent.
-	scored := s.scorePatents(patents, objective, req.Preferences)
+	scored := s.scorePatents(patentValues, objective, req.Preferences)
 
 	// Identify prune candidates.
 	pruneCandidates := s.identifyPruneCandidates(scored, req.Constraints)
@@ -249,7 +267,7 @@ func (s *optimizationServiceImpl) Optimize(ctx context.Context, req *Optimizatio
 	}
 
 	// Calculate projected coverage.
-	totalDomains := s.countUniqueDomains(patents)
+	totalDomains := s.countUniqueDomains(patentValues)
 	retainDomains := 0
 	for _, sp := range scored {
 		if !pruneSet[sp.patent.GetID()] {
@@ -282,12 +300,11 @@ func (s *optimizationServiceImpl) Optimize(ctx context.Context, req *Optimizatio
 		GeneratedAt:       time.Now().UTC(),
 	}
 
-	s.logger.Info(ctx, "optimization completed",
-		"portfolio_id", req.PortfolioID,
-		"retain", len(retainList),
-		"prune", len(pruneCandidates),
-		"savings", totalSavings,
-	)
+	s.logger.Info("optimization completed",
+		logging.String("portfolio_id", req.PortfolioID),
+		logging.Int("retain", len(retainList)),
+		logging.Int("prune", len(pruneCandidates)),
+		logging.Float64("savings", totalSavings))
 
 	return response, nil
 }
@@ -322,17 +339,22 @@ func (s *optimizationServiceImpl) EstimateCost(ctx context.Context, portfolioID 
 		return nil, errors.NewValidation("portfolio_id is required")
 	}
 
-	portfolio, err := s.portfolioSvc.GetByID(ctx, portfolioID)
+	portfolioUUID, err := uuid.Parse(portfolioID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load portfolio")
+		return nil, errors.Wrap(err, errors.ErrCodeValidation, "invalid portfolio ID")
+	}
+
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio")
 	}
 	if portfolio == nil {
 		return nil, errors.NewNotFound("portfolio", portfolioID)
 	}
 
-	patents, err := s.patentRepo.FindByPortfolioID(ctx, portfolioID)
+	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load patents")
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load patents")
 	}
 
 	totalCost := 0.0
@@ -425,8 +447,9 @@ func (s *optimizationServiceImpl) scorePatents(
 		}
 
 		// Recency score [0, 1]: newer patents score higher.
-		if !p.GetFilingDate().IsZero() {
-			ageYears := now.Sub(p.GetFilingDate()).Hours() / (24 * 365.25)
+		filingDate := p.GetFilingDate()
+		if filingDate != nil && !filingDate.IsZero() {
+			ageYears := now.Sub(*filingDate).Hours() / (24 * 365.25)
 			sp.recency = math.Max(0, 1.0-ageYears/20.0)
 		}
 
@@ -596,8 +619,9 @@ func estimatePatentAnnualCost(p domainpatent.Patent) float64 {
 
 	// Age-based escalation: maintenance fees increase over time.
 	ageFactor := 1.0
-	if !p.GetFilingDate().IsZero() {
-		ageYears := time.Since(p.GetFilingDate()).Hours() / (24 * 365.25)
+	filingDate := p.GetFilingDate()
+	if filingDate != nil && !filingDate.IsZero() {
+		ageYears := time.Since(*filingDate).Hours() / (24 * 365.25)
 		if ageYears > 4 {
 			ageFactor = 1.0 + (ageYears-4)*0.05
 		}

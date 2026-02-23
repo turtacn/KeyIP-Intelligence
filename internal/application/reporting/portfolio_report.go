@@ -16,7 +16,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math"
 	"sort"
 	"sync"
 	"time"
@@ -367,7 +366,7 @@ func (s *portfolioReportServiceImpl) initiateReportTask(ctx context.Context, por
 	lockKey := fmt.Sprintf("lock:portfolio_report:%s", portfolioID)
 	acquired, err := s.lock.Acquire(ctx, lockKey, 10*time.Minute)
 	if err != nil || !acquired {
-		return "", errors.NewError(errors.ErrInvalidState, "another report generation task is currently running for this portfolio")
+		return "", errors.InvalidState( "another report generation task is currently running for this portfolio")
 	}
 
 	reportID := uuid.New().String()
@@ -383,7 +382,7 @@ func (s *portfolioReportServiceImpl) initiateReportTask(ctx context.Context, por
 
 	if err := s.metaRepo.Create(ctx, meta); err != nil {
 		_ = s.lock.Release(ctx, lockKey)
-		return "", errors.Wrap(err, "failed to create report metadata")
+		return "", errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to create report metadata")
 	}
 
 	return reportID, nil
@@ -460,7 +459,7 @@ func (s *portfolioReportServiceImpl) processFullReport(ctx context.Context, repo
 
 	wg.Wait()
 	if len(errs) > 0 {
-		taskErr = errors.Wrap(errs[0], "data collection failed")
+		taskErr = errors.Wrap(errs[0], errors.ErrCodeInternal, "data collection failed")
 		return
 	}
 
@@ -492,16 +491,21 @@ func (s *portfolioReportServiceImpl) processFullReport(ctx context.Context, repo
 	format := req.OutputFormat
 	if format == "" { format = FormatPortfolioPDF }
 
-	renderedBytes, err := s.templater.Render(ctx, "portfolio_full", data, ReportFormat(format))
+	renderResult, err := s.templater.Render(ctx, &RenderRequest{
+		TemplateID:   "portfolio_full",
+		Data:         data,
+		OutputFormat: ReportFormat(format),
+		Options:      nil,
+	})
 	if err != nil {
-		taskErr = errors.Wrap(err, "template rendering failed")
+		taskErr = errors.Wrap(err, errors.ErrCodeInternal, "template rendering failed")
 		return
 	}
 
 	key := fmt.Sprintf("reports/portfolio/%s.%s", reportID, string(format))
-	err = s.storage.Save(ctx, key, renderedBytes, "application/octet-stream")
+	err = s.storage.Save(ctx, key, renderResult.Content, "application/octet-stream")
 	if err != nil {
-		taskErr = errors.Wrap(err, "storage failed")
+		taskErr = errors.Wrap(err, errors.ErrCodeInternal, "storage failed")
 		return
 	}
 
@@ -607,7 +611,7 @@ func (s *portfolioReportServiceImpl) GetReportStatus(ctx context.Context, report
 
 	meta, err := s.metaRepo.Get(ctx, reportID)
 	if err != nil {
-		return nil, errors.Wrap(err, "report not found")
+		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "report not found")
 	}
 
 	progress := 0
@@ -622,28 +626,36 @@ func (s *portfolioReportServiceImpl) GetReportStatus(ctx context.Context, report
 
 func (s *portfolioReportServiceImpl) ListReports(ctx context.Context, portfolioID string, opts *ListReportOptions) (*common.PaginatedResult[ReportMeta], error) {
 	if opts == nil {
-		opts = &ListReportOptions{Pagination: common.Pagination{Page: 1, Size: 20}}
+		opts = &ListReportOptions{Pagination: common.Pagination{Page: 1, PageSize: 20}}
 	}
 	items, total, err := s.metaRepo.List(ctx, portfolioID, opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "listing failed")
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "listing failed")
+	}
+
+	totalPages := 0
+	if opts.Pagination.PageSize > 0 && int(total) > 0 {
+		totalPages = (int(total) + opts.Pagination.PageSize - 1) / opts.Pagination.PageSize
 	}
 
 	return &common.PaginatedResult[ReportMeta]{
-	Data:       items,
-		TotalCount: total,
+		Items: items,
+		Pagination: common.PaginationResult{
 			Page:       opts.Pagination.Page,
-			Size:       opts.Pagination.Size,
+			PageSize:   opts.Pagination.PageSize,
+			Total:      int(total),
+			TotalPages: totalPages,
+		},
 	}, nil
 }
 
 func (s *portfolioReportServiceImpl) ExportReport(ctx context.Context, reportID string, format ExportFormat) ([]byte, error) {
 	meta, err := s.metaRepo.Get(ctx, reportID)
 	if err != nil {
-		return nil, errors.Wrap(err, "report metadata not found")
+		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "report metadata not found")
 	}
 	if meta.Status != StatusCompleted {
-		return nil, errors.NewError(errors.ErrInvalidState, "report is not completed")
+		return nil, errors.InvalidState( "report is not completed")
 	}
 
 	// Assuming the file is saved as reportID.Format
@@ -652,7 +664,7 @@ func (s *portfolioReportServiceImpl) ExportReport(ctx context.Context, reportID 
 	if err != nil {
 		// Mock logic: If format doesn't exist, we might trigger a synchronous conversion here.
 		// For MVP, return error indicating format unavailable.
-		return nil, errors.NewError(errors.ErrNotFound, "requested format not available")
+		return nil, errors.NotFound( "requested format not available")
 	}
 	defer stream.Close()
 

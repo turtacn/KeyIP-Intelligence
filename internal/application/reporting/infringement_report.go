@@ -387,7 +387,7 @@ func (s *infringementReportServiceImpl) executeReportPipeline(ctx context.Contex
 	for _, claim := range ownedClaims {
 		for inchikey, smiles := range targetSmilesMap {
 			if ctx.Err() != nil {
-				return errors.Wrap(ctx.Err(), "pipeline aborted")
+				return errors.Wrap(ctx.Err(), errors.ErrCodeTimeout, "pipeline aborted")
 			}
 
 			// Abstract mock call logic for literal infringement
@@ -494,13 +494,18 @@ func (s *infringementReportServiceImpl) executeReportPipeline(ctx context.Contex
 	targetFormat := FormatPDF
 	if req.Language == LangEN { targetFormat = FormatDOCX } // Mock format decision
 
-	renderedBytes, err := s.templater.Render(ctx, "infringement_template", reportData, targetFormat)
+	renderResult, err := s.templater.Render(ctx, &RenderRequest{
+		TemplateID:   "infringement_template",
+		Data:         reportData,
+		OutputFormat: targetFormat,
+		Options:      nil,
+	})
 	if err != nil {
 		return errors.Wrap(err, errors.ErrCodeInternal, "template rendering failed")
 	}
 
 	storageKey := fmt.Sprintf("reports/infringement/%s.%s", reportID, string(targetFormat))
-	err = s.storage.Save(ctx, storageKey, renderedBytes, "application/octet-stream")
+	err = s.storage.Save(ctx, storageKey, renderResult.Content, "application/octet-stream")
 	if err != nil {
 		return errors.Wrap(err, errors.ErrCodeInternal, "storage save failed")
 	}
@@ -579,18 +584,26 @@ func (s *infringementReportServiceImpl) GetReport(ctx context.Context, reportID 
 
 func (s *infringementReportServiceImpl) ListReports(ctx context.Context, filter *InfringementReportFilter, page *common.Pagination) (*common.PaginatedResult[InfringementReportSummary], error) {
 	if page == nil {
-		page = &common.Pagination{Page: 1, Size: 20}
+		page = &common.Pagination{Page: 1, PageSize: 20}
 	}
 	items, total, err := s.metaRepo.List(ctx, filter, page)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "listing failed")
 	}
 
+	totalPages := 0
+	if page.PageSize > 0 && int(total) > 0 {
+		totalPages = (int(total) + page.PageSize - 1) / page.PageSize
+	}
+
 	return &common.PaginatedResult[InfringementReportSummary]{
-	Data:       items,
-		TotalCount: total,
+		Items: items,
+		Pagination: common.PaginationResult{
 			Page:       page.Page,
-			Size:       page.Size,
+			PageSize:   page.PageSize,
+			Total:      int(total),
+			TotalPages: totalPages,
+		},
 	}, nil
 }
 

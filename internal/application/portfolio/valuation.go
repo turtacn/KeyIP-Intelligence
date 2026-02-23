@@ -33,6 +33,7 @@
 package portfolio
 
 import (
+	"github.com/google/uuid"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -685,9 +686,16 @@ func (s *valuationServiceImpl) AssessPatent(ctx context.Context, req *SinglePate
 	}
 
 	// 3. Fetch patent entity
-	pat, err := s.patentRepo.FindByID(ctx, req.PatentID)
+	patentUUID, err := uuid.Parse(req.PatentID)
 	if err != nil {
-		s.logger.Error("failed to fetch patent for assessment", "patent_id", req.PatentID, "error", err)
+		return nil, errors.Wrap(err, errors.ErrCodeValidation, "invalid patent ID")
+	}
+
+	pat, err := s.patentRepo.GetByID(ctx, patentUUID)
+	if err != nil {
+		s.logger.Error("failed to fetch patent for assessment",
+			logging.String("patent_id", req.PatentID),
+			logging.Err(err))
 		return nil, errors.NewNotFound(fmt.Sprintf("patent %s not found", req.PatentID))
 	}
 
@@ -730,7 +738,7 @@ func (s *valuationServiceImpl) AssessPatent(ctx context.Context, req *SinglePate
 		dimScoreMap[d] = ds.Score
 	}
 	record := &AssessmentRecord{
-		ID:              commontypes.NewULID(),
+		ID:              uuid.New().String(),
 		PatentID:        req.PatentID,
 		OverallScore:    overall.Score,
 		Tier:            overall.Tier,
@@ -739,7 +747,7 @@ func (s *valuationServiceImpl) AssessPatent(ctx context.Context, req *SinglePate
 		AssessorType:    assessorType,
 	}
 	if saveErr := s.assessmentRepo.Save(ctx, record); saveErr != nil {
-		s.logger.Error("failed to persist assessment record", "patent_id", req.PatentID, "error", saveErr)
+		s.logger.Error("failed to persist assessment record", logging.String("patent_id", req.PatentID), logging.Err(saveErr))
 		// non-fatal: still return the result
 	}
 
@@ -838,7 +846,7 @@ func (s *valuationServiceImpl) AssessPortfolio(ctx context.Context, req *Portfol
 	// Persist portfolio-level records
 	for _, a := range assessments {
 		record := &AssessmentRecord{
-			ID:           commontypes.NewULID(),
+			ID:           uuid.New().String(),
 			PatentID:     a.PatentID,
 			PortfolioID:  req.PortfolioID,
 			OverallScore: a.OverallScore.Score,

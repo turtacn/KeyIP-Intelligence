@@ -381,7 +381,7 @@ func (s *templateEngineImpl) Render(ctx context.Context, req *RenderRequest) (*R
 	// 1. Load Template
 	tmpl, err := s.GetTemplate(renderCtx, req.TemplateID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load template")
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load template")
 	}
 
 	var warnings []string
@@ -437,14 +437,14 @@ func (s *templateEngineImpl) Render(ctx context.Context, req *RenderRequest) (*R
 			t := template.New(tmpl.ID).Funcs(s.registerTemplateFuncs())
 			parsedTmpl, err = t.Parse(contentStr)
 			if err != nil {
-				return nil, errors.Wrap(err, "template parse failed")
+				return nil, errors.Wrap(err, errors.ErrCodeInternal, "template parse failed")
 			}
 			s.astCache.Store(tmpl.ID+":"+tmpl.Version, parsedTmpl)
 		}
 
 		var buf bytes.Buffer
 		if err := parsedTmpl.Execute(&buf, req.Data); err != nil {
-			return nil, errors.Wrap(err, "template execution failed")
+			return nil, errors.Wrap(err, errors.ErrCodeInternal, "template execution failed")
 		}
 		boundContent = buf.Bytes()
 	}
@@ -463,7 +463,7 @@ func (s *templateEngineImpl) Render(ctx context.Context, req *RenderRequest) (*R
 		// Assuming previous step bound HTML
 		pdfBytes, err := s.htmlRender.RenderPDF(renderCtx, string(boundContent), req.Options)
 		if err != nil {
-			return nil, errors.Wrap(err, "PDF rendering failed")
+			return nil, errors.Wrap(err, errors.ErrCodeInternal, "PDF rendering failed")
 		}
 		finalContent = pdfBytes
 		contentType = "application/pdf"
@@ -471,7 +471,7 @@ func (s *templateEngineImpl) Render(ctx context.Context, req *RenderRequest) (*R
 	case FormatPortfolioDOCX:
 		docxBytes, err := s.docxRender.RenderDOCX(renderCtx, tmpl, req.Data, req.Options)
 		if err != nil {
-			return nil, errors.Wrap(err, "DOCX rendering failed")
+			return nil, errors.Wrap(err, errors.ErrCodeInternal, "DOCX rendering failed")
 		}
 		finalContent = docxBytes
 		contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -479,7 +479,7 @@ func (s *templateEngineImpl) Render(ctx context.Context, req *RenderRequest) (*R
 	case FormatPortfolioPPTX:
 		pptxBytes, err := s.pptxRender.RenderPPTX(renderCtx, tmpl, req.Data, req.Options)
 		if err != nil {
-			return nil, errors.Wrap(err, "PPTX rendering failed")
+			return nil, errors.Wrap(err, errors.ErrCodeInternal, "PPTX rendering failed")
 		}
 		finalContent = pptxBytes
 		contentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
@@ -512,17 +512,26 @@ func (s *templateEngineImpl) RenderToBytes(ctx context.Context, req *RenderReque
 
 func (s *templateEngineImpl) ListTemplates(ctx context.Context, opts *ListTemplateOptions) (*common.PaginatedResult[TemplateMeta], error) {
 	if opts == nil {
-		opts = &ListTemplateOptions{Pagination: common.Pagination{Page: 1, Size: 20}}
+		opts = &ListTemplateOptions{Pagination: common.Pagination{Page: 1, PageSize: 20}}
 	}
 	items, total, err := s.repo.List(ctx, opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list templates")
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to list templates")
 	}
+
+	totalPages := 0
+	if opts.Pagination.PageSize > 0 && int(total) > 0 {
+		totalPages = (int(total) + opts.Pagination.PageSize - 1) / opts.Pagination.PageSize
+	}
+
 	return &common.PaginatedResult[TemplateMeta]{
-	Data:       items,
-		TotalCount: total,
+		Items: items,
+		Pagination: common.PaginationResult{
 			Page:       opts.Pagination.Page,
-			Size:       opts.Pagination.Size,
+			PageSize:   opts.Pagination.PageSize,
+			Total:      int(total),
+			TotalPages: totalPages,
+		},
 	}, nil
 }
 
@@ -541,7 +550,7 @@ func (s *templateEngineImpl) RegisterTemplate(ctx context.Context, tmpl *Templat
 
 	exists, _ := s.repo.CheckExists(ctx, tmpl.ID)
 	if exists {
-		return errors.NewError(errors.ErrConflict, "template ID already exists")
+		return errors.Conflict( "template ID already exists")
 	}
 
 	valRes, err := s.ValidateTemplate(ctx, tmpl)
