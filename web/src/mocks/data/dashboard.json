@@ -1,0 +1,54 @@
+{
+  "kpiMetrics": {
+    "totalPatents": 142,
+    "activePatents": 128,
+    "highRiskAlerts": 4,
+    "dueThisMonth": 7
+  },
+  "monthlyApplicationTrend": [
+    { "month": "Jan", "filed": 5, "granted": 2 },
+    { "month": "Feb", "filed": 3, "granted": 1 },
+    { "month": "Mar", "filed": 7, "granted": 3 },
+    { "month": "Apr", "filed": 4, "granted": 2 },
+    { "month": "May", "filed": 6, "granted": 4 },
+    { "month": "Jun", "filed": 8, "granted": 2 }
+  ],
+  "jurisdictionBreakdown": [
+    { "jurisdiction": "CN", "count": 55 },
+    { "jurisdiction": "US", "count": 32 },
+    { "jurisdiction": "EP", "count": 28 },
+    { "jurisdiction": "JP", "count": 15 },
+    { "jurisdiction": "KR", "count": 12 }
+  ],
+  "competitorComparison": [
+    { "name": "Organization", "portfolioSize": 142 },
+    { "name": "Samsung SDI", "portfolioSize": 12500 },
+    { "name": "LG Chem", "portfolioSize": 9800 },
+    { "name": "UDC", "portfolioSize": 4500 }
+  ],
+  "portfolioHealthScore": 76,
+  "upcomingDeadlines": [
+    {
+      "id": "le_001",
+      "patentId": "pat_001",
+      "jurisdiction": "CN",
+      "eventType": "annuity_due",
+      "dueDate": "2024-09-20",
+      "feeAmount": 1200,
+      "currency": "CNY",
+      "status": "pending"
+    }
+  ],
+  "recentAlerts": [
+    {
+      "id": "alert_001",
+      "targetPatentId": "pat_001",
+      "triggerMoleculeId": "mol_001",
+      "riskLevel": "HIGH",
+      "literalScore": 0.88,
+      "docScore": 0.76,
+      "detectedAt": "2024-06-15T10:30:00Z",
+      "status": "new"
+    }
+  ]
+}

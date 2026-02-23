@@ -1,0 +1,72 @@
+[
+  {
+    "id": "pat_001",
+    "publicationNumber": "CN115321456A",
+    "title": "Novel Blue Emitter Material for OLED Devices",
+    "abstract": "The present invention relates to a novel organic electroluminescent compound having a pyrene core structure...",
+    "filingDate": "2022-03-15",
+    "publicationDate": "2022-09-20",
+    "legalStatus": "pending",
+    "ipcCodes": ["C09K11/06", "H10K85/60"],
+    "assignee": "Samsung SDI Co., Ltd.",
+    "inventors": ["Kim, Min-Soo", "Lee, Ji-Hoon"],
+    "claims": [
+      {
+        "id": "clm_001_1",
+        "patentId": "pat_001",
+        "type": "independent",
+        "text": "1. An organic electroluminescent compound represented by Formula 1...",
+        "elements": ["pyrene core", "aryl group", "heteroaryl group"]
+      }
+    ]
+  },
+  {
+    "id": "pat_002",
+    "publicationNumber": "US20230123456A1",
+    "title": "Thermally Activated Delayed Fluorescence Material",
+    "abstract": "A compound for an organic light-emitting device, comprising a donor moiety and an acceptor moiety...",
+    "filingDate": "2021-11-10",
+    "publicationDate": "2023-05-12",
+    "legalStatus": "granted",
+    "ipcCodes": ["H10K85/10", "C07D487/04"],
+    "assignee": "Universal Display Corporation",
+    "inventors": ["Smith, John", "Doe, Jane"],
+    "grantDate": "2024-01-15"
+  },
+  {
+    "id": "pat_003",
+    "publicationNumber": "EP3456789A1",
+    "title": "Hole Transport Material with High Thermal Stability",
+    "abstract": "Disclosed is a hole transport material comprising a spirobifluorene derivative...",
+    "filingDate": "2020-06-22",
+    "publicationDate": "2021-01-05",
+    "legalStatus": "granted",
+    "ipcCodes": ["H10K50/15", "C07C13/62"],
+    "assignee": "Merck Patent GmbH",
+    "inventors": ["Muller, Hans", "Schmidt, Peter"]
+  },
+  {
+    "id": "pat_004",
+    "publicationNumber": "JP2022567890A",
+    "title": "Electron Transport Layer Material for Blue OLED",
+    "abstract": "An electron transport material having an anthracene core substituted with...",
+    "filingDate": "2021-09-01",
+    "publicationDate": "2022-03-15",
+    "legalStatus": "pending",
+    "ipcCodes": ["H10K85/30", "C07D213/02"],
+    "assignee": "Idemitsu Kosan Co., Ltd.",
+    "inventors": ["Tanaka, Hiroshi", "Suzuki, Kenji"]
+  },
+  {
+    "id": "pat_005",
+    "publicationNumber": "KR1020230012345A",
+    "title": "High Efficiency Green Phosphorescent Host Material",
+    "abstract": "A host material for a phosphorescent OLED device comprising a carbazole-based compound...",
+    "filingDate": "2022-07-18",
+    "publicationDate": "2023-01-25",
+    "legalStatus": "examination",
+    "ipcCodes": ["C09K11/06", "H10K85/60"],
+    "assignee": "LG Chem, Ltd.",
+    "inventors": ["Park, Sung-Hoon", "Choi, Young-Jin"]
+  }
+]

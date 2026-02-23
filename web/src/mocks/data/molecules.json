@@ -1,0 +1,46 @@
+[
+  {
+    "id": "mol_001",
+    "name": "CBP",
+    "smiles": "c1ccc(c(c1)c2ccccc2)n3c4ccccc4c5ccccc53",
+    "inchi": "InChI=1S/C24H17N/c1-3-7-21-19(5-1)17-15-18-20-6-2-4-8-22(20)25(21)23-13-11-9-10-12-14-23/h1-14H,15-16H2",
+    "molecularWeight": 319.41,
+    "properties": [
+      { "type": "HOMO", "value": -5.9, "unit": "eV" },
+      { "type": "LUMO", "value": -2.4, "unit": "eV" },
+      { "type": "Triplet Energy", "value": 2.56, "unit": "eV" }
+    ]
+  },
+  {
+    "id": "mol_002",
+    "name": "NPB",
+    "smiles": "c1ccc(cc1)N(c2ccccc2)c3ccc(cc3)c4ccc(cc4)N(c5ccccc5)c6ccccc6",
+    "molecularWeight": 588.76,
+    "properties": [
+      { "type": "HOMO", "value": -5.4, "unit": "eV" },
+      { "type": "LUMO", "value": -2.3, "unit": "eV" },
+      { "type": "Tg", "value": 98, "unit": "°C" }
+    ]
+  },
+  {
+    "id": "mol_003",
+    "name": "Alq3",
+    "smiles": "c1cc2ccccc2[n+]3c1[O-]3.[Al]",
+    "molecularWeight": 459.43,
+    "properties": [
+      { "type": "Emission", "value": 520, "unit": "nm" },
+      { "type": "EQE", "value": 2.1, "unit": "%" }
+    ]
+  },
+  {
+    "id": "mol_004",
+    "name": "4CzIPN",
+    "smiles": "C1=CC=C(C=C1)N2C3=CC=CC=C3C4=C2C(=C(C(=C4C#N)N5C6=CC=CC=C6C7=CC=CC=C75)C#N)N8C9=CC=CC=C9C1=CC=CC=C18",
+    "molecularWeight": 788.87,
+    "properties": [
+      { "type": "PLQY", "value": 90, "unit": "%" },
+      { "type": "Emission", "value": 510, "unit": "nm" },
+      { "type": "Triplet Energy", "value": 2.6, "unit": "eV" }
+    ]
+  }
+]

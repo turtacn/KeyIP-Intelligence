@@ -1,0 +1,25 @@
+{
+  "summary": {
+    "totalPatents": 142,
+    "granted": 87,
+    "pending": 45,
+    "lapsed": 10,
+    "totalValue": 45000000,
+    "healthGrade": "B"
+  },
+  "coverage": {
+    "Blue Emitter": 45,
+    "Green Emitter": 32,
+    "Red Emitter": 15,
+    "HTL": 28,
+    "ETL": 12,
+    "Encapsulation": 10
+  },
+  "scores": {
+    "coverage": 78,
+    "concentration": 65,
+    "aging": 82,
+    "totalValue": 45000000,
+    "healthGrade": "B"
+  }
+}
