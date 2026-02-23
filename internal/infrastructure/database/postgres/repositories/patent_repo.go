@@ -170,6 +170,27 @@ func (r *postgresPatentRepo) FindDuplicates(ctx context.Context, fullTextHash st
 	return nil, nil
 }
 
+func (r *postgresPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*patent.Patent, error) {
+	molUUID, err := uuid.Parse(moleculeID)
+	if err != nil {
+		return nil, errors.NewInvalidInputError("invalid molecule ID format")
+	}
+
+	query := `
+		SELECT p.*
+		FROM patents p
+		JOIN patent_molecule_relations pmr ON p.id = pmr.patent_id
+		WHERE pmr.molecule_id = $1 AND p.deleted_at IS NULL
+	`
+	rows, err := r.executor().QueryContext(ctx, query, molUUID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to find patents by molecule ID")
+	}
+	defer rows.Close()
+
+	return scanPatents(rows)
+}
+
 // Claims
 
 func (r *postgresPatentRepo) CreateClaim(ctx context.Context, claim *patent.Claim) error {

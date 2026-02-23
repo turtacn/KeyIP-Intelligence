@@ -20,6 +20,39 @@ type EventBus interface {
 	Publish(ctx context.Context, events ...common.DomainEvent) error
 }
 
+// SimilaritySearchRequest defines criteria for finding patents by molecular similarity.
+type SimilaritySearchRequest struct {
+	SMILES          string
+	Threshold       float64
+	MaxResults      int
+	PatentOffices   []string
+	Assignees       []string
+	TechDomains     []string
+	DateFrom        *time.Time
+	DateTo          *time.Time
+	ExcludePatents  []string
+}
+
+// SimilaritySearchResult represents a patent found via similarity search.
+type SimilaritySearchResult struct {
+	PatentNumber       string
+	Title              string
+	Assignee           string
+	FilingDate         time.Time
+	LegalStatus        string
+	IPCCodes           []string
+	MorganSimilarity   float64
+	RDKitSimilarity    float64
+	AtomPairSimilarity float64
+}
+
+// PatentDomainService defines the interface for patent domain operations.
+type PatentDomainService interface {
+	SearchBySimilarity(ctx context.Context, req *SimilaritySearchRequest) ([]*SimilaritySearchResult, error)
+	GetPatentsByMoleculeID(ctx context.Context, moleculeID string) ([]*Patent, error)
+	GetPatentByNumber(ctx context.Context, patentNumber string) (*Patent, error)
+}
+
 // PatentService provides domain services for patent management.
 type PatentService struct {
 	patentRepo  PatentRepository
@@ -155,6 +188,18 @@ func (s *PatentService) publishEvents(ctx context.Context, p *Patent, events ...
 	if err := s.eventBus.Publish(ctx, events...); err != nil {
 		s.logger.Error("failed to publish events", logging.Err(err))
 	}
+}
+
+// SearchBySimilarity finds patents containing molecules similar to the query.
+func (s *PatentService) SearchBySimilarity(ctx context.Context, req *SimilaritySearchRequest) ([]*SimilaritySearchResult, error) {
+	// Dummy implementation to satisfy the interface.
+	// In a real implementation, this would query a specialized index or cross-reference molecule similarity.
+	return []*SimilaritySearchResult{}, nil
+}
+
+// GetPatentsByMoleculeID retrieves patents associated with a molecule ID.
+func (s *PatentService) GetPatentsByMoleculeID(ctx context.Context, moleculeID string) ([]*Patent, error) {
+	return s.patentRepo.FindByMoleculeID(ctx, moleculeID)
 }
 
 //Personal.AI order the ending

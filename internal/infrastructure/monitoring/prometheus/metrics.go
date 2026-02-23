@@ -27,6 +27,12 @@ type AppMetrics struct {
 	PatentSearchResultCount HistogramVec
 	PatentTotalCount      GaugeVec
 
+	// Infringement/Risk Layer
+	RiskAssessmentRequestsTotal  CounterVec
+	RiskAssessmentDuration       HistogramVec
+	RiskAssessmentCacheHitsTotal CounterVec
+	FTOAnalysisDuration          HistogramVec
+
 	// Analysis Layer
 	AnalysisTasksTotal    CounterVec
 	AnalysisTaskDuration  HistogramVec
@@ -94,6 +100,12 @@ func NewAppMetrics(collector MetricsCollector) *AppMetrics {
 	m.PatentSearchDuration = collector.RegisterHistogram("patent_search_duration_seconds", "Patent search duration", DefaultHTTPDurationBuckets, "query_type")
 	m.PatentSearchResultCount = collector.RegisterHistogram("patent_search_result_count", "Patent search result count", []float64{0, 10, 50, 100, 500, 1000, 5000, 10000}, "query_type")
 	m.PatentTotalCount = collector.RegisterGauge("patent_total_count", "Total patents", "status")
+
+	// Infringement/Risk
+	m.RiskAssessmentRequestsTotal = collector.RegisterCounter("risk_assessment_requests_total", "Risk assessment requests", "method", "depth")
+	m.RiskAssessmentDuration = collector.RegisterHistogram("risk_assessment_duration_seconds", "Risk assessment duration", DefaultAnalysisDurationBuckets, "depth")
+	m.RiskAssessmentCacheHitsTotal = collector.RegisterCounter("risk_assessment_cache_hits_total", "Risk assessment cache hits")
+	m.FTOAnalysisDuration = collector.RegisterHistogram("fto_analysis_duration_seconds", "FTO analysis duration", DefaultAnalysisDurationBuckets, "jurisdictions")
 
 	// Analysis
 	m.AnalysisTasksTotal = collector.RegisterCounter("analysis_tasks_total", "Analysis tasks total", "type", "status")

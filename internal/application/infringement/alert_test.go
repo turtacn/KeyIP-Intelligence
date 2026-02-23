@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/redis"
+	kafkainfra "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/messaging/kafka"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
@@ -142,11 +145,7 @@ func (m *mockAlertRepository) FindOverSLA(ctx context.Context) ([]*Alert, error)
 
 type mockAlertProducer struct {
 	mu       sync.Mutex
-	messages []struct {
-		Topic string
-		Key   string
-		Value any
-	}
+	messages []*kafkainfra.ProducerMessage
 	publishErr error
 }
 
@@ -154,17 +153,13 @@ func newMockAlertProducer() *mockAlertProducer {
 	return &mockAlertProducer{}
 }
 
-func (m *mockAlertProducer) Publish(ctx context.Context, topic, key string, value any) error {
+func (m *mockAlertProducer) Publish(ctx context.Context, msg *kafkainfra.ProducerMessage) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.publishErr != nil {
 		return m.publishErr
 	}
-	m.messages = append(m.messages, struct {
-		Topic string
-		Key   string
-		Value any
-	}{topic, key, value})
+	m.messages = append(m.messages, msg)
 	return nil
 }
 
@@ -195,10 +190,12 @@ func (m *mockAlertCache) Set(ctx context.Context, key string, value any, ttl tim
 	return nil
 }
 
-func (m *mockAlertCache) Delete(ctx context.Context, key string) error {
+func (m *mockAlertCache) Delete(ctx context.Context, keys ...string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.store, key)
+	for _, k := range keys {
+		delete(m.store, k)
+	}
 	return nil
 }
 
@@ -209,12 +206,71 @@ func (m *mockAlertCache) Exists(ctx context.Context, key string) (bool, error) {
 	return ok, nil
 }
 
+func (m *mockAlertCache) Decr(ctx context.Context, key string) (int64, error) {
+	return 0, nil // Dummy implementation
+}
+
+func (m *mockAlertCache) DeleteByPrefix(ctx context.Context, prefix string) (int64, error) {
+	return 0, nil // Dummy implementation
+}
+
+func (m *mockAlertCache) Expire(ctx context.Context, key string, expiration time.Duration) error {
+	return nil
+}
+
+func (m *mockAlertCache) GetOrSet(ctx context.Context, key string, dest interface{}, expiration time.Duration, fetch func(context.Context) (interface{}, error)) error {
+	// Simple implementation: try Get, if fail, call fetch and Set
+	if err := m.Get(ctx, key, dest); err == nil {
+		return nil
+	}
+	val, err := fetch(ctx)
+	if err != nil {
+		return err
+	}
+	// We need to set the value. But Set takes interface{}.
+	// And Get unmarshals. This mock stores []byte.
+	// This is getting complicated for a mock.
+	// Assuming Set handles marshalling.
+	if err := m.Set(ctx, key, val, expiration); err != nil {
+		return err
+	}
+	// And now we need to put it into dest.
+	// Since we just Set it, we can Get it again?
+	// Or just assign? We can't assign to interface{}.
+	// Let's rely on Get.
+	return m.Get(ctx, key, dest)
+}
+
+// Implement remaining redis.Cache interface methods with dummy implementations
+func (m *mockAlertCache) MGet(ctx context.Context, keys []string) (map[string][]byte, error) { return nil, nil }
+func (m *mockAlertCache) MSet(ctx context.Context, items map[string]interface{}, ttl time.Duration) error { return nil }
+func (m *mockAlertCache) HGet(ctx context.Context, key, field string) (string, error) { return "", nil }
+func (m *mockAlertCache) HSet(ctx context.Context, key string, fields map[string]interface{}, ttl time.Duration) error { return nil }
+func (m *mockAlertCache) HGetAll(ctx context.Context, key string) (map[string]string, error) { return nil, nil }
+func (m *mockAlertCache) HDel(ctx context.Context, key string, fields ...string) error { return nil }
+func (m *mockAlertCache) Incr(ctx context.Context, key string) (int64, error) { return 0, nil }
+func (m *mockAlertCache) IncrBy(ctx context.Context, key string, value int64) (int64, error) { return 0, nil }
+// Decr is already implemented
+func (m *mockAlertCache) ZAdd(ctx context.Context, key string, members ...*redis.ZMember) error { return nil }
+func (m *mockAlertCache) ZRangeByScore(ctx context.Context, key string, min, max float64, offset, count int64) ([]string, error) { return nil, nil }
+func (m *mockAlertCache) ZRevRangeWithScores(ctx context.Context, key string, start, stop int64) ([]*redis.ZMember, error) { return nil, nil }
+func (m *mockAlertCache) ZRem(ctx context.Context, key string, members ...string) error { return nil }
+func (m *mockAlertCache) ZScore(ctx context.Context, key, member string) (float64, error) { return 0, nil }
+func (m *mockAlertCache) TTL(ctx context.Context, key string) (time.Duration, error) { return 0, nil }
+func (m *mockAlertCache) Ping(ctx context.Context) error { return nil }
+
 type mockAlertLogger struct{}
 
-func (m *mockAlertLogger) Info(msg string, args ...any)  {}
-func (m *mockAlertLogger) Error(msg string, args ...any) {}
-func (m *mockAlertLogger) Debug(msg string, args ...any) {}
-func (m *mockAlertLogger) Warn(msg string, args ...any)  {}
+func (m *mockAlertLogger) Sync() error { return nil }
+
+func (m *mockAlertLogger) Info(msg string, fields ...logging.Field)  {}
+func (m *mockAlertLogger) Error(msg string, fields ...logging.Field) {}
+func (m *mockAlertLogger) Debug(msg string, fields ...logging.Field) {}
+func (m *mockAlertLogger) Warn(msg string, fields ...logging.Field)  {}
+func (m *mockAlertLogger) Fatal(msg string, fields ...logging.Field) {}
+func (m *mockAlertLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockAlertLogger) WithContext(ctx context.Context) logging.Logger { return m }
+func (m *mockAlertLogger) WithError(err error) logging.Logger { return m }
 
 // --- Helper ---
 
@@ -1038,6 +1094,3 @@ func TestListAlerts_PaginationResult(t *testing.T) {
 
 // Verify unused import guard — commontypes.PaginationResult is used.
 var _ *commontypes.PaginationResult
-
-//Personal.AI order the ending
-

@@ -6,6 +6,9 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
+// MoleculeID is a string alias for a molecule identifier.
+type MoleculeID string
+
 // MoleculeType categorises a molecule by its primary chemical function.
 type MoleculeType string
 

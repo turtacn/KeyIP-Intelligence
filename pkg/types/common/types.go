@@ -135,6 +135,14 @@ type Pagination struct {
 // PageRequest is an alias for Pagination for backward compatibility.
 type PageRequest = Pagination
 
+// PaginationResult holds the pagination metadata for a response.
+type PaginationResult struct {
+	Page       int `json:"page"`
+	PageSize   int `json:"page_size"`
+	Total      int `json:"total"`
+	TotalPages int `json:"total_pages"`
+}
+
 // PageResponse is a generic wrapper for paginated results.
 type PageResponse[T any] struct {
 	Items      []T `json:"items"`
@@ -251,6 +259,14 @@ type ComponentHealth struct {
 // NewID generates a new UUID v4.
 func NewID() ID {
 	return ID(uuid.New().String())
+}
+
+// GenerateID generates a unique ID with an optional prefix.
+func GenerateID(prefix string) string {
+	if prefix == "" {
+		return uuid.New().String()
+	}
+	return fmt.Sprintf("%s-%s", prefix, uuid.New().String())
 }
 
 // NewTimestamp returns the current UTC time as a Timestamp.

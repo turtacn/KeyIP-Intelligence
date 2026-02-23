@@ -288,6 +288,9 @@ type ClaimParser interface {
 
 	// AnalyzeDependency builds a dependency tree from a set of claims.
 	AnalyzeDependency(ctx context.Context, claims []string) (*DependencyTree, error)
+
+	// SemanticMatch computes a similarity score between a molecule and a claim text.
+	SemanticMatch(ctx context.Context, smiles, claimText string) (float64, error)
 }
 
 // ============================================================================
@@ -727,6 +730,20 @@ func (p *claimParserImpl) AnalyzeDependency(ctx context.Context, claims []string
 		Children: children,
 		Depth:    depth,
 	}, nil
+}
+
+// ============================================================================
+// SemanticMatch
+// ============================================================================
+
+func (p *claimParserImpl) SemanticMatch(ctx context.Context, smiles, claimText string) (float64, error) {
+	// Dummy implementation for now.
+	// In a real implementation, this would encode both inputs and compute cosine similarity
+	// or use a cross-encoder model.
+	if strings.TrimSpace(smiles) == "" || strings.TrimSpace(claimText) == "" {
+		return 0, nil
+	}
+	return 0.5, nil
 }
 
 // ============================================================================

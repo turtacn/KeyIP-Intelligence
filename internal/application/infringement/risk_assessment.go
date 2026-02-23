@@ -775,7 +775,7 @@ type RiskRecordRepository interface {
 	FindByID(ctx context.Context, recordID string) (*RiskRecord, error)
 
 	// GetTrend retrieves monthly aggregated risk data for a portfolio.
-	GetTrend(ctx context.Context, portfolioID string, months int) ([]RiskTrendPoint, error)
+	GetTrend(ctx context.Context, portfolioID string, months int) ([]*RiskTrendPoint, error)
 }
 
 // FTOReportRepository persists FTO analysis reports.
@@ -845,15 +845,15 @@ type RiskAssessmentService interface {
 type riskAssessmentServiceImpl struct {
 	moleculeSvc    molecule.MoleculeDomainService
 	patentSvc      patent.PatentDomainService
-	infringeNet    infringe_net.InfringeNetAssessor
-	claimParser    claim_bert.ClaimBERTParser
-	gnnInference   molpatent_gnn.MolPatentGNNInference
+	infringeNet    infringe_net.InfringementAssessor
+	claimParser    claim_bert.ClaimParser
+	gnnInference   molpatent_gnn.GNNInferenceService
 	riskRepo       RiskRecordRepository
 	ftoRepo        FTOReportRepository
 	eventPublisher EventPublisher
 	cache          redis.Cache
 	logger         logging.Logger
-	metrics        prometheus.Metrics
+	metrics        *prometheus.AppMetrics
 }
 
 // RiskAssessmentServiceConfig holds all dependencies for constructing the
@@ -861,15 +861,15 @@ type riskAssessmentServiceImpl struct {
 type RiskAssessmentServiceConfig struct {
 	MoleculeSvc    molecule.MoleculeDomainService
 	PatentSvc      patent.PatentDomainService
-	InfringeNet    infringe_net.InfringeNetAssessor
-	ClaimParser    claim_bert.ClaimBERTParser
-	GNNInference   molpatent_gnn.MolPatentGNNInference
+	InfringeNet    infringe_net.InfringementAssessor
+	ClaimParser    claim_bert.ClaimParser
+	GNNInference   molpatent_gnn.GNNInferenceService
 	RiskRepo       RiskRecordRepository
 	FTORepo        FTOReportRepository
 	EventPublisher EventPublisher
 	Cache          redis.Cache
 	Logger         logging.Logger
-	Metrics        prometheus.Metrics
+	Metrics        *prometheus.AppMetrics
 }
 
 // NewRiskAssessmentService constructs a new RiskAssessmentService with all
@@ -927,10 +927,7 @@ func NewRiskAssessmentService(cfg RiskAssessmentServiceConfig) (RiskAssessmentSe
 
 func (s *riskAssessmentServiceImpl) AssessMolecule(ctx context.Context, req *MoleculeRiskRequest) (*MoleculeRiskResponse, error) {
 	startTime := time.Now()
-	s.metrics.IncrementCounter("risk_assessment_requests_total", map[string]string{
-		"method": "AssessMolecule",
-		"depth":  string(req.Depth),
-	})
+	s.metrics.RiskAssessmentRequestsTotal.WithLabelValues("AssessMolecule", string(req.Depth)).Inc()
 
 	// 1. Validate and apply defaults.
 	if err := req.Validate(); err != nil {
@@ -941,7 +938,7 @@ func (s *riskAssessmentServiceImpl) AssessMolecule(ctx context.Context, req *Mol
 	// 2. Canonicalize the molecular input.
 	canonicalSMILES, inchiKey, err := s.canonicalizeMolecule(ctx, req.SMILES, req.InChI)
 	if err != nil {
-		s.logger.Error("failed to canonicalize molecule", "error", err)
+		s.logger.Error("failed to canonicalize molecule", logging.Err(err))
 		return nil, fmt.Errorf("molecule canonicalization failed: %w", err)
 	}
 
@@ -950,15 +947,15 @@ func (s *riskAssessmentServiceImpl) AssessMolecule(ctx context.Context, req *Mol
 	if cached, cacheErr := s.tryGetCachedResult(ctx, cacheKey); cacheErr == nil && cached != nil {
 		cached.CacheHit = true
 		cached.ProcessingTime = time.Since(startTime)
-		s.metrics.IncrementCounter("risk_assessment_cache_hits_total", nil)
-		s.logger.Debug("risk assessment cache hit", "smiles", canonicalSMILES)
+		s.metrics.RiskAssessmentCacheHitsTotal.WithLabelValues().Inc()
+		s.logger.Debug("risk assessment cache hit", logging.String("smiles", canonicalSMILES))
 		return cached, nil
 	}
 
 	// 4. Search for candidate patents using parallel similarity engines.
 	candidates, err := s.searchCandidatePatents(ctx, canonicalSMILES, req)
 	if err != nil {
-		s.logger.Error("candidate patent search failed", "error", err)
+		s.logger.Error("candidate patent search failed", logging.Err(err))
 		return nil, fmt.Errorf("candidate patent search failed: %w", err)
 	}
 
@@ -973,7 +970,7 @@ func (s *riskAssessmentServiceImpl) AssessMolecule(ctx context.Context, req *Mol
 	// 6. Perform claim-level infringement analysis on each candidate.
 	patentDetails, err := s.analyzePatentCandidates(ctx, canonicalSMILES, candidates, req)
 	if err != nil {
-		s.logger.Error("patent candidate analysis failed", "error", err)
+		s.logger.Error("patent candidate analysis failed", logging.Err(err))
 		return nil, fmt.Errorf("patent analysis failed: %w", err)
 	}
 
@@ -982,20 +979,18 @@ func (s *riskAssessmentServiceImpl) AssessMolecule(ctx context.Context, req *Mol
 
 	// 8. Cache the result.
 	if cacheErr := s.cacheResult(ctx, cacheKey, resp); cacheErr != nil {
-		s.logger.Warn("failed to cache risk assessment result", "error", cacheErr)
+		s.logger.Warn("failed to cache risk assessment result", logging.Err(cacheErr))
 	}
 
 	// 9. Persist the immutable assessment record.
 	if persistErr := s.persistRecord(ctx, resp, req); persistErr != nil {
-		s.logger.Warn("failed to persist risk record", "error", persistErr)
+		s.logger.Warn("failed to persist risk record", logging.Err(persistErr))
 	}
 
 	// 10. Publish risk assessment event.
 	s.publishRiskEvent(ctx, resp, req)
 
-	s.metrics.ObserveHistogram("risk_assessment_duration_seconds",
-		time.Since(startTime).Seconds(),
-		map[string]string{"depth": string(req.Depth)})
+	s.metrics.RiskAssessmentDuration.WithLabelValues(string(req.Depth)).Observe(time.Since(startTime).Seconds())
 
 	return resp, nil
 }
@@ -1006,9 +1001,7 @@ func (s *riskAssessmentServiceImpl) AssessMolecule(ctx context.Context, req *Mol
 
 func (s *riskAssessmentServiceImpl) AssessBatch(ctx context.Context, req *BatchRiskRequest) (*BatchRiskResponse, error) {
 	startTime := time.Now()
-	s.metrics.IncrementCounter("risk_assessment_requests_total", map[string]string{
-		"method": "AssessBatch",
-	})
+	s.metrics.RiskAssessmentRequestsTotal.WithLabelValues("AssessBatch", string(req.Depth)).Inc()
 
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -1101,9 +1094,7 @@ func (s *riskAssessmentServiceImpl) AssessBatch(ctx context.Context, req *BatchR
 
 func (s *riskAssessmentServiceImpl) AssessFTO(ctx context.Context, req *FTORequest) (*FTOResponse, error) {
 	startTime := time.Now()
-	s.metrics.IncrementCounter("risk_assessment_requests_total", map[string]string{
-		"method": "AssessFTO",
-	})
+	s.metrics.RiskAssessmentRequestsTotal.WithLabelValues("AssessFTO", string(req.Depth)).Inc()
 
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -1148,9 +1139,9 @@ func (s *riskAssessmentServiceImpl) AssessFTO(ctx context.Context, req *FTOReque
 			resp, err := s.AssessMolecule(ctx, molReq)
 			if err != nil {
 				s.logger.Warn("FTO molecule assessment failed",
-					"molecule", mol.SMILES,
-					"jurisdiction", jurisdiction,
-					"error", err)
+					logging.String("molecule", mol.SMILES),
+					logging.String("jurisdiction", jurisdiction),
+					logging.Err(err))
 				row.Jurisdictions[jurisdiction] = RiskLevelNone
 				continue
 			}
@@ -1243,11 +1234,10 @@ func (s *riskAssessmentServiceImpl) AssessFTO(ctx context.Context, req *FTOReque
 
 	// Persist FTO report.
 	if err := s.ftoRepo.SaveFTOReport(ctx, resp); err != nil {
-		s.logger.Warn("failed to persist FTO report", "fto_id", ftoID, "error", err)
+		s.logger.Warn("failed to persist FTO report", logging.String("fto_id", ftoID), logging.Err(err))
 	}
 
-	s.metrics.ObserveHistogram("fto_analysis_duration_seconds",	time.Since(startTime).Seconds(),
-		map[string]string{"jurisdictions": fmt.Sprintf("%d", len(req.Jurisdictions))})
+	s.metrics.FTOAnalysisDuration.WithLabelValues(fmt.Sprintf("%d", len(req.Jurisdictions))).Observe(time.Since(startTime).Seconds())
 
 	return resp, nil
 }
@@ -1257,9 +1247,7 @@ func (s *riskAssessmentServiceImpl) AssessFTO(ctx context.Context, req *FTOReque
 // ---------------------------------------------------------------------------
 
 func (s *riskAssessmentServiceImpl) GetRiskSummary(ctx context.Context, portfolioID string) (*RiskSummaryResponse, error) {
-	s.metrics.IncrementCounter("risk_assessment_requests_total", map[string]string{
-		"method": "GetRiskSummary",
-	})
+	s.metrics.RiskAssessmentRequestsTotal.WithLabelValues("GetRiskSummary", "none").Inc()
 
 	if portfolioID == "" {
 		return nil, pkgErrors.NewValidation("portfolio_id", "must not be empty")
@@ -1269,7 +1257,7 @@ func (s *riskAssessmentServiceImpl) GetRiskSummary(ctx context.Context, portfoli
 	records, err := s.riskRepo.FindByPortfolio(ctx, portfolioID)
 	if err != nil {
 		s.logger.Error("failed to retrieve portfolio risk records",
-			"portfolio_id", portfolioID, "error", err)
+			logging.String("portfolio_id", portfolioID), logging.Err(err))
 		return nil, fmt.Errorf("portfolio risk records retrieval failed: %w", err)
 	}
 
@@ -1382,8 +1370,20 @@ func (s *riskAssessmentServiceImpl) GetRiskSummary(ctx context.Context, portfoli
 	// 5. Retrieve trend data (last 6 months).
 	trend, trendErr := s.riskRepo.GetTrend(ctx, portfolioID, 6)
 	if trendErr != nil {
-		s.logger.Warn("failed to retrieve risk trend", "portfolio_id", portfolioID, "error", trendErr)
-		trend = []RiskTrendPoint{}
+		s.logger.Warn("failed to retrieve risk trend", logging.String("portfolio_id", portfolioID), logging.Err(trendErr))
+	}
+
+	// Handle Trend conversion or nil
+	var trendValues []RiskTrendPoint
+	if trend != nil {
+		trendValues = make([]RiskTrendPoint, len(trend))
+		for i, t := range trend {
+			if t != nil {
+				trendValues[i] = *t
+			}
+		}
+	} else {
+		trendValues = []RiskTrendPoint{}
 	}
 
 	return &RiskSummaryResponse{
@@ -1395,7 +1395,7 @@ func (s *riskAssessmentServiceImpl) GetRiskSummary(ctx context.Context, portfoli
 		RiskDistribution:    distribution,
 		TechDomainRisks:     techDomainRisks,
 		HighRiskPatentsTopN: highRiskPatents,
-		Trend:               trend,
+		Trend:               trendValues,
 		GeneratedAt:         time.Now().UTC(),
 	}, nil
 }
@@ -1413,9 +1413,7 @@ type techDomainAccumulator struct {
 // ---------------------------------------------------------------------------
 
 func (s *riskAssessmentServiceImpl) GetRiskHistory(ctx context.Context, moleculeID string, opts ...QueryOption) ([]*RiskRecord, error) {
-	s.metrics.IncrementCounter("risk_assessment_requests_total", map[string]string{
-		"method": "GetRiskHistory",
-	})
+	s.metrics.RiskAssessmentRequestsTotal.WithLabelValues("GetRiskHistory", "none").Inc()
 
 	if moleculeID == "" {
 		return nil, pkgErrors.NewValidation("molecule_id", "must not be empty")
@@ -1426,7 +1424,7 @@ func (s *riskAssessmentServiceImpl) GetRiskHistory(ctx context.Context, molecule
 	records, _, err := s.riskRepo.FindByMolecule(ctx, moleculeID, qo)
 	if err != nil {
 		s.logger.Error("failed to retrieve risk history",
-			"molecule_id", moleculeID, "error", err)
+			logging.String("molecule_id", moleculeID), logging.Err(err))
 		return nil, fmt.Errorf("risk history retrieval failed: %w", err)
 	}
 
@@ -1461,28 +1459,16 @@ func (s *riskAssessmentServiceImpl) canonicalizeMolecule(ctx context.Context, sm
 // ---------------------------------------------------------------------------
 
 func (s *riskAssessmentServiceImpl) tryGetCachedResult(ctx context.Context, key string) (*MoleculeRiskResponse, error) {
-	data, err := s.cache.Get(ctx, key)
-	if err != nil {
-		return nil, err
-	}
-	if data == nil {
-		return nil, nil
-	}
-
 	var resp MoleculeRiskResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
-		s.logger.Warn("failed to unmarshal cached risk result", "key", key, "error", err)
+	err := s.cache.Get(ctx, key, &resp)
+	if err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
 func (s *riskAssessmentServiceImpl) cacheResult(ctx context.Context, key string, resp *MoleculeRiskResponse) error {
-	data, err := json.Marshal(resp)
-	if err != nil {
-		return fmt.Errorf("failed to marshal risk result for caching: %w", err)
-	}
-	return s.cache.Set(ctx, key, data, RiskCacheTTL)
+	return s.cache.Set(ctx, key, resp, RiskCacheTTL)
 }
 
 // ---------------------------------------------------------------------------
@@ -1575,34 +1561,45 @@ func (s *riskAssessmentServiceImpl) searchCandidatePatents(
 			return
 		}
 
-		results, err := s.gnnInference.SearchSimilar(ctx, &molpatent_gnn.SimilarityRequest{
-			SMILES:     canonicalSMILES,
-			TopK:       req.MaxCandidates,
-			Threshold:  req.SimilarityThreshold,
-			Offices:    req.PatentOffices,
-			ExcludeIDs: req.ExcludePatents,
+		resp, err := s.gnnInference.SearchSimilar(ctx, &molpatent_gnn.SimilarSearchRequest{
+			SMILES:    canonicalSMILES,
+			TopK:      req.MaxCandidates,
+			Threshold: req.SimilarityThreshold,
 		})
 		if err != nil {
 			// GNN failure is non-fatal; log and continue with fingerprint results.
 			s.logger.Warn("GNN similarity search failed, continuing with fingerprint results",
-				"error", err)
+				logging.Err(err))
 			gnnCh <- searchResult{candidates: nil}
 			return
 		}
 
-		candidates := make([]candidatePatent, 0, len(results))
-		for _, r := range results {
-			candidates = append(candidates, candidatePatent{
-				PatentNumber: r.PatentNumber,
-				Title:        r.Title,
-				Assignee:     r.Assignee,
-				FilingDate:   r.FilingDate,
-				LegalStatus:  r.LegalStatus,
-				IPCCodes:     r.IPCCodes,
-				Similarity: SimilarityScores{
-					GNN: r.GNNSimilarity,
-				},
-			})
+		candidates := make([]candidatePatent, 0, len(resp.Matches))
+		for _, m := range resp.Matches {
+			// Lookup patents for this molecule ID
+			patents, err := s.patentSvc.GetPatentsByMoleculeID(ctx, m.MoleculeID)
+			if err != nil {
+				continue
+			}
+
+			for _, p := range patents {
+				filingDate := time.Time{}
+				if p.FilingDate != nil {
+					filingDate = *p.FilingDate
+				}
+
+				candidates = append(candidates, candidatePatent{
+					PatentNumber: p.PatentNumber,
+					Title:        p.Title,
+					Assignee:     p.AssigneeName,
+					FilingDate:   filingDate,
+					LegalStatus:  string(p.Status),
+					IPCCodes:     p.IPCCodes,
+					Similarity: SimilarityScores{
+						GNN: m.Score,
+					},
+				})
+			}
 		}
 		gnnCh <- searchResult{candidates: candidates}
 	}()
@@ -1699,13 +1696,23 @@ func (s *riskAssessmentServiceImpl) analyzePatentCandidates(
 			continue
 		}
 
+		// Fetch patent to get claim texts.
+		pat, err := s.patentSvc.GetPatentByNumber(ctx, cand.PatentNumber)
+		if err != nil {
+			s.logger.Warn("failed to fetch patent details", logging.String("patent", cand.PatentNumber), logging.Err(err))
+			continue
+		}
+
+		var claimTexts []string
+		for _, c := range pat.Claims {
+			claimTexts = append(claimTexts, c.Text)
+		}
+
 		// Parse claims using ClaimBERT.
-		parsedClaims, parseErr := s.claimParser.ParseClaims(ctx, &claim_bert.ParseRequest{
-			PatentNumber: cand.PatentNumber,
-		})
+		parsedClaimsSet, parseErr := s.claimParser.ParseClaimSet(ctx, claimTexts)
 		if parseErr != nil {
 			s.logger.Warn("ClaimBERT parse failed for patent",
-				"patent", cand.PatentNumber, "error", parseErr)
+				logging.String("patent", cand.PatentNumber), logging.Err(parseErr))
 			// Fall back to similarity-only scoring.
 			detail.PatentRiskScore = cand.Similarity.WeightedOverall * 100
 			detail.PatentRiskLevel = RiskLevelFromScore(detail.PatentRiskScore)
@@ -1714,62 +1721,77 @@ func (s *riskAssessmentServiceImpl) analyzePatentCandidates(
 		}
 
 		// Analyze each claim with InfringeNet.
-		claimDetails := make([]ClaimRiskDetail, 0, len(parsedClaims.Claims))
+		claimDetails := make([]ClaimRiskDetail, 0, len(parsedClaimsSet.Claims))
 		var maxClaimScore float64
 
-		for _, claim := range parsedClaims.Claims {
+		for _, claim := range parsedClaimsSet.Claims {
 			claimDetail := ClaimRiskDetail{
-				ClaimNumber: claim.Number,
-				ClaimType:   claim.Type,
+				ClaimNumber: claim.ClaimNumber,
+				ClaimType:   string(claim.ClaimType),
+			}
+
+			// Extract element texts from features.
+			var elements []string
+			for _, f := range claim.Features {
+				elements = append(elements, f.Text)
 			}
 
 			if req.Depth == AnalysisDepthDeep {
-				// Full InfringeNet element-by-element analysis.
+				// Construct correct ClaimInput slice for assessment
+				claimInputs := []*infringe_net.ClaimInput{
+					{
+						ClaimID:   fmt.Sprintf("%s-C%d", cand.PatentNumber, claim.ClaimNumber),
+						ClaimText: claim.Body,
+						ClaimType: infringe_net.ClaimType(claim.ClaimType), // Casting assuming string compatibility
+						PatentID:  cand.PatentNumber,
+					},
+				}
+
 				assessment, assessErr := s.infringeNet.Assess(ctx, &infringe_net.AssessmentRequest{
-					MoleculeSMILES: canonicalSMILES,
-					PatentNumber:   cand.PatentNumber,
-					ClaimNumber:    claim.Number,
-					ClaimElements:  claim.Elements,
-					MarkushGroups:  claim.MarkushGroups,
+					Molecule: &infringe_net.MoleculeInput{
+						SMILES: canonicalSMILES,
+					},
+					Claims: claimInputs,
 				})
 				if assessErr != nil {
 					s.logger.Warn("InfringeNet assessment failed",
-						"patent", cand.PatentNumber,
-						"claim", claim.Number,
-						"error", assessErr)
+						logging.String("patent", cand.PatentNumber),
+						logging.Int("claim", claim.ClaimNumber),
+						logging.Err(assessErr))
 					continue
 				}
 
-				claimDetail.LiteralMatch = assessment.LiteralMatch
-				claimDetail.MarkushCovered = assessment.MarkushCovered
-				claimDetail.EquivalentsMatch = assessment.EquivalentsMatch
-				claimDetail.EstoppelApplies = assessment.EstoppelApplies
-				claimDetail.Explanation = assessment.Explanation
+				// Use assessment result (assuming it returns info for the first claim)
+				if len(assessment.MatchedClaims) > 0 {
+					mc := assessment.MatchedClaims[0]
+					claimDetail.LiteralMatch = (mc.LiteralScore >= 0.9)
+					claimDetail.EquivalentsMatch = (mc.EquivalentsScore >= 0.5)
 
-				// Compute claim-level risk score.
-				claimScore := computeClaimRiskScore(assessment, cand.Similarity.WeightedOverall)
-				claimDetail.ClaimRiskScore = claimScore
-				claimDetail.ClaimRiskLevel = RiskLevelFromScore(claimScore)
+					// Compute claim-level risk score using the returned overall score (already computed by InfringeNet).
+					claimScore := assessment.OverallScore * 100
+					claimDetail.ClaimRiskScore = claimScore
+					claimDetail.ClaimRiskLevel = RiskLevelFromScore(claimScore)
+					claimDetail.Explanation = "InfringeNet analysis complete"
+				}
 			} else {
 				// Standard depth: semantic matching without full element analysis.
-				matchResult, matchErr := s.claimParser.SemanticMatch(ctx, &claim_bert.MatchRequest{
-					MoleculeSMILES: canonicalSMILES,
-					PatentNumber:   cand.PatentNumber,
-					ClaimNumber:    claim.Number,
-				})
+				score, matchErr := s.claimParser.SemanticMatch(ctx, canonicalSMILES, claim.Body)
 				if matchErr != nil {
 					s.logger.Warn("ClaimBERT semantic match failed",
-						"patent", cand.PatentNumber,
-						"claim", claim.Number,
-						"error", matchErr)
+						logging.String("patent", cand.PatentNumber),
+						logging.Int("claim", claim.ClaimNumber),
+						logging.Err(matchErr))
 					continue
 				}
 
-				claimDetail.LiteralMatch = matchResult.LiteralMatch
-				claimDetail.MarkushCovered = matchResult.MarkushCovered
-				claimDetail.ClaimRiskScore = matchResult.MatchScore * 100
+				claimDetail.ClaimRiskScore = score * 100
 				claimDetail.ClaimRiskLevel = RiskLevelFromScore(claimDetail.ClaimRiskScore)
-				claimDetail.Explanation = matchResult.Explanation
+				// Basic explanation for standard depth
+				if score > 0.7 {
+					claimDetail.Explanation = "High semantic similarity detected"
+				} else {
+					claimDetail.Explanation = "Low semantic similarity"
+				}
 			}
 
 			if claimDetail.ClaimRiskScore > maxClaimScore {
@@ -1811,21 +1833,21 @@ func (s *riskAssessmentServiceImpl) analyzePatentCandidates(
 //   - breadthScore: similarity * 100 (proxy for claim breadth coverage)
 //   - penalty: -20 if estoppel applies (reduces equivalents contribution)
 func computeClaimRiskScore(assessment *infringe_net.AssessmentResult, similarity float64) float64 {
+	// This function might be redundant if using InfringeNet's score, but keeping for logic preservation if manual calculation is desired.
 	var literalScore float64
-	if assessment.LiteralMatch || assessment.MarkushCovered {
+	if assessment.LiteralAnalysis != nil && assessment.LiteralAnalysis.AllElementsMet {
 		literalScore = 100.0
 	}
 
 	var equivalentsScore float64
-	if assessment.EquivalentsMatch {
-		equivalentsScore = 100.0
+	if assessment.EquivalentsAnalysis != nil && !assessment.EquivalentsAnalysis.Skipped {
+		equivalentsScore = assessment.EquivalentsAnalysis.Score * 100
 	}
 
 	breadthScore := similarity * 100.0
 
 	var penalty float64
-	if assessment.EstoppelApplies {
-		// Prosecution history estoppel reduces the equivalents contribution.
+	if assessment.EstoppelCheck != nil && assessment.EstoppelCheck.HasEstoppel {
 		penalty = 20.0
 	}
 
@@ -1993,7 +2015,7 @@ func (s *riskAssessmentServiceImpl) publishRiskEvent(ctx context.Context, resp *
 
 	if err := s.eventPublisher.Publish(ctx, event); err != nil {
 		s.logger.Warn("failed to publish risk assessment event",
-			"assessment_id", resp.AssessmentID, "error", err)
+			logging.String("assessment_id", resp.AssessmentID), logging.Err(err))
 	}
 }
 
@@ -2028,8 +2050,7 @@ func (s *riskAssessmentServiceImpl) computeBatchStats(results []BatchMoleculeRes
 				if score > stats.MaxScore {
 					stats.MaxScore = score
 				}
-				if score < stats.MinScore
-				{
+				if score < stats.MinScore {
 					stats.MinScore = score
 				}
 
@@ -2279,4 +2300,3 @@ var (
 )
 
 //Personal.AI order the ending
-

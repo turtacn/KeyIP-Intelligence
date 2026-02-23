@@ -207,6 +207,24 @@ func NewInvalidInputError(message string) *AppError {
 	return ErrBadRequest(message)
 }
 
+func NewValidation(message string, args ...interface{}) *AppError {
+	if len(args) > 0 {
+		// If additional args are provided, treat the first one as context/field if string
+		if ctx, ok := args[0].(string); ok {
+			return New(ErrCodeValidation, message).WithDetail(ctx)
+		}
+	}
+	return New(ErrCodeValidation, message)
+}
+
+func NewInternal(format string, args ...interface{}) *AppError {
+	return Newf(ErrCodeInternal, format, args...)
+}
+
+func NewNotFound(format string, args ...interface{}) *AppError {
+	return Newf(ErrCodeNotFound, format, args...)
+}
+
 func ErrNotFound(resource string, id string) *AppError {
 	return New(ErrCodeNotFound, fmt.Sprintf("%s not found: %s", resource, id)).
 		WithDetails("resource", resource).
