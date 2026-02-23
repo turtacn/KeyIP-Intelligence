@@ -1,0 +1,47 @@
+[
+  {
+    "id": "le_001",
+    "patentId": "pat_001",
+    "jurisdiction": "CN",
+    "eventType": "annuity_due",
+    "dueDate": "2024-09-20",
+    "feeAmount": 1200,
+    "currency": "CNY",
+    "status": "pending"
+  },
+  {
+    "id": "le_002",
+    "patentId": "pat_002",
+    "jurisdiction": "US",
+    "eventType": "response_deadline",
+    "dueDate": "2024-07-15",
+    "feeAmount": 0,
+    "status": "pending"
+  },
+  {
+    "id": "le_003",
+    "patentId": "pat_003",
+    "jurisdiction": "EP",
+    "eventType": "grant_expected",
+    "dueDate": "2024-08-01",
+    "status": "pending"
+  },
+  {
+    "id": "le_004",
+    "patentId": "pat_004",
+    "jurisdiction": "JP",
+    "eventType": "annuity_due",
+    "dueDate": "2024-03-15",
+    "feeAmount": 45000,
+    "currency": "JPY",
+    "status": "overdue"
+  },
+  {
+    "id": "le_005",
+    "patentId": "pat_005",
+    "jurisdiction": "KR",
+    "eventType": "examination",
+    "dueDate": "2024-06-30",
+    "status": "completed"
+  }
+]

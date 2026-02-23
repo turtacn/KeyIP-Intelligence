@@ -1,0 +1,12 @@
+[
+  { "id": "comp_001", "name": "Samsung SDI", "country": "KR", "portfolioSize": 12500, "type": "Conglomerate" },
+  { "id": "comp_002", "name": "LG Chem", "country": "KR", "portfolioSize": 9800, "type": "Conglomerate" },
+  { "id": "comp_003", "name": "Universal Display Corp (UDC)", "country": "US", "portfolioSize": 4500, "type": "IP Licensing" },
+  { "id": "comp_004", "name": "Idemitsu Kosan", "country": "JP", "portfolioSize": 3200, "type": "Material Supplier" },
+  { "id": "comp_005", "name": "Merck KGaA", "country": "DE", "portfolioSize": 6700, "type": "Material Supplier" },
+  { "id": "comp_006", "name": "Cynora", "country": "DE", "portfolioSize": 800, "type": "Startup" },
+  { "id": "comp_007", "name": "Kyulux", "country": "JP", "portfolioSize": 600, "type": "Startup" },
+  { "id": "comp_008", "name": "Dupont", "country": "US", "portfolioSize": 15000, "type": "Conglomerate" },
+  { "id": "comp_009", "name": "Hodogaya Chemical", "country": "JP", "portfolioSize": 1200, "type": "Material Supplier" },
+  { "id": "comp_010", "name": "JNC Corp", "country": "JP", "portfolioSize": 900, "type": "Material Supplier" }
+]
