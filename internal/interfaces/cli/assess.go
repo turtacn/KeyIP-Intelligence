@@ -1,317 +1,268 @@
 package cli
 
 import (
-	"encoding/csv"
-	"encoding/json"
-	"fmt"
-	"os"
-	"regexp"
-	"strings"
+"encoding/json"
+"fmt"
+"os"
+"strings"
 
-	"github.com/spf13/cobra"
+"github.com/spf13/cobra"
 )
 
-// NewAssessCmd creates the assess command for patent valuation
+// NewAssessCmd creates the assess command
 func NewAssessCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "assess",
-		Short: "Assess patent or portfolio value across multiple dimensions",
-		Long: `Perform multi-dimensional valuation assessment for patents or portfolios.
-Supported dimensions: technical, legal, commercial, strategic.
-Output formats: stdout (table), json, csv.`,
-	}
-
-	cmd.AddCommand(newAssessPatentCmd())
-	cmd.AddCommand(newAssessPortfolioCmd())
-
-	return cmd
+cmd := &cobra.Command{
+Use:   "assess",
+Short: "Patent valuation assessment tools",
+Long:  "Perform multi-dimensional patent valuation assessment including technical, legal, commercial and strategic dimensions",
 }
 
-// Patent assessment command flags
-var (
-	patentNumbers      string
-	assessDimensions   string
-	assessOutputFormat string
-	assessOutputFile   string
-)
+cmd.AddCommand(newAssessPatentCmd())
+cmd.AddCommand(newAssessPortfolioCmd())
 
-// Portfolio assessment command flags
-var (
-	portfolioID            string
-	includeRecommendations bool
-	portfolioOutputFormat  string
-	portfolioOutputFile    string
-)
+return cmd
+}
 
 func newAssessPatentCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "patent",
-		Short: "Assess individual patent(s) value",
-		RunE:  runAssessPatent,
-	}
+var (
+patentNumbers string
+dimensions    string
+output        string
+file          string
+)
 
-	cmd.Flags().StringVar(&patentNumbers, "patent-number", "", "Patent number(s), comma-separated (required)")
-	cmd.Flags().StringVar(&assessDimensions, "dimensions", "technical,legal,commercial,strategic", "Assessment dimensions")
-	cmd.Flags().StringVar(&assessOutputFormat, "output", "stdout", "Output format: stdout, json, csv")
-	cmd.Flags().StringVar(&assessOutputFile, "file", "", "Output file path (optional)")
-	cmd.MarkFlagRequired("patent-number")
+cmd := &cobra.Command{
+Use:   "patent",
+Short: "Assess individual patent(s)",
+Long:  "Perform multi-dimensional valuation assessment for one or more patents",
+RunE: func(cmd *cobra.Command, args []string) error {
+// Parse patent numbers
+patents := strings.Split(patentNumbers, ",")
+for i := range patents {
+patents[i] = strings.TrimSpace(patents[i])
+if !isValidPatentNumber(patents[i]) {
+return fmt.Errorf("invalid patent number format: %s (expected CN/US/EP/JP/KR prefix)", patents[i])
+}
+}
 
-	return cmd
+// Parse dimensions
+dims := strings.Split(dimensions, ",")
+for i := range dims {
+dims[i] = strings.TrimSpace(dims[i])
+if !isValidDimension(dims[i]) {
+return fmt.Errorf("invalid dimension: %s (must be technical/legal/commercial/strategic)", dims[i])
+}
+}
+
+// Validate output format
+if !isValidOutputFormat(output) {
+return fmt.Errorf("invalid output format: %s (must be stdout/json/csv)", output)
+}
+
+// Simulate valuation result
+result := &ValuationResult{
+Patents: []PatentValuation{
+{
+PatentNumber: patents[0],
+TechnicalScore: 85,
+LegalScore: 78,
+CommercialScore: 92,
+StrategicScore: 88,
+OverallScore: 85.75,
+RiskLevel: "MEDIUM",
+},
+},
+}
+
+// Format output
+content, err := formatAssessOutput(result, output)
+if err != nil {
+return fmt.Errorf("failed to format output: %w", err)
+}
+
+// Write output
+if err := writeOutput(content, file); err != nil {
+return fmt.Errorf("failed to write output: %w", err)
+}
+
+// Warn for high-risk patents
+for _, pv := range result.Patents {
+if pv.RiskLevel == "HIGH" {
+fmt.Fprintf(os.Stderr, "\033[31mWARNING: Patent %s has HIGH risk level\033[0m\n", pv.PatentNumber)
+}
+}
+
+return nil
+},
+}
+
+cmd.Flags().StringVar(&patentNumbers, "patent-number", "", "Patent number(s) (comma-separated for multiple) [REQUIRED]")
+cmd.Flags().StringVar(&dimensions, "dimensions", "technical,legal,commercial,strategic", "Assessment dimensions")
+cmd.Flags().StringVar(&output, "output", "stdout", "Output format (stdout/json/csv)")
+cmd.Flags().StringVar(&file, "file", "", "Output file path (default: stdout)")
+cmd.MarkFlagRequired("patent-number")
+
+return cmd
 }
 
 func newAssessPortfolioCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "portfolio",
-		Short: "Assess portfolio value and optimization opportunities",
-		RunE:  runAssessPortfolio,
-	}
+var (
+portfolioID           string
+includeRecommendations bool
+output                string
+file                  string
+)
 
-	cmd.Flags().StringVar(&portfolioID, "portfolio-id", "", "Portfolio ID (required)")
-	cmd.Flags().BoolVar(&includeRecommendations, "include-recommendations", true, "Include optimization recommendations")
-	cmd.Flags().StringVar(&portfolioOutputFormat, "output", "stdout", "Output format: stdout, json, csv")
-	cmd.Flags().StringVar(&portfolioOutputFile, "file", "", "Output file path (optional)")
-	cmd.MarkFlagRequired("portfolio-id")
-
-	return cmd
+cmd := &cobra.Command{
+Use:   "portfolio",
+Short: "Assess patent portfolio",
+Long:  "Perform comprehensive assessment of a patent portfolio with strategic recommendations",
+RunE: func(cmd *cobra.Command, args []string) error {
+// Validate output format
+if !isValidOutputFormat(output) {
+return fmt.Errorf("invalid output format: %s (must be stdout/json/csv)", output)
 }
 
-func runAssessPatent(cmd *cobra.Command, args []string) error {
-	// Validate patent numbers
-	patents := strings.Split(patentNumbers, ",")
-	for i, pn := range patents {
-		patents[i] = strings.TrimSpace(pn)
-		if !isValidPatentNumber(patents[i]) {
-			return fmt.Errorf("invalid patent number format: %s (expected CN/US/EP/JP/KR prefix)", patents[i])
-		}
-	}
-
-	// Validate dimensions
-	dims := strings.Split(assessDimensions, ",")
-	for _, dim := range dims {
-		if !isValidDimension(strings.TrimSpace(dim)) {
-			return fmt.Errorf("invalid dimension: %s (allowed: technical, legal, commercial, strategic)", dim)
-		}
-	}
-
-	// Validate output format
-	if !isValidOutputFormat(assessOutputFormat) {
-		return fmt.Errorf("invalid output format: %s (allowed: stdout, json, csv)", assessOutputFormat)
-	}
-
-	// Simulate assessment result (placeholder for actual service call)
-	result := &ValuationResult{
-		Patents: patents,
-		Scores: map[string]float64{
-			"technical":  75.5,
-			"legal":      82.3,
-			"commercial": 68.7,
-			"strategic":  91.2,
-		},
-		OverallScore: 79.4,
-		RiskLevel:    "MEDIUM",
-	}
-
-	// Format output
-	output, err := formatAssessOutput(result, assessOutputFormat)
-	if err != nil {
-		return fmt.Errorf("format output error: %w", err)
-	}
-
-	// Write output
-	if err := writeOutput(output, assessOutputFile); err != nil {
-		return fmt.Errorf("write output error: %w", err)
-	}
-
-	// Warning for high risk
-	if result.RiskLevel == "HIGH" {
-		fmt.Fprintf(os.Stderr, "⚠️  WARNING: Assessment detected HIGH risk level\n")
-	}
-
-	return nil
+// Simulate portfolio assessment result
+result := &ValuationResult{
+PortfolioID: portfolioID,
+Patents: []PatentValuation{
+{PatentNumber: "CN202110123456", OverallScore: 85.75, RiskLevel: "MEDIUM"},
+{PatentNumber: "US11234567B2", OverallScore: 92.5, RiskLevel: "LOW"},
+},
+AverageScore: 89.125,
+Recommendations: []string{
+"Consider filing continuation applications for high-value patents",
+"Monitor competitor activities in blue OLED materials",
+},
 }
 
-func runAssessPortfolio(cmd *cobra.Command, args []string) error {
-	// Validate portfolio ID
-	if portfolioID == "" {
-		return fmt.Errorf("portfolio ID is required")
-	}
-
-	// Validate output format
-	if !isValidOutputFormat(portfolioOutputFormat) {
-		return fmt.Errorf("invalid output format: %s (allowed: stdout, json, csv)", portfolioOutputFormat)
-	}
-
-	// Simulate portfolio assessment result
-	result := &PortfolioValuationResult{
-		PortfolioID:  portfolioID,
-		TotalPatents: 42,
-		Scores: map[string]float64{
-			"technical":  78.5,
-			"legal":      85.3,
-			"commercial": 72.1,
-			"strategic":  88.9,
-		},
-		OverallScore: 81.2,
-		Recommendations: []string{
-			"Consider filing continuation applications for high-value patents",
-			"Review maintenance fee strategy for low-value patents",
-			"Strengthen portfolio in emerging technology areas",
-		},
-	}
-
-	// Format output
-	var output string
-	if portfolioOutputFormat == "json" {
-		data, _ := json.MarshalIndent(result, "", "  ")
-		output = string(data)
-	} else if portfolioOutputFormat == "csv" {
-		output = fmt.Sprintf("PortfolioID,TotalPatents,Technical,Legal,Commercial,Strategic,Overall\n%s,%d,%.2f,%.2f,%.2f,%.2f,%.2f\n",
-			result.PortfolioID, result.TotalPatents,
-			result.Scores["technical"], result.Scores["legal"],
-			result.Scores["commercial"], result.Scores["strategic"],
-			result.OverallScore)
-	} else {
-		output = formatPortfolioTable(result, includeRecommendations)
-	}
-
-	if err := writeOutput(output, portfolioOutputFile); err != nil {
-		return fmt.Errorf("write output error: %w", err)
-	}
-
-	return nil
+if !includeRecommendations {
+result.Recommendations = nil
 }
 
-// ValuationResult represents patent assessment result
+// Format and write output
+content, err := formatAssessOutput(result, output)
+if err != nil {
+return fmt.Errorf("failed to format output: %w", err)
+}
+
+return writeOutput(content, file)
+},
+}
+
+cmd.Flags().StringVar(&portfolioID, "portfolio-id", "", "Portfolio ID [REQUIRED]")
+cmd.Flags().BoolVar(&includeRecommendations, "include-recommendations", true, "Include strategic recommendations")
+cmd.Flags().StringVar(&output, "output", "stdout", "Output format (stdout/json/csv)")
+cmd.Flags().StringVar(&file, "file", "", "Output file path")
+cmd.MarkFlagRequired("portfolio-id")
+
+return cmd
+}
+
+// Helper types
 type ValuationResult struct {
-	Patents      []string
-	Scores       map[string]float64
-	OverallScore float64
-	RiskLevel    string
+PortfolioID     string              `json:"portfolio_id,omitempty"`
+Patents         []PatentValuation   `json:"patents"`
+AverageScore    float64             `json:"average_score,omitempty"`
+Recommendations []string            `json:"recommendations,omitempty"`
 }
 
-// PortfolioValuationResult represents portfolio assessment result
-type PortfolioValuationResult struct {
-	PortfolioID     string
-	TotalPatents    int
-	Scores          map[string]float64
-	OverallScore    float64
-	Recommendations []string
+type PatentValuation struct {
+PatentNumber    string  `json:"patent_number"`
+TechnicalScore  float64 `json:"technical_score,omitempty"`
+LegalScore      float64 `json:"legal_score,omitempty"`
+CommercialScore float64 `json:"commercial_score,omitempty"`
+StrategicScore  float64 `json:"strategic_score,omitempty"`
+OverallScore    float64 `json:"overall_score"`
+RiskLevel       string  `json:"risk_level"`
 }
 
-func formatAssessOutput(result *ValuationResult, format string) (string, error) {
-	switch format {
-	case "json":
-		data, err := json.MarshalIndent(result, "", "  ")
-		if err != nil {
-			return "", err
-		}
-		return string(data), nil
-
-	case "csv":
-		var buf strings.Builder
-		w := csv.NewWriter(&buf)
-		w.Write([]string{"PatentNumber", "Technical", "Legal", "Commercial", "Strategic", "Overall", "Risk"})
-		for _, pn := range result.Patents {
-			w.Write([]string{
-				pn,
-				fmt.Sprintf("%.2f", result.Scores["technical"]),
-				fmt.Sprintf("%.2f", result.Scores["legal"]),
-				fmt.Sprintf("%.2f", result.Scores["commercial"]),
-				fmt.Sprintf("%.2f", result.Scores["strategic"]),
-				fmt.Sprintf("%.2f", result.OverallScore),
-				result.RiskLevel,
-			})
-		}
-		w.Flush()
-		return buf.String(), nil
-
-	case "stdout":
-		var buf strings.Builder
-		buf.WriteString("═══════════════════════════════════════════════════════════\n")
-		buf.WriteString("                    PATENT VALUATION REPORT                \n")
-		buf.WriteString("═══════════════════════════════════════════════════════════\n\n")
-		buf.WriteString(fmt.Sprintf("Patents Assessed: %s\n\n", strings.Join(result.Patents, ", ")))
-		buf.WriteString("Dimension Scores:\n")
-		buf.WriteString(fmt.Sprintf("  Technical:   %.2f\n", result.Scores["technical"]))
-		buf.WriteString(fmt.Sprintf("  Legal:       %.2f\n", result.Scores["legal"]))
-		buf.WriteString(fmt.Sprintf("  Commercial:  %.2f\n", result.Scores["commercial"]))
-		buf.WriteString(fmt.Sprintf("  Strategic:   %.2f\n\n", result.Scores["strategic"]))
-		buf.WriteString(fmt.Sprintf("Overall Score: %.2f\n", result.OverallScore))
-		buf.WriteString(fmt.Sprintf("Risk Level:    %s\n", result.RiskLevel))
-		buf.WriteString("═══════════════════════════════════════════════════════════\n")
-		return buf.String(), nil
-
-	default:
-		return "", fmt.Errorf("unsupported output format: %s", format)
-	}
+// Helper functions
+func isValidPatentNumber(num string) bool {
+prefixes := []string{"CN", "US", "EP", "JP", "KR"}
+for _, prefix := range prefixes {
+if strings.HasPrefix(num, prefix) {
+return true
 }
-
-func formatPortfolioTable(result *PortfolioValuationResult, includeRecs bool) string {
-	var buf strings.Builder
-	buf.WriteString("═══════════════════════════════════════════════════════════\n")
-	buf.WriteString("               PORTFOLIO VALUATION REPORT                 \n")
-	buf.WriteString("═══════════════════════════════════════════════════════════\n\n")
-	buf.WriteString(fmt.Sprintf("Portfolio ID:     %s\n", result.PortfolioID))
-	buf.WriteString(fmt.Sprintf("Total Patents:    %d\n\n", result.TotalPatents))
-	buf.WriteString("Dimension Scores:\n")
-	buf.WriteString(fmt.Sprintf("  Technical:   %.2f\n", result.Scores["technical"]))
-	buf.WriteString(fmt.Sprintf("  Legal:       %.2f\n", result.Scores["legal"]))
-	buf.WriteString(fmt.Sprintf("  Commercial:  %.2f\n", result.Scores["commercial"]))
-	buf.WriteString(fmt.Sprintf("  Strategic:   %.2f\n\n", result.Scores["strategic"]))
-	buf.WriteString(fmt.Sprintf("Overall Score: %.2f\n", result.OverallScore))
-
-	if includeRecs && len(result.Recommendations) > 0 {
-		buf.WriteString("\nRecommendations:\n")
-		for i, rec := range result.Recommendations {
-			buf.WriteString(fmt.Sprintf("  %d. %s\n", i+1, rec))
-		}
-	}
-
-	buf.WriteString("═══════════════════════════════════════════════════════════\n")
-	return buf.String()
 }
-
-func writeOutput(content string, filePath string) error {
-	if filePath == "" {
-		fmt.Print(content)
-		return nil
-	}
-
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", filePath, err)
-	}
-
-	fmt.Printf("Output written to: %s\n", filePath)
-	return nil
-}
-
-func isValidPatentNumber(pn string) bool {
-	// Validate CN/US/EP/JP/KR prefix formats
-	validPrefixes := regexp.MustCompile(`^(CN|US|EP|JP|KR)\d+`)
-	return validPrefixes.MatchString(pn)
+return false
 }
 
 func isValidDimension(dim string) bool {
-	valid := map[string]bool{
-		"technical":  true,
-		"legal":      true,
-		"commercial": true,
-		"strategic":  true,
-	}
-	return valid[dim]
+validDims := map[string]bool{
+"technical": true, "legal": true, "commercial": true, "strategic": true,
+}
+return validDims[dim]
 }
 
 func isValidOutputFormat(format string) bool {
-	valid := map[string]bool{
-		"stdout": true,
-		"json":   true,
-		"csv":    true,
-	}
-	return valid[format]
+return format == "stdout" || format == "json" || format == "csv"
 }
 
-func init() {
-	RootCmd.AddCommand(NewAssessCmd())
+func formatAssessOutput(result *ValuationResult, format string) (string, error) {
+switch format {
+case "json":
+data, err := json.MarshalIndent(result, "", "  ")
+if err != nil {
+return "", err
+}
+return string(data), nil
+
+case "csv":
+var sb strings.Builder
+sb.WriteString("Patent Number,Technical,Legal,Commercial,Strategic,Overall,Risk Level\n")
+for _, pv := range result.Patents {
+fmt.Fprintf(&sb, "%s,%.2f,%.2f,%.2f,%.2f,%.2f,%s\n",
+pv.PatentNumber, pv.TechnicalScore, pv.LegalScore,
+pv.CommercialScore, pv.StrategicScore, pv.OverallScore, pv.RiskLevel)
+}
+return sb.String(), nil
+
+case "stdout":
+var sb strings.Builder
+sb.WriteString("Patent Valuation Assessment Results\n")
+sb.WriteString("====================================\n\n")
+for _, pv := range result.Patents {
+fmt.Fprintf(&sb, "Patent: %s\n", pv.PatentNumber)
+if pv.TechnicalScore > 0 {
+fmt.Fprintf(&sb, "  Technical:  %.2f\n", pv.TechnicalScore)
+}
+if pv.LegalScore > 0 {
+fmt.Fprintf(&sb, "  Legal:      %.2f\n", pv.LegalScore)
+}
+if pv.CommercialScore > 0 {
+fmt.Fprintf(&sb, "  Commercial: %.2f\n", pv.CommercialScore)
+}
+if pv.StrategicScore > 0 {
+fmt.Fprintf(&sb, "  Strategic:  %.2f\n", pv.StrategicScore)
+}
+fmt.Fprintf(&sb, "  Overall:    %.2f\n", pv.OverallScore)
+fmt.Fprintf(&sb, "  Risk Level: %s\n\n", pv.RiskLevel)
+}
+if result.AverageScore > 0 {
+fmt.Fprintf(&sb, "Portfolio Average Score: %.2f\n", result.AverageScore)
+}
+if len(result.Recommendations) > 0 {
+sb.WriteString("\nRecommendations:\n")
+for i, rec := range result.Recommendations {
+fmt.Fprintf(&sb, "  %d. %s\n", i+1, rec)
+}
+}
+return sb.String(), nil
+
+default:
+return "", fmt.Errorf("unknown format: %s", format)
+}
+}
+
+func writeOutput(content string, filePath string) error {
+if filePath == "" {
+fmt.Print(content)
+return nil
+}
+
+return os.WriteFile(filePath, []byte(content), 0644)
 }
 
 //Personal.AI order the ending
