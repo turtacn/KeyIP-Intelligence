@@ -375,4 +375,58 @@ func (p *Patent) ClaimCount() int {
 	return len(p.Claims)
 }
 
+// GetPrimaryTechDomain returns the primary technology domain for the patent.
+func (p *Patent) GetPrimaryTechDomain() string {
+	if len(p.KeyIPTechCodes) > 0 {
+		return p.KeyIPTechCodes[0]
+	}
+	if len(p.IPCCodes) > 0 {
+		return p.IPCCodes[0]
+	}
+	return ""
+}
+
+// GetValueScore returns the value score from metadata, or 0 if not available.
+func (p *Patent) GetValueScore() float64 {
+	if p.Metadata != nil {
+		if score, ok := p.Metadata["value_score"].(float64); ok {
+			return score
+		}
+	}
+	return 0.0
+}
+
+// GetFilingDate returns the filing date of the patent.
+func (p *Patent) GetFilingDate() *time.Time {
+	if p.Dates.FilingDate != nil {
+		return p.Dates.FilingDate
+	}
+	return p.FilingDate
+}
+
+// GetLegalStatus returns the status as a string.
+func (p *Patent) GetLegalStatus() string {
+	return p.Status.String()
+}
+
+// GetAssignee returns the assignee name.
+func (p *Patent) GetAssignee() string {
+	return p.AssigneeName
+}
+
+// GetMoleculeIDs returns the list of associated molecule IDs.
+func (p *Patent) GetMoleculeIDs() []string {
+	return p.MoleculeIDs
+}
+
+// GetID returns the patent ID as a string.
+func (p *Patent) GetID() string {
+	return p.ID.String()
+}
+
+// GetPatentNumber returns the patent number.
+func (p *Patent) GetPatentNumber() string {
+	return p.PatentNumber
+}
+
 //Personal.AI order the ending

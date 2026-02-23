@@ -155,8 +155,8 @@ type GNNInferenceEngine struct {
 	mu            sync.RWMutex
 }
 
-// InferenceEngine is an alias for GNNInferenceEngine for backward compatibility.
-type InferenceEngine = GNNInferenceEngine
+// InferenceEngine is an alias for *GNNInferenceEngine for backward compatibility.
+type InferenceEngine = *GNNInferenceEngine
 
 // NewGNNInferenceEngine creates a new inference engine with all dependencies.
 func NewGNNInferenceEngine(

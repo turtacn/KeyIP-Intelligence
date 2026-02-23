@@ -274,4 +274,17 @@ func (m *Molecule) String() string {
 	return fmt.Sprintf("Molecule{id=%s, smiles=%s, status=%s}", m.ID, m.SMILES, m.Status)
 }
 
+// GetSMILES returns the SMILES representation of the molecule.
+func (m *Molecule) GetSMILES() string {
+	if m.CanonicalSMILES != "" {
+		return m.CanonicalSMILES
+	}
+	return m.SMILES
+}
+
+// GetID returns the molecule ID as a string.
+func (m *Molecule) GetID() string {
+	return m.ID.String()
+}
+
 //Personal.AI order the ending
