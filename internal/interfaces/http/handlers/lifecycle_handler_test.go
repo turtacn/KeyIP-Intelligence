@@ -1,25 +1,19 @@
 package handlers
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
-func TestNewLifecycleHandler(t *testing.T) {
+func TestLifecycleHandler_GetDeadlines(t *testing.T) {
 	handler := NewLifecycleHandler()
-	if handler == nil {
-		t.Error("handler should not be nil")
-	}
-}
-
-func TestLifecycleHandler_Handle(t *testing.T) {
-	handler := NewLifecycleHandler()
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("GET", "/api/v1/lifecycle/deadlines", nil)
 	w := httptest.NewRecorder()
-	handler.Handle(w, req)
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
+
+	handler.GetDeadlines(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("expected status 200, got %d", w.Code)
 	}
 }
 

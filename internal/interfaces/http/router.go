@@ -1,21 +1,16 @@
 package http
 
 import (
+	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/handlers"
 	"net/http"
-
-	"github.com/gorilla/mux"
 )
 
-func NewRouter() *mux.Router {
-	r := mux.NewRouter()
-
-	// Health check
-	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	}).Methods("GET")
-
-	return r
+func NewRouter() http.Handler {
+	mux := http.NewServeMux()
+	health := handlers.NewHealthHandler()
+	mux.HandleFunc("/health", health.Check)
+	mux.HandleFunc("/ready", health.Ready)
+	return mux
 }
 
 //Personal.AI order the ending

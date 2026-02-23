@@ -6,20 +6,15 @@ import (
 	"testing"
 )
 
-func TestNewCollaborationHandler(t *testing.T) {
+func TestCollaborationHandler_CreateWorkspace(t *testing.T) {
 	handler := NewCollaborationHandler()
-	if handler == nil {
-		t.Error("handler should not be nil")
-	}
-}
-
-func TestCollaborationHandler_Handle(t *testing.T) {
-	handler := NewCollaborationHandler()
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest("POST", "/api/v1/workspaces", nil)
 	w := httptest.NewRecorder()
-	handler.Handle(w, req)
+
+	handler.CreateWorkspace(w, req)
+
 	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
+		t.Errorf("expected status 200, got %d", w.Code)
 	}
 }
 

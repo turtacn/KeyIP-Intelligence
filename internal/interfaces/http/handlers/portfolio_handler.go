@@ -11,9 +11,12 @@ func NewPortfolioHandler() *PortfolioHandler {
 	return &PortfolioHandler{}
 }
 
-func (h *PortfolioHandler) Handle(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok"})
+func (h *PortfolioHandler) GetPortfolio(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(map[string]interface{}{"id": "pf-123", "patents": 90})
+}
+
+func (h *PortfolioHandler) Analyze(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(map[string]string{"health_score": "85"})
 }
 
 //Personal.AI order the ending
