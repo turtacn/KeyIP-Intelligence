@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	pkgerrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
@@ -81,8 +82,17 @@ func (m *mockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string
 	}
 	return nil, nil
 }
-func (m *mockPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Patent) error {
-	return m.err
+func (m *mockPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Patent) (int, error) {
+	if m.err != nil {
+		return 0, m.err
+	}
+	return len(patents), nil
+}
+func (m *mockPatentRepo) BatchCreateClaims(ctx context.Context, claims []*patent.Claim) (int, error) {
+	if m.err != nil {
+		return 0, m.err
+	}
+	return len(claims), nil
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +318,8 @@ func (mockLogger) Warn(msg string, fields ...logging.Field)  {}
 func (mockLogger) Error(msg string, fields ...logging.Field) {}
 func (mockLogger) Fatal(msg string, fields ...logging.Field) {}
 func (mockLogger) With(fields ...logging.Field) logging.Logger { return mockLogger{} }
+func (mockLogger) WithContext(ctx context.Context) logging.Logger { return mockLogger{} }
+func (mockLogger) WithError(err error) logging.Logger { return mockLogger{} }
 func (mockLogger) Sync() error { return nil }
 
 // ---------------------------------------------------------------------------
