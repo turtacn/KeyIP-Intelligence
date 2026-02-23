@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import companies from '../data/companies.json';
+import companies from '@/mocks/data/companies.json';
 
 const typedCompanies = companies as any[];
 

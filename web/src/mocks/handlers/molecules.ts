@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import molecules from '../data/molecules.json';
+import molecules from '@/mocks/data/molecules.json';
 
 const typedMolecules = molecules as any[];
 

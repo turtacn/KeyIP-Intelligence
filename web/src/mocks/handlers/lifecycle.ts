@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import lifecycle from '../data/lifecycle.json';
+import lifecycle from '@/mocks/data/lifecycle.json';
 
 const typedLifecycle = lifecycle as any[];
 
