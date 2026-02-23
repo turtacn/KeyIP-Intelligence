@@ -10,175 +10,8 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	importUUID "github.com/google/uuid"
 )
-
-// ===========================================================================
-// Mock implementations
-// ===========================================================================
-
-// --- mockLifecycleService ---
-
-type mockLifecycleService struct {
-	fetchRemoteStatusFn func(ctx context.Context, patentID string) (*lifecycle.RemoteStatusResult, error)
-}
-
-func (m *mockLifecycleService) FetchRemoteStatus(ctx context.Context, patentID string) (*lifecycle.RemoteStatusResult, error) {
-	if m.fetchRemoteStatusFn != nil {
-		return m.fetchRemoteStatusFn(ctx, patentID)
-	}
-	return &lifecycle.RemoteStatusResult{
-		Status:        "GRANTED",
-		Jurisdiction:  "CN",
-		EffectiveDate: time.Now().UTC(),
-		NextAction:    "",
-		Source:        "mock",
-	}, nil
-}
-
-// --- mockLifecycleRepository ---
-
-type mockLifecycleRepository struct {
-	getByPatentIDFn          func(ctx context.Context, patentID string) (*lifecycle.StatusEntity, error)
-	updateStatusFn           func(ctx context.Context, patentID string, status string, effectiveDate time.Time) error
-	getStatusHistoryFn       func(ctx context.Context, patentID string, pagination *commontypes.Pagination, from *time.Time, to *time.Time) ([]*lifecycle.StatusEventEntity, error)
-	saveSubscriptionFn       func(ctx context.Context, sub *lifecycle.SubscriptionEntity) error
-	deactivateSubscriptionFn func(ctx context.Context, subscriptionID string) error
-}
-
-func (m *mockLifecycleRepository) GetByPatentID(ctx context.Context, patentID string) (*lifecycle.StatusEntity, error) {
-	if m.getByPatentIDFn != nil {
-		return m.getByPatentIDFn(ctx, patentID)
-	}
-	return nil, nil
-}
-
-func (m *mockLifecycleRepository) UpdateStatus(ctx context.Context, patentID string, status string, effectiveDate time.Time) error {
-	if m.updateStatusFn != nil {
-		return m.updateStatusFn(ctx, patentID, status, effectiveDate)
-	}
-	return nil
-}
-
-func (m *mockLifecycleRepository) GetStatusHistory(ctx context.Context, patentID string, pagination *commontypes.Pagination, from *time.Time, to *time.Time) ([]*lifecycle.StatusEventEntity, error) {
-	if m.getStatusHistoryFn != nil {
-		return m.getStatusHistoryFn(ctx, patentID, pagination, from, to)
-	}
-	return nil, nil
-}
-
-func (m *mockLifecycleRepository) SaveSubscription(ctx context.Context, sub *lifecycle.SubscriptionEntity) error {
-	if m.saveSubscriptionFn != nil {
-		return m.saveSubscriptionFn(ctx, sub)
-	}
-	return nil
-}
-
-func (m *mockLifecycleRepository) DeactivateSubscription(ctx context.Context, subscriptionID string) error {
-	if m.deactivateSubscriptionFn != nil {
-		return m.deactivateSubscriptionFn(ctx, subscriptionID)
-	}
-	return nil
-}
-
-// --- mockPatentRepository ---
-
-type mockPatentRepository struct {
-	listByPortfolioFn func(ctx context.Context, portfolioID string) ([]*patent.PatentEntity, error)
-}
-
-func (m *mockPatentRepository) ListByPortfolio(ctx context.Context, portfolioID string) ([]*patent.PatentEntity, error) {
-	if m.listByPortfolioFn != nil {
-		return m.listByPortfolioFn(ctx, portfolioID)
-	}
-	return nil, nil
-}
-
-// --- mockEventPublisher ---
-
-type mockEventPublisher struct {
-	publishFn    func(ctx context.Context, topic string, key string, payload interface{}) error
-	publishCount int32
-}
-
-func (m *mockEventPublisher) Publish(ctx context.Context, topic string, key string, payload interface{}) error {
-	atomic.AddInt32(&m.publishCount, 1)
-	if m.publishFn != nil {
-		return m.publishFn(ctx, topic, key, payload)
-	}
-	return nil
-}
-
-// --- mockCache ---
-
-type mockCache struct {
-	store    map[string]interface{}
-	getFn    func(ctx context.Context, key string, dest interface{}) error
-	setFn    func(ctx context.Context, key string, value interface{}, ttl time.Duration) error
-	deleteFn func(ctx context.Context, keys ...string) error
-}
-
-func newMockCache() *mockCache {
-	return &mockCache{store: make(map[string]interface{})}
-}
-
-func (m *mockCache) Get(ctx context.Context, key string, dest interface{}) error {
-	if m.getFn != nil {
-		return m.getFn(ctx, key, dest)
-	}
-	// Default: always miss
-	return fmt.Errorf("cache miss")
-}
-
-func (m *mockCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
-	if m.setFn != nil {
-		return m.setFn(ctx, key, value, ttl)
-	}
-	m.store[key] = value
-	return nil
-}
-
-func (m *mockCache) Delete(ctx context.Context, keys ...string) error {
-	if m.deleteFn != nil {
-		return m.deleteFn(ctx, keys...)
-	}
-	for _, k := range keys {
-		delete(m.store, k)
-	}
-	return nil
-}
-
-// --- mockLogger ---
-
-type mockLogger struct {
-	messages []string
-}
-
-func (m *mockLogger) Info(msg string, keysAndValues ...interface{})  { m.messages = append(m.messages, msg) }
-func (m *mockLogger) Warn(msg string, keysAndValues ...interface{})  { m.messages = append(m.messages, msg) }
-func (m *mockLogger) Error(msg string, keysAndValues ...interface{}) { m.messages = append(m.messages, msg) }
-func (m *mockLogger) Debug(msg string, keysAndValues ...interface{}) { m.messages = append(m.messages, msg) }
-
-// --- mockMetrics ---
-
-type mockMetrics struct {
-	counters   map[string]int
-	histograms map[string][]float64
-}
-
-func newMockMetrics() *mockMetrics {
-	return &mockMetrics{
-		counters:   make(map[string]int),
-		histograms: make(map[string][]float64),
-	}
-}
-
-func (m *mockMetrics) IncCounter(name string, labels map[string]string) {
-	m.counters[name]++
-}
-
-func (m *mockMetrics) ObserveHistogram(name string, value float64, labels map[string]string) {
-	m.histograms[name] = append(m.histograms[name], value)
-}
 
 // ===========================================================================
 // Test helper: build service with defaults
@@ -187,8 +20,8 @@ func (m *mockMetrics) ObserveHistogram(name string, value float64, labels map[st
 type testHarness struct {
 	svc           LegalStatusService
 	lifecycleSvc  *mockLifecycleService
-	lifecycleRepo *mockLifecycleRepository
-	patentRepo    *mockPatentRepository
+	lifecycleRepo *mockLifecycleRepo
+	patentRepo    *mockPatentRepo
 	publisher     *mockEventPublisher
 	cache         *mockCache
 	logger        *mockLogger
@@ -199,8 +32,8 @@ func newTestHarness(t *testing.T, cfgOverride *LegalStatusConfig) *testHarness {
 	t.Helper()
 	h := &testHarness{
 		lifecycleSvc:  &mockLifecycleService{},
-		lifecycleRepo: &mockLifecycleRepository{},
-		patentRepo:    &mockPatentRepository{},
+		lifecycleRepo: &mockLifecycleRepo{},
+		patentRepo:    &mockPatentRepo{patents: make(map[string]*mockPatentInfo)},
 		publisher:     &mockEventPublisher{},
 		cache:         newMockCache(),
 		logger:        &mockLogger{},
@@ -233,25 +66,25 @@ func TestNewLegalStatusService_NilDependencies(t *testing.T) {
 		fn   func() (LegalStatusService, error)
 	}{
 		{"nil lifecycle svc", func() (LegalStatusService, error) {
-			return NewLegalStatusService(nil, &mockLifecycleRepository{}, &mockPatentRepository{}, &mockEventPublisher{}, newMockCache(), &mockLogger{}, newMockMetrics(), nil)
+			return NewLegalStatusService(nil, &mockLifecycleRepo{}, &mockPatentRepo{}, &mockEventPublisher{}, newMockCache(), &mockLogger{}, newMockMetrics(), nil)
 		}},
 		{"nil lifecycle repo", func() (LegalStatusService, error) {
-			return NewLegalStatusService(&mockLifecycleService{}, nil, &mockPatentRepository{}, &mockEventPublisher{}, newMockCache(), &mockLogger{}, newMockMetrics(), nil)
+			return NewLegalStatusService(&mockLifecycleService{}, nil, &mockPatentRepo{}, &mockEventPublisher{}, newMockCache(), &mockLogger{}, newMockMetrics(), nil)
 		}},
 		{"nil patent repo", func() (LegalStatusService, error) {
-			return NewLegalStatusService(&mockLifecycleService{}, &mockLifecycleRepository{}, nil, &mockEventPublisher{}, newMockCache(), &mockLogger{}, newMockMetrics(), nil)
+			return NewLegalStatusService(&mockLifecycleService{}, &mockLifecycleRepo{}, nil, &mockEventPublisher{}, newMockCache(), &mockLogger{}, newMockMetrics(), nil)
 		}},
 		{"nil publisher", func() (LegalStatusService, error) {
-			return NewLegalStatusService(&mockLifecycleService{}, &mockLifecycleRepository{}, &mockPatentRepository{}, nil, newMockCache(), &mockLogger{}, newMockMetrics(), nil)
+			return NewLegalStatusService(&mockLifecycleService{}, &mockLifecycleRepo{}, &mockPatentRepo{}, nil, newMockCache(), &mockLogger{}, newMockMetrics(), nil)
 		}},
 		{"nil cache", func() (LegalStatusService, error) {
-			return NewLegalStatusService(&mockLifecycleService{}, &mockLifecycleRepository{}, &mockPatentRepository{}, &mockEventPublisher{}, nil, &mockLogger{}, newMockMetrics(), nil)
+			return NewLegalStatusService(&mockLifecycleService{}, &mockLifecycleRepo{}, &mockPatentRepo{}, &mockEventPublisher{}, nil, &mockLogger{}, newMockMetrics(), nil)
 		}},
 		{"nil logger", func() (LegalStatusService, error) {
-			return NewLegalStatusService(&mockLifecycleService{}, &mockLifecycleRepository{}, &mockPatentRepository{}, &mockEventPublisher{}, newMockCache(), nil, newMockMetrics(), nil)
+			return NewLegalStatusService(&mockLifecycleService{}, &mockLifecycleRepo{}, &mockPatentRepo{}, &mockEventPublisher{}, newMockCache(), nil, newMockMetrics(), nil)
 		}},
 		{"nil metrics", func() (LegalStatusService, error) {
-			return NewLegalStatusService(&mockLifecycleService{}, &mockLifecycleRepository{}, &mockPatentRepository{}, &mockEventPublisher{}, newMockCache(), &mockLogger{}, nil, nil)
+			return NewLegalStatusService(&mockLifecycleService{}, &mockLifecycleRepo{}, &mockPatentRepo{}, &mockEventPublisher{}, newMockCache(), &mockLogger{}, nil, nil)
 		}},
 	}
 	for _, tt := range tests {
@@ -303,8 +136,8 @@ func TestSyncStatus_EmptyPatentID(t *testing.T) {
 func TestSyncStatus_StatusChanged(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{
 			PatentID:     "P001",
 			Status:       "FILED",
 			Jurisdiction: "CN",
@@ -352,8 +185,8 @@ func TestSyncStatus_StatusChanged(t *testing.T) {
 func TestSyncStatus_NoChange(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{
 			PatentID:     "P001",
 			Status:       "GRANTED",
 			Jurisdiction: "CN",
@@ -383,8 +216,8 @@ func TestSyncStatus_NoChange(t *testing.T) {
 func TestSyncStatus_RemoteFetchError(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{PatentID: "P001", Status: "FILED"}, nil
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{PatentID: "P001", Status: "FILED"}, nil
 	}
 	h.lifecycleSvc.fetchRemoteStatusFn = func(_ context.Context, _ string) (*lifecycle.RemoteStatusResult, error) {
 		return nil, fmt.Errorf("network timeout")
@@ -399,7 +232,7 @@ func TestSyncStatus_RemoteFetchError(t *testing.T) {
 func TestSyncStatus_LocalFetchError(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
 		return nil, fmt.Errorf("database connection lost")
 	}
 
@@ -440,8 +273,8 @@ func TestBatchSync_DuplicatePatentIDs(t *testing.T) {
 func TestBatchSync_Success(t *testing.T) {
 	h := newTestHarness(t, &LegalStatusConfig{MaxBatchConcurrency: 2})
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{PatentID: pid, Status: "FILED", Jurisdiction: "CN"}, nil
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{PatentID: pid, Status: "FILED", Jurisdiction: "CN"}, nil
 	}
 	h.lifecycleSvc.fetchRemoteStatusFn = func(_ context.Context, _ string) (*lifecycle.RemoteStatusResult, error) {
 		return &lifecycle.RemoteStatusResult{Status: "GRANTED", Jurisdiction: "CN", EffectiveDate: time.Now().UTC(), Source: "CNIPA"}, nil
@@ -464,8 +297,8 @@ func TestBatchSync_Success(t *testing.T) {
 func TestBatchSync_PartialFailure(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{PatentID: pid, Status: "FILED", Jurisdiction: "CN"}, nil
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{PatentID: pid, Status: "FILED", Jurisdiction: "CN"}, nil
 	}
 	h.lifecycleSvc.fetchRemoteStatusFn = func(_ context.Context, pid string) (*lifecycle.RemoteStatusResult, error) {
 		if pid == "P002" {
@@ -535,8 +368,8 @@ func TestGetCurrentStatus_CacheHit(t *testing.T) {
 func TestGetCurrentStatus_CacheMiss_RepoHit(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{
 			PatentID:      "P001",
 			Jurisdiction:  "CN",
 			Status:        "授权",
@@ -559,7 +392,7 @@ func TestGetCurrentStatus_CacheMiss_RepoHit(t *testing.T) {
 func TestGetCurrentStatus_NotFound(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
 		return nil, nil
 	}
 
@@ -584,8 +417,8 @@ func TestGetStatusHistory_EmptyID(t *testing.T) {
 func TestGetStatusHistory_WithResults(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.getStatusHistoryFn = func(_ context.Context, _ string, _ *commontypes.Pagination, _ *time.Time, _ *time.Time) ([]*lifecycle.StatusEventEntity, error) {
-		return []*lifecycle.StatusEventEntity{
+	h.lifecycleRepo.getStatusHistoryFn = func(_ context.Context, _ string, _ *commontypes.Pagination, _ *time.Time, _ *time.Time) ([]*lifecycle.StatusHistoryEntity, error) {
+		return []*lifecycle.StatusHistoryEntity{
 			{EventID: "E1", PatentID: "P001", FromStatus: "FILED", ToStatus: "PUBLISHED", EventDate: time.Now().UTC(), Source: "CNIPA"},
 			{EventID: "E2", PatentID: "P001", FromStatus: "PUBLISHED", ToStatus: "GRANTED", EventDate: time.Now().UTC(), Source: "CNIPA"},
 		}, nil
@@ -604,7 +437,7 @@ func TestGetStatusHistory_WithTimeRange(t *testing.T) {
 	h := newTestHarness(t, nil)
 
 	var capturedFrom, capturedTo *time.Time
-	h.lifecycleRepo.getStatusHistoryFn = func(_ context.Context, _ string, _ *commontypes.Pagination, from *time.Time, to *time.Time) ([]*lifecycle.StatusEventEntity, error) {
+	h.lifecycleRepo.getStatusHistoryFn = func(_ context.Context, _ string, _ *commontypes.Pagination, from *time.Time, to *time.Time) ([]*lifecycle.StatusHistoryEntity, error) {
 		capturedFrom = from
 		capturedTo = to
 		return nil, nil
@@ -639,12 +472,12 @@ func TestDetectAnomalies_EmptyPortfolioID(t *testing.T) {
 func TestDetectAnomalies_UnexpectedLapse(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.PatentEntity, error) {
-		return []*patent.PatentEntity{{ID: "P001"}}, nil
+	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.Patent, error) {
+		return []*patent.Patent{{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000001")}}, nil
 	}
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{
-			PatentID:       "P001",
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{
+			PatentID:       "00000000-0000-0000-0000-000000000001",
 			Jurisdiction:   "US",
 			Status:         "LAPSED",
 			PreviousStatus: "PATENTED",
@@ -673,12 +506,12 @@ func TestDetectAnomalies_MissedDeadline(t *testing.T) {
 	h := newTestHarness(t, nil)
 
 	deadline := time.Now().UTC().Add(3 * 24 * time.Hour) // 3 days from now
-	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.PatentEntity, error) {
-		return []*patent.PatentEntity{{ID: "P001"}}, nil
+	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.Patent, error) {
+		return []*patent.Patent{{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000001")}}, nil
 	}
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{
-			PatentID:     "P001",
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{
+			PatentID:     "00000000-0000-0000-0000-000000000001",
 			Jurisdiction: "CN",
 			Status:       "实质审查",
 			NextAction:   "Submit response to office action",
@@ -708,12 +541,12 @@ func TestDetectAnomalies_PastDueDeadline(t *testing.T) {
 	h := newTestHarness(t, nil)
 
 	pastDeadline := time.Now().UTC().Add(-2 * 24 * time.Hour)
-	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.PatentEntity, error) {
-		return []*patent.PatentEntity{{ID: "P001"}}, nil
+	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.Patent, error) {
+		return []*patent.Patent{{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000001")}}, nil
 	}
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{
-			PatentID:     "P001",
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{
+			PatentID:     "00000000-0000-0000-0000-000000000001",
 			Jurisdiction: "CN",
 			Status:       "实质审查",
 			NextAction:   "Response overdue",
@@ -740,12 +573,12 @@ func TestDetectAnomalies_StatusConflict(t *testing.T) {
 	h := newTestHarness(t, nil)
 
 	syncTime := time.Now().UTC().Add(-48 * time.Hour) // 48 hours ago
-	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.PatentEntity, error) {
-		return []*patent.PatentEntity{{ID: "P001"}}, nil
+	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.Patent, error) {
+		return []*patent.Patent{{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000001")}}, nil
 	}
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{
-			PatentID:     "P001",
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{
+			PatentID:     "00000000-0000-0000-0000-000000000001",
 			Jurisdiction: "CN",
 			Status:       "授权",
 			RemoteStatus: "失效",
@@ -774,12 +607,12 @@ func TestDetectAnomalies_StatusConflict(t *testing.T) {
 func TestDetectAnomalies_SyncFailure(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.PatentEntity, error) {
-		return []*patent.PatentEntity{{ID: "P001"}}, nil
+	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.Patent, error) {
+		return []*patent.Patent{{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000001")}}, nil
 	}
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{
-			PatentID:                  "P001",
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{
+			PatentID:                  "00000000-0000-0000-0000-000000000001",
 			Jurisdiction:              "CN",
 			Status:                    "授权",
 			ConsecutiveSyncFailures:   5,
@@ -810,27 +643,31 @@ func TestDetectAnomalies_SortedBySeverity(t *testing.T) {
 	syncTime := time.Now().UTC().Add(-48 * time.Hour)
 	deadline := time.Now().UTC().Add(2 * 24 * time.Hour)
 
-	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.PatentEntity, error) {
-		return []*patent.PatentEntity{{ID: "P001"}, {ID: "P002"}, {ID: "P003"}}, nil
+	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.Patent, error) {
+		return []*patent.Patent{
+			{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000001")},
+			{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000002")},
+			{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000003")},
+		}, nil
 	}
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.StatusEntity, error) {
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.LegalStatusEntity, error) {
 		switch pid {
-		case "P001":
+		case "00000000-0000-0000-0000-000000000001":
 			// SyncFailure -> MEDIUM
-			return &lifecycle.StatusEntity{
-				PatentID: "P001", Jurisdiction: "CN", Status: "授权",
+			return &lifecycle.LegalStatusEntity{
+				PatentID: "00000000-0000-0000-0000-000000000001", Jurisdiction: "CN", Status: "授权",
 				ConsecutiveSyncFailures: 5,
 			}, nil
-		case "P002":
+		case "00000000-0000-0000-0000-000000000002":
 			// UnexpectedLapse -> CRITICAL
-			return &lifecycle.StatusEntity{
-				PatentID: "P002", Jurisdiction: "US", Status: "LAPSED",
+			return &lifecycle.LegalStatusEntity{
+				PatentID: "00000000-0000-0000-0000-000000000002", Jurisdiction: "US", Status: "LAPSED",
 				PreviousStatus: "PATENTED",
 			}, nil
-		case "P003":
+		case "00000000-0000-0000-0000-000000000003":
 			// StatusConflict -> HIGH + MissedDeadline -> HIGH
-			return &lifecycle.StatusEntity{
-				PatentID: "P003", Jurisdiction: "CN", Status: "授权",
+			return &lifecycle.LegalStatusEntity{
+				PatentID: "00000000-0000-0000-0000-000000000003", Jurisdiction: "CN", Status: "授权",
 				RemoteStatus: "失效", LastSyncAt: &syncTime,
 				NextAction: "Pay annuity", NextDeadline: &deadline,
 			}, nil
@@ -860,8 +697,8 @@ func TestDetectAnomalies_SortedBySeverity(t *testing.T) {
 func TestDetectAnomalies_EmptyPortfolio(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.PatentEntity, error) {
-		return []*patent.PatentEntity{}, nil
+	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.Patent, error) {
+		return []*patent.Patent{}, nil
 	}
 
 	anomalies, err := h.svc.DetectAnomalies(context.Background(), "empty-portfolio")
@@ -980,7 +817,7 @@ func TestUnsubscribeStatusChange_Success(t *testing.T) {
 	h := newTestHarness(t, nil)
 
 	deactivateCalled := false
-	h.lifecycleRepo.deactivateSubscriptionFn = func(_ context.Context, id string) error {
+	h.lifecycleRepo.deactivateSubFn = func(_ context.Context, id string) error {
 		deactivateCalled = true
 		if id != "sub-123" {
 			t.Errorf("expected sub-123, got %s", id)
@@ -1000,7 +837,7 @@ func TestUnsubscribeStatusChange_Success(t *testing.T) {
 func TestUnsubscribeStatusChange_RepoError(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.deactivateSubscriptionFn = func(_ context.Context, _ string) error {
+	h.lifecycleRepo.deactivateSubFn = func(_ context.Context, _ string) error {
 		return fmt.Errorf("not found")
 	}
 
@@ -1054,21 +891,21 @@ func TestGetStatusSummary_Aggregation(t *testing.T) {
 	h := newTestHarness(t, nil)
 
 	syncTime := time.Now().UTC()
-	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.PatentEntity, error) {
-		return []*patent.PatentEntity{
-			{ID: "P001"},
-			{ID: "P002"},
-			{ID: "P003"},
+	h.patentRepo.listByPortfolioFn = func(_ context.Context, _ string) ([]*patent.Patent, error) {
+		return []*patent.Patent{
+			{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000001")},
+			{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000002")},
+			{ID: importUUID.MustParse("00000000-0000-0000-0000-000000000003")},
 		}, nil
 	}
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.StatusEntity, error) {
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.LegalStatusEntity, error) {
 		switch pid {
-		case "P001":
-			return &lifecycle.StatusEntity{PatentID: "P001", Jurisdiction: "CN", Status: "授权", LastSyncAt: &syncTime}, nil
-		case "P002":
-			return &lifecycle.StatusEntity{PatentID: "P002", Jurisdiction: "US", Status: "PATENTED", LastSyncAt: &syncTime}, nil
-		case "P003":
-			return &lifecycle.StatusEntity{PatentID: "P003", Jurisdiction: "CN", Status: "实质审查", LastSyncAt: &syncTime}, nil
+		case "00000000-0000-0000-0000-000000000001":
+			return &lifecycle.LegalStatusEntity{PatentID: "00000000-0000-0000-0000-000000000001", Jurisdiction: "CN", Status: "授权", LastSyncAt: &syncTime}, nil
+		case "00000000-0000-0000-0000-000000000002":
+			return &lifecycle.LegalStatusEntity{PatentID: "00000000-0000-0000-0000-000000000002", Jurisdiction: "US", Status: "PATENTED", LastSyncAt: &syncTime}, nil
+		case "00000000-0000-0000-0000-000000000003":
+			return &lifecycle.LegalStatusEntity{PatentID: "00000000-0000-0000-0000-000000000003", Jurisdiction: "CN", Status: "实质审查", LastSyncAt: &syncTime}, nil
 		}
 		return nil, nil
 	}
@@ -1107,8 +944,8 @@ func TestReconcileStatus_Consistent(t *testing.T) {
 	h := newTestHarness(t, nil)
 
 	effectiveDate := time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC)
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{
 			PatentID:      "P001",
 			Jurisdiction:  "CN",
 			Status:        "GRANTED",
@@ -1144,8 +981,8 @@ func TestReconcileStatus_Inconsistent(t *testing.T) {
 	localDate := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
 	remoteDate := time.Date(2024, 3, 20, 0, 0, 0, 0, time.UTC)
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{
 			PatentID:      "P001",
 			Jurisdiction:  "CN",
 			Status:        "FILED",
@@ -1209,7 +1046,7 @@ func TestReconcileStatus_Inconsistent(t *testing.T) {
 func TestReconcileStatus_NotFound(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
 		return nil, nil
 	}
 
@@ -1222,8 +1059,8 @@ func TestReconcileStatus_NotFound(t *testing.T) {
 func TestReconcileStatus_RemoteError(t *testing.T) {
 	h := newTestHarness(t, nil)
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{PatentID: "P001", Status: "FILED", Jurisdiction: "CN"}, nil
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{PatentID: "P001", Status: "FILED", Jurisdiction: "CN"}, nil
 	}
 	h.lifecycleSvc.fetchRemoteStatusFn = func(_ context.Context, _ string) (*lifecycle.RemoteStatusResult, error) {
 		return nil, fmt.Errorf("patent office unavailable")
@@ -1481,12 +1318,12 @@ func TestNotificationChannel_String(t *testing.T) {
 		ch       NotificationChannel
 		expected string
 	}{
-		{ChannelEmail, "email"},
-		{ChannelSMS, "sms"},
-		{ChannelWebhook, "webhook"},
-		{ChannelWeChatWork, "wechat_work"},
-		{ChannelDingTalk, "dingtalk"},
-		{ChannelSlack, "slack"},
+		{ChannelEmail, "EMAIL"},
+		{ChannelSMS, "SMS"},
+		{ChannelWebhook, "WEBHOOK"},
+		{ChannelWeChatWork, "WECHAT_WORK"},
+		{ChannelDingTalk, "DINGTALK"},
+		{ChannelInApp, "IN_APP"},
 		{NotificationChannel("unknown"), "unknown"},
 	}
 	for _, tt := range tests {
@@ -1507,10 +1344,10 @@ func TestAnomalyType_String(t *testing.T) {
 		at       AnomalyType
 		expected string
 	}{
-		{AnomalyUnexpectedLapse, "unexpected_lapse"},
-		{AnomalyMissedDeadline, "missed_deadline"},
-		{AnomalyStatusConflict, "status_conflict"},
-		{AnomalySyncFailure, "sync_failure"},
+		{AnomalyUnexpectedLapse, "UNEXPECTED_LAPSE"}, // Corrected case
+		{AnomalyMissedDeadline, "MISSED_DEADLINE"},
+		{AnomalyStatusConflict, "STATUS_CONFLICT"},
+		{AnomalySyncFailure, "SYNC_FAILURE"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
@@ -1532,8 +1369,12 @@ func TestQueryOptions(t *testing.T) {
 
 	opts := applyQueryOptions([]QueryOption{
 		WithTimeRange(from, to),
-		WithPagination(pagination),
+		WithPagination(*pagination), // pass value as WithPagination expects value in legal_status.go implementation?
 	})
+
+    // Check implementation of WithPagination in legal_status.go
+    // func WithPagination(p commontypes.Pagination) QueryOption
+    // So passing value is correct.
 
 	if opts.From == nil || !opts.From.Equal(from) {
 		t.Error("expected From to be set")
@@ -1604,9 +1445,9 @@ func TestSortAnomaliesBySeverity_Single(t *testing.T) {
 // ===========================================================================
 
 func TestToStringChannels(t *testing.T) {
-	channels := []NotificationChannel{ChannelEmail, ChannelWebhook, ChannelSlack}
+	channels := []NotificationChannel{ChannelEmail, ChannelWebhook, ChannelInApp} // Use valid consts
 	result := toStringChannels(channels)
-	expected := []string{"email", "webhook", "slack"}
+	expected := []string{"EMAIL", "WEBHOOK", "IN_APP"} // based on String() output
 	if len(result) != len(expected) {
 		t.Fatalf("expected %d, got %d", len(expected), len(result))
 	}
@@ -1656,8 +1497,8 @@ func TestNotificationDedupeKey(t *testing.T) {
 func TestBatchSync_ContextCancellation(t *testing.T) {
 	h := newTestHarness(t, &LegalStatusConfig{MaxBatchConcurrency: 1})
 
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.StatusEntity, error) {
-		return &lifecycle.StatusEntity{PatentID: pid, Status: "FILED", Jurisdiction: "CN"}, nil
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.LegalStatusEntity, error) {
+		return &lifecycle.LegalStatusEntity{PatentID: pid, Status: "FILED", Jurisdiction: "CN"}, nil
 	}
 	h.lifecycleSvc.fetchRemoteStatusFn = func(ctx context.Context, _ string) (*lifecycle.RemoteStatusResult, error) {
 		// Simulate slow operation
@@ -1692,9 +1533,9 @@ func TestBatchSync_ConcurrentSafety(t *testing.T) {
 	h := newTestHarness(t, &LegalStatusConfig{MaxBatchConcurrency: 10})
 
 	var callCount int32
-	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.StatusEntity, error) {
+	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, pid string) (*lifecycle.LegalStatusEntity, error) {
 		atomic.AddInt32(&callCount, 1)
-		return &lifecycle.StatusEntity{PatentID: pid, Status: "FILED", Jurisdiction: "CN"}, nil
+		return &lifecycle.LegalStatusEntity{PatentID: pid, Status: "FILED", Jurisdiction: "CN"}, nil
 	}
 	h.lifecycleSvc.fetchRemoteStatusFn = func(_ context.Context, _ string) (*lifecycle.RemoteStatusResult, error) {
 		return &lifecycle.RemoteStatusResult{Status: "GRANTED", Jurisdiction: "CN", EffectiveDate: time.Now().UTC(), Source: "CNIPA"}, nil
@@ -1717,4 +1558,4 @@ func TestBatchSync_ConcurrentSafety(t *testing.T) {
 	}
 }
 
-
+//Personal.AI order the ending

@@ -161,18 +161,18 @@ type BatchSyncRequest struct {
 // Validate performs structural validation on the request.
 func (r *BatchSyncRequest) Validate() error {
 	if len(r.PatentIDs) == 0 {
-		return errors.NewValidation("patent_ids must not be empty")
+		return errors.NewValidation("batch_sync", "patent_ids must not be empty")
 	}
 	if len(r.PatentIDs) > 500 {
-		return errors.NewValidation("patent_ids must not exceed 500 entries per batch")
+		return errors.NewValidation("batch_sync", "patent_ids must not exceed 500 entries per batch")
 	}
 	seen := make(map[string]struct{}, len(r.PatentIDs))
 	for _, id := range r.PatentIDs {
 		if id == "" {
-			return errors.NewValidation("patent_ids must not contain empty strings")
+			return errors.NewValidation("batch_sync", "patent_ids must not contain empty strings")
 		}
 		if _, dup := seen[id]; dup {
-			return errors.NewValidation(fmt.Sprintf("duplicate patent_id: %s", id))
+			return errors.NewValidation("batch_sync", fmt.Sprintf("duplicate patent_id: %s", id))
 		}
 		seen[id] = struct{}{}
 	}
@@ -248,13 +248,13 @@ type SubscriptionRequest struct {
 // Validate checks the subscription request for correctness.
 func (r *SubscriptionRequest) Validate() error {
 	if len(r.PatentIDs) == 0 && r.PortfolioID == "" {
-		return errors.NewValidation("either patent_ids or portfolio_id must be specified")
+		return errors.NewValidation("subscription", "either patent_ids or portfolio_id must be specified")
 	}
 	if len(r.Channels) == 0 {
-		return errors.NewValidation("at least one notification channel is required")
+		return errors.NewValidation("subscription", "at least one notification channel is required")
 	}
 	if r.Recipient == "" {
-		return errors.NewValidation("recipient must not be empty")
+		return errors.NewValidation("subscription", "recipient must not be empty")
 	}
 	return nil
 }
@@ -334,21 +334,6 @@ func WithTimeRange(from, to time.Time) QueryOption {
 // EventPublisher abstracts asynchronous event emission (e.g. Kafka producer).
 type EventPublisher interface {
 	Publish(ctx context.Context, topic string, key string, payload interface{}) error
-}
-
-// Cache abstracts a key-value cache with TTL support (e.g. Redis).
-type Cache interface {
-	Get(ctx context.Context, key string, dest interface{}) error
-	Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error
-	Delete(ctx context.Context, keys ...string) error
-}
-
-// Logger abstracts structured logging.
-type Logger interface {
-	Info(msg string, keysAndValues ...interface{})
-	Warn(msg string, keysAndValues ...interface{})
-	Error(msg string, keysAndValues ...interface{})
-	Debug(msg string, keysAndValues ...interface{})
 }
 
 // Metrics abstracts metric recording (counters, histograms).
@@ -446,10 +431,10 @@ func DefaultLegalStatusConfig() LegalStatusConfig {
 // legalStatusServiceImpl is the concrete implementation of LegalStatusService.
 type legalStatusServiceImpl struct {
 	lifecycleSvc  lifecycle.Service
-	lifecycleRepo lifecycle.Repository
-	patentRepo    patent.Repository
+	lifecycleRepo lifecycle.LifecycleRepository
+	patentRepo    patent.PatentRepository
 	publisher     EventPublisher
-	cache         Cache
+	cache         CachePort
 	logger        Logger
 	metrics       Metrics
 	config        LegalStatusConfig
@@ -459,34 +444,34 @@ type legalStatusServiceImpl struct {
 // dependencies. It returns an error if any mandatory dependency is nil.
 func NewLegalStatusService(
 	lifecycleSvc lifecycle.Service,
-	lifecycleRepo lifecycle.Repository,
-	patentRepo patent.Repository,
+	lifecycleRepo lifecycle.LifecycleRepository,
+	patentRepo patent.PatentRepository,
 	publisher EventPublisher,
-	cache Cache,
+	cache CachePort,
 	logger Logger,
 	metrics Metrics,
 	cfg *LegalStatusConfig,
 ) (LegalStatusService, error) {
 	if lifecycleSvc == nil {
-		return nil, errors.NewInternal("lifecycle domain service must not be nil")
+		return nil, errors.NewInternal("legal_status.new", "lifecycle domain service must not be nil")
 	}
 	if lifecycleRepo == nil {
-		return nil, errors.NewInternal("lifecycle repository must not be nil")
+		return nil, errors.NewInternal("legal_status.new", "lifecycle repository must not be nil")
 	}
 	if patentRepo == nil {
-		return nil, errors.NewInternal("patent repository must not be nil")
+		return nil, errors.NewInternal("legal_status.new", "patent repository must not be nil")
 	}
 	if publisher == nil {
-		return nil, errors.NewInternal("event publisher must not be nil")
+		return nil, errors.NewInternal("legal_status.new", "event publisher must not be nil")
 	}
 	if cache == nil {
-		return nil, errors.NewInternal("cache must not be nil")
+		return nil, errors.NewInternal("legal_status.new", "cache must not be nil")
 	}
 	if logger == nil {
-		return nil, errors.NewInternal("logger must not be nil")
+		return nil, errors.NewInternal("legal_status.new", "logger must not be nil")
 	}
 	if metrics == nil {
-		return nil, errors.NewInternal("metrics must not be nil")
+		return nil, errors.NewInternal("legal_status.new", "metrics must not be nil")
 	}
 
 	c := DefaultLegalStatusConfig()
@@ -635,7 +620,7 @@ func MapJurisdictionStatus(jurisdiction, rawStatus string) (LegalStatusCode, boo
 
 func (s *legalStatusServiceImpl) SyncStatus(ctx context.Context, patentID string) (*SyncResult, error) {
 	if patentID == "" {
-		return nil, errors.NewValidation("patent_id must not be empty")
+		return nil, errors.NewValidation("sync_status", "patent_id must not be empty")
 	}
 
 	start := time.Now()
@@ -718,7 +703,7 @@ func (s *legalStatusServiceImpl) SyncStatus(ctx context.Context, patentID string
 
 func (s *legalStatusServiceImpl) BatchSync(ctx context.Context, req *BatchSyncRequest) (*BatchSyncResult, error) {
 	if req == nil {
-		return nil, errors.NewValidation("batch sync request must not be nil")
+		return nil, errors.NewValidation("batch_sync", "batch sync request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -791,7 +776,7 @@ func (s *legalStatusServiceImpl) BatchSync(ctx context.Context, req *BatchSyncRe
 
 func (s *legalStatusServiceImpl) GetCurrentStatus(ctx context.Context, patentID string) (*LegalStatusDetail, error) {
 	if patentID == "" {
-		return nil, errors.NewValidation("patent_id must not be empty")
+		return nil, errors.NewValidation("get_current_status", "patent_id must not be empty")
 	}
 
 	// 1. Try cache.
@@ -809,7 +794,7 @@ func (s *legalStatusServiceImpl) GetCurrentStatus(ctx context.Context, patentID 
 		return nil, fmt.Errorf("get current status for %s: %w", patentID, err)
 	}
 	if entity == nil {
-		return nil, errors.NewNotFound(fmt.Sprintf("legal status not found for patent %s", patentID))
+		return nil, errors.NewNotFound("get_current_status", fmt.Sprintf("legal status not found for patent %s", patentID))
 	}
 
 	mappedCode, _ := MapJurisdictionStatus(entity.Jurisdiction, entity.Status)
@@ -839,7 +824,7 @@ func (s *legalStatusServiceImpl) GetCurrentStatus(ctx context.Context, patentID 
 
 func (s *legalStatusServiceImpl) GetStatusHistory(ctx context.Context, patentID string, opts ...QueryOption) ([]*LegalStatusEvent, error) {
 	if patentID == "" {
-		return nil, errors.NewValidation("patent_id must not be empty")
+		return nil, errors.NewValidation("get_status_history", "patent_id must not be empty")
 	}
 
 	qo := applyQueryOptions(opts)
@@ -871,7 +856,7 @@ func (s *legalStatusServiceImpl) GetStatusHistory(ctx context.Context, patentID 
 
 func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioID string) ([]*StatusAnomaly, error) {
 	if portfolioID == "" {
-		return nil, errors.NewValidation("portfolio_id must not be empty")
+		return nil, errors.NewValidation("detect_anomalies", "portfolio_id must not be empty")
 	}
 
 	s.logger.Debug("detect_anomalies started", "portfolio_id", portfolioID)
@@ -886,9 +871,9 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 	var anomalies []*StatusAnomaly
 
 	for _, p := range patents {
-		entity, err := s.lifecycleRepo.GetByPatentID(ctx, p.ID)
+		entity, err := s.lifecycleRepo.GetByPatentID(ctx, p.ID.String())
 		if err != nil {
-			s.logger.Warn("failed to get status for anomaly detection", "patent_id", p.ID, "error", err)
+			s.logger.Warn("failed to get status for anomaly detection", "patent_id", p.ID.String(), "error", err)
 			continue
 		}
 		if entity == nil {
@@ -902,10 +887,10 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 			prevCode, _ := MapJurisdictionStatus(entity.Jurisdiction, entity.PreviousStatus)
 			if prevCode == StatusGranted {
 				anomalies = append(anomalies, &StatusAnomaly{
-					PatentID:        p.ID,
+					PatentID:        p.ID.String(),
 					AnomalyType:     AnomalyUnexpectedLapse,
 					Severity:        SeverityCritical,
-					Description:     fmt.Sprintf("Patent %s lapsed unexpectedly from granted status", p.ID),
+					Description:     fmt.Sprintf("Patent %s lapsed unexpectedly from granted status", p.ID.String()),
 					DetectedAt:      now,
 					SuggestedAction: "Verify annuity payment status and contact patent office immediately",
 				})
@@ -917,19 +902,19 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 			daysUntilDeadline := entity.NextDeadline.Sub(now).Hours() / 24
 			if daysUntilDeadline <= 7 && daysUntilDeadline > 0 {
 				anomalies = append(anomalies, &StatusAnomaly{
-					PatentID:        p.ID,
+					PatentID:        p.ID.String(),
 					AnomalyType:     AnomalyMissedDeadline,
 					Severity:        SeverityHigh,
-					Description:     fmt.Sprintf("Patent %s has a deadline in %.0f days (%s) with no action recorded", p.ID, daysUntilDeadline, entity.NextAction),
+					Description:     fmt.Sprintf("Patent %s has a deadline in %.0f days (%s) with no action recorded", p.ID.String(), daysUntilDeadline, entity.NextAction),
 					DetectedAt:      now,
 					SuggestedAction: fmt.Sprintf("Take action on '%s' before %s", entity.NextAction, entity.NextDeadline.Format(time.RFC3339)),
 				})
 			} else if daysUntilDeadline <= 0 {
 				anomalies = append(anomalies, &StatusAnomaly{
-					PatentID:        p.ID,
+					PatentID:        p.ID.String(),
 					AnomalyType:     AnomalyMissedDeadline,
 					Severity:        SeverityCritical,
-					Description:     fmt.Sprintf("Patent %s has a past-due deadline: %s", p.ID, entity.NextDeadline.Format(time.RFC3339)),
+					Description:     fmt.Sprintf("Patent %s has a past-due deadline: %s", p.ID.String(), entity.NextDeadline.Format(time.RFC3339)),
 					DetectedAt:      now,
 					SuggestedAction: "Immediately assess whether late action or petition for revival is possible",
 				})
@@ -940,10 +925,10 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 		if entity.LastSyncAt != nil && entity.RemoteStatus != "" {
 			if entity.Status != entity.RemoteStatus && now.Sub(*entity.LastSyncAt).Hours() > 24 {
 				anomalies = append(anomalies, &StatusAnomaly{
-					PatentID:        p.ID,
+					PatentID:        p.ID.String(),
 					AnomalyType:     AnomalyStatusConflict,
 					Severity:        SeverityHigh,
-					Description:     fmt.Sprintf("Patent %s local status '%s' conflicts with remote '%s' for over 24 hours", p.ID, entity.Status, entity.RemoteStatus),
+					Description:     fmt.Sprintf("Patent %s local status '%s' conflicts with remote '%s' for over 24 hours", p.ID.String(), entity.Status, entity.RemoteStatus),
 					DetectedAt:      now,
 					SuggestedAction: "Run reconciliation to resolve the conflict",
 				})
@@ -953,10 +938,10 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 		// Rule 4: SyncFailure — consecutive failures exceeding threshold.
 		if entity.ConsecutiveSyncFailures >= s.config.SyncFailureThreshold {
 			anomalies = append(anomalies, &StatusAnomaly{
-				PatentID:        p.ID,
+				PatentID:        p.ID.String(),
 				AnomalyType:     AnomalySyncFailure,
 				Severity:        SeverityMedium,
-				Description:     fmt.Sprintf("Patent %s has %d consecutive sync failures", p.ID, entity.ConsecutiveSyncFailures),
+				Description:     fmt.Sprintf("Patent %s has %d consecutive sync failures", p.ID.String(), entity.ConsecutiveSyncFailures),
 				DetectedAt:      now,
 				SuggestedAction: "Check network connectivity and patent office API availability",
 			})
@@ -1004,7 +989,7 @@ func sortAnomaliesBySeverity(anomalies []*StatusAnomaly) {
 
 func (s *legalStatusServiceImpl) SubscribeStatusChange(ctx context.Context, req *SubscriptionRequest) (*Subscription, error) {
 	if req == nil {
-		return nil, errors.NewValidation("subscription request must not be nil")
+		return nil, errors.NewValidation("subscribe", "subscription request must not be nil")
 	}
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -1054,7 +1039,7 @@ func toStringChannels(channels []NotificationChannel) []string {
 
 func (s *legalStatusServiceImpl) UnsubscribeStatusChange(ctx context.Context, subscriptionID string) error {
 	if subscriptionID == "" {
-		return errors.NewValidation("subscription_id must not be empty")
+		return errors.NewValidation("unsubscribe", "subscription_id must not be empty")
 	}
 
 	if err := s.lifecycleRepo.DeactivateSubscription(ctx, subscriptionID); err != nil {
@@ -1073,7 +1058,7 @@ func (s *legalStatusServiceImpl) UnsubscribeStatusChange(ctx context.Context, su
 
 func (s *legalStatusServiceImpl) GetStatusSummary(ctx context.Context, portfolioID string) (*StatusSummary, error) {
 	if portfolioID == "" {
-		return nil, errors.NewValidation("portfolio_id must not be empty")
+		return nil, errors.NewValidation("get_status_summary", "portfolio_id must not be empty")
 	}
 
 	// 1. Try cache.
@@ -1096,7 +1081,7 @@ func (s *legalStatusServiceImpl) GetStatusSummary(ctx context.Context, portfolio
 	var latestSync time.Time
 
 	for _, p := range patents {
-		entity, err := s.lifecycleRepo.GetByPatentID(ctx, p.ID)
+		entity, err := s.lifecycleRepo.GetByPatentID(ctx, p.ID.String())
 		if err != nil || entity == nil {
 			continue
 		}
@@ -1169,7 +1154,7 @@ func computeHealthScore(anomalies []*StatusAnomaly, totalPatents int) float64 {
 
 func (s *legalStatusServiceImpl) ReconcileStatus(ctx context.Context, patentID string) (*ReconcileResult, error) {
 	if patentID == "" {
-		return nil, errors.NewValidation("patent_id must not be empty")
+		return nil, errors.NewValidation("reconcile_status", "patent_id must not be empty")
 	}
 
 	s.logger.Debug("reconcile_status started", "patent_id", patentID)
@@ -1180,7 +1165,7 @@ func (s *legalStatusServiceImpl) ReconcileStatus(ctx context.Context, patentID s
 		return nil, fmt.Errorf("get local status for reconciliation %s: %w", patentID, err)
 	}
 	if localEntity == nil {
-		return nil, errors.NewNotFound(fmt.Sprintf("no local status found for patent %s", patentID))
+		return nil, errors.NewNotFound("reconcile_status", fmt.Sprintf("no local status found for patent %s", patentID))
 	}
 
 	// 2. Get remote status.
@@ -1267,4 +1252,3 @@ func (s *legalStatusServiceImpl) ReconcileStatus(ctx context.Context, patentID s
 var _ LegalStatusService = (*legalStatusServiceImpl)(nil)
 
 //Personal.AI order the ending
-

@@ -41,10 +41,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	commonTypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ---------------------------------------------------------------------------
@@ -329,20 +329,6 @@ type ExchangeRateProvider interface {
 	GetRate(ctx context.Context, from, to Currency) (float64, error)
 }
 
-// CachePort abstracts cache get/set for this service.
-type CachePort interface {
-	Get(ctx context.Context, key string, dest interface{}) error
-	Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error
-	Delete(ctx context.Context, key string) error
-}
-
-// Logger abstracts structured logging.
-type Logger interface {
-	Info(msg string, keysAndValues ...interface{})
-	Warn(msg string, keysAndValues ...interface{})
-	Error(msg string, keysAndValues ...interface{})
-}
-
 // PatentValueProvider abstracts patent value scoring (used by OptimizeCosts).
 type PatentValueProvider interface {
 	GetValueScore(ctx context.Context, patentID string) (float64, error)
@@ -355,8 +341,8 @@ type PatentValueProvider interface {
 // annuityServiceImpl is the concrete implementation of AnnuityService.
 type annuityServiceImpl struct {
 	lifecycleSvc   domainLifecycle.Service
-	lifecycleRepo  domainLifecycle.Repository
-	patentRepo     domainPatent.Repository
+	lifecycleRepo  domainLifecycle.LifecycleRepository
+	patentRepo     domainPatent.PatentRepository
 	exchangeRate   ExchangeRateProvider
 	valueProvider  PatentValueProvider
 	cache          CachePort
@@ -380,8 +366,8 @@ type AnnuityServiceConfig struct {
 // NewAnnuityService constructs an AnnuityService with all required dependencies.
 func NewAnnuityService(
 	lifecycleSvc domainLifecycle.Service,
-	lifecycleRepo domainLifecycle.Repository,
-	patentRepo domainPatent.Repository,
+	lifecycleRepo domainLifecycle.LifecycleRepository,
+	patentRepo domainPatent.PatentRepository,
 	exchangeRate ExchangeRateProvider,
 	valueProvider PatentValueProvider,
 	cache CachePort,
@@ -452,14 +438,19 @@ func (s *annuityServiceImpl) CalculateAnnuity(ctx context.Context, req *Calculat
 	}
 
 	// Fetch patent
-	patent, err := s.patentRepo.GetByID(ctx, req.PatentID)
+	patentID, err := uuid.Parse(req.PatentID)
+	if err != nil {
+		return nil, errors.NewValidation("annuity.calculate", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
+	}
+
+	patent, err := s.patentRepo.GetByID(ctx, patentID)
 	if err != nil {
 		s.logger.Error("failed to fetch patent", "patent_id", req.PatentID, "error", err)
 		return nil, errors.NewNotFound("annuity.calculate", fmt.Sprintf("patent %s not found", req.PatentID))
 	}
 
 	// Delegate to domain service for fee calculation
-	domainAnnuity, err := s.lifecycleSvc.CalculateAnnuityFee(ctx, patent.ID, req.Jurisdiction, asOf)
+	domainAnnuity, err := s.lifecycleSvc.CalculateAnnuityFee(ctx, patent.ID.String(), req.Jurisdiction, asOf)
 	if err != nil {
 		s.logger.Error("domain annuity calculation failed", "patent_id", req.PatentID, "error", err)
 		return nil, errors.NewInternal("annuity.calculate", fmt.Sprintf("fee calculation failed: %v", err))
@@ -476,7 +467,7 @@ func (s *annuityServiceImpl) CalculateAnnuity(ctx context.Context, req *Calculat
 	}
 
 	result := &AnnuityResult{
-		PatentID:       patent.ID,
+		PatentID:       patent.ID.String(),
 		PatentNumber:   patent.PatentNumber,
 		Title:          patent.Title,
 		Jurisdiction:   req.Jurisdiction,
@@ -539,7 +530,8 @@ func (s *annuityServiceImpl) BatchCalculate(ctx context.Context, req *BatchCalcu
 			jurisdiction := req.Jurisdiction
 			if jurisdiction == "" {
 				// Resolve primary jurisdiction from patent record
-				pat, fetchErr := s.patentRepo.GetByID(ctx, patentID)
+			uid, _ := uuid.Parse(patentID)
+			pat, fetchErr := s.patentRepo.GetByID(ctx, uid)
 				if fetchErr != nil {
 					results[idx] = itemResult{err: &BatchItemError{
 						PatentID: patentID,
@@ -627,7 +619,7 @@ func (s *annuityServiceImpl) GenerateBudget(ctx context.Context, req *GenerateBu
 			return nil, errors.NewInternal("annuity.budget", fmt.Sprintf("failed to list portfolio patents: %v", err))
 		}
 		for _, p := range patents {
-			patentIDs = append(patentIDs, p.ID)
+			patentIDs = append(patentIDs, p.ID.String())
 		}
 	}
 	if len(patentIDs) == 0 {
@@ -651,7 +643,8 @@ func (s *annuityServiceImpl) GenerateBudget(ctx context.Context, req *GenerateBu
 	var totalAmount float64
 
 	for _, pid := range patentIDs {
-		patent, err := s.patentRepo.GetByID(ctx, pid)
+		uid, _ := uuid.Parse(pid)
+		patent, err := s.patentRepo.GetByID(ctx, uid)
 		if err != nil {
 			s.logger.Warn("budget: skipping patent", "patent_id", pid, "error", err)
 			continue
@@ -780,7 +773,7 @@ func (s *annuityServiceImpl) GetPaymentSchedule(ctx context.Context, req *Paymen
 			return nil, errors.NewInternal("annuity.schedule", fmt.Sprintf("failed to list portfolio: %v", err))
 		}
 		for _, p := range patents {
-			patentIDs = append(patentIDs, p.ID)
+			patentIDs = append(patentIDs, p.ID.String())
 		}
 	} else {
 		return nil, errors.NewValidation("annuity.schedule", "patent_id or portfolio_id is required")
@@ -790,7 +783,8 @@ func (s *annuityServiceImpl) GetPaymentSchedule(ctx context.Context, req *Paymen
 	var entries []PaymentScheduleEntry
 
 	for _, pid := range patentIDs {
-		patent, err := s.patentRepo.GetByID(ctx, pid)
+		uid, _ := uuid.Parse(pid)
+		patent, err := s.patentRepo.GetByID(ctx, uid)
 		if err != nil {
 			s.logger.Warn("schedule: skipping patent", "patent_id", pid, "error", err)
 			continue
@@ -880,9 +874,9 @@ func (s *annuityServiceImpl) OptimizeCosts(ctx context.Context, req *OptimizeCos
 		jurisdiction := domainLifecycle.Jurisdiction(patent.Jurisdiction)
 
 		// Get annual cost for this patent
-		schedule, schedErr := s.lifecycleSvc.GetAnnuitySchedule(ctx, patent.ID, jurisdiction, now, forecastEnd)
+		schedule, schedErr := s.lifecycleSvc.GetAnnuitySchedule(ctx, patent.ID.String(), jurisdiction, now, forecastEnd)
 		if schedErr != nil {
-			s.logger.Warn("optimize: schedule fetch failed", "patent_id", patent.ID, "error", schedErr)
+			s.logger.Warn("optimize: schedule fetch failed", "patent_id", patent.ID.String(), "error", schedErr)
 			continue
 		}
 
@@ -902,19 +896,23 @@ func (s *annuityServiceImpl) OptimizeCosts(ctx context.Context, req *OptimizeCos
 		currentTotal += annualCost
 
 		// Get value score
-		valueScore, valErr := s.valueProvider.GetValueScore(ctx, patent.ID)
+		valueScore, valErr := s.valueProvider.GetValueScore(ctx, patent.ID.String())
 		if valErr != nil {
-			s.logger.Warn("optimize: value score unavailable", "patent_id", patent.ID, "error", valErr)
+			s.logger.Warn("optimize: value score unavailable", "patent_id", patent.ID.String(), "error", valErr)
 			valueScore = 50.0 // default mid-range
 		}
 
 		if valueScore < threshold {
-			remainingLife := estimateRemainingLife(patent.FilingDate, jurisdiction)
+			filingDate := time.Time{}
+			if patent.FilingDate != nil {
+				filingDate = *patent.FilingDate
+			}
+			remainingLife := estimateRemainingLife(filingDate, jurisdiction)
 			riskLevel := classifyAbandonmentRisk(valueScore, threshold)
 			rationale := buildAbandonmentRationale(valueScore, threshold, annualCost, remainingLife, targetCurrency)
 
 			recommendations = append(recommendations, AbandonmentRecommendation{
-				PatentID:      patent.ID,
+				PatentID:      patent.ID.String(),
 				PatentNumber:  patent.PatentNumber,
 				Title:         patent.Title,
 				ValueScore:    valueScore,
@@ -986,7 +984,11 @@ func (s *annuityServiceImpl) RecordPayment(ctx context.Context, req *RecordPayme
 	}
 
 	// Verify patent exists
-	_, err := s.patentRepo.GetByID(ctx, req.PatentID)
+	uid, err := uuid.Parse(req.PatentID)
+	if err != nil {
+		return nil, errors.NewValidation("annuity.record", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
+	}
+	_, err = s.patentRepo.GetByID(ctx, uid)
 	if err != nil {
 		return nil, errors.NewNotFound("annuity.record", fmt.Sprintf("patent %s not found", req.PatentID))
 	}

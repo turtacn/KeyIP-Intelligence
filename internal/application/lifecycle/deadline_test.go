@@ -7,7 +7,6 @@ package lifecycle
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -18,72 +17,7 @@ import (
 // Mock implementations for deadline tests
 // ---------------------------------------------------------------------------
 
-type mockDeadlinePatentRepo struct {
-	patents map[string]*domainPatentRecord
-}
-
-func newMockDeadlinePatentRepo(records ...*domainPatentRecord) *mockDeadlinePatentRepo {
-	m := &mockDeadlinePatentRepo{patents: make(map[string]*domainPatentRecord)}
-	for _, r := range records {
-		m.patents[r.ID] = r
-	}
-	return m
-}
-
-func (m *mockDeadlinePatentRepo) GetByID(_ context.Context, id string) (*domainPatentRecord, error) {
-	p, ok := m.patents[id]
-	if !ok {
-		return nil, fmt.Errorf("patent %s not found", id)
-	}
-	return p, nil
-}
-
-func (m *mockDeadlinePatentRepo) ListByPortfolio(_ context.Context, _ string) ([]domainPatentRecord, error) {
-	var result []domainPatentRecord
-	for _, p := range m.patents {
-		result = append(result, *p)
-	}
-	return result, nil
-}
-
-type mockDeadlineLifecycleRepo struct{}
-
-func (m *mockDeadlineLifecycleRepo) GetByPatentID(_ context.Context, _ string) (*domainLifecycle.LifecycleRecord, error) {
-	return nil, nil
-}
-func (m *mockDeadlineLifecycleRepo) Save(_ context.Context, _ *domainLifecycle.LifecycleRecord) error {
-	return nil
-}
-func (m *mockDeadlineLifecycleRepo) ListByPortfolio(_ context.Context, _ string) ([]domainLifecycle.LifecycleRecord, error) {
-	return nil, nil
-}
-func (m *mockDeadlineLifecycleRepo) GetPaymentRecords(_ context.Context, _ string) ([]domainLifecycle.PaymentRecord, error) {
-	return nil, nil
-}
-func (m *mockDeadlineLifecycleRepo) SavePaymentRecord(_ context.Context, _ *domainLifecycle.PaymentRecord) error {
-	return nil
-}
-func (m *mockDeadlineLifecycleRepo) GetCustomEvents(_ context.Context, _ []string, _, _ time.Time) ([]domainLifecycle.CustomEvent, error) {
-	return nil, nil
-}
-func (m *mockDeadlineLifecycleRepo) SaveCustomEvent(_ context.Context, _ *domainLifecycle.CustomEvent) error {
-	return nil
-}
-func (m *mockDeadlineLifecycleRepo) UpdateEventStatus(_ context.Context, _ string, _ string) error {
-	return nil
-}
-func (m *mockDeadlineLifecycleRepo) DeleteEvent(_ context.Context, _ string) error {
-	return nil
-}
-
-type mockDeadlineLifecycleSvc struct{}
-
-func (m *mockDeadlineLifecycleSvc) CalculateAnnuityFee(_ context.Context, _ string, _ domainLifecycle.Jurisdiction, _ time.Time) (*domainLifecycle.AnnuityFeeResult, error) {
-	return nil, nil
-}
-func (m *mockDeadlineLifecycleSvc) GetLegalStatus(_ context.Context, _ string) (*domainLifecycle.LegalStatus, error) {
-	return nil, nil
-}
+// Mock implementations removed. Use shared mocks from common_test.go.
 
 // ---------------------------------------------------------------------------
 // Helper
@@ -91,16 +25,21 @@ func (m *mockDeadlineLifecycleSvc) GetLegalStatus(_ context.Context, _ string) (
 
 func newTestDeadlineService(opts ...func(*testDeadlineOpts)) DeadlineService {
 	o := &testDeadlineOpts{
-		lifecycleSvc:  &mockDeadlineLifecycleSvc{},
-		lifecycleRepo: &mockDeadlineLifecycleRepo{},
-		patentRepo: newMockDeadlinePatentRepo(&domainPatentRecord{
-			ID: "pat-001", PatentNumber: "CN202310001234.5",
-			Title: "Test Patent", Jurisdiction: "CN",
-			FilingDate: time.Now().AddDate(-3, 0, 0),
-		}),
-		cache:  newMockCache(),
-		logger: mockLogger{},
+		lifecycleSvc:  &mockLifecycleService{},
+		lifecycleRepo: &mockLifecycleRepo{},
+		patentRepo:    newMockPatentRepo(),
+		cache:         newMockCache(),
+		logger:        &mockLogger{},
 	}
+
+	// Default patent for tests
+	fd := time.Now().AddDate(-3, 0, 0)
+	o.patentRepo.patents["00000000-0000-0000-0000-000000000001"] = &mockPatentInfo{
+		ID: "00000000-0000-0000-0000-000000000001", PatentNumber: "CN202310001234.5",
+		Title: "Test Patent", Jurisdiction: "CN",
+		FilingDate: fd,
+	}
+
 	for _, fn := range opts {
 		fn(o)
 	}
@@ -112,8 +51,8 @@ func newTestDeadlineService(opts ...func(*testDeadlineOpts)) DeadlineService {
 
 type testDeadlineOpts struct {
 	lifecycleSvc  domainLifecycle.Service
-	lifecycleRepo domainLifecycle.Repository
-	patentRepo    patentRepoPort
+	lifecycleRepo domainLifecycle.LifecycleRepository
+	patentRepo    *mockPatentRepo
 	cache         CachePort
 	logger        Logger
 }
@@ -127,7 +66,7 @@ func TestListDeadlines_ByPatentID(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := svc.ListDeadlines(ctx, &DeadlineQuery{
-		PatentID: "pat-001",
+		PatentID: "00000000-0000-0000-0000-000000000001",
 		PageSize: 100,
 	})
 	if err != nil {
@@ -137,8 +76,8 @@ func TestListDeadlines_ByPatentID(t *testing.T) {
 		t.Error("expected at least one deadline")
 	}
 	for _, dl := range resp.Deadlines {
-		if dl.PatentID != "pat-001" {
-			t.Errorf("expected patent_id pat-001, got %s", dl.PatentID)
+		if dl.PatentID != "00000000-0000-0000-0000-000000000001" {
+			t.Errorf("expected patent_id 00000000-0000-0000-0000-000000000001, got %s", dl.PatentID)
 		}
 	}
 }
@@ -170,7 +109,7 @@ func TestListDeadlines_FilterByType(t *testing.T) {
 	svc := newTestDeadlineService()
 
 	resp, err := svc.ListDeadlines(context.Background(), &DeadlineQuery{
-		PatentID: "pat-001",
+		PatentID: "00000000-0000-0000-0000-000000000001",
 		Types:    []DeadlineType{DeadlineTypeExamRequest},
 		PageSize: 100,
 	})
@@ -188,7 +127,7 @@ func TestListDeadlines_FilterByUrgency(t *testing.T) {
 	svc := newTestDeadlineService()
 
 	resp, err := svc.ListDeadlines(context.Background(), &DeadlineQuery{
-		PatentID:  "pat-001",
+		PatentID:  "00000000-0000-0000-0000-000000000001",
 		Urgencies: []DeadlineUrgency{UrgencyFuture},
 		PageSize:  100,
 	})
@@ -206,7 +145,7 @@ func TestListDeadlines_Pagination(t *testing.T) {
 	svc := newTestDeadlineService()
 
 	resp, err := svc.ListDeadlines(context.Background(), &DeadlineQuery{
-		PatentID: "pat-001",
+		PatentID: "00000000-0000-0000-0000-000000000001",
 		Page:     1,
 		PageSize: 3,
 	})
@@ -225,7 +164,7 @@ func TestListDeadlines_SortByUrgency(t *testing.T) {
 	svc := newTestDeadlineService()
 
 	resp, err := svc.ListDeadlines(context.Background(), &DeadlineQuery{
-		PatentID: "pat-001",
+		PatentID: "00000000-0000-0000-0000-000000000001",
 		SortBy:   "urgency",
 		PageSize: 100,
 	})
@@ -250,7 +189,7 @@ func TestCreateDeadline_Success(t *testing.T) {
 	svc := newTestDeadlineService()
 
 	dl, err := svc.CreateDeadline(context.Background(), &CreateDeadlineRequest{
-		PatentID:     "pat-001",
+		PatentID:     "00000000-0000-0000-0000-000000000001",
 		Title:        "Custom Deadline",
 		DeadlineType: DeadlineTypeCustom,
 		DueDate:      time.Now().AddDate(0, 6, 0),
@@ -258,8 +197,8 @@ func TestCreateDeadline_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if dl.PatentID != "pat-001" {
-		t.Errorf("expected pat-001, got %s", dl.PatentID)
+	if dl.PatentID != "00000000-0000-0000-0000-000000000001" {
+		t.Errorf("expected 00000000-0000-0000-0000-000000000001, got %s", dl.PatentID)
 	}
 	if dl.DeadlineType != DeadlineTypeCustom {
 		t.Errorf("expected custom, got %s", dl.DeadlineType)
@@ -290,7 +229,7 @@ func TestCreateDeadline_MissingFields(t *testing.T) {
 	}
 
 	_, err = svc.CreateDeadline(context.Background(), &CreateDeadlineRequest{
-		PatentID:     "pat-001",
+		PatentID:     "00000000-0000-0000-0000-000000000001",
 		DeadlineType: DeadlineTypeCustom,
 		DueDate:      time.Now().AddDate(0, 1, 0),
 	})
@@ -302,7 +241,7 @@ func TestCreateDeadline_MissingFields(t *testing.T) {
 func TestCreateDeadline_PatentNotFound(t *testing.T) {
 	svc := newTestDeadlineService()
 	_, err := svc.CreateDeadline(context.Background(), &CreateDeadlineRequest{
-		PatentID:     "nonexistent",
+		PatentID:     "00000000-0000-0000-0000-000000000000",
 		Title:        "Test",
 		DeadlineType: DeadlineTypeCustom,
 		DueDate:      time.Now().AddDate(0, 1, 0),
@@ -458,7 +397,7 @@ func TestGetOverdueDeadlines_EmptyPortfolio(t *testing.T) {
 func TestSyncStatutoryDeadlines_Success(t *testing.T) {
 	svc := newTestDeadlineService()
 
-	count, err := svc.SyncStatutoryDeadlines(context.Background(), "pat-001")
+	count, err := svc.SyncStatutoryDeadlines(context.Background(), "00000000-0000-0000-0000-000000000001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -477,7 +416,7 @@ func TestSyncStatutoryDeadlines_EmptyID(t *testing.T) {
 
 func TestSyncStatutoryDeadlines_NotFound(t *testing.T) {
 	svc := newTestDeadlineService()
-	_, err := svc.SyncStatutoryDeadlines(context.Background(), "nonexistent")
+	_, err := svc.SyncStatutoryDeadlines(context.Background(), "00000000-0000-0000-0000-000000000000")
 	if err == nil {
 		t.Fatal("expected not-found error")
 	}

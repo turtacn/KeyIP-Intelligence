@@ -428,6 +428,18 @@ func NewParsingError(message string) *AppError {
 	return New(ErrCodeValidation, message)
 }
 
+func NewValidation(operation string, message string) *AppError {
+	return New(ErrCodeValidation, message).WithDetails("operation", operation)
+}
+
+func NewNotFound(operation string, message string) *AppError {
+	return New(ErrCodeNotFound, message).WithDetails("operation", operation)
+}
+
+func NewInternal(operation string, message string) *AppError {
+	return New(ErrCodeInternal, message).WithDetails("operation", operation)
+}
+
 var (
 	ErrInferenceTimeout        = New(ErrCodeTimeout, "inference timed out")
 	ErrModelBackendUnavailable = New(ErrCodeServiceUnavailable, "model backend unavailable")
