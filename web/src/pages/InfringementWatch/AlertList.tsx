@@ -103,7 +103,7 @@ const AlertList: React.FC<AlertListProps> = ({
                 `}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <RiskLevelBadge level={alert.riskLevel} size="sm" />
+                  <RiskLevelBadge level={alert.riskLevel} />
                   <span className="text-xs text-slate-400">
                     {new Date(alert.detectedAt).toLocaleDateString()}
                   </span>

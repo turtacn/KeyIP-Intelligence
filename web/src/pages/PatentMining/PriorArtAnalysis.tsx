@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import { Search, Loader2, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Search, Loader2, FileText, CheckCircle } from 'lucide-react';
 
 const PriorArtAnalysis: React.FC = () => {
   const [claimText, setClaimText] = useState('');

@@ -2,14 +2,13 @@ import React from 'react';
 import Card from '../../components/ui/Card';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { LifecycleEvent, Jurisdiction } from '../../types/domain';
-import { Globe } from 'lucide-react';
 
 interface LegalStatusMonitorProps {
   events: LifecycleEvent[];
-  loading: boolean;
+  loading?: boolean;
 }
 
-const LegalStatusMonitor: React.FC<LegalStatusMonitorProps> = ({ events, loading }) => {
+const LegalStatusMonitor: React.FC<LegalStatusMonitorProps> = ({ events }) => {
   // Mock grouping by patent (since events are flattened)
   const patents = Array.from(new Set(events.map(e => e.patentId)));
 

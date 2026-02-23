@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
-import { ChevronDown, ChevronUp, Star, TrendingUp, Gavel, DollarSign } from 'lucide-react';
+import { ChevronDown, ChevronUp, TrendingUp, Gavel, DollarSign } from 'lucide-react';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from 'recharts';
 
 interface ValueScoringProps {

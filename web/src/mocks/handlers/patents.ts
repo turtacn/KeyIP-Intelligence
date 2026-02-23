@@ -1,6 +1,9 @@
 import { http, HttpResponse } from 'msw';
 import patents from '../data/patents.json';
 
+// Type assertion for mock data if needed, or rely on inference
+const typedPatents = patents as any[];
+
 export const patentHandlers = [
   http.get('/api/openapi/v1/patents', ({ request }) => {
     const url = new URL(request.url);
@@ -14,7 +17,7 @@ export const patentHandlers = [
 
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
-    const paginatedData = patents.slice(start, end);
+    const paginatedData = typedPatents.slice(start, end);
 
     return HttpResponse.json({
       code: 0,
@@ -23,14 +26,14 @@ export const patentHandlers = [
       pagination: {
         page,
         pageSize,
-        total: patents.length
+        total: typedPatents.length
       }
     });
   }),
 
   http.get('/api/openapi/v1/patents/:id', ({ params }) => {
     const { id } = params;
-    const patent = patents.find(p => p.id === id);
+    const patent = typedPatents.find((p: any) => p.id === id);
 
     if (!patent) {
       return HttpResponse.json({

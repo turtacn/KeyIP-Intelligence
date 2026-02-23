@@ -1,6 +1,5 @@
 import React from 'react';
 import Card from '../../components/ui/Card';
-import StatusBadge from '../../components/ui/StatusBadge';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface PanoramaViewProps {
@@ -11,7 +10,9 @@ interface PanoramaViewProps {
 const PanoramaView: React.FC<PanoramaViewProps> = ({ summary, loading }) => {
   if (loading || !summary) {
     return (
-      <Card className="h-64 animate-pulse bg-slate-100" />
+      <Card className="h-64 animate-pulse bg-slate-100">
+        <div></div>
+      </Card>
     );
   }
 
@@ -57,7 +58,6 @@ const PanoramaView: React.FC<PanoramaViewProps> = ({ summary, loading }) => {
 
         {/* Treemap Container */}
         <div id="coverage-treemap-container" className="h-[400px]">
-           {/* This will be filled by CoverageTreemap component in index.tsx composition */}
            <div className="bg-slate-50 h-full rounded-lg border border-slate-200 flex items-center justify-center text-slate-400">
              Treemap Component Location
            </div>
