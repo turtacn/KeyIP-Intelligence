@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	domainmol "github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
@@ -128,76 +129,195 @@ func (m *mockPortfolioService) GetOverlapAnalysis(ctx context.Context, portfolio
 var _ domainportfolio.Service = (*mockPortfolioService)(nil)
 
 // -----------------------------------------------------------------------
-// Mock: Portfolio entity
+// Mock: Portfolio entity (for test data creation)
 // -----------------------------------------------------------------------
+// Note: Portfolio is a struct. This mock is only used for creating test data,
+// not for interface implementation.
 
 type mockPortfolio struct {
 	id   string
 	name string
 }
 
-func (p *mockPortfolio) GetID() string   { return p.id }
-func (p *mockPortfolio) GetName() string { return p.name }
-
-var _ domainportfolio.Portfolio = (*mockPortfolio)(nil)
+// Helper to convert mockPortfolio to actual Portfolio struct for testing
+func (m *mockPortfolio) toPortfolio() *domainportfolio.Portfolio {
+	return &domainportfolio.Portfolio{
+		ID:   uuid.MustParse(m.id),
+		Name: m.name,
+	}
+}
 
 // -----------------------------------------------------------------------
 // Mock: Patent Repository
 // -----------------------------------------------------------------------
 
 type mockPatentRepoConstellation struct {
-	byPortfolio map[string][]domainpatent.Patent
-	byAssignee  map[string][]domainpatent.Patent
-	byIDs       map[string]domainpatent.Patent
+	byPortfolio map[string][]*domainpatent.Patent
+	byAssignee  map[string][]*domainpatent.Patent
+	byIDs       map[string]*domainpatent.Patent
 	findErr     error
 }
 
 func newMockPatentRepoConstellation() *mockPatentRepoConstellation {
 	return &mockPatentRepoConstellation{
-		byPortfolio: make(map[string][]domainpatent.Patent),
-		byAssignee:  make(map[string][]domainpatent.Patent),
-		byIDs:       make(map[string]domainpatent.Patent),
+		byPortfolio: make(map[string][]*domainpatent.Patent),
+		byAssignee:  make(map[string][]*domainpatent.Patent),
+		byIDs:       make(map[string]*domainpatent.Patent),
 	}
 }
 
-func (m *mockPatentRepoConstellation) FindByPortfolioID(ctx context.Context, portfolioID string) ([]domainpatent.Patent, error) {
+// Simplified mock methods for testing - not implementing full PatentRepository interface
+func (m *mockPatentRepoConstellation) ListByPortfolio(ctx context.Context, portfolioID string) ([]*domainpatent.Patent, error) {
 	if m.findErr != nil {
 		return nil, m.findErr
 	}
 	return m.byPortfolio[portfolioID], nil
 }
 
-func (m *mockPatentRepoConstellation) FindByAssignee(ctx context.Context, assignee string) ([]domainpatent.Patent, error) {
-	if m.findErr != nil {
-		return nil, m.findErr
-	}
-	return m.byAssignee[assignee], nil
+// Stub minimal methods to satisfy compilation (not implementing full interface)
+func (m *mockPatentRepoConstellation) Create(ctx context.Context, p *domainpatent.Patent) error {
+	return nil
 }
 
-func (m *mockPatentRepoConstellation) FindByIDs(ctx context.Context, ids []string) ([]domainpatent.Patent, error) {
-	if m.findErr != nil {
-		return nil, m.findErr
+func (m *mockPatentRepoConstellation) GetByID(ctx context.Context, id uuid.UUID) (*domainpatent.Patent, error) {
+	idStr := id.String()
+	if p, ok := m.byIDs[idStr]; ok {
+		return p, nil
 	}
-	result := make([]domainpatent.Patent, 0, len(ids))
-	for _, id := range ids {
-		if p, ok := m.byIDs[id]; ok {
-			result = append(result, p)
-		}
-	}
-	return result, nil
+	return nil, fmt.Errorf("not found")
 }
 
-// Stub remaining interface methods.
-func (m *mockPatentRepoConstellation) Save(ctx context.Context, p domainpatent.Patent) error   { return nil }
-func (m *mockPatentRepoConstellation) GetByID(ctx context.Context, id string) (domainpatent.Patent, error) { return nil, nil }
-func (m *mockPatentRepoConstellation) Delete(ctx context.Context, id string) error              { return nil }
-func (m *mockPatentRepoConstellation) AssociateMolecule(ctx context.Context, patentID, moleculeID string) error { return nil }
+func (m *mockPatentRepoConstellation) GetByPatentNumber(ctx context.Context, number string) (*domainpatent.Patent, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) Update(ctx context.Context, p *domainpatent.Patent) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) Restore(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) HardDelete(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) Search(ctx context.Context, query domainpatent.SearchQuery) (*domainpatent.SearchResult, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) GetByFamilyID(ctx context.Context, familyID string) ([]*domainpatent.Patent, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) GetByAssignee(ctx context.Context, assigneeID uuid.UUID, limit, offset int) ([]*domainpatent.Patent, int64, error) {
+	return nil, 0, nil
+}
+
+func (m *mockPatentRepoConstellation) GetByJurisdiction(ctx context.Context, jurisdiction string, limit, offset int) ([]*domainpatent.Patent, int64, error) {
+	return nil, 0, nil
+}
+
+func (m *mockPatentRepoConstellation) GetExpiringPatents(ctx context.Context, daysAhead int, limit, offset int) ([]*domainpatent.Patent, int64, error) {
+	return nil, 0, nil
+}
+
+func (m *mockPatentRepoConstellation) FindDuplicates(ctx context.Context, fullTextHash string) ([]*domainpatent.Patent, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*domainpatent.Patent, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) CreateClaim(ctx context.Context, claim *domainpatent.Claim) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) GetClaimsByPatent(ctx context.Context, patentID uuid.UUID) ([]*domainpatent.Claim, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) UpdateClaim(ctx context.Context, claim *domainpatent.Claim) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) DeleteClaimsByPatent(ctx context.Context, patentID uuid.UUID) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) BatchCreateClaims(ctx context.Context, claims []*domainpatent.Claim) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) GetIndependentClaims(ctx context.Context, patentID uuid.UUID) ([]*domainpatent.Claim, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) SetInventors(ctx context.Context, patentID uuid.UUID, inventors []*domainpatent.Inventor) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) GetInventors(ctx context.Context, patentID uuid.UUID) ([]*domainpatent.Inventor, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) SearchByInventor(ctx context.Context, inventorName string, limit, offset int) ([]*domainpatent.Patent, int64, error) {
+	return nil, 0, nil
+}
+
+func (m *mockPatentRepoConstellation) SetPriorityClaims(ctx context.Context, patentID uuid.UUID, claims []*domainpatent.PriorityClaim) error {
+	return nil
+}
+
+func (m *mockPatentRepoConstellation) GetPriorityClaims(ctx context.Context, patentID uuid.UUID) ([]*domainpatent.PriorityClaim, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) BatchCreate(ctx context.Context, patents []*domainpatent.Patent) (int, error) {
+	return 0, nil
+}
+
+func (m *mockPatentRepoConstellation) BatchUpdateStatus(ctx context.Context, ids []uuid.UUID, status domainpatent.PatentStatus) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockPatentRepoConstellation) CountByStatus(ctx context.Context) (map[domainpatent.PatentStatus]int64, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) CountByJurisdiction(ctx context.Context) (map[string]int64, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) CountByYear(ctx context.Context, field string) (map[int]int64, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) GetIPCDistribution(ctx context.Context, level int) (map[string]int64, error) {
+	return nil, nil
+}
+
+func (m *mockPatentRepoConstellation) WithTx(ctx context.Context, fn func(domainpatent.PatentRepository) error) error {
+	return nil
+}
 
 var _ domainpatent.Repository = (*mockPatentRepoConstellation)(nil)
 
 // -----------------------------------------------------------------------
-// Mock: Patent entity
+// Mock: Patent entity (for test data creation)
 // -----------------------------------------------------------------------
+// Note: Patent is a struct. This mock is only used for creating test data,
+// not for interface implementation.
 
 type mockPatent struct {
 	id          string
@@ -210,35 +330,44 @@ type mockPatent struct {
 	moleculeIDs []string
 }
 
-func (p *mockPatent) GetID() string               { return p.id }
-func (p *mockPatent) GetPatentNumber() string      { return p.number }
-func (p *mockPatent) GetPrimaryTechDomain() string { return p.techDomain }
-func (p *mockPatent) GetLegalStatus() string       { return p.legalStatus }
-func (p *mockPatent) GetAssignee() string          { return p.assignee }
-func (p *mockPatent) GetFilingDate() time.Time     { return p.filingDate }
-func (p *mockPatent) GetValueScore() float64       { return p.valueScore }
-func (p *mockPatent) GetMoleculeIDs() []string     { return p.moleculeIDs }
-
-var _ domainpatent.Patent = (*mockPatent)(nil)
+// Helper to convert mockPatent to actual Patent struct for testing
+func (m *mockPatent) toPatent() *domainpatent.Patent {
+	status := domainpatent.PatentStatusActive
+	if m.legalStatus == "pending" {
+		status = domainpatent.PatentStatusPending
+	}
+	
+	return &domainpatent.Patent{
+		ID:               uuid.MustParse(m.id),
+		PatentNumber:     m.number,
+		Title:            "Test Patent",
+		Jurisdiction:     domainpatent.PatentOfficeUSPTO,
+		Status:           status,
+		Assignee:         m.assignee,
+		FilingDate:       domainpatent.PatentDate{Time: m.filingDate},
+		TechDomains:      []string{m.techDomain},
+		MoleculeRefs:     m.moleculeIDs,
+	}
+}
 
 // -----------------------------------------------------------------------
 // Mock: Molecule Repository
 // -----------------------------------------------------------------------
 
 type mockMoleculeRepo struct {
-	molecules map[string]domainmol.Molecule
+	molecules map[string]*domainmol.Molecule
 	findErr   error
 }
 
 func newMockMoleculeRepo() *mockMoleculeRepo {
-	return &mockMoleculeRepo{molecules: make(map[string]domainmol.Molecule)}
+	return &mockMoleculeRepo{molecules: make(map[string]*domainmol.Molecule)}
 }
 
-func (m *mockMoleculeRepo) FindByIDs(ctx context.Context, ids []string) ([]domainmol.Molecule, error) {
+func (m *mockMoleculeRepo) FindByIDs(ctx context.Context, ids []string) ([]*domainmol.Molecule, error) {
 	if m.findErr != nil {
 		return nil, m.findErr
 	}
-	result := make([]domainmol.Molecule, 0, len(ids))
+	result := make([]*domainmol.Molecule, 0, len(ids))
 	for _, id := range ids {
 		if mol, ok := m.molecules[id]; ok {
 			result = append(result, mol)
@@ -247,27 +376,99 @@ func (m *mockMoleculeRepo) FindByIDs(ctx context.Context, ids []string) ([]domai
 	return result, nil
 }
 
-// Stub remaining interface methods.
-func (m *mockMoleculeRepo) Save(ctx context.Context, mol domainmol.Molecule) error { return nil }
-func (m *mockMoleculeRepo) GetByID(ctx context.Context, id string) (domainmol.Molecule, error) { return nil, nil }
-func (m *mockMoleculeRepo) Delete(ctx context.Context, id string) error             { return nil }
-func (m *mockMoleculeRepo) BatchSave(ctx context.Context, molecules []domainmol.Molecule) error { return nil }
+// Stub remaining interface methods
+func (m *mockMoleculeRepo) Save(ctx context.Context, mol *domainmol.Molecule) error {
+	return nil
+}
+
+func (m *mockMoleculeRepo) Update(ctx context.Context, molecule *domainmol.Molecule) error {
+	return nil
+}
+
+func (m *mockMoleculeRepo) Delete(ctx context.Context, id string) error {
+	return nil
+}
+
+func (m *mockMoleculeRepo) BatchSave(ctx context.Context, molecules []*domainmol.Molecule) (int, error) {
+	return len(molecules), nil
+}
+
+func (m *mockMoleculeRepo) FindByID(ctx context.Context, id string) (*domainmol.Molecule, error) {
+	if mol, ok := m.molecules[id]; ok {
+		return mol, nil
+	}
+	return nil, fmt.Errorf("not found")
+}
+
+func (m *mockMoleculeRepo) FindByInChIKey(ctx context.Context, inchiKey string) (*domainmol.Molecule, error) {
+	return nil, nil
+}
+
+func (m *mockMoleculeRepo) FindBySMILES(ctx context.Context, smiles string) ([]*domainmol.Molecule, error) {
+	return nil, nil
+}
+
+func (m *mockMoleculeRepo) Exists(ctx context.Context, id string) (bool, error) {
+	_, ok := m.molecules[id]
+	return ok, nil
+}
+
+func (m *mockMoleculeRepo) ExistsByInChIKey(ctx context.Context, inchiKey string) (bool, error) {
+	return false, nil
+}
+
+func (m *mockMoleculeRepo) Search(ctx context.Context, query *domainmol.MoleculeQuery) (*domainmol.MoleculeSearchResult, error) {
+	return nil, nil
+}
+
+func (m *mockMoleculeRepo) Count(ctx context.Context, query *domainmol.MoleculeQuery) (int64, error) {
+	return 0, nil
+}
+
+func (m *mockMoleculeRepo) FindBySource(ctx context.Context, source domainmol.MoleculeSource, offset, limit int) ([]*domainmol.Molecule, error) {
+	return nil, nil
+}
+
+func (m *mockMoleculeRepo) FindByStatus(ctx context.Context, status domainmol.MoleculeStatus, offset, limit int) ([]*domainmol.Molecule, error) {
+	return nil, nil
+}
+
+func (m *mockMoleculeRepo) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*domainmol.Molecule, error) {
+	return nil, nil
+}
+
+func (m *mockMoleculeRepo) FindByMolecularWeightRange(ctx context.Context, minWeight, maxWeight float64, offset, limit int) ([]*domainmol.Molecule, error) {
+	return nil, nil
+}
+
+func (m *mockMoleculeRepo) FindWithFingerprint(ctx context.Context, fpType domainmol.FingerprintType, offset, limit int) ([]*domainmol.Molecule, error) {
+	return nil, nil
+}
+
+func (m *mockMoleculeRepo) FindWithoutFingerprint(ctx context.Context, fpType domainmol.FingerprintType, offset, limit int) ([]*domainmol.Molecule, error) {
+	return nil, nil
+}
 
 var _ domainmol.Repository = (*mockMoleculeRepo)(nil)
 
 // -----------------------------------------------------------------------
-// Mock: Molecule entity
+// Mock: Molecule entity (for test data creation)
 // -----------------------------------------------------------------------
+// Note: Molecule is a struct. This mock is only used for creating test data,
+// not for interface implementation.
 
 type mockMolecule struct {
 	id     string
 	smiles string
 }
 
-func (m *mockMolecule) GetID() string     { return m.id }
-func (m *mockMolecule) GetSMILES() string { return m.smiles }
-
-var _ domainmol.Molecule = (*mockMolecule)(nil)
+// Helper to convert mockMolecule to actual Molecule struct for testing
+func (m *mockMolecule) toMolecule() *domainmol.Molecule {
+	return &domainmol.Molecule{
+		ID:     m.id,
+		SMILES: m.smiles,
+	}
+}
 
 // -----------------------------------------------------------------------
 // Mock: Molecule Domain Service
@@ -275,9 +476,9 @@ var _ domainmol.Molecule = (*mockMolecule)(nil)
 
 type mockMoleculeService struct{}
 
-func (m *mockMoleculeService) GetByID(ctx context.Context, id string) (domainmol.Molecule, error) { return nil, nil }
-func (m *mockMoleculeService) Create(ctx context.Context, mol domainmol.Molecule) error           { return nil }
-func (m *mockMoleculeService) CreateFromSMILES(ctx context.Context, smiles string) (domainmol.Molecule, error) { return nil, nil }
+func (m *mockMoleculeService) CreateFromSMILES(ctx context.Context, smiles string, metadata map[string]string) (*domainmol.Molecule, error) {
+	return nil, nil
+}
 
 var _ domainmol.Service = (*mockMoleculeService)(nil)
 
@@ -312,11 +513,20 @@ func (m *mockGNNInference) BatchEmbed(ctx context.Context, req *molpatent_gnn.Ba
 }
 
 func (m *mockGNNInference) ComputeSimilarity(ctx context.Context, req *molpatent_gnn.SimilarityRequest) (*molpatent_gnn.SimilarityResponse, error) {
-	return &molpatent_gnn.SimilarityResponse{Score: 0.85}, nil
+	return &molpatent_gnn.SimilarityResponse{
+		FusedScore:   0.85,
+		Scores:       map[string]float64{"morgan": 0.85},
+		InferenceMs:  10,
+		ModelVersion: "test-v1",
+	}, nil
 }
 
 func (m *mockGNNInference) SearchSimilar(ctx context.Context, req *molpatent_gnn.SimilarSearchRequest) (*molpatent_gnn.SimilarSearchResponse, error) {
-	return &molpatent_gnn.SimilarSearchResponse{Results: nil}, nil
+	return &molpatent_gnn.SimilarSearchResponse{
+		Matches:      nil,
+		QuerySMILES:  req.SMILES,
+		InferenceMs:  10,
+	}, nil
 }
 
 // -----------------------------------------------------------------------
