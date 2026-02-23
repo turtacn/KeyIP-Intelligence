@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -147,7 +146,7 @@ func (m *mockCache) Get(ctx context.Context, key string, dest interface{}) error
 		}
 		return nil
 	}
-	return errors.NewInternalError("cache miss")
+	return errors.NewInternal("cache miss")
 }
 
 func (m *mockCache) Set(ctx context.Context, key string, val interface{}, ttl time.Duration) error {
@@ -304,12 +303,12 @@ func buildSamplePaths(length int) []GraphPath {
 	}
 }
 
-func assertErrorCode(t *testing.T, err error, expectedCode string) {
+func assertErrorCode(t *testing.T, err error, expectedCode errors.ErrorCode) {
 	t.Helper()
 	if err == nil {
 		t.Fatalf("Expected error code %s, got nil", expectedCode)
 	}
-	if !errors.IsErrorCode(err, expectedCode) {
+	if !errors.IsCode(err, expectedCode) {
 		t.Errorf("Expected error code %s, got %v", expectedCode, err)
 	}
 }
@@ -365,7 +364,7 @@ func TestSearchEntities_InvalidEntityType(t *testing.T) {
 	svc, _ := newTestKGSearchService()
 	req := &EntitySearchRequest{EntityType: EntityType("InvalidType")}
 	_, err := svc.SearchEntities(context.Background(), req)
-	assertErrorCode(t, err, errors.ErrInvalidParameter)
+	assertErrorCode(t, err, errors.ErrCodeValidation)
 }
 
 func TestSearchEntities_FilterFieldNotInWhitelist(t *testing.T) {
@@ -376,7 +375,7 @@ func TestSearchEntities_FilterFieldNotInWhitelist(t *testing.T) {
 		Filters:    map[string]FilterCondition{"internal_score": {Operator: OpEq, Value: 100}},
 	}
 	_, err := svc.SearchEntities(context.Background(), req)
-	assertErrorCode(t, err, errors.ErrInvalidParameter)
+	assertErrorCode(t, err, errors.ErrCodeValidation)
 }
 
 func TestSearchEntities_PaginationBoundary(t *testing.T) {
@@ -472,7 +471,7 @@ func TestSearchEntities_RepositoryError(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestKGSearchService()
 	m.repo.queryNodesFunc = func(ctx context.Context, req *EntitySearchRequest) ([]GraphEntity, int64, map[string][]FacetBucket, error) {
-		return nil, 0, nil, errors.NewInternalError("db timeout")
+		return nil, 0, nil, errors.NewInternal("db timeout")
 	}
 
 	req := &EntitySearchRequest{EntityType: EntityTypePatent}
@@ -542,7 +541,7 @@ func TestTraverseRelations_MaxDepthExceeded(t *testing.T) {
 	svc, _ := newTestKGSearchService()
 	req := &RelationTraverseRequest{StartNodeID: "pat-1", MaxDepth: 6}
 	_, err := svc.TraverseRelations(context.Background(), req)
-	assertErrorCode(t, err, errors.ErrInvalidParameter)
+	assertErrorCode(t, err, errors.ErrCodeValidation)
 }
 
 func TestTraverseRelations_MaxDepthBoundary(t *testing.T) {
@@ -611,7 +610,7 @@ func TestTraverseRelations_RepositoryError(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestKGSearchService()
 	m.repo.traverseFunc = func(ctx context.Context, req *RelationTraverseRequest) ([]GraphNode, []GraphEdge, TraverseMetadata, error) {
-		return nil, nil, TraverseMetadata{}, errors.NewInternalError("neo4j down")
+		return nil, nil, TraverseMetadata{}, errors.NewInternal("neo4j down")
 	}
 
 	req := &RelationTraverseRequest{StartNodeID: "pat-1", MaxDepth: 2}
@@ -671,7 +670,7 @@ func TestFindPaths_MaxPathLengthExceeded(t *testing.T) {
 	svc, _ := newTestKGSearchService()
 	req := &PathFindRequest{SourceID: "A", TargetID: "B", MaxPathLength: 11}
 	_, err := svc.FindPaths(context.Background(), req)
-	assertErrorCode(t, err, errors.ErrInvalidParameter)
+	assertErrorCode(t, err, errors.ErrCodeValidation)
 }
 
 func TestFindPaths_MaxPathLengthBoundary(t *testing.T) {
@@ -692,7 +691,7 @@ func TestFindPaths_RepositoryError(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestKGSearchService()
 	m.repo.shortestPathFunc = func(ctx context.Context, req *PathFindRequest) ([]GraphPath, error) {
-		return nil, errors.NewInternalError("db error")
+		return nil, errors.NewInternal("db error")
 	}
 
 	req := &PathFindRequest{SourceID: "A", TargetID: "B", MaxPathLength: 5}
@@ -754,7 +753,7 @@ func TestAggregateByDimension_ByYear(t *testing.T) {
 		return []AggBucket{}, 0, nil
 	}
 
-	tr := &common.TimeRange{From: time.Now().Add(-24 * time.Hour), To: time.Now()}
+	tr := &common.TimeRange{From: common.Timestamp(time.Now().Add(-24 * time.Hour)), To: common.Timestamp(time.Now())}
 	req := &AggregationRequest{Dimension: ByYear, DateRange: tr}
 	_, err := svc.AggregateByDimension(context.Background(), req)
 	if err != nil {
@@ -847,7 +846,7 @@ func TestAggregateByDimension_RepositoryError(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestKGSearchService()
 	m.repo.aggregateFunc = func(ctx context.Context, req *AggregationRequest) ([]AggBucket, int64, error) {
-		return nil, 0, errors.NewInternalError("db error")
+		return nil, 0, errors.NewInternal("db error")
 	}
 
 	req := &AggregationRequest{Dimension: ByTechDomain}
@@ -908,7 +907,7 @@ func TestHybridSearch_WeightSumInvalid(t *testing.T) {
 	svc, _ := newTestKGSearchService()
 	req := &HybridSearchRequest{VectorWeight: 0.3, TextWeight: 0.3, GraphWeight: 0.3} // sum=0.9
 	_, err := svc.HybridSearch(context.Background(), req)
-	assertErrorCode(t, err, errors.ErrInvalidParameter)
+	assertErrorCode(t, err, errors.ErrCodeValidation)
 }
 
 func TestHybridSearch_WeightSumFloatingPointTolerance(t *testing.T) {
@@ -986,7 +985,7 @@ func TestHybridSearch_AllRoutesTimeout(t *testing.T) {
 	_, err := svc.HybridSearch(context.Background(), req)
 
 	// Implementation returns InternalError when all branches fail
-	assertErrorCode(t, err, errors.ErrInternalError)
+	assertErrorCode(t, err, errors.ErrCodeInternal)
 }
 
 func TestHybridSearch_ResultMergeDedup(t *testing.T) {
@@ -1084,7 +1083,7 @@ func TestHybridSearch_EmptyQuery(t *testing.T) {
 	svc, _ := newTestKGSearchService()
 	req := &HybridSearchRequest{Query: "", VectorWeight: 0.3, TextWeight: 0.3, GraphWeight: 0.3} // Also invalid weight
 	_, err := svc.HybridSearch(context.Background(), req)
-	assertErrorCode(t, err, errors.ErrInvalidParameter)
+	assertErrorCode(t, err, errors.ErrCodeValidation)
 }
 
 func TestHybridSearch_MetricsRecorded(t *testing.T) {

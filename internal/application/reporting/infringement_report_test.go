@@ -168,7 +168,7 @@ func (m *infMockCache) Get(ctx context.Context, key string, dest interface{}) er
 		}
 		return nil
 	}
-	return errors.NewInternalError("miss")
+	return errors.NewInternal("miss")
 }
 func (m *infMockCache) Set(ctx context.Context, key string, val interface{}, ttl time.Duration) error {
 	m.mu.Lock()
@@ -278,7 +278,7 @@ func sampleEquivalentsAssessment() (float64, []claimElementMapping) {
 func assertErrCode(t *testing.T, err error, code string) {
 	t.Helper()
 	if err == nil { t.Fatalf("Expected error code %s, got nil", code) }
-	if !errors.IsErrorCode(err, code) { t.Errorf("Expected error code %s, got %v", code, err) }
+	if !errors.IsCode(err, code) { t.Errorf("Expected error code %s, got %v", code, err) }
 }
 
 // ============================================================================
@@ -366,7 +366,7 @@ func TestInfringementReportService_Generate_EmptyOwnedPatents(t *testing.T) {
 	req := validInfringementRequest()
 	req.OwnedPatentNumbers = []string{}
 	_, err := svc.Generate(context.Background(), req)
-	assertErrCode(t, err, errors.ErrInvalidParameter)
+	assertErrCode(t, err, errors.ErrCodeValidation)
 }
 
 func TestInfringementReportService_Generate_NoSuspectedTargets(t *testing.T) {
@@ -376,7 +376,7 @@ func TestInfringementReportService_Generate_NoSuspectedTargets(t *testing.T) {
 	req.SuspectedMolecules = []MoleculeInput{}
 	req.SuspectedPatentNumbers = []string{}
 	_, err := svc.Generate(context.Background(), req)
-	assertErrCode(t, err, errors.ErrInvalidParameter)
+	assertErrCode(t, err, errors.ErrCodeValidation)
 	if !strings.Contains(err.Error(), "must provide at least one suspected") {
 		t.Errorf("Error message missing expected context")
 	}
@@ -463,7 +463,7 @@ func TestInfringementReportService_Generate_ClaimParserError(t *testing.T) {
 	req := validInfringementRequest()
 	m.parser.parseFunc = func(ctx context.Context, patentID string) (interface{}, error) {
 		if patentID == "CN1000001" {
-			return nil, errors.NewInternalError("parse err")
+			return nil, errors.NewInternal("parse err")
 		}
 		return sampleClaimElements(), nil
 	}
@@ -478,7 +478,7 @@ func TestInfringementReportService_Generate_AssessorError(t *testing.T) {
 	svc, m := newTestInfringementService()
 	req := validInfringementRequest()
 	m.assessor.assessFunc = func(ctx context.Context, smiles string, claimData interface{}, depth string) (interface{}, error) {
-		return nil, errors.NewInternalError("assessor offline")
+		return nil, errors.NewInternal("assessor offline")
 	}
 
 	// Implementation skips failing assessment. Doesn't completely abort the report but logs warning
@@ -492,7 +492,7 @@ func TestInfringementReportService_Generate_EquivalentsAnalyzerError(t *testing.
 	svc, m := newTestInfringementService()
 	req := validInfringementRequest()
 	m.equiv.analyzeFunc = func(ctx context.Context, claimData interface{}, targetSmiles string) (float64, []claimElementMapping, error) {
-		return 0, nil, errors.NewInternalError("equiv offline")
+		return 0, nil, errors.NewInternal("equiv offline")
 	}
 
 	// Should still complete with literal results
@@ -510,7 +510,7 @@ func TestInfringementReportService_Generate_ChemExtractorError(t *testing.T) {
 
 	m.chemExt.extractFunc = func(ctx context.Context, text string) ([]string, error) {
 		if strings.Contains(text, "P1") {
-			return nil, errors.NewInternalError("extract err")
+			return nil, errors.NewInternal("extract err")
 		}
 		return []string{"MOL-P2"}, nil
 	}
@@ -611,7 +611,7 @@ func TestInfringementReportService_Generate_TemplateRenderError(t *testing.T) {
 	svc, m := newTestInfringementService()
 	req := validInfringementRequest()
 	m.templater.renderFunc = func(ctx context.Context, templateName string, data interface{}, format ReportFormat) ([]byte, error) {
-		return nil, errors.NewInternalError("template error")
+		return nil, errors.NewInternal("template error")
 	}
 
 	_, err := svc.Generate(context.Background(), req)
@@ -623,7 +623,7 @@ func TestInfringementReportService_Generate_StorageError(t *testing.T) {
 	svc, m := newTestInfringementService()
 	req := validInfringementRequest()
 	m.storage.saveFunc = func(ctx context.Context, key string, data []byte, contentType string) error {
-		return errors.NewInternalError("storage error")
+		return errors.NewInternal("storage error")
 	}
 
 	_, err := svc.Generate(context.Background(), req)
@@ -654,7 +654,7 @@ func TestInfringementReportService_GetStatus_CacheHit(t *testing.T) {
 
 	_ = m.cache.Set(context.Background(), "inf_status:R1", ReportStatusInfo{ReportID: "R1", Status: StatusProcessing, ProgressPct: 50}, 1*time.Hour)
 	m.metaRepo.getFunc = func(ctx context.Context, reportID string) (*InfringementReportSummary, error) {
-		return nil, errors.NewInternalError("DB should not be hit")
+		return nil, errors.NewInternal("DB should not be hit")
 	}
 
 	info, err := svc.GetStatus(context.Background(), "R1")

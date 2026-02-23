@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ============================================================================
@@ -149,7 +148,7 @@ func (m *localMockCache) Get(ctx context.Context, key string, dest interface{}) 
 		_ = json.Unmarshal(b, dest)
 		return nil
 	}
-	return errors.NewInternalError("cache miss")
+	return errors.NewInternal("cache miss")
 }
 func (m *localMockCache) Set(ctx context.Context, key string, val interface{}, ttl time.Duration) error {
 	m.mu.Lock()
@@ -616,7 +615,7 @@ func TestQuery_AnswerGeneration_Failure_Retry(t *testing.T) {
 		callCount++
 		if callCount == 1 {
 			if temp != 0.4 { t.Errorf("First call temp should be 0.4") }
-			return "", errors.NewInternalError("LLM timeout")
+			return "", errors.NewInternal("LLM timeout")
 		}
 		if temp != 0.2 { t.Errorf("Retry temp should be 0.2") }
 		return "Retry success", nil
@@ -658,7 +657,7 @@ func TestQuery_PromptInjection(t *testing.T) {
 			_, err := svc.Query(context.Background(), req)
 
 			if tt.expectErr {
-				assertErrorCode(t, err, errors.ErrInvalidParameter)
+				assertErrorCode(t, err, errors.ErrCodeValidation)
 			} else {
 				if err != nil {
 					t.Errorf("Expected no error for normal question, got: %v", err)

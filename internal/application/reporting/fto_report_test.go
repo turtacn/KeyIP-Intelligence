@@ -188,7 +188,7 @@ func (m *mockCache) Get(ctx context.Context, key string, dest interface{}) error
 		}
 		return nil
 	}
-	return errors.NewInternalError("cache miss")
+	return errors.NewInternal("cache miss")
 }
 
 func (m *mockCache) Set(ctx context.Context, key string, val interface{}, ttl time.Duration) error {
@@ -292,12 +292,12 @@ func sampleAssessmentResult() interface{} {
 	return map[string]interface{}{"risk": "High"}
 }
 
-func assertErrorCode(t *testing.T, err error, expectedCode string) {
+func assertErrorCode(t *testing.T, err error, expectedCode errors.ErrorCode) {
 	t.Helper()
 	if err == nil {
 		t.Fatalf("Expected error code %s, got nil", expectedCode)
 	}
-	if !errors.IsErrorCode(err, expectedCode) {
+	if !errors.IsCode(err, expectedCode) {
 		t.Errorf("Expected error code %s, got %v", expectedCode, err)
 	}
 }
@@ -361,7 +361,7 @@ func TestFTOReportService_Generate_EmptyMolecules(t *testing.T) {
 	req.TargetMolecules = []MoleculeInput{}
 
 	_, err := svc.Generate(context.Background(), req)
-	assertErrorCode(t, err, errors.ErrInvalidParameter)
+	assertErrorCode(t, err, errors.ErrCodeValidation)
 }
 
 func TestFTOReportService_Generate_InvalidJurisdiction(t *testing.T) {
@@ -371,7 +371,7 @@ func TestFTOReportService_Generate_InvalidJurisdiction(t *testing.T) {
 	req.Jurisdictions = []string{}
 
 	_, err := svc.Generate(context.Background(), req)
-	assertErrorCode(t, err, errors.ErrInvalidParameter)
+	assertErrorCode(t, err, errors.ErrCodeValidation)
 	if !strings.Contains(err.Error(), "jurisdictions") {
 		t.Errorf("Expected error message to mention jurisdictions")
 	}
@@ -384,7 +384,7 @@ func TestFTOReportService_Generate_InvalidAnalysisDepth(t *testing.T) {
 	req.AnalysisDepth = AnalysisDepth("SuperDeepAndFake")
 
 	_, err := svc.Generate(context.Background(), req)
-	assertErrorCode(t, err, errors.ErrInvalidParameter)
+	assertErrorCode(t, err, errors.ErrCodeValidation)
 }
 
 func TestFTOReportService_Generate_PartialMoleculeFailure(t *testing.T) {
@@ -417,7 +417,7 @@ func TestFTOReportService_Generate_SimilaritySearchError(t *testing.T) {
 	req := validFTORequest()
 
 	m.simSearch.searchFunc = func(ctx context.Context, smiles string, jurisdictions []string, competitors []string, limit int) ([]string, error) {
-		return nil, errors.NewInternalError("sim search down")
+		return nil, errors.NewInternal("sim search down")
 	}
 
 	// Notice that the current implementation treats similarity search failure as a partial failure (skips to next molecule).
@@ -439,7 +439,7 @@ func TestFTOReportService_Generate_ClaimParserError(t *testing.T) {
 
 	m.parser.parseFunc = func(ctx context.Context, patentID string) (interface{}, error) {
 		if patentID == "CN110000001A" {
-			return nil, errors.NewInternalError("parse failed")
+			return nil, errors.NewInternal("parse failed")
 		}
 		return sampleClaimParseResult(), nil
 	}
@@ -460,7 +460,7 @@ func TestFTOReportService_Generate_AssessorError(t *testing.T) {
 	req := validFTORequest()
 
 	m.assessor.assessFunc = func(ctx context.Context, smiles string, claimData interface{}, depth string) (interface{}, error) {
-		return nil, errors.NewInternalError("assess failed")
+		return nil, errors.NewInternal("assess failed")
 	}
 
 	resp, err := svc.Generate(context.Background(), req)
@@ -478,7 +478,7 @@ func TestFTOReportService_Generate_TemplateRenderError(t *testing.T) {
 	req := validFTORequest()
 
 	m.templater.renderFunc = func(ctx context.Context, templateName string, data interface{}, format ReportFormat) ([]byte, error) {
-		return nil, errors.NewInternalError("render failed")
+		return nil, errors.NewInternal("render failed")
 	}
 
 	_, err := svc.Generate(context.Background(), req)
@@ -495,7 +495,7 @@ func TestFTOReportService_Generate_StorageError(t *testing.T) {
 	req := validFTORequest()
 
 	m.storage.saveFunc = func(ctx context.Context, key string, data []byte, contentType string) error {
-		return errors.NewInternalError("s3 down")
+		return errors.NewInternal("s3 down")
 	}
 
 	_, err := svc.Generate(context.Background(), req)
@@ -548,7 +548,7 @@ func TestFTOReportService_GetStatus_CacheHit(t *testing.T) {
 
 	// Make sure DB is not hit by setting it to fail if called
 	m.metaRepo.getFunc = func(ctx context.Context, id string) (*FTOReportSummary, error) {
-		return nil, errors.NewInternalError("should not be called")
+		return nil, errors.NewInternal("should not be called")
 	}
 
 	info, err := svc.GetStatus(context.Background(), reportID)
@@ -586,7 +586,7 @@ func TestFTOReportService_GetStatus_NotFound(t *testing.T) {
 	svc, m := newTestFTOService()
 
 	m.metaRepo.getFunc = func(ctx context.Context, id string) (*FTOReportSummary, error) {
-		return nil, errors.NewError(errors.ErrNotFound, "not found")
+		return nil, errors.NotFound("not found")
 	}
 
 	_, err := svc.GetStatus(context.Background(), "unknown-id")
@@ -619,7 +619,7 @@ func TestFTOReportService_GetReport_FormatMismatch(t *testing.T) {
 
 	m.storage.getStreamFunc = func(ctx context.Context, key string) (io.ReadCloser, error) {
 		if strings.HasSuffix(key, ".DOCX") {
-			return nil, errors.NewError(errors.ErrNotFound, "object not found")
+			return nil, errors.NotFound("object not found")
 		}
 		return io.NopCloser(bytes.NewReader([]byte("pdf"))), nil
 	}
@@ -643,7 +643,7 @@ func TestFTOReportService_GetReport_NotCompleted(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected error when requesting incomplete report")
 	}
-	assertErrorCode(t, err, errors.ErrInvalidState)
+	assertErrorCode(t, err, errors.ErrCodeConflict)
 }
 
 // ============================================================================
@@ -654,14 +654,14 @@ func TestFTOReportService_ListReports_Success(t *testing.T) {
 	t.Parallel()
 	svc, _ := newTestFTOService()
 
-	res, err := svc.ListReports(context.Background(), nil, &common.Pagination{Page: 1, Size: 10})
+	res, err := svc.ListReports(context.Background(), nil, &common.Pagination{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if res.TotalCount != 1 || len(res.Data) != 1 {
-		t.Errorf("Expected 1 item, got %d", len(res.Data))
+	if res.Pagination.Total != 1 || len(res.Items) != 1 {
+		t.Errorf("Expected 1 item, got %d", len(res.Items))
 	}
-	if res.Page != 1 || res.Size != 10 {
+	if res.Pagination.Page != 1 || res.Pagination.PageSize != 10 {
 		t.Errorf("Pagination properties mismatch")
 	}
 }
@@ -702,7 +702,7 @@ func TestFTOReportService_DeleteReport_NotFound(t *testing.T) {
 	svc, m := newTestFTOService()
 
 	m.metaRepo.getFunc = func(ctx context.Context, id string) (*FTOReportSummary, error) {
-		return nil, errors.NewError(errors.ErrNotFound, "not found")
+		return nil, errors.NotFound("not found")
 	}
 
 	err := svc.DeleteReport(context.Background(), "unknown-report")
@@ -717,7 +717,7 @@ func TestFTOReportService_DeleteReport_AlreadyDeleted(t *testing.T) {
 
 	// Mimic scenario where Get returns not found because it's soft deleted
 	m.metaRepo.getFunc = func(ctx context.Context, id string) (*FTOReportSummary, error) {
-		return nil, errors.NewError(errors.ErrNotFound, "report already deleted")
+		return nil, errors.NotFound("report already deleted")
 	}
 
 	err := svc.DeleteReport(context.Background(), "deleted-report")

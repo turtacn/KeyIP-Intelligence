@@ -39,7 +39,7 @@ func assertErrCodePort(t *testing.T, err error, code string) {
 	if err == nil {
 		t.Fatalf("Expected error code %s, got nil", code)
 	}
-	if !errors.IsErrorCode(err, code) {
+	if !errors.IsCode(err, code) {
 		t.Errorf("Expected error code %s, got %v", code, err)
 	}
 }
@@ -170,7 +170,7 @@ func (m *portMockCache) Get(ctx context.Context, key string, dest interface{}) e
 		}
 		return nil
 	}
-	return errors.NewInternalError("cache miss")
+	return errors.NewInternal("cache miss")
 }
 func (m *portMockCache) Set(ctx context.Context, key string, val interface{}, ttl time.Duration) error {
 	m.mu.Lock(); defer m.mu.Unlock(); m.data[key] = val; return nil
@@ -295,7 +295,7 @@ func TestGenerateFullReport_InvalidRequest_EmptyPortfolioID(t *testing.T) {
 	svc, _ := newTestPortfolioReportService()
 	req := &PortfolioReportRequest{PortfolioID: ""}
 	_, err := svc.GenerateFullReport(context.Background(), req)
-	assertErrCodePort(t, err, errors.ErrInvalidParameter)
+	assertErrCodePort(t, err, errors.ErrCodeValidation)
 }
 
 func TestGenerateFullReport_PortfolioNotFound(t *testing.T) {
@@ -337,7 +337,7 @@ func TestGenerateFullReport_DataCollectionPartialFailure(t *testing.T) {
 	svc, m := newTestPortfolioReportService()
 
 	m.valSvc.evaluatePortfolioFunc = func(ctx context.Context, portfolioID string) ([]interface{}, error) {
-		return nil, errors.NewInternalError("valuation service down")
+		return nil, errors.NewInternal("valuation service down")
 	}
 
 	req := &PortfolioReportRequest{PortfolioID: "port-123", IncludeSections: []ReportSection{SectionOverview}}
@@ -362,7 +362,7 @@ func TestGenerateFullReport_StrategyGPTTimeout(t *testing.T) {
 	svc, m := newTestPortfolioReportService()
 
 	m.gpt.generateFunc = func(ctx context.Context, section ReportSection, data interface{}, lang ReportLanguage) (string, error) {
-		return "", errors.NewInternalError("gpt timeout")
+		return "", errors.NewInternal("gpt timeout")
 	}
 
 	req := &PortfolioReportRequest{PortfolioID: "port-123"}
@@ -382,7 +382,7 @@ func TestGenerateFullReport_ObjectStorageUploadFailure(t *testing.T) {
 	svc, m := newTestPortfolioReportService()
 
 	m.storage.saveFunc = func(ctx context.Context, key string, data []byte, contentType string) error {
-		return errors.NewInternalError("s3 down")
+		return errors.NewInternal("s3 down")
 	}
 
 	req := &PortfolioReportRequest{PortfolioID: "port-123"}
@@ -484,7 +484,7 @@ func TestGenerateCompetitiveReport_NoCompetitors(t *testing.T) {
 	svc, _ := newTestPortfolioReportService()
 	req := &CompetitiveReportRequest{PortfolioID: "port-comp", CompetitorIDs: []string{}, Dimensions: []CompetitiveDimension{DimPatentCount}}
 	_, err := svc.GenerateCompetitiveReport(context.Background(), req)
-	assertErrCodePort(t, err, errors.ErrInvalidParameter)
+	assertErrCodePort(t, err, errors.ErrCodeValidation)
 }
 
 func TestGenerateCompetitiveReport_SingleDimension(t *testing.T) {

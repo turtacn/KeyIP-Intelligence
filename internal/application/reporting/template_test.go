@@ -221,7 +221,7 @@ func (m *tmplMockCache) Get(ctx context.Context, key string, dest interface{}) e
 	if _, ok := m.data[key]; ok {
 		return nil
 	}
-	return errors.NewInternalError("miss")
+	return errors.NewInternal("miss")
 }
 
 func (m *tmplMockCache) Set(ctx context.Context, key string, val interface{}, ttl time.Duration) error {
@@ -369,7 +369,7 @@ func assertErrCodeTmpl(t *testing.T, err error, code string) {
 	if err == nil {
 		t.Fatalf("Expected error code %s, got nil", code)
 	}
-	if !errors.IsErrorCode(err, code) {
+	if !errors.IsCode(err, code) {
 		t.Errorf("Expected error code %s, got %v", code, err)
 	}
 }
@@ -591,7 +591,7 @@ func TestRender_NilData(t *testing.T) {
 	engine, _ := newTestTemplateEngine(t)
 	req := &RenderRequest{TemplateID: "html-1", Data: nil, OutputFormat: "HTML"}
 	_, err := engine.Render(context.Background(), req)
-	assertErrCodeTmpl(t, err, errors.ErrInvalidParameter)
+	assertErrCodeTmpl(t, err, errors.ErrCodeValidation)
 }
 
 func TestRender_InvalidOutputFormat(t *testing.T) {
@@ -602,7 +602,7 @@ func TestRender_InvalidOutputFormat(t *testing.T) {
 
 	req := &RenderRequest{TemplateID: tmpl.ID, Data: &ReportData{}, OutputFormat: "UNKNOWN"}
 	_, err := engine.Render(context.Background(), req)
-	assertErrCodeTmpl(t, err, errors.ErrInvalidParameter)
+	assertErrCodeTmpl(t, err, errors.ErrCodeValidation)
 }
 
 func TestRender_ChartRenderingTimeout(t *testing.T) {
@@ -665,7 +665,7 @@ func TestRender_HTMLRendererFailure(t *testing.T) {
 	_ = m.repo.Create(context.Background(), tmpl)
 
 	m.htmlRen.renderFunc = func(ctx context.Context, html string, opts *RenderOptions) ([]byte, error) {
-		return nil, errors.NewInternalError("pdf core dump")
+		return nil, errors.NewInternal("pdf core dump")
 	}
 
 	req := &RenderRequest{TemplateID: tmpl.ID, Data: &ReportData{}, OutputFormat: "PDF"}
@@ -817,7 +817,7 @@ func TestRegisterTemplate_Success_Duplicate_Invalid(t *testing.T) {
 	// Invalid Syntax
 	tmplInvalid := &Template{ID: "new-2", Format: HTMLTemplate, Content: "<div>{{.Title"}
 	err = engine.RegisterTemplate(context.Background(), tmplInvalid)
-	assertErrCodeTmpl(t, err, errors.ErrInvalidParameter)
+	assertErrCodeTmpl(t, err, errors.ErrCodeValidation)
 }
 
 func TestUpdateTemplate_Success_NotFound(t *testing.T) {
@@ -947,7 +947,7 @@ func TestSecurity_TemplateInjection(t *testing.T) {
 
 	// Validation should fail due to undefined function "exec"
 	err := engine.RegisterTemplate(context.Background(), tmpl)
-	assertErrCodeTmpl(t, err, errors.ErrInvalidParameter)
+	assertErrCodeTmpl(t, err, errors.ErrCodeValidation)
 }
 
 // ============================================================================
