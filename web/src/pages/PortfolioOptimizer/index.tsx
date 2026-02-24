@@ -4,7 +4,6 @@ import { usePortfolio } from '../../hooks/usePortfolio';
 import { usePartners } from '../../hooks/usePartner';
 import { usePatents } from '../../hooks/usePatents';
 import PanoramaView from './PanoramaView';
-import CoverageTreemap from './CoverageTreemap';
 import GapAnalysis from './GapAnalysis';
 import ValueScoring from './ValueScoring';
 import BudgetOptimizer from './BudgetOptimizer';
@@ -78,10 +77,12 @@ const PortfolioOptimizer: React.FC = () => {
               <h2 className="text-xl font-bold text-slate-900 mb-2">{t('portfolio.panorama.title')}</h2>
               <p className="text-slate-500">{t('portfolio.panorama.desc')}</p>
             </div>
-            <PanoramaView summary={summary.data} loading={summary.loading} />
-            <div className="mt-6">
-              <CoverageTreemap data={coverageData} scores={scoresData} />
-            </div>
+            <PanoramaView
+              summary={summary.data}
+              loading={summary.loading}
+              coverageData={coverageData}
+              scoresData={scoresData}
+            />
           </div>
 
           {/* Section 2: Gap Analysis */}

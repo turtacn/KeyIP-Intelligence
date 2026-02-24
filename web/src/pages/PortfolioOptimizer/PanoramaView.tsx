@@ -1,13 +1,16 @@
 import React from 'react';
 import Card from '../../components/ui/Card';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts';
+import CoverageTreemap from './CoverageTreemap';
 
 interface PanoramaViewProps {
   summary: any;
   loading: boolean;
+  coverageData?: { [key: string]: number };
+  scoresData?: { [key: string]: number };
 }
 
-const PanoramaView: React.FC<PanoramaViewProps> = ({ summary, loading }) => {
+const PanoramaView: React.FC<PanoramaViewProps> = ({ summary, loading, coverageData = {}, scoresData = {} }) => {
   if (loading || !summary) {
     return (
       <Card className="h-64 animate-pulse bg-slate-100">
@@ -58,9 +61,7 @@ const PanoramaView: React.FC<PanoramaViewProps> = ({ summary, loading }) => {
 
         {/* Treemap Container */}
         <div id="coverage-treemap-container" className="h-[400px]">
-           <div className="bg-slate-50 h-full rounded-lg border border-slate-200 flex items-center justify-center text-slate-400">
-             Treemap Component Location
-           </div>
+           <CoverageTreemap data={coverageData} scores={scoresData} />
         </div>
       </div>
     </div>
