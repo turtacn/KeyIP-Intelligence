@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePartners } from '../../hooks/usePartner';
 import AdminView from './AdminView';
 import AgencyView from './AgencyView';
@@ -9,6 +10,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 type ViewMode = 'admin' | 'agency' | 'counsel' | 'api';
 
 const PartnerPortal: React.FC = () => {
+  const { t } = useTranslation();
   const { data: partners, loading, error } = usePartners();
   const [activeView, setActiveView] = useState<ViewMode>('admin');
 
@@ -25,10 +27,10 @@ const PartnerPortal: React.FC = () => {
       <div className="bg-white border-b border-slate-200 sticky top-0 z-10 mb-6 flex justify-between items-center">
         <nav className="flex space-x-8 px-1 overflow-x-auto" aria-label="Portal Views">
           {[
-            { id: 'admin', label: 'Partner Management (Admin)' },
-            { id: 'agency', label: 'Agency Workspace' },
-            { id: 'counsel', label: 'Legal Counsel Review' },
-            { id: 'api', label: 'API & Developer Portal' },
+            { id: 'admin', label: t('partners.nav.admin') },
+            { id: 'agency', label: t('partners.nav.agency') },
+            { id: 'counsel', label: t('partners.nav.counsel') },
+            { id: 'api', label: t('partners.nav.api') },
           ].map((item) => (
             <button
               key={item.id}

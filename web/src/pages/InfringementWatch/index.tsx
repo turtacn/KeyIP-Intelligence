@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useInfringement } from '../../hooks/useInfringement';
 import AlertList from './AlertList';
 import AlertDetail from './AlertDetail';
@@ -11,6 +12,7 @@ import { ShieldAlert } from 'lucide-react';
 import { RiskLevel } from '../../types/domain';
 
 const InfringementWatch: React.FC = () => {
+  const { t } = useTranslation();
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
   const [riskFilter, setRiskFilter] = useState<RiskLevel | 'All'>('All');
 
@@ -78,8 +80,8 @@ const InfringementWatch: React.FC = () => {
           <div className="flex items-center justify-center h-full">
             <EmptyState
               icon={ShieldAlert}
-              title="No Alert Selected"
-              description="Select an infringement alert from the list to view detailed analysis."
+              title={t('infringement.title')}
+              description={t('infringement.list_title')}
             />
           </div>
         )}

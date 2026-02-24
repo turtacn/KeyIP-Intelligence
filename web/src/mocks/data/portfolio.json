@@ -21,5 +21,13 @@
     "aging": 82,
     "totalValue": 45000000,
     "healthGrade": "B"
+  },
+  "categoryScores": {
+    "Blue Emitter": 85,
+    "Green Emitter": 72,
+    "Red Emitter": 60,
+    "HTL": 68,
+    "ETL": 55,
+    "Encapsulation": 40
   }
 }

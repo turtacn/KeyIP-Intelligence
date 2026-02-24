@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { usePartners } from '../../hooks/usePartner';
 import { usePatents } from '../../hooks/usePatents';
@@ -11,6 +12,7 @@ import WhatIfSimulator from './WhatIfSimulator';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
 const PortfolioOptimizer: React.FC = () => {
+  const { t } = useTranslation();
   const { summary, scores, coverage } = usePortfolio();
   const { data: companies } = usePartners();
   const { data: patents } = usePatents();
@@ -45,11 +47,11 @@ const PortfolioOptimizer: React.FC = () => {
       <div className="bg-white border-b border-slate-200 sticky top-0 z-10 mb-6">
         <nav className="flex space-x-8 px-1 overflow-x-auto" aria-label="Portfolio Sections">
           {[
-            { id: 'panorama', label: 'Portfolio Panorama' },
-            { id: 'gap', label: 'Competitive Gap' },
-            { id: 'scoring', label: 'Value Scoring' },
-            { id: 'budget', label: 'Budget Optimizer' },
-            { id: 'simulator', label: 'What-If Simulator' },
+            { id: 'panorama', label: t('portfolio.nav.panorama') },
+            { id: 'gap', label: t('portfolio.nav.gap') },
+            { id: 'scoring', label: t('portfolio.nav.scoring') },
+            { id: 'budget', label: t('portfolio.nav.budget') },
+            { id: 'simulator', label: t('portfolio.nav.simulator') },
           ].map((item) => (
             <button
               key={item.id}
@@ -73,8 +75,8 @@ const PortfolioOptimizer: React.FC = () => {
           {/* Section 1: Panorama */}
           <div id="panorama" className="scroll-mt-6">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Portfolio Panorama</h2>
-              <p className="text-slate-500">Overview of portfolio health, value, and domain coverage.</p>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">{t('portfolio.panorama.title')}</h2>
+              <p className="text-slate-500">{t('portfolio.panorama.desc')}</p>
             </div>
             <PanoramaView summary={summary.data} loading={summary.loading} />
             <div className="mt-6">
@@ -85,7 +87,7 @@ const PortfolioOptimizer: React.FC = () => {
           {/* Section 2: Gap Analysis */}
           <div id="gap" className="scroll-mt-6">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Competitive Gap Analysis</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">{t('portfolio.gap.title')}</h2>
               <p className="text-slate-500">Compare patent coverage against key competitors across technology domains.</p>
             </div>
             <div className="h-[500px]">
@@ -96,7 +98,7 @@ const PortfolioOptimizer: React.FC = () => {
           {/* Section 3: Value Scoring */}
           <div id="scoring" className="scroll-mt-6">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Patent Value Scoring</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">{t('portfolio.scoring.title')}</h2>
               <p className="text-slate-500">AI-driven valuation of individual patent assets based on technical, legal, and commercial factors.</p>
             </div>
             <ValueScoring patents={patents || []} />
@@ -105,8 +107,8 @@ const PortfolioOptimizer: React.FC = () => {
           {/* Section 4: Budget */}
           <div id="budget" className="scroll-mt-6">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Budget Optimization</h2>
-              <p className="text-slate-500">Analyze maintenance costs and identify savings opportunities.</p>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">{t('portfolio.budget.title')}</h2>
+              <p className="text-slate-500">{t('portfolio.budget.desc')}</p>
             </div>
             <div className="h-[500px]">
               <BudgetOptimizer />
@@ -116,8 +118,8 @@ const PortfolioOptimizer: React.FC = () => {
           {/* Section 5: Simulator */}
           <div id="simulator" className="scroll-mt-6">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-2">What-If Simulator</h2>
-              <p className="text-slate-500">Simulate strategic moves and their impact on portfolio metrics.</p>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">{t('portfolio.simulator.title')}</h2>
+              <p className="text-slate-500">{t('portfolio.simulator.desc')}</p>
             </div>
             <div className="h-[500px]">
               <WhatIfSimulator />

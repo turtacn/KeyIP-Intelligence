@@ -5,26 +5,30 @@ import DataTable, { Column } from '../../components/ui/DataTable';
 import { Search } from 'lucide-react';
 import { patentService } from '../../services/patent.service';
 import { Patent } from '../../types/domain';
+import { useTranslation } from 'react-i18next';
 
 const PatentSearch: React.FC = () => {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'text' | 'structure'>('text');
   const [query, setQuery] = useState('');
   const [smiles, setSmiles] = useState('');
   const [similarity, setSimilarity] = useState(0.8);
   const [results, setResults] = useState<Patent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1 });
 
-  const handleSearch = async () => {
+  const handleSearch = async (page = 1) => {
     setLoading(true);
     try {
-      // Mock search logic using service (which returns mock data)
-      const response = await patentService.getPatents();
-      // Filter mock data based on query for demo purposes
-      const filtered = response.data.filter(p =>
-        p.title.toLowerCase().includes(query.toLowerCase()) ||
-        p.publicationNumber.toLowerCase().includes(query.toLowerCase())
-      );
-      setResults(filtered);
+      // Pass query to service for server-side filtering (mock)
+      const response = await patentService.getPatents(page, 20, query);
+      setResults(response.data);
+      if (response.pagination) {
+          setPagination({
+              currentPage: response.pagination.page,
+              totalPages: Math.ceil(response.pagination.total / response.pagination.pageSize)
+          });
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -51,7 +55,7 @@ const PatentSearch: React.FC = () => {
               mode === 'text' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            Text Search
+            {t('mining.search.mode_text', 'Text Search')}
           </button>
           <button
             onClick={() => setMode('structure')}
@@ -59,7 +63,7 @@ const PatentSearch: React.FC = () => {
               mode === 'structure' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            Structure Search
+             {t('mining.search.mode_structure', 'Structure Search')}
           </button>
         </div>
 
@@ -74,7 +78,8 @@ const PatentSearch: React.FC = () => {
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="e.g., Blue OLED Host Material"
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch(1)}
+                    placeholder={t('mining.search.placeholder_text', 'e.g., Blue OLED Host Material')}
                     className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -88,12 +93,12 @@ const PatentSearch: React.FC = () => {
                   type="text"
                   value={smiles}
                   onChange={(e) => setSmiles(e.target.value)}
-                  placeholder="Enter SMILES string..."
+                  placeholder={t('mining.search.placeholder_smiles', 'Enter SMILES string...')}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Similarity Threshold: {similarity}</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">{t('mining.search.similarity', 'Similarity Threshold')}: {similarity}</label>
                 <input
                   type="range"
                   min="0.5"
@@ -107,8 +112,8 @@ const PatentSearch: React.FC = () => {
             </>
           )}
 
-          <Button onClick={handleSearch} isLoading={loading} leftIcon={<Search className="w-4 h-4" />}>
-            Search
+          <Button onClick={() => handleSearch(1)} isLoading={loading} leftIcon={<Search className="w-4 h-4" />}>
+            {t('mining.search.btn_search', 'Search')}
           </Button>
         </div>
       </div>
@@ -118,7 +123,11 @@ const PatentSearch: React.FC = () => {
           columns={columns}
           data={results}
           isLoading={loading}
-          pagination={{ currentPage: 1, totalPages: 5, onPageChange: () => {} }}
+          pagination={{
+              currentPage: pagination.currentPage,
+              totalPages: pagination.totalPages,
+              onPageChange: (p) => handleSearch(p)
+          }}
         />
       </div>
     </Card>
