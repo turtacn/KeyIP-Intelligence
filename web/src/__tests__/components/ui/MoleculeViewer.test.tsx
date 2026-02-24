@@ -1,4 +1,4 @@
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import MoleculeViewer from '../../../components/ui/MoleculeViewer';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as rdkitLoader from '../../../utils/rdkitLoader';
