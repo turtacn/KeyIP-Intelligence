@@ -4,6 +4,7 @@
     "role": "知识产权经理"
   },
   "nav": {
+    "home": "主页",
     "dashboard": "管理驾驶舱",
     "mining": "专利挖掘",
     "infringement": "侵权监测",

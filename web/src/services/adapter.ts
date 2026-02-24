@@ -78,9 +78,10 @@ class FetchAdapter implements ApiAdapter {
 }
 
 // Environment-based base URL
+// Always use the full path prefix to match MSW handlers, even in mock mode.
 const mode = import.meta.env.VITE_API_MODE || 'mock';
 const isMock = mode === 'mock' || import.meta.env.DEV;
-const baseUrl = isMock ? '' : (import.meta.env.VITE_API_BASE_URL || '/api/openapi/v1');
+const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/openapi/v1';
 
 console.log('[ApiAdapter] Initialized', { mode, isMock, baseUrl });
 

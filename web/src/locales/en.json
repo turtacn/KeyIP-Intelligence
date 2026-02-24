@@ -4,6 +4,7 @@
     "role": "IP Manager"
   },
   "nav": {
+    "home": "Home",
     "dashboard": "Dashboard",
     "mining": "Patent Mining",
     "infringement": "Infringement Watch",
@@ -52,6 +53,200 @@
       "title": "Competitive Radar",
       "my_org": "My Organization",
       "leader": "Market Leader"
+    }
+  },
+  "mining": {
+    "title": "Patent Mining Workbench",
+    "tools_nav": "Mining Tools",
+    "tool_assessment": "Patentability Assessment",
+    "tool_whitespace": "White Space Discovery",
+    "tool_search": "Patent Search",
+    "tool_priorart": "Prior Art Analysis",
+    "tool_drafting": "Claim Draft Assistant",
+    "assessment": {
+      "title": "New Invention Details",
+      "smiles_label": "Target Molecule Structure (SMILES)",
+      "desc_label": "Technical Description",
+      "desc_placeholder": "Describe technical problem, solution and advantages...",
+      "btn_assess": "Assess Patentability",
+      "report_title": "Assessment Report",
+      "novelty": "Novelty",
+      "inventive": "Inventive Step",
+      "utility": "Utility Assessment",
+      "similar": "Similar Prior Art",
+      "recommendation": "Recommendation"
+    },
+    "search": {
+      "mode_text": "Text Search",
+      "mode_structure": "Structure Search",
+      "btn_search": "Search",
+      "placeholder_text": "Keywords / Patent Number",
+      "placeholder_smiles": "Enter SMILES string...",
+      "similarity": "Similarity Threshold"
+    }
+  },
+  "infringement": {
+    "title": "Infringement Watch Center",
+    "list_title": "Monitoring Alerts",
+    "refresh": "Refresh",
+    "filter_risk": "Risk Level",
+    "detail": {
+      "assignee": "Assignee",
+      "filing_date": "Filing Date",
+      "risk_assess": "Risk Assessment",
+      "literal": "Literal Infringement",
+      "doctrine": "Doctrine of Equivalents",
+      "abstract": "Abstract"
+    },
+    "comparison": {
+      "title": "Molecular Structure Comparison",
+      "trigger": "Trigger Molecule",
+      "patent_coverage": "Patent Coverage",
+      "extracted": "Extracted from Claim"
+    },
+    "claims": {
+      "title": "Claim Analysis",
+      "match": "Element Match"
+    },
+    "actions": {
+      "title": "Risk Mitigation Actions",
+      "report": "Generate FTO Report",
+      "design": "Design Around Suggestions",
+      "assign": "Assign to Legal Team",
+      "reviewed": "Mark as Reviewed"
+    },
+    "feed": {
+      "title": "Global Patent Live Feed",
+      "new": "NEW"
+    }
+  },
+  "portfolio": {
+    "title": "Portfolio Optimizer",
+    "nav": {
+      "panorama": "Portfolio Panorama",
+      "gap": "Competitive Gap",
+      "scoring": "Value Scoring",
+      "budget": "Budget Optimizer",
+      "simulator": "What-If Simulator"
+    },
+    "panorama": {
+      "title": "Portfolio Panorama",
+      "desc": "Overview of portfolio health, value, and domain coverage.",
+      "domain_analysis": "Domain Coverage Analysis"
+    },
+    "treemap": {
+      "title": "Technology Coverage Map"
+    },
+    "gap": {
+      "title": "Competitive Gap Matrix",
+      "select_comp": "Select Competitors",
+      "domain": "Technology Domain",
+      "my_org": "My Org"
+    },
+    "scoring": {
+      "title": "Patent Value Scoring",
+      "rank": "Rank",
+      "composite": "Composite Score",
+      "recommendation": "Recommendation",
+      "details": "Details",
+      "tech_val": "Technical Value",
+      "legal_val": "Legal Value",
+      "comm_val": "Commercial Value"
+    },
+    "budget": {
+      "title": "Budget Optimizer",
+      "desc": "Analyze maintenance costs and identify savings opportunities.",
+      "chart_title": "Annual Maintenance Cost by Jurisdiction",
+      "rec_title": "Optimization Recommendations",
+      "savings": "Potential Annual Savings",
+      "apply_btn": "Apply Optimization Plan"
+    },
+    "simulator": {
+      "title": "What-If Simulator",
+      "desc": "Simulate strategic moves and their impact on portfolio metrics.",
+      "builder_title": "Scenario Builder",
+      "name_label": "Scenario Name",
+      "action_label": "Simulation Action",
+      "run_btn": "Run Simulation",
+      "results_title": "Simulation Results",
+      "coverage": "Portfolio Coverage",
+      "value": "Total Value",
+      "risk": "Risk Exposure",
+      "current": "Current"
+    }
+  },
+  "lifecycle": {
+    "title": "Lifecycle Management",
+    "tabs": {
+      "calendar": "Deadline Calendar",
+      "annuity": "Annuity Management",
+      "status": "Legal Status Monitor"
+    },
+    "filters": {
+      "title": "Filters",
+      "jurisdiction": "Jurisdiction",
+      "type": "Event Type",
+      "date_range": "Due Date Range",
+      "urgency": "Urgency",
+      "reset": "Reset",
+      "apply": "Apply Filters"
+    },
+    "calendar": {
+      "title": "Deadline Calendar",
+      "mark_handled": "Mark as Handled",
+      "export": "Export CSV"
+    },
+    "annuity": {
+      "total_due": "Total Due This Year",
+      "completed": "Completed Payments",
+      "pending": "Pending Payments",
+      "projected": "Projected Next Year",
+      "table_title": "Annuity Payments",
+      "pay_btn": "Pay"
+    },
+    "status": {
+      "active_family": "Active Family",
+      "last_sync": "Last Sync"
+    }
+  },
+  "partners": {
+    "nav": {
+      "admin": "Partner Management (Admin)",
+      "agency": "Agency Workspace",
+      "counsel": "Legal Counsel Review",
+      "api": "API & Developer Portal"
+    },
+    "admin": {
+      "title": "Partner Management",
+      "add_btn": "Add Partner",
+      "table": {
+        "name": "Name",
+        "type": "Type",
+        "country": "Country",
+        "projects": "Active Projects",
+        "performance": "Performance",
+        "status": "Status",
+        "actions": "Actions"
+      }
+    },
+    "agency": {
+      "tasks_title": "Pending Tasks",
+      "files_title": "File Exchange",
+      "comm_title": "Communication Log",
+      "upload_hint": "Drag and drop files here or click to upload",
+      "recent_files": "Recent Files"
+    },
+    "counsel": {
+      "title": "External Legal Counsel Review",
+      "submit_btn": "Submit Review Opinion",
+      "opinion_label": "Legal Opinion",
+      "rating_label": "Final Risk Rating"
+    },
+    "api": {
+      "intro_title": "Introduction",
+      "endpoints_title": "Endpoints",
+      "auth_title": "Authentication",
+      "limits_title": "Rate Limits"
     }
   }
 }

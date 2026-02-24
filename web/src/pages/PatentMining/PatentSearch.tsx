@@ -20,8 +20,8 @@ const PatentSearch: React.FC = () => {
   const handleSearch = async (page = 1) => {
     setLoading(true);
     try {
-      // Pass query to service for server-side filtering (mock)
-      const response = await patentService.getPatents(page, 20, query);
+      const q = mode === 'text' ? query : smiles;
+      const response = await patentService.getPatents(page, 20, q, mode);
       setResults(response.data);
       if (response.pagination) {
           setPagination({

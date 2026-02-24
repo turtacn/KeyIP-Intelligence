@@ -3,8 +3,8 @@ import { Patent } from '../types/domain';
 import { ApiResponse } from '../types/api';
 
 export const patentService = {
-  async getPatents(page = 1, pageSize = 20, query = ''): Promise<ApiResponse<Patent[]>> {
-    return api.get<ApiResponse<Patent[]>>('/patents', { page, pageSize, query });
+  async getPatents(page = 1, pageSize = 20, query = '', searchType = 'text'): Promise<ApiResponse<Patent[]>> {
+    return api.get<ApiResponse<Patent[]>>('/patents', { page, pageSize, query, searchType });
   },
 
   async getPatentById(id: string): Promise<ApiResponse<Patent>> {

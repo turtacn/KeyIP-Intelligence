@@ -1,5 +1,6 @@
 import React from 'react';
 import Card from '../../components/ui/Card';
+import { useTranslation } from 'react-i18next';
 
 interface CoverageTreemapProps {
   data: { [key: string]: number }; // category -> count
@@ -7,13 +8,14 @@ interface CoverageTreemapProps {
 }
 
 const CoverageTreemap: React.FC<CoverageTreemapProps> = ({ data, scores }) => {
+  const { t } = useTranslation();
   const total = Object.values(data).reduce((acc, curr) => acc + curr, 0);
 
   // Sort by size desc for simple layout (not true treemap algorithm but close enough for grid)
   const sortedCategories = Object.entries(data).sort((a, b) => b[1] - a[1]);
 
   return (
-    <Card header="Technology Coverage Map" padding="none" className="h-[400px] flex flex-col overflow-hidden">
+    <Card header={t('portfolio.treemap.title', 'Technology Coverage Map')} padding="none" className="h-[400px] flex flex-col overflow-hidden">
       <div className="flex-1 flex flex-wrap content-start p-1">
         {sortedCategories.map(([category, count]) => {
           const percentage = (count / total) * 100;
