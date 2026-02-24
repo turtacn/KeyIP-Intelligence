@@ -10,6 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { useTranslation } from 'react-i18next';
 
 interface TrendChartProps {
   data: { month: string; filed: number; granted: number }[];
@@ -17,8 +18,10 @@ interface TrendChartProps {
 }
 
 const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
+  const { t } = useTranslation();
+
   return (
-    <Card header="Monthly Application Trend" padding="none" className="h-80">
+    <Card header={t('dashboard.trend.title')} padding="none" className="h-80">
       {loading ? (
         <div className="flex items-center justify-center h-full">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -44,7 +47,7 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
             <Line
               type="monotone"
               dataKey="filed"
-              name="Filed"
+              name={t('dashboard.trend.filed')}
               stroke="#3b82f6"
               strokeWidth={2}
               dot={{ r: 4, strokeWidth: 2 }}
@@ -53,7 +56,7 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
             <Line
               type="monotone"
               dataKey="granted"
-              name="Granted"
+              name={t('dashboard.trend.granted')}
               stroke="#10b981"
               strokeWidth={2}
               dot={{ r: 4, strokeWidth: 2 }}

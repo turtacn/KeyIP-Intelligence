@@ -14,14 +14,31 @@ class FetchAdapter implements ApiAdapter {
   }
 
   private async request<T>(path: string, options: RequestInit): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, options);
+    const fullUrl = `${this.baseUrl}${path}`;
+    console.log(`[API] Requesting: ${fullUrl}`, options);
 
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    try {
+      const response = await fetch(fullUrl, options);
+      console.log(`[API] Response status: ${response.status} for ${fullUrl}`);
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error(`[API] Expected JSON but got ${contentType}:`, text.substring(0, 100));
+        // This is often where "Unexpected token <" comes from (HTML fallback)
+        throw new Error(`Invalid response format: ${contentType}`);
+      }
+
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      console.error(`[API] Fetch failed for ${fullUrl}:`, error);
+      throw error;
     }
-
-    const result = await response.json();
-    return result.data; // Unwrapping the envelope based on ApiResponse<T>
   }
 
   async get<T>(path: string, params?: Record<string, unknown>): Promise<T> {
@@ -61,11 +78,10 @@ class FetchAdapter implements ApiAdapter {
 }
 
 // Environment-based base URL
-// In mock mode, we use relative paths which MSW intercepts
-// In real mode, we use the VITE_API_BASE_URL
-// Default to 'mock' if not specified, to align with Docker all-in-one default
 const mode = import.meta.env.VITE_API_MODE || 'mock';
 const isMock = mode === 'mock' || import.meta.env.DEV;
 const baseUrl = isMock ? '' : (import.meta.env.VITE_API_BASE_URL || '/api/openapi/v1');
+
+console.log('[ApiAdapter] Initialized', { mode, isMock, baseUrl });
 
 export const api = new FetchAdapter(baseUrl);

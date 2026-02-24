@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { useTranslation } from 'react-i18next';
 
 interface CompetitorRadarProps {
   data: {
@@ -22,8 +23,10 @@ interface CompetitorRadarProps {
 }
 
 const CompetitorRadar: React.FC<CompetitorRadarProps> = ({ data, loading }) => {
+  const { t } = useTranslation();
+
   return (
-    <Card header="Competitive Radar" padding="none" className="h-80">
+    <Card header={t('dashboard.radar.title')} padding="none" className="h-80">
       {loading ? (
         <div className="flex items-center justify-center h-full">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -35,14 +38,14 @@ const CompetitorRadar: React.FC<CompetitorRadarProps> = ({ data, loading }) => {
             <PolarAngleAxis dataKey="subject" />
             <PolarRadiusAxis angle={30} domain={[0, 100]} />
             <Radar
-              name="My Organization"
+              name={t('dashboard.radar.my_org')}
               dataKey="A"
               stroke="#8884d8"
               fill="#8884d8"
               fillOpacity={0.6}
             />
             <Radar
-              name="Market Leader"
+              name={t('dashboard.radar.leader')}
               dataKey="B"
               stroke="#82ca9d"
               fill="#82ca9d"

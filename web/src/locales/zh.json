@@ -14,6 +14,7 @@
   "dashboard": {
     "title": "管理驾驶舱",
     "subtitle": "您的专利组合和战略 KPI 的实时概览。",
+    "search_placeholder": "搜索专利、分子式、公司...",
     "export": "导出报告",
     "add_patent": "新增专利",
     "kpi": {
@@ -21,6 +22,36 @@
       "active_patents": "有效专利",
       "high_risk": "高风险预警",
       "due_month": "本月到期"
+    },
+    "trend": {
+      "title": "月度申请趋势",
+      "filed": "申请量",
+      "granted": "授权量"
+    },
+    "jurisdiction": {
+      "title": "司法管辖区分布"
+    },
+    "deadlines": {
+      "title": "即将到期",
+      "patent_id": "专利号",
+      "event": "事件",
+      "jurisdiction": "地区",
+      "due_date": "截止日期",
+      "status": "状态"
+    },
+    "alerts": {
+      "title": "近期侵权预警",
+      "id": "预警ID",
+      "risk": "风险等级",
+      "target": "目标专利",
+      "detected": "检测时间",
+      "action": "操作",
+      "view": "查看"
+    },
+    "radar": {
+      "title": "竞争雷达",
+      "my_org": "本机构",
+      "leader": "市场领袖"
     }
   }
 }

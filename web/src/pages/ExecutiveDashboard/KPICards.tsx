@@ -2,6 +2,7 @@ import React from 'react';
 import Card from '../../components/ui/Card';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { DashboardMetrics } from '../../types/domain';
+import { useTranslation } from 'react-i18next';
 
 interface KPICardsProps {
   metrics: DashboardMetrics;
@@ -9,6 +10,8 @@ interface KPICardsProps {
 }
 
 const KPICards: React.FC<KPICardsProps> = ({ metrics, loading }) => {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -23,29 +26,29 @@ const KPICards: React.FC<KPICardsProps> = ({ metrics, loading }) => {
 
   const kpis = [
     {
-      label: 'Total Patents',
+      label: t('dashboard.kpi.total_patents'),
       value: metrics.totalPatents,
       trend: '+12%',
       trendUp: true,
       color: 'bg-blue-50 text-blue-700',
     },
     {
-      label: 'Active Patents',
+      label: t('dashboard.kpi.active_patents'),
       value: metrics.activePatents,
       trend: '+5%',
       trendUp: true,
       color: 'bg-green-50 text-green-700',
     },
     {
-      label: 'High Risk Alerts',
+      label: t('dashboard.kpi.high_risk'),
       value: metrics.highRiskAlerts,
       trend: '-2',
-      trendUp: false, // Good that it's down, but visually down arrow
+      trendUp: false,
       trendGood: true,
       color: 'bg-red-50 text-red-700',
     },
     {
-      label: 'Due This Month',
+      label: t('dashboard.kpi.due_month'),
       value: metrics.dueThisMonth,
       trend: '+3',
       trendUp: true,
@@ -64,7 +67,6 @@ const KPICards: React.FC<KPICardsProps> = ({ metrics, loading }) => {
               <h3 className="text-3xl font-bold text-slate-900">{kpi.value}</h3>
             </div>
             <div className={`p-2 rounded-lg ${kpi.color}`}>
-              {/* Icon placeholder or just color block */}
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">

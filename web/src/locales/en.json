@@ -14,6 +14,7 @@
   "dashboard": {
     "title": "Executive Dashboard",
     "subtitle": "Real-time overview of your patent portfolio and strategic KPIs.",
+    "search_placeholder": "Search patents, molecules, companies...",
     "export": "Export Report",
     "add_patent": "Add New Patent",
     "kpi": {
@@ -21,6 +22,36 @@
       "active_patents": "Active Patents",
       "high_risk": "High Risk Alerts",
       "due_month": "Due This Month"
+    },
+    "trend": {
+      "title": "Monthly Application Trend",
+      "filed": "Filed",
+      "granted": "Granted"
+    },
+    "jurisdiction": {
+      "title": "Jurisdiction Breakdown"
+    },
+    "deadlines": {
+      "title": "Upcoming Deadlines",
+      "patent_id": "Patent No.",
+      "event": "Event Type",
+      "jurisdiction": "Jurisdiction",
+      "due_date": "Due Date",
+      "status": "Status"
+    },
+    "alerts": {
+      "title": "Recent Infringement Alerts",
+      "id": "Alert ID",
+      "risk": "Risk Level",
+      "target": "Target Patent",
+      "detected": "Detected",
+      "action": "Action",
+      "view": "View"
+    },
+    "radar": {
+      "title": "Competitive Radar",
+      "my_org": "My Organization",
+      "leader": "Market Leader"
     }
   }
 }
