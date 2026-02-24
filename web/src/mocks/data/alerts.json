@@ -38,5 +38,35 @@
     "docScore": 0.82,
     "detectedAt": "2024-06-08T11:45:00Z",
     "status": "escalated"
+  },
+  {
+    "id": "alert_005",
+    "targetPatentId": "pat_010",
+    "triggerMoleculeId": "mol_009",
+    "riskLevel": "HIGH",
+    "literalScore": 0.95,
+    "docScore": 0.89,
+    "detectedAt": "2024-06-18T16:00:00Z",
+    "status": "new"
+  },
+  {
+    "id": "alert_006",
+    "targetPatentId": "pat_007",
+    "triggerMoleculeId": "mol_006",
+    "riskLevel": "MEDIUM",
+    "literalScore": 0.70,
+    "docScore": 0.60,
+    "detectedAt": "2024-06-17T11:00:00Z",
+    "status": "new"
+  },
+  {
+    "id": "alert_007",
+    "targetPatentId": "pat_008",
+    "triggerMoleculeId": "mol_005",
+    "riskLevel": "LOW",
+    "literalScore": 0.40,
+    "docScore": 0.30,
+    "detectedAt": "2024-06-16T09:30:00Z",
+    "status": "reviewed"
   }
 ]

@@ -42,5 +42,55 @@
       { "type": "Emission", "value": 510, "unit": "nm" },
       { "type": "Triplet Energy", "value": 2.6, "unit": "eV" }
     ]
+  },
+  {
+    "id": "mol_005",
+    "name": "mCP",
+    "smiles": "c1ccccc1n2c3ccccc3c4ccccc42.c1ccccc1n2c3ccccc3c4ccccc42",
+    "molecularWeight": 484.59,
+    "properties": [
+      { "type": "Triplet Energy", "value": 2.9, "unit": "eV" },
+      { "type": "HOMO", "value": -6.1, "unit": "eV" }
+    ]
+  },
+  {
+    "id": "mol_006",
+    "name": "Ir(ppy)3",
+    "smiles": "[Ir].c1ccc[n-]1c2ccccc2.c1ccc[n-]1c2ccccc2.c1ccc[n-]1c2ccccc2",
+    "molecularWeight": 654.78,
+    "properties": [
+      { "type": "Emission", "value": 515, "unit": "nm" },
+      { "type": "PLQY", "value": 98, "unit": "%" }
+    ]
+  },
+  {
+    "id": "mol_007",
+    "name": "TCTA",
+    "smiles": "c1ccc(cc1)N(c2ccc(cc2)n3c4ccccc4c5ccccc53)c6ccc(cc6)n7c8ccccc8c9ccccc97",
+    "molecularWeight": 740.91,
+    "properties": [
+      { "type": "HOMO", "value": -5.7, "unit": "eV" },
+      { "type": "Tg", "value": 151, "unit": "°C" }
+    ]
+  },
+  {
+    "id": "mol_008",
+    "name": "FIrpic",
+    "smiles": "[Ir].FC1=CC(F)=C(C2=CC=CC=[N-]2)C=C1.FC3=CC(F)=C(C4=CC=CC=[N-]4)C=C3.O=C([O-])C5=NC=CC=C5",
+    "molecularWeight": 694.58,
+    "properties": [
+      { "type": "Emission", "value": 470, "unit": "nm" },
+      { "type": "PLQY", "value": 85, "unit": "%" }
+    ]
+  },
+  {
+    "id": "mol_009",
+    "name": "DMAC-DPS",
+    "smiles": "CC(C)(C)c1ccc(cc1)N(c2ccc(cc2)C(C)(C)C)c3ccc(cc3)S(=O)(=O)c4ccccc4",
+    "molecularWeight": 589.84,
+    "properties": [
+      { "type": "Emission", "value": 460, "unit": "nm" },
+      { "type": "Triplet Energy", "value": 2.95, "unit": "eV" }
+    ]
   }
 ]

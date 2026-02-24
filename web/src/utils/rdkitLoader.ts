@@ -1,6 +1,7 @@
 declare global {
   interface Window {
-    initRDKitModule: () => Promise<RDKitModule>;
+    // Use any to avoid conflicts with external type definitions
+    initRDKitModule: any;
   }
 }
 

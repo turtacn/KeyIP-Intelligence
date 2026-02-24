@@ -34,7 +34,8 @@ class FetchAdapter implements ApiAdapter {
       }
 
       const result = await response.json();
-      return result.data;
+      // Return the full response object, assuming T is ApiResponse<D>
+      return result;
     } catch (error) {
       console.error(`[API] Fetch failed for ${fullUrl}:`, error);
       throw error;

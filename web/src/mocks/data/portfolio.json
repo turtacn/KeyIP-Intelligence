@@ -1,11 +1,11 @@
 {
   "summary": {
-    "totalPatents": 142,
-    "granted": 87,
-    "pending": 45,
+    "totalPatents": 158,
+    "granted": 95,
+    "pending": 53,
     "lapsed": 10,
-    "totalValue": 45000000,
-    "healthGrade": "B"
+    "totalValue": 48500000,
+    "healthGrade": "B+"
   },
   "coverage": {
     "Blue Emitter": 45,
@@ -19,8 +19,8 @@
     "coverage": 78,
     "concentration": 65,
     "aging": 82,
-    "totalValue": 45000000,
-    "healthGrade": "B",
+    "totalValue": 48500000,
+    "healthGrade": "B+",
     "Blue Emitter": 85,
     "Green Emitter": 72,
     "Red Emitter": 60,
