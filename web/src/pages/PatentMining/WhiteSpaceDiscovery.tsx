@@ -28,7 +28,7 @@ const WhiteSpaceDiscovery: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-      <Card className="lg:col-span-1 h-full flex flex-col">
+      <Card className="lg:col-span-1 h-full flex flex-col" bodyClassName="flex flex-col">
         <h3 className="text-lg font-semibold text-slate-800 mb-4">Discovery Parameters</h3>
         <div className="space-y-4 flex-1">
           <div>
@@ -67,7 +67,7 @@ const WhiteSpaceDiscovery: React.FC = () => {
         </div>
       </Card>
 
-      <Card className="lg:col-span-2 h-[500px] flex flex-col">
+      <Card className="lg:col-span-2 h-[500px] flex flex-col" bodyClassName="flex flex-col">
         <h3 className="text-lg font-semibold text-slate-800 mb-2">Molecular Space Map</h3>
         <p className="text-sm text-slate-500 mb-4">Visualizing patented vs. potential candidate space based on electronic properties.</p>
 
