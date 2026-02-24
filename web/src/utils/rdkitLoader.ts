@@ -1,9 +1,3 @@
-declare global {
-  interface Window {
-    initRDKitModule: () => Promise<RDKitModule>;
-  }
-}
-
 export interface RDKitModule {
   get_mol: (smiles: string) => RDKitMolecule | null;
   version: () => string;
@@ -21,8 +15,10 @@ export const getRDKit = (): Promise<RDKitModule> => {
   if (!rdkitPromise) {
     rdkitPromise = new Promise((resolve, reject) => {
       // Prioritize global loader if available (e.g. script tag)
-      if (window.initRDKitModule) {
-        window.initRDKitModule()
+      // Cast window to any to avoid TS2717 conflict if types are loaded globally
+      const win = window as any;
+      if (win.initRDKitModule) {
+        win.initRDKitModule()
           .then(resolve)
           .catch(reject);
       } else {
@@ -39,6 +35,21 @@ export const getRDKit = (): Promise<RDKitModule> => {
 
                  // Type casting to any to bypass strict type check for now on loader signature
                  const initFn = loader as any;
+
+                 initFn({
+                    locateFile: (file: string) => {
+                        if (file.endsWith('.wasm')) return '/' + file;
+                        return file;
+                    }
+                 }).then((instance: any) => {
+                     resolve(instance as RDKitModule);
+                 }).catch((e: any) => {
+                     console.error("RDKit initialization failed", e);
+                     reject(e);
+                 });
+             } else if (typeof loader === 'object' && typeof loader.default === 'function') {
+                 // Handle ESM interop where default is the function
+                 const initFn = loader.default as any;
 
                  initFn({
                     locateFile: (file: string) => {

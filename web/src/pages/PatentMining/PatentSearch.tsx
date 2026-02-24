@@ -40,7 +40,7 @@ const PatentSearch: React.FC = () => {
   const columns: Column<Patent>[] = [
     {
       header: 'Structure',
-      accessor: (row) => {
+      accessor: (_row) => {
         // Mocking structure extraction from abstract or claims for preview
         // In real app, patent object should have a `previewSmiles` or similar field
         // For demo, we use a placeholder or extract if available
