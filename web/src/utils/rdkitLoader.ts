@@ -1,10 +1,3 @@
-declare global {
-  interface Window {
-    // Use any to avoid conflicts with external type definitions
-    initRDKitModule: any;
-  }
-}
-
 export interface RDKitModule {
   get_mol: (smiles: string) => RDKitMolecule | null;
   version: () => string;

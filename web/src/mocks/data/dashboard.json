@@ -1,10 +1,9 @@
 {
-  "kpiMetrics": {
-    "totalPatents": 142,
-    "activePatents": 128,
-    "highRiskAlerts": 4,
-    "dueThisMonth": 7
-  },
+  "totalPatents": 158,
+  "activePatents": 142,
+  "pendingPatents": 10,
+  "highRiskAlerts": 7,
+  "dueThisMonth": 7,
   "monthlyApplicationTrend": [
     { "month": "Jan", "filed": 5, "granted": 2 },
     { "month": "Feb", "filed": 3, "granted": 1 },
@@ -14,14 +13,14 @@
     { "month": "Jun", "filed": 8, "granted": 2 }
   ],
   "jurisdictionBreakdown": [
-    { "jurisdiction": "CN", "count": 55 },
-    { "jurisdiction": "US", "count": 32 },
+    { "jurisdiction": "CN", "count": 65 },
+    { "jurisdiction": "US", "count": 38 },
     { "jurisdiction": "EP", "count": 28 },
     { "jurisdiction": "JP", "count": 15 },
     { "jurisdiction": "KR", "count": 12 }
   ],
   "competitorComparison": [
-    { "name": "Organization", "portfolioSize": 142 },
+    { "name": "Organization", "portfolioSize": 158 },
     { "name": "Samsung SDI", "portfolioSize": 12500 },
     { "name": "LG Chem", "portfolioSize": 9800 },
     { "name": "UDC", "portfolioSize": 4500 }
