@@ -1,0 +1,252 @@
+{
+  "app": {
+    "title": "KeyIP Intelligence",
+    "role": "IPマネージャー"
+  },
+  "nav": {
+    "home": "ホーム",
+    "dashboard": "ダッシュボード",
+    "mining": "特許マイニング",
+    "infringement": "侵害監視",
+    "portfolio": "ポートフォリオ最適化",
+    "lifecycle": "ライフサイクル管理",
+    "partners": "パートナーポータル"
+  },
+  "dashboard": {
+    "title": "エグゼクティブ・ダッシュボード",
+    "subtitle": "特許ポートフォリオと戦略的KPIのリアルタイム概要。",
+    "search_placeholder": "特許、分子、企業を検索...",
+    "export": "レポートをエクスポート",
+    "add_patent": "特許を追加",
+    "kpi": {
+      "total_patents": "特許総数",
+      "active_patents": "有効特許",
+      "high_risk": "高リスクアラート",
+      "due_month": "今月の期限"
+    },
+    "trend": {
+      "title": "月次出願傾向",
+      "filed": "出願済み",
+      "granted": "登録済み"
+    },
+    "jurisdiction": {
+      "title": "管轄区域別内訳"
+    },
+    "deadlines": {
+      "title": "今後の期限",
+      "patent_id": "特許番号",
+      "event": "イベントタイプ",
+      "jurisdiction": "管轄",
+      "due_date": "期日",
+      "status": "ステータス"
+    },
+    "alerts": {
+      "title": "最近の侵害アラート",
+      "id": "アラートID",
+      "risk": "リスクレベル",
+      "target": "対象特許",
+      "detected": "検知日",
+      "action": "アクション",
+      "view": "表示"
+    },
+    "radar": {
+      "title": "競合レーダー",
+      "my_org": "自社組織",
+      "leader": "マーケットリーダー"
+    }
+  },
+  "mining": {
+    "title": "特許マイニングワークベンチ",
+    "tools_nav": "マイニングツール",
+    "tool_assessment": "特許性評価",
+    "tool_whitespace": "ホワイトスペース発見",
+    "tool_search": "特許検索",
+    "tool_priorart": "先行技術分析",
+    "tool_drafting": "請求項ドラフト支援",
+    "assessment": {
+      "title": "新規発明の詳細",
+      "smiles_label": "ターゲット分子構造 (SMILES)",
+      "desc_label": "技術的説明",
+      "desc_placeholder": "技術的な課題、解決策、利点を説明してください...",
+      "btn_assess": "特許性を評価",
+      "report_title": "評価レポート",
+      "novelty": "新規性",
+      "inventive": "進歩性",
+      "utility": "有用性評価",
+      "similar": "類似先行技術",
+      "recommendation": "推奨事項"
+    },
+    "search": {
+      "mode_text": "テキスト検索",
+      "mode_structure": "構造検索",
+      "btn_search": "検索",
+      "placeholder_text": "キーワード / 特許番号",
+      "placeholder_smiles": "SMILES文字列を入力...",
+      "similarity": "類似度しきい値"
+    }
+  },
+  "infringement": {
+    "title": "侵害監視センター",
+    "list_title": "監視アラート",
+    "refresh": "更新",
+    "filter_risk": "リスクレベル",
+    "detail": {
+      "assignee": "権利者",
+      "filing_date": "出願日",
+      "risk_assess": "リスク評価",
+      "literal": "文言侵害",
+      "doctrine": "均等論",
+      "abstract": "要約"
+    },
+    "comparison": {
+      "title": "分子構造比較",
+      "trigger": "トリガー分子",
+      "patent_coverage": "特許範囲",
+      "extracted": "請求項から抽出"
+    },
+    "claims": {
+      "title": "請求項分析",
+      "match": "要素一致"
+    },
+    "actions": {
+      "title": "リスク軽減措置",
+      "report": "FTOレポート作成",
+      "design": "回避設計案",
+      "assign": "法務チームに割り当て",
+      "reviewed": "レビュー済みにする"
+    },
+    "feed": {
+      "title": "世界特許ライブフィード",
+      "new": "新規"
+    }
+  },
+  "portfolio": {
+    "title": "ポートフォリオ最適化",
+    "nav": {
+      "panorama": "ポートフォリオパノラマ",
+      "gap": "競合ギャップ",
+      "scoring": "価値スコアリング",
+      "budget": "予算オプティマイザ",
+      "simulator": "What-Ifシミュレータ"
+    },
+    "panorama": {
+      "title": "ポートフォリオパノラマ",
+      "desc": "ポートフォリオの健全性、価値、領域カバレッジの概要。",
+      "domain_analysis": "領域カバレッジ分析"
+    },
+    "treemap": {
+      "title": "技術カバレッジマップ"
+    },
+    "gap": {
+      "title": "競合ギャップマトリックス",
+      "select_comp": "競合他社を選択",
+      "domain": "技術領域",
+      "my_org": "自社"
+    },
+    "scoring": {
+      "title": "特許価値スコアリング",
+      "rank": "ランク",
+      "composite": "総合スコア",
+      "recommendation": "推奨",
+      "details": "詳細",
+      "tech_val": "技術的価値",
+      "legal_val": "法的価値",
+      "comm_val": "商業的価値"
+    },
+    "budget": {
+      "title": "予算オプティマイザ",
+      "desc": "維持費を分析し、節約の機会を特定します。",
+      "chart_title": "管轄区域別の年間維持費",
+      "rec_title": "最適化の推奨事項",
+      "savings": "潜在的な年間節約額",
+      "apply_btn": "最適化プランを適用"
+    },
+    "simulator": {
+      "title": "What-Ifシミュレータ",
+      "desc": "戦略的動きとポートフォリオ指標への影響をシミュレート。",
+      "builder_title": "シナリオビルダー",
+      "name_label": "シナリオ名",
+      "action_label": "シミュレーションアクション",
+      "run_btn": "シミュレーション実行",
+      "results_title": "シミュレーション結果",
+      "coverage": "ポートフォリオカバレッジ",
+      "value": "総価値",
+      "risk": "リスクエクスポージャー",
+      "current": "現在"
+    }
+  },
+  "lifecycle": {
+    "title": "ライフサイクル管理",
+    "tabs": {
+      "calendar": "期限カレンダー",
+      "annuity": "年金管理",
+      "status": "法的ステータス監視"
+    },
+    "filters": {
+      "title": "フィルター",
+      "jurisdiction": "管轄区域",
+      "type": "イベントタイプ",
+      "date_range": "期日範囲",
+      "urgency": "緊急度",
+      "reset": "リセット",
+      "apply": "フィルター適用"
+    },
+    "calendar": {
+      "title": "期限カレンダー",
+      "mark_handled": "処理済みにする",
+      "export": "CSVエクスポート"
+    },
+    "annuity": {
+      "total_due": "今年の支払総額",
+      "completed": "支払完了",
+      "pending": "支払待ち",
+      "projected": "来年の予測",
+      "table_title": "年金支払い",
+      "pay_btn": "支払う"
+    },
+    "status": {
+      "active_family": "アクティブなファミリー",
+      "last_sync": "最終同期"
+    }
+  },
+  "partners": {
+    "nav": {
+      "admin": "パートナー管理 (管理者)",
+      "agency": "代理店ワークスペース",
+      "counsel": "法務顧問レビュー",
+      "api": "API & 開発者ポータル"
+    },
+    "admin": {
+      "title": "パートナー管理",
+      "add_btn": "パートナー追加",
+      "table": {
+        "name": "名前",
+        "type": "タイプ",
+        "country": "国",
+        "projects": "アクティブなプロジェクト",
+        "performance": "パフォーマンス",
+        "status": "ステータス",
+        "actions": "アクション"
+      }
+    },
+    "agency": {
+      "tasks_title": "保留中のタスク",
+      "files_title": "ファイル交換",
+      "comm_title": "通信ログ",
+      "upload_hint": "ファイルをここにドラッグ＆ドロップまたはクリックしてアップロード",
+      "recent_files": "最近のファイル"
+    },
+    "counsel": {
+      "title": "外部法務顧問レビュー",
+      "submit_btn": "レビュー意見を提出",
+      "opinion_label": "法的意見",
+      "rating_label": "最終リスク評価"
+    },
+    "api": {
+      "intro_title": "はじめに",
+      "endpoints_title": "エンドポイント",
+      "auth_title": "認証",
+      "limits_title": "レート制限"
+    }
+  }
+}

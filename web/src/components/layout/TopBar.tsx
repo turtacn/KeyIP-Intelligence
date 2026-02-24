@@ -5,9 +5,8 @@ import { useTranslation } from 'react-i18next';
 const TopBar: React.FC = () => {
   const { i18n, t } = useTranslation();
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'zh' ? 'en' : 'zh';
-    i18n.changeLanguage(newLang);
+  const changeLanguage = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    i18n.changeLanguage(e.target.value);
   };
 
   return (
@@ -25,14 +24,22 @@ const TopBar: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          <button
-            onClick={toggleLanguage}
-            className="flex items-center space-x-1 px-3 py-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
-            title="Switch Language"
-          >
-            <Globe className="w-5 h-5" />
-            <span className="text-sm font-medium">{i18n.language === 'zh' ? 'EN' : '中文'}</span>
-          </button>
+          <div className="relative flex items-center">
+            <Globe className="w-5 h-5 text-slate-600 absolute left-3 pointer-events-none" />
+            <select
+              value={i18n.language}
+              onChange={changeLanguage}
+              className="pl-10 pr-4 py-2 bg-transparent rounded-lg hover:bg-slate-100 text-slate-600 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              title="Switch Language"
+            >
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="ja">日本語</option>
+              <option value="ko">한국어</option>
+            </select>
+          </div>
 
           <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors relative">
             <Bell className="w-5 h-5" />

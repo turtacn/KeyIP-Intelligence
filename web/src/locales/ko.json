@@ -1,0 +1,252 @@
+{
+  "app": {
+    "title": "KeyIP Intelligence",
+    "role": "IP 관리자"
+  },
+  "nav": {
+    "home": "홈",
+    "dashboard": "대시보드",
+    "mining": "특허 마이닝",
+    "infringement": "침해 감시",
+    "portfolio": "포트폴리오 최적화",
+    "lifecycle": "수명 주기 관리",
+    "partners": "파트너 포털"
+  },
+  "dashboard": {
+    "title": "경영진 대시보드",
+    "subtitle": "특허 포트폴리오 및 전략적 KPI에 대한 실시간 개요.",
+    "search_placeholder": "특허, 분자, 회사 검색...",
+    "export": "보고서 내보내기",
+    "add_patent": "특허 추가",
+    "kpi": {
+      "total_patents": "총 특허",
+      "active_patents": "유효 특허",
+      "high_risk": "고위험 경고",
+      "due_month": "이번 달 마감"
+    },
+    "trend": {
+      "title": "월별 출원 추세",
+      "filed": "출원됨",
+      "granted": "등록됨"
+    },
+    "jurisdiction": {
+      "title": "관할 구역별 내역"
+    },
+    "deadlines": {
+      "title": "다가오는 마감일",
+      "patent_id": "특허 번호",
+      "event": "이벤트 유형",
+      "jurisdiction": "관할 구역",
+      "due_date": "마감일",
+      "status": "상태"
+    },
+    "alerts": {
+      "title": "최근 침해 경고",
+      "id": "경고 ID",
+      "risk": "위험 수준",
+      "target": "대상 특허",
+      "detected": "탐지됨",
+      "action": "조치",
+      "view": "보기"
+    },
+    "radar": {
+      "title": "경쟁 레이더",
+      "my_org": "우리 조직",
+      "leader": "시장 리더"
+    }
+  },
+  "mining": {
+    "title": "특허 마이닝 워크벤치",
+    "tools_nav": "마이닝 도구",
+    "tool_assessment": "특허성 평가",
+    "tool_whitespace": "공백 영역 발견",
+    "tool_search": "특허 검색",
+    "tool_priorart": "선행 기술 분석",
+    "tool_drafting": "청구항 작성 지원",
+    "assessment": {
+      "title": "새로운 발명 세부 정보",
+      "smiles_label": "목표 분자 구조 (SMILES)",
+      "desc_label": "기술적 설명",
+      "desc_placeholder": "기술적 문제, 해결책 및 장점을 설명하십시오...",
+      "btn_assess": "특허성 평가",
+      "report_title": "평가 보고서",
+      "novelty": "신규성",
+      "inventive": "진보성",
+      "utility": "유용성 평가",
+      "similar": "유사 선행 기술",
+      "recommendation": "권장 사항"
+    },
+    "search": {
+      "mode_text": "텍스트 검색",
+      "mode_structure": "구조 검색",
+      "btn_search": "검색",
+      "placeholder_text": "키워드 / 특허 번호",
+      "placeholder_smiles": "SMILES 문자열 입력...",
+      "similarity": "유사도 임계값"
+    }
+  },
+  "infringement": {
+    "title": "침해 감시 센터",
+    "list_title": "감시 경고",
+    "refresh": "새로 고침",
+    "filter_risk": "위험 수준",
+    "detail": {
+      "assignee": "양수인",
+      "filing_date": "출원일",
+      "risk_assess": "위험 평가",
+      "literal": "문언 침해",
+      "doctrine": "균등론",
+      "abstract": "초록"
+    },
+    "comparison": {
+      "title": "분자 구조 비교",
+      "trigger": "트리거 분자",
+      "patent_coverage": "특허 범위",
+      "extracted": "청구항에서 추출"
+    },
+    "claims": {
+      "title": "청구항 분석",
+      "match": "요소 일치"
+    },
+    "actions": {
+      "title": "위험 완화 조치",
+      "report": "FTO 보고서 생성",
+      "design": "회피 설계 제안",
+      "assign": "법무팀에 할당",
+      "reviewed": "검토 완료로 표시"
+    },
+    "feed": {
+      "title": "글로벌 특허 실시간 피드",
+      "new": "신규"
+    }
+  },
+  "portfolio": {
+    "title": "포트폴리오 최적화",
+    "nav": {
+      "panorama": "포트폴리오 파노라마",
+      "gap": "경쟁 격차",
+      "scoring": "가치 점수",
+      "budget": "예산 최적화",
+      "simulator": "가상 시뮬레이터"
+    },
+    "panorama": {
+      "title": "포트폴리오 파노라마",
+      "desc": "포트폴리오 건전성, 가치 및 도메인 범위 개요.",
+      "domain_analysis": "도메인 범위 분석"
+    },
+    "treemap": {
+      "title": "기술 범위 지도"
+    },
+    "gap": {
+      "title": "경쟁 격차 매트릭스",
+      "select_comp": "경쟁사 선택",
+      "domain": "기술 도메인",
+      "my_org": "우리 조직"
+    },
+    "scoring": {
+      "title": "특허 가치 점수",
+      "rank": "순위",
+      "composite": "종합 점수",
+      "recommendation": "권장 사항",
+      "details": "세부 정보",
+      "tech_val": "기술적 가치",
+      "legal_val": "법적 가치",
+      "comm_val": "상업적 가치"
+    },
+    "budget": {
+      "title": "예산 최적화",
+      "desc": "유지 관리 비용을 분석하고 절감 기회를 식별합니다.",
+      "chart_title": "관할 구역별 연간 유지 관리 비용",
+      "rec_title": "최적화 권장 사항",
+      "savings": "잠재적 연간 절감액",
+      "apply_btn": "최적화 계획 적용"
+    },
+    "simulator": {
+      "title": "가상 시뮬레이터",
+      "desc": "전략적 움직임과 포트폴리오 지표에 미치는 영향을 시뮬레이션합니다.",
+      "builder_title": "시나리오 빌더",
+      "name_label": "시나리오 이름",
+      "action_label": "시뮬레이션 작업",
+      "run_btn": "시뮬레이션 실행",
+      "results_title": "시뮬레이션 결과",
+      "coverage": "포트폴리오 범위",
+      "value": "총 가치",
+      "risk": "위험 노출",
+      "current": "현재"
+    }
+  },
+  "lifecycle": {
+    "title": "수명 주기 관리",
+    "tabs": {
+      "calendar": "마감일 달력",
+      "annuity": "연금 관리",
+      "status": "법적 상태 모니터"
+    },
+    "filters": {
+      "title": "필터",
+      "jurisdiction": "관할 구역",
+      "type": "이벤트 유형",
+      "date_range": "마감일 범위",
+      "urgency": "긴급도",
+      "reset": "초기화",
+      "apply": "필터 적용"
+    },
+    "calendar": {
+      "title": "마감일 달력",
+      "mark_handled": "처리됨으로 표시",
+      "export": "CSV 내보내기"
+    },
+    "annuity": {
+      "total_due": "올해 총 만기",
+      "completed": "완료된 지불",
+      "pending": "보류 중인 지불",
+      "projected": "내년 예상",
+      "table_title": "연금 지불",
+      "pay_btn": "지불"
+    },
+    "status": {
+      "active_family": "활성 패밀리",
+      "last_sync": "마지막 동기화"
+    }
+  },
+  "partners": {
+    "nav": {
+      "admin": "파트너 관리 (관리자)",
+      "agency": "대행사 작업 공간",
+      "counsel": "법무 고문 검토",
+      "api": "API 및 개발자 포털"
+    },
+    "admin": {
+      "title": "파트너 관리",
+      "add_btn": "파트너 추가",
+      "table": {
+        "name": "이름",
+        "type": "유형",
+        "country": "국가",
+        "projects": "진행 중인 프로젝트",
+        "performance": "성과",
+        "status": "상태",
+        "actions": "작업"
+      }
+    },
+    "agency": {
+      "tasks_title": "보류 중인 작업",
+      "files_title": "파일 교환",
+      "comm_title": "커뮤니케이션 로그",
+      "upload_hint": "파일을 여기로 드래그 앤 드롭하거나 클릭하여 업로드",
+      "recent_files": "최근 파일"
+    },
+    "counsel": {
+      "title": "외부 법무 고문 검토",
+      "submit_btn": "검토 의견 제출",
+      "opinion_label": "법적 의견",
+      "rating_label": "최종 위험 등급"
+    },
+    "api": {
+      "intro_title": "소개",
+      "endpoints_title": "엔드포인트",
+      "auth_title": "인증",
+      "limits_title": "속도 제한"
+    }
+  }
+}

@@ -1,0 +1,252 @@
+{
+  "app": {
+    "title": "KeyIP Intelligence",
+    "role": "Responsable PI"
+  },
+  "nav": {
+    "home": "Accueil",
+    "dashboard": "Tableau de bord",
+    "mining": "Exploration de brevets",
+    "infringement": "Surveillance contrefaçon",
+    "portfolio": "Optimiseur portefeuille",
+    "lifecycle": "Gestion cycle de vie",
+    "partners": "Portail partenaires"
+  },
+  "dashboard": {
+    "title": "Tableau de bord exécutif",
+    "subtitle": "Aperçu en temps réel de votre portefeuille de brevets et KPI stratégiques.",
+    "search_placeholder": "Rechercher brevets, molécules, entreprises...",
+    "export": "Exporter rapport",
+    "add_patent": "Ajouter brevet",
+    "kpi": {
+      "total_patents": "Total Brevets",
+      "active_patents": "Brevets Actifs",
+      "high_risk": "Alertes Haut Risque",
+      "due_month": "Échéance ce mois"
+    },
+    "trend": {
+      "title": "Tendance mensuelle des dépôts",
+      "filed": "Déposé",
+      "granted": "Accordé"
+    },
+    "jurisdiction": {
+      "title": "Répartition par juridiction"
+    },
+    "deadlines": {
+      "title": "Échéances à venir",
+      "patent_id": "N° Brevet",
+      "event": "Type d'événement",
+      "jurisdiction": "Juridiction",
+      "due_date": "Date d'échéance",
+      "status": "Statut"
+    },
+    "alerts": {
+      "title": "Alertes contrefaçon récentes",
+      "id": "ID Alerte",
+      "risk": "Niveau de risque",
+      "target": "Brevet cible",
+      "detected": "Détecté",
+      "action": "Action",
+      "view": "Voir"
+    },
+    "radar": {
+      "title": "Radar concurrentiel",
+      "my_org": "Mon organisation",
+      "leader": "Leader du marché"
+    }
+  },
+  "mining": {
+    "title": "Atelier d'exploration de brevets",
+    "tools_nav": "Outils d'exploration",
+    "tool_assessment": "Évaluation de brevetabilité",
+    "tool_whitespace": "Découverte d'espaces blancs",
+    "tool_search": "Recherche de brevets",
+    "tool_priorart": "Analyse de l'art antérieur",
+    "tool_drafting": "Assistant rédaction",
+    "assessment": {
+      "title": "Détails de la nouvelle invention",
+      "smiles_label": "Structure moléculaire cible (SMILES)",
+      "desc_label": "Description technique",
+      "desc_placeholder": "Décrire le problème technique, la solution et les avantages...",
+      "btn_assess": "Évaluer brevetabilité",
+      "report_title": "Rapport d'évaluation",
+      "novelty": "Nouveauté",
+      "inventive": "Activité inventive",
+      "utility": "Évaluation d'utilité",
+      "similar": "Art antérieur similaire",
+      "recommendation": "Recommandation"
+    },
+    "search": {
+      "mode_text": "Recherche textuelle",
+      "mode_structure": "Recherche structurelle",
+      "btn_search": "Rechercher",
+      "placeholder_text": "Mots-clés / Numéro de brevet",
+      "placeholder_smiles": "Entrez la chaîne SMILES...",
+      "similarity": "Seuil de similarité"
+    }
+  },
+  "infringement": {
+    "title": "Centre de surveillance contrefaçon",
+    "list_title": "Alertes de surveillance",
+    "refresh": "Actualiser",
+    "filter_risk": "Niveau de risque",
+    "detail": {
+      "assignee": "Titulaire",
+      "filing_date": "Date de dépôt",
+      "risk_assess": "Évaluation des risques",
+      "literal": "Contrefaçon littérale",
+      "doctrine": "Doctrine des équivalents",
+      "abstract": "Résumé"
+    },
+    "comparison": {
+      "title": "Comparaison structure moléculaire",
+      "trigger": "Molécule déclencheuse",
+      "patent_coverage": "Couverture du brevet",
+      "extracted": "Extrait de la revendication"
+    },
+    "claims": {
+      "title": "Analyse des revendications",
+      "match": "Correspondance éléments"
+    },
+    "actions": {
+      "title": "Actions d'atténuation des risques",
+      "report": "Générer rapport FTO",
+      "design": "Suggestions de contournement",
+      "assign": "Assigner à l'équipe juridique",
+      "reviewed": "Marquer comme vu"
+    },
+    "feed": {
+      "title": "Flux brevets mondial",
+      "new": "NOUVEAU"
+    }
+  },
+  "portfolio": {
+    "title": "Optimiseur de portefeuille",
+    "nav": {
+      "panorama": "Panorama portefeuille",
+      "gap": "Écart concurrentiel",
+      "scoring": "Score de valeur",
+      "budget": "Optimiseur budget",
+      "simulator": "Simulateur What-If"
+    },
+    "panorama": {
+      "title": "Panorama portefeuille",
+      "desc": "Aperçu santé, valeur et couverture domaine.",
+      "domain_analysis": "Analyse couverture domaine"
+    },
+    "treemap": {
+      "title": "Carte couverture technologique"
+    },
+    "gap": {
+      "title": "Matrice écart concurrentiel",
+      "select_comp": "Sélectionner concurrents",
+      "domain": "Domaine technologique",
+      "my_org": "Mon Org"
+    },
+    "scoring": {
+      "title": "Score valeur brevet",
+      "rank": "Rang",
+      "composite": "Score composite",
+      "recommendation": "Recommandation",
+      "details": "Détails",
+      "tech_val": "Valeur technique",
+      "legal_val": "Valeur juridique",
+      "comm_val": "Valeur commerciale"
+    },
+    "budget": {
+      "title": "Optimiseur budget",
+      "desc": "Analyser coûts maintenance et identifier économies.",
+      "chart_title": "Coût maintenance annuel par juridiction",
+      "rec_title": "Recommandations optimisation",
+      "savings": "Économies annuelles potentielles",
+      "apply_btn": "Appliquer plan"
+    },
+    "simulator": {
+      "title": "Simulateur What-If",
+      "desc": "Simuler mouvements stratégiques et impact.",
+      "builder_title": "Constructeur scénario",
+      "name_label": "Nom scénario",
+      "action_label": "Action simulation",
+      "run_btn": "Lancer simulation",
+      "results_title": "Résultats simulation",
+      "coverage": "Couverture portefeuille",
+      "value": "Valeur totale",
+      "risk": "Exposition risque",
+      "current": "Actuel"
+    }
+  },
+  "lifecycle": {
+    "title": "Gestion du cycle de vie",
+    "tabs": {
+      "calendar": "Calendrier échéances",
+      "annuity": "Gestion annuités",
+      "status": "Moniteur statut juridique"
+    },
+    "filters": {
+      "title": "Filtres",
+      "jurisdiction": "Juridiction",
+      "type": "Type événement",
+      "date_range": "Plage dates",
+      "urgency": "Urgence",
+      "reset": "Réinitialiser",
+      "apply": "Appliquer"
+    },
+    "calendar": {
+      "title": "Calendrier échéances",
+      "mark_handled": "Marquer traité",
+      "export": "Exporter CSV"
+    },
+    "annuity": {
+      "total_due": "Total dû cette année",
+      "completed": "Paiements effectués",
+      "pending": "Paiements en attente",
+      "projected": "Projeté année prochaine",
+      "table_title": "Paiements annuités",
+      "pay_btn": "Payer"
+    },
+    "status": {
+      "active_family": "Famille active",
+      "last_sync": "Dernière synchro"
+    }
+  },
+  "partners": {
+    "nav": {
+      "admin": "Gestion partenaires (Admin)",
+      "agency": "Espace agence",
+      "counsel": "Revue conseil juridique",
+      "api": "API & Portail dév"
+    },
+    "admin": {
+      "title": "Gestion partenaires",
+      "add_btn": "Ajouter partenaire",
+      "table": {
+        "name": "Nom",
+        "type": "Type",
+        "country": "Pays",
+        "projects": "Projets actifs",
+        "performance": "Performance",
+        "status": "Statut",
+        "actions": "Actions"
+      }
+    },
+    "agency": {
+      "tasks_title": "Tâches en attente",
+      "files_title": "Échange fichiers",
+      "comm_title": "Journal communication",
+      "upload_hint": "Glisser-déposer ou cliquer pour uploader",
+      "recent_files": "Fichiers récents"
+    },
+    "counsel": {
+      "title": "Revue conseil juridique externe",
+      "submit_btn": "Soumettre avis",
+      "opinion_label": "Avis juridique",
+      "rating_label": "Notation risque final"
+    },
+    "api": {
+      "intro_title": "Introduction",
+      "endpoints_title": "Points de terminaison",
+      "auth_title": "Authentification",
+      "limits_title": "Limites de taux"
+    }
+  }
+}

@@ -1,0 +1,252 @@
+{
+  "app": {
+    "title": "KeyIP Intelligence",
+    "role": "IP Manager"
+  },
+  "nav": {
+    "home": "Startseite",
+    "dashboard": "Dashboard",
+    "mining": "Patent Mining",
+    "infringement": "Verletzungsüberwachung",
+    "portfolio": "Portfolio-Optimierer",
+    "lifecycle": "Lebenszyklus-Mgmt",
+    "partners": "Partnerportal"
+  },
+  "dashboard": {
+    "title": "Executive Dashboard",
+    "subtitle": "Echtzeit-Überblick über Ihr Patentportfolio und strategische KPIs.",
+    "search_placeholder": "Suche Patente, Moleküle, Firmen...",
+    "export": "Bericht exportieren",
+    "add_patent": "Patent hinzufügen",
+    "kpi": {
+      "total_patents": "Patente Gesamt",
+      "active_patents": "Aktive Patente",
+      "high_risk": "Hohes Risiko Warnungen",
+      "due_month": "Fällig diesen Monat"
+    },
+    "trend": {
+      "title": "Monatlicher Anmeldetrend",
+      "filed": "Angemeldet",
+      "granted": "Erteilt"
+    },
+    "jurisdiction": {
+      "title": "Verteilung nach Gerichtsbarkeit"
+    },
+    "deadlines": {
+      "title": "Kommende Fristen",
+      "patent_id": "Patent Nr.",
+      "event": "Ereignistyp",
+      "jurisdiction": "Gerichtsbarkeit",
+      "due_date": "Fälligkeitsdatum",
+      "status": "Status"
+    },
+    "alerts": {
+      "title": "Kürzliche Verletzungswarnungen",
+      "id": "Warnung ID",
+      "risk": "Risikostufe",
+      "target": "Zielpatent",
+      "detected": "Erkannt",
+      "action": "Aktion",
+      "view": "Ansehen"
+    },
+    "radar": {
+      "title": "Wettbewerbsradar",
+      "my_org": "Meine Org",
+      "leader": "Marktführer"
+    }
+  },
+  "mining": {
+    "title": "Patent Mining Werkbank",
+    "tools_nav": "Mining Tools",
+    "tool_assessment": "Patentierbarkeitsbewertung",
+    "tool_whitespace": "White Space Entdeckung",
+    "tool_search": "Patentsuche",
+    "tool_priorart": "Stand der Technik Analyse",
+    "tool_drafting": "Anspruchsentwurf Assistent",
+    "assessment": {
+      "title": "Details zur neuen Erfindung",
+      "smiles_label": "Zielmolekülstruktur (SMILES)",
+      "desc_label": "Technische Beschreibung",
+      "desc_placeholder": "Beschreiben Sie das technische Problem, die Lösung und Vorteile...",
+      "btn_assess": "Patentierbarkeit bewerten",
+      "report_title": "Bewertungsbericht",
+      "novelty": "Neuheit",
+      "inventive": "Erfinderische Tätigkeit",
+      "utility": "Nützlichkeitsbewertung",
+      "similar": "Ähnlicher Stand der Technik",
+      "recommendation": "Empfehlung"
+    },
+    "search": {
+      "mode_text": "Textsuche",
+      "mode_structure": "Struktursuche",
+      "btn_search": "Suchen",
+      "placeholder_text": "Schlüsselwörter / Patentnummer",
+      "placeholder_smiles": "SMILES-String eingeben...",
+      "similarity": "Ähnlichkeitsschwelle"
+    }
+  },
+  "infringement": {
+    "title": "Verletzungsüberwachungszentrum",
+    "list_title": "Überwachungswarnungen",
+    "refresh": "Aktualisieren",
+    "filter_risk": "Risikostufe",
+    "detail": {
+      "assignee": "Inhaber",
+      "filing_date": "Anmeldedatum",
+      "risk_assess": "Risikobewertung",
+      "literal": "Wörtliche Verletzung",
+      "doctrine": "Äquivalenzdoktrin",
+      "abstract": "Zusammenfassung"
+    },
+    "comparison": {
+      "title": "Molekülstrukturvergleich",
+      "trigger": "Auslösermolekül",
+      "patent_coverage": "Patentabdeckung",
+      "extracted": "Aus Anspruch extrahiert"
+    },
+    "claims": {
+      "title": "Anspruchsanalyse",
+      "match": "Elementübereinstimmung"
+    },
+    "actions": {
+      "title": "Risikominderungsmaßnahmen",
+      "report": "FTO-Bericht generieren",
+      "design": "Design-Around Vorschläge",
+      "assign": "An Rechtsteam zuweisen",
+      "reviewed": "Als geprüft markieren"
+    },
+    "feed": {
+      "title": "Globaler Patent Live-Feed",
+      "new": "NEU"
+    }
+  },
+  "portfolio": {
+    "title": "Portfolio-Optimierer",
+    "nav": {
+      "panorama": "Portfolio-Panorama",
+      "gap": "Wettbewerbslücke",
+      "scoring": "Wertbewertung",
+      "budget": "Budget-Optimierer",
+      "simulator": "Was-wäre-wenn Simulator"
+    },
+    "panorama": {
+      "title": "Portfolio-Panorama",
+      "desc": "Überblick über Portfoliogesundheit, Wert und Bereichsabdeckung.",
+      "domain_analysis": "Bereichsabdeckungsanalyse"
+    },
+    "treemap": {
+      "title": "Technologie-Abdeckungskarte"
+    },
+    "gap": {
+      "title": "Wettbewerbslückenmatrix",
+      "select_comp": "Wettbewerber auswählen",
+      "domain": "Technologiebereich",
+      "my_org": "Meine Org"
+    },
+    "scoring": {
+      "title": "Patentwertbewertung",
+      "rank": "Rang",
+      "composite": "Gesamtwert",
+      "recommendation": "Empfehlung",
+      "details": "Details",
+      "tech_val": "Technischer Wert",
+      "legal_val": "Rechtlicher Wert",
+      "comm_val": "Kommerzieller Wert"
+    },
+    "budget": {
+      "title": "Budget-Optimierer",
+      "desc": "Wartungskosten analysieren und Einsparpotenziale identifizieren.",
+      "chart_title": "Jährliche Wartungskosten nach Gerichtsbarkeit",
+      "rec_title": "Optimierungsempfehlungen",
+      "savings": "Potenzielle jährliche Einsparungen",
+      "apply_btn": "Optimierungsplan anwenden"
+    },
+    "simulator": {
+      "title": "Was-wäre-wenn Simulator",
+      "desc": "Strategische Schritte und deren Auswirkungen simulieren.",
+      "builder_title": "Szenario-Ersteller",
+      "name_label": "Szenarioname",
+      "action_label": "Simulationsaktion",
+      "run_btn": "Simulation starten",
+      "results_title": "Simulationsergebnisse",
+      "coverage": "Portfolioabdeckung",
+      "value": "Gesamtwert",
+      "risk": "Risikoexposition",
+      "current": "Aktuell"
+    }
+  },
+  "lifecycle": {
+    "title": "Lebenszyklus-Management",
+    "tabs": {
+      "calendar": "Fristenkalender",
+      "annuity": "Annuitätenverwaltung",
+      "status": "Rechtsstatusmonitor"
+    },
+    "filters": {
+      "title": "Filter",
+      "jurisdiction": "Gerichtsbarkeit",
+      "type": "Ereignistyp",
+      "date_range": "Fälligkeitszeitraum",
+      "urgency": "Dringlichkeit",
+      "reset": "Zurücksetzen",
+      "apply": "Filter anwenden"
+    },
+    "calendar": {
+      "title": "Fristenkalender",
+      "mark_handled": "Als erledigt markieren",
+      "export": "CSV exportieren"
+    },
+    "annuity": {
+      "total_due": "Gesamt fällig dieses Jahr",
+      "completed": "Abgeschlossene Zahlungen",
+      "pending": "Ausstehende Zahlungen",
+      "projected": "Prognose nächstes Jahr",
+      "table_title": "Annuitätenzahlungen",
+      "pay_btn": "Bezahlen"
+    },
+    "status": {
+      "active_family": "Aktive Familie",
+      "last_sync": "Letzte Synchronisierung"
+    }
+  },
+  "partners": {
+    "nav": {
+      "admin": "Partnermanagement (Admin)",
+      "agency": "Agentur-Arbeitsbereich",
+      "counsel": "Rechtsberater-Überprüfung",
+      "api": "API & Entwicklerportal"
+    },
+    "admin": {
+      "title": "Partnermanagement",
+      "add_btn": "Partner hinzufügen",
+      "table": {
+        "name": "Name",
+        "type": "Typ",
+        "country": "Land",
+        "projects": "Aktive Projekte",
+        "performance": "Leistung",
+        "status": "Status",
+        "actions": "Aktionen"
+      }
+    },
+    "agency": {
+      "tasks_title": "Ausstehende Aufgaben",
+      "files_title": "Dateiaustausch",
+      "comm_title": "Kommunikationsprotokoll",
+      "upload_hint": "Dateien hierher ziehen oder zum Hochladen klicken",
+      "recent_files": "Aktuelle Dateien"
+    },
+    "counsel": {
+      "title": "Externe Rechtsberater-Überprüfung",
+      "submit_btn": "Prüfungsmeinung einreichen",
+      "opinion_label": "Rechtsmeinung",
+      "rating_label": "Endgültige Risikobewertung"
+    },
+    "api": {
+      "intro_title": "Einführung",
+      "endpoints_title": "Endpunkte",
+      "auth_title": "Authentifizierung",
+      "limits_title": "Ratenbegrenzungen"
+    }
+  }
+}
