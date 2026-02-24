@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { useTranslation } from 'react-i18next';
 
 interface JurisdictionPieProps {
   data: { jurisdiction: string; count: number }[];
@@ -15,10 +16,11 @@ interface JurisdictionPieProps {
 }
 
 const JurisdictionPie: React.FC<JurisdictionPieProps> = ({ data, loading }) => {
+  const { t } = useTranslation();
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b'];
 
   return (
-    <Card header="Jurisdiction Breakdown" padding="none" className="h-80">
+    <Card header={t('dashboard.jurisdiction.title')} padding="none" className="h-80">
       {loading ? (
         <div className="flex items-center justify-center h-full">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

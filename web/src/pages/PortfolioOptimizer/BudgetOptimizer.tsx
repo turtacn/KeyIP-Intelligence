@@ -9,7 +9,7 @@ const BudgetOptimizer: React.FC = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
 
-  // Mock data
+  // Mock data - Hardcoded for demo stability, can be moved to JSON if needed but this ensures it works
   const costData = [
     { name: 'CN', cost: 12000 },
     { name: 'US', cost: 25000 },
@@ -36,25 +36,27 @@ const BudgetOptimizer: React.FC = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
-      <Card header="Annual Maintenance Cost by Jurisdiction" className="h-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={costData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip cursor={{ fill: '#f8fafc' }} />
-            <Legend />
-            <Bar dataKey="cost" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Annual Cost (USD)" />
-          </BarChart>
-        </ResponsiveContainer>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px]"> {/* Fixed height container */}
+      <Card header="Annual Maintenance Cost by Jurisdiction" className="h-full flex flex-col">
+        <div className="flex-1 w-full min-h-0"> {/* Flex child with min-height 0 to allow recharts to resize properly */}
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={costData}
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip cursor={{ fill: '#f8fafc' }} />
+              <Legend />
+              <Bar dataKey="cost" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Annual Cost (USD)" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </Card>
 
       <Card header="Optimization Recommendations" className="h-full flex flex-col">
-        <div className="bg-green-50 p-4 rounded-lg border border-green-100 mb-4 flex items-center justify-between">
+        <div className="bg-green-50 p-4 rounded-lg border border-green-100 mb-4 flex items-center justify-between flex-shrink-0">
           <div>
             <h4 className="font-semibold text-green-800">Potential Annual Savings</h4>
             <p className="text-sm text-green-600">Based on value-to-cost analysis</p>
@@ -84,7 +86,7 @@ const BudgetOptimizer: React.FC = () => {
           ))}
         </div>
 
-        <div className="mt-4 pt-4 border-t border-slate-100">
+        <div className="mt-4 pt-4 border-t border-slate-100 flex-shrink-0">
           <Button
             onClick={() => setShowConfirm(true)}
             className="w-full"

@@ -5,6 +5,7 @@ import RiskLevelBadge from '../../components/ui/RiskLevelBadge';
 import Button from '../../components/ui/Button';
 import { InfringementAlert } from '../../types/domain';
 import { Eye } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface RecentAlertsProps {
   alerts: InfringementAlert[];
@@ -12,23 +13,25 @@ interface RecentAlertsProps {
 }
 
 const RecentAlerts: React.FC<RecentAlertsProps> = ({ alerts, loading }) => {
+  const { t } = useTranslation();
+
   const columns: Column<InfringementAlert>[] = [
-    { header: 'Alert ID', accessor: 'id' },
-    { header: 'Risk Level', accessor: (row) => <RiskLevelBadge level={row.riskLevel} /> },
-    { header: 'Target Patent', accessor: 'targetPatentId' },
-    { header: 'Detected', accessor: (row) => new Date(row.detectedAt).toLocaleDateString() },
+    { header: t('dashboard.alerts.id'), accessor: 'id' },
+    { header: t('dashboard.alerts.risk'), accessor: (row) => <RiskLevelBadge level={row.riskLevel} /> },
+    { header: t('dashboard.alerts.target'), accessor: 'targetPatentId' },
+    { header: t('dashboard.alerts.detected'), accessor: (row) => new Date(row.detectedAt).toLocaleDateString() },
     {
-      header: 'Action',
+      header: t('dashboard.alerts.action'),
       accessor: () => (
         <Button size="sm" variant="ghost" leftIcon={<Eye className="w-4 h-4" />}>
-          View
+          {t('dashboard.alerts.view')}
         </Button>
       )
     },
   ];
 
   return (
-    <Card header="Recent Infringement Alerts" padding="none" className="h-96">
+    <Card header={t('dashboard.alerts.title')} padding="none" className="h-96">
       <DataTable
         columns={columns}
         data={alerts}
