@@ -10,6 +10,7 @@ export const patentHandlers = [
     const page = Number(url.searchParams.get('page')) || 1;
     const pageSize = Number(url.searchParams.get('pageSize')) || 20;
     const query = url.searchParams.get('query') || '';
+    const searchType = url.searchParams.get('searchType') || 'text';
 
     // Simulate error
     if (url.searchParams.get('__error')) {
@@ -18,7 +19,13 @@ export const patentHandlers = [
 
     // Filter logic
     let filtered = typedPatents;
-    if (query) {
+
+    if (searchType === 'structure' && query) {
+        // Mock logic for structure search
+        // Return all patents or random set to ensure "not empty" for demo
+        // In real app, perform substructure search
+        filtered = typedPatents;
+    } else if (query) {
       const lowerQuery = query.toLowerCase();
       filtered = filtered.filter((p: any) =>
         p.title.toLowerCase().includes(lowerQuery) ||
