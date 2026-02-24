@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLifecycle } from '../../hooks/useLifecycle';
 import FilterPanel from './FilterPanel';
 import DeadlineTable from './DeadlineTable';
@@ -12,6 +13,7 @@ import { Jurisdiction } from '../../types/domain';
 type Tab = 'calendar' | 'annuity' | 'status';
 
 const LifecycleConsole: React.FC = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>('calendar');
   const [filters, setFilters] = useState({
     jurisdiction: 'All' as Jurisdiction | 'All',
@@ -104,10 +106,10 @@ const LifecycleConsole: React.FC = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Lifecycle Management</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('lifecycle.title')}</h1>
           <div className="flex space-x-2">
             <Button variant="outline" onClick={handleExport} leftIcon={<Download className="w-4 h-4" />}>
-              Export All
+              {t('lifecycle.calendar.export')}
             </Button>
           </div>
         </div>
@@ -116,9 +118,9 @@ const LifecycleConsole: React.FC = () => {
         <div className="bg-white border-b border-slate-200 mb-6 sticky top-0 z-10">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             {[
-              { id: 'calendar', name: 'Deadline Calendar' },
-              { id: 'annuity', name: 'Annuity Management' },
-              { id: 'status', name: 'Legal Status Monitor' },
+              { id: 'calendar', name: t('lifecycle.tabs.calendar') },
+              { id: 'annuity', name: t('lifecycle.tabs.annuity') },
+              { id: 'status', name: t('lifecycle.tabs.status') },
             ].map((tab) => (
               <button
                 key={tab.id}

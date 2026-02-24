@@ -36,9 +36,15 @@ const BudgetOptimizer: React.FC = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px]"> {/* Fixed height container */}
-      <Card header="Annual Maintenance Cost by Jurisdiction" className="h-full flex flex-col">
-        <div className="flex-1 w-full min-h-0"> {/* Flex child with min-height 0 to allow recharts to resize properly */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px]">
+      {/* Use padding="none" and custom bodyClassName to ensure full height for chart */}
+      <Card
+        header="Annual Maintenance Cost by Jurisdiction"
+        className="h-full"
+        padding="none"
+        bodyClassName="flex flex-col h-full"
+      >
+        <div className="flex-1 w-full h-full p-4">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={costData}
@@ -55,7 +61,7 @@ const BudgetOptimizer: React.FC = () => {
         </div>
       </Card>
 
-      <Card header="Optimization Recommendations" className="h-full flex flex-col">
+      <Card header="Optimization Recommendations" className="h-full" bodyClassName="flex flex-col h-full overflow-hidden">
         <div className="bg-green-50 p-4 rounded-lg border border-green-100 mb-4 flex items-center justify-between flex-shrink-0">
           <div>
             <h4 className="font-semibold text-green-800">Potential Annual Savings</h4>
@@ -66,7 +72,7 @@ const BudgetOptimizer: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+        <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
           {recommendations.map((rec) => (
             <div key={rec.id} className="flex justify-between items-center p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
               <div>

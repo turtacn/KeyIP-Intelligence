@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import PatentabilityAssessor from './PatentabilityAssessor';
 import WhiteSpaceDiscovery from './WhiteSpaceDiscovery';
 import PatentSearch from './PatentSearch';
@@ -7,14 +8,15 @@ import ClaimDraftAssistant from './ClaimDraftAssistant';
 import { Search, Map, FileSearch, Scale, PenTool } from 'lucide-react';
 
 const PatentMining: React.FC = () => {
+  const { t } = useTranslation();
   const [activeTool, setActiveTool] = useState('assessment');
 
   const tools = [
-    { id: 'assessment', label: 'Patentability Assessment', icon: Scale, component: <PatentabilityAssessor /> },
-    { id: 'whitespace', label: 'White Space Discovery', icon: Map, component: <WhiteSpaceDiscovery /> },
-    { id: 'search', label: 'Patent Search', icon: Search, component: <PatentSearch /> },
-    { id: 'priorart', label: 'Prior Art Analysis', icon: FileSearch, component: <PriorArtAnalysis /> },
-    { id: 'drafting', label: 'Claim Draft Assistant', icon: PenTool, component: <ClaimDraftAssistant /> },
+    { id: 'assessment', label: t('mining.tool_assessment'), icon: Scale, component: <PatentabilityAssessor /> },
+    { id: 'whitespace', label: t('mining.tool_whitespace'), icon: Map, component: <WhiteSpaceDiscovery /> },
+    { id: 'search', label: t('mining.tool_search'), icon: Search, component: <PatentSearch /> },
+    { id: 'priorart', label: t('mining.tool_priorart'), icon: FileSearch, component: <PriorArtAnalysis /> },
+    { id: 'drafting', label: t('mining.tool_drafting'), icon: PenTool, component: <ClaimDraftAssistant /> },
   ];
 
   return (
@@ -22,7 +24,7 @@ const PatentMining: React.FC = () => {
       {/* Tool Selector */}
       <div className="w-full lg:w-64 flex-shrink-0 bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden h-fit">
         <div className="p-4 bg-slate-50 border-b border-slate-200 font-semibold text-slate-800">
-          Mining Tools
+          {t('mining.tools_nav')}
         </div>
         <nav className="p-2 space-y-1">
           {tools.map((tool) => (

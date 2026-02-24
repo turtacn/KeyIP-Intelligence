@@ -11,17 +11,14 @@ async function enableMocking() {
 
   console.log('[App] Starting...', { isDev, isMockMode, VITE_API_MODE: import.meta.env.VITE_API_MODE });
 
-  // If we are NOT in mock mode, and NOT in dev mode (unless dev mode is forcing mock), we don't start MSW.
-  // But wait, the default behavior in Dockerfile is VITE_API_MODE=mock.
+  // Logic:
+  // 1. If VITE_API_MODE is 'mock', we MUST start MSW (Production Demo or Local Mock).
+  // 2. If DEV mode and VITE_API_MODE is NOT 'real', we start MSW (Default Local Dev).
 
-  if (!isMockMode && !isDev) {
-    console.log('[App] MSW skipped: Production mode without VITE_API_MODE=mock');
-    return;
-  }
+  const shouldStartMSW = isMockMode || (isDev && import.meta.env.VITE_API_MODE !== 'real');
 
-  // If explicitly 'real', skip
-  if (import.meta.env.VITE_API_MODE === 'real') {
-    console.log('[App] MSW skipped: VITE_API_MODE is real');
+  if (!shouldStartMSW) {
+    console.log('[App] MSW skipped.');
     return;
   }
 

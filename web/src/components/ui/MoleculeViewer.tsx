@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import SmilesDrawer from 'smiles-drawer';
+import { Drawer, parse } from 'smiles-drawer';
 
 interface MoleculeViewerProps {
   smiles: string;
@@ -21,14 +21,16 @@ const MoleculeViewer: React.FC<MoleculeViewerProps> = ({
   useEffect(() => {
     if (!canvasRef.current || !smiles) return;
 
-    const drawer = new SmilesDrawer.Drawer({
+    // Use named import 'Drawer'
+    const drawer = new Drawer({
       width: width,
       height: height,
       compactDrawing: false,
     });
 
-    SmilesDrawer.parse(smiles, (tree: any) => {
-      drawer.draw(tree, canvasRef.current, theme, false);
+    // Use named import 'parse'
+    parse(smiles, (tree: any) => {
+      drawer.draw(tree, canvasRef.current!, theme, false);
     }, (err: any) => {
       console.error('Error parsing SMILES:', err);
     });

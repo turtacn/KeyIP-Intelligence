@@ -53,5 +53,199 @@
       "my_org": "本机构",
       "leader": "市场领袖"
     }
+  },
+  "mining": {
+    "title": "专利挖掘工作台",
+    "tools_nav": "挖掘工具",
+    "tool_assessment": "可专利性评估",
+    "tool_whitespace": "空白点发现",
+    "tool_search": "专利检索",
+    "tool_priorart": "现有技术分析",
+    "tool_drafting": "权利要求撰写",
+    "assessment": {
+      "title": "新发明详情",
+      "smiles_label": "目标分子结构 (SMILES)",
+      "desc_label": "技术描述",
+      "desc_placeholder": "描述技术问题、解决方案和优势...",
+      "btn_assess": "评估可专利性",
+      "report_title": "评估报告",
+      "novelty": "新颖性",
+      "inventive": "创造性",
+      "utility": "实用性评估",
+      "similar": "相似现有技术",
+      "recommendation": "建议"
+    },
+    "search": {
+      "mode_text": "文本检索",
+      "mode_structure": "结构检索",
+      "btn_search": "检索",
+      "placeholder_text": "关键词 / 专利号",
+      "placeholder_smiles": "输入 SMILES 字符串...",
+      "similarity": "相似度阈值"
+    }
+  },
+  "infringement": {
+    "title": "侵权监测中心",
+    "list_title": "监测预警",
+    "refresh": "刷新",
+    "filter_risk": "风险等级",
+    "detail": {
+      "assignee": "申请人",
+      "filing_date": "申请日",
+      "risk_assess": "风险评估",
+      "literal": "字面侵权",
+      "doctrine": "等同侵权",
+      "abstract": "摘要"
+    },
+    "comparison": {
+      "title": "分子结构对比",
+      "trigger": "触发分子",
+      "patent_coverage": "专利覆盖范围",
+      "extracted": "提取自权利要求"
+    },
+    "claims": {
+      "title": "权利要求分析",
+      "match": "要素匹配"
+    },
+    "actions": {
+      "title": "风险应对措施",
+      "report": "生成 FTO 报告",
+      "design": "规避设计",
+      "assign": "指派法务",
+      "reviewed": "标记已阅"
+    },
+    "feed": {
+      "title": "全球专利实时流",
+      "new": "新增"
+    }
+  },
+  "portfolio": {
+    "title": "组合优化器",
+    "nav": {
+      "panorama": "组合全景",
+      "gap": "竞争缺口",
+      "scoring": "价值评分",
+      "budget": "预算优化",
+      "simulator": "情景模拟"
+    },
+    "panorama": {
+      "title": "组合全景",
+      "desc": "专利组合健康度、价值和领域覆盖概览。",
+      "domain_analysis": "领域覆盖分析"
+    },
+    "treemap": {
+      "title": "技术覆盖热力图"
+    },
+    "gap": {
+      "title": "竞争缺口矩阵",
+      "select_comp": "选择竞争对手",
+      "domain": "技术领域",
+      "my_org": "本机构"
+    },
+    "scoring": {
+      "title": "专利价值评估",
+      "rank": "排名",
+      "composite": "综合分",
+      "recommendation": "建议",
+      "details": "详情",
+      "tech_val": "技术价值",
+      "legal_val": "法律价值",
+      "comm_val": "商业价值"
+    },
+    "budget": {
+      "title": "预算优化",
+      "desc": "分析维护成本并识别节省机会。",
+      "chart_title": "各管辖区年度维护成本",
+      "rec_title": "优化建议",
+      "savings": "潜在年度节省",
+      "apply_btn": "应用优化方案"
+    },
+    "simulator": {
+      "title": "情景模拟器",
+      "desc": "模拟战略举措及其对组合指标的影响。",
+      "builder_title": "情景构建",
+      "name_label": "情景名称",
+      "action_label": "模拟动作",
+      "run_btn": "运行模拟",
+      "results_title": "模拟结果",
+      "coverage": "组合覆盖率",
+      "value": "总价值",
+      "risk": "风险暴露",
+      "current": "当前"
+    }
+  },
+  "lifecycle": {
+    "title": "生命周期管理",
+    "tabs": {
+      "calendar": "期限日历",
+      "annuity": "年金管理",
+      "status": "法律状态监控"
+    },
+    "filters": {
+      "title": "筛选",
+      "jurisdiction": "管辖区",
+      "type": "事件类型",
+      "date_range": "到期日期范围",
+      "urgency": "紧急程度",
+      "reset": "重置",
+      "apply": "应用筛选"
+    },
+    "calendar": {
+      "title": "期限日历",
+      "mark_handled": "标记已处理",
+      "export": "导出 CSV"
+    },
+    "annuity": {
+      "total_due": "本年应付总额",
+      "completed": "已完成支付",
+      "pending": "待支付",
+      "projected": "明年预计",
+      "table_title": "年金支付",
+      "pay_btn": "支付"
+    },
+    "status": {
+      "active_family": "有效同族",
+      "last_sync": "上次同步"
+    }
+  },
+  "partners": {
+    "nav": {
+      "admin": "合作伙伴管理 (Admin)",
+      "agency": "代理机构工作台",
+      "counsel": "法律顾问审查",
+      "api": "API & 开发者门户"
+    },
+    "admin": {
+      "title": "合作伙伴管理",
+      "add_btn": "新增合作伙伴",
+      "table": {
+        "name": "名称",
+        "type": "类型",
+        "country": "国家",
+        "projects": "活跃项目",
+        "performance": "绩效",
+        "status": "状态",
+        "actions": "操作"
+      }
+    },
+    "agency": {
+      "tasks_title": "待办任务",
+      "files_title": "文件交换",
+      "comm_title": "沟通记录",
+      "upload_hint": "拖拽文件到此处或点击上传",
+      "recent_files": "最近文件"
+    },
+    "counsel": {
+      "title": "外部法律顾问审查",
+      "submit_btn": "提交审查意见",
+      "opinion_label": "法律意见",
+      "rating_label": "最终风险评级"
+    },
+    "api": {
+      "intro_title": "简介",
+      "endpoints_title": "端点",
+      "auth_title": "认证",
+      "limits_title": "速率限制"
+    }
   }
 }
