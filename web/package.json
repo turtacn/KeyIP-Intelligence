@@ -11,6 +11,7 @@
     "analyze": "vite build --mode analyze && npx vite-bundle-visualizer"
   },
   "dependencies": {
+    "@rdkit/rdkit": "^2025.3.4-1.0.0",
     "cytoscape": "^3.31.0",
     "d3": "^7.9.0",
     "date-fns": "^4.1.0",

@@ -1,51 +1,89 @@
-import React, { useEffect, useRef } from 'react';
-import { Drawer, parse } from 'smiles-drawer';
+import React, { useEffect, useState } from 'react';
+import { getRDKit, RDKitModule, RDKitMolecule } from '../../utils/rdkitLoader';
+import LoadingSpinner from './LoadingSpinner';
 
 interface MoleculeViewerProps {
   smiles: string;
   width?: number;
   height?: number;
   className?: string;
-  theme?: 'light' | 'dark';
 }
 
 const MoleculeViewer: React.FC<MoleculeViewerProps> = ({
   smiles,
   width = 300,
   height = 200,
-  className = '',
-  theme = 'light'
+  className = ''
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [svg, setSvg] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!canvasRef.current || !smiles) return;
+    let molecule: RDKitMolecule | null = null;
+    let mounted = true;
 
-    // Use named import 'Drawer'
-    const drawer = new Drawer({
-      width: width,
-      height: height,
-      compactDrawing: false,
-    });
+    const renderMolecule = async () => {
+      if (!smiles) {
+        setLoading(false);
+        return;
+      }
 
-    // Use named import 'parse'
-    parse(smiles, (tree: any) => {
-      drawer.draw(tree, canvasRef.current!, theme, false);
-    }, (err: any) => {
-      console.error('Error parsing SMILES:', err);
-    });
+      try {
+        setLoading(true);
+        const rdkit: RDKitModule = await getRDKit();
 
-  }, [smiles, width, height, theme]);
+        if (!mounted) return;
+
+        molecule = rdkit.get_mol(smiles);
+
+        if (molecule) {
+          const svgString = molecule.get_svg(width, height);
+          setSvg(svgString);
+        } else {
+          setError('Invalid SMILES');
+        }
+      } catch (err) {
+        console.error('RDKit rendering error:', err);
+        setError('Failed to load renderer');
+      } finally {
+        if (mounted) {
+          setLoading(false);
+          if (molecule) molecule.delete();
+        }
+      }
+    };
+
+    renderMolecule();
+
+    return () => {
+      mounted = false;
+      if (molecule) molecule.delete();
+    };
+  }, [smiles, width, height]);
+
+  if (loading) {
+    return (
+      <div className={`flex justify-center items-center bg-slate-50 rounded ${className}`} style={{ width, height }}>
+        <LoadingSpinner size="sm" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={`flex justify-center items-center bg-red-50 text-red-400 text-xs rounded ${className}`} style={{ width, height }}>
+        {error}
+      </div>
+    );
+  }
 
   return (
-    <div className={`flex justify-center items-center ${className}`}>
-      <canvas
-        ref={canvasRef}
-        width={width}
-        height={height}
-        className="max-w-full h-auto"
-      />
-    </div>
+    <div
+      className={`molecule-viewer ${className}`}
+      style={{ width, height }}
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 };
 

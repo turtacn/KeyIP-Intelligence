@@ -4,6 +4,7 @@ import { moleculeService } from '../../services/molecule.service';
 import { Molecule } from '../../types/domain';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import MoleculeViewer from '../../components/ui/MoleculeViewer';
+import { useTranslation } from 'react-i18next';
 
 interface MoleculeComparisonProps {
   triggerMoleculeId: string;
@@ -11,6 +12,7 @@ interface MoleculeComparisonProps {
 }
 
 const MoleculeComparison: React.FC<MoleculeComparisonProps> = ({ triggerMoleculeId, similarityScore }) => {
+  const { t } = useTranslation();
   const [triggerMolecule, setTriggerMolecule] = useState<Molecule | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,31 +41,31 @@ const MoleculeComparison: React.FC<MoleculeComparisonProps> = ({ triggerMolecule
 
   return (
     <Card className="mb-6">
-      <h3 className="text-lg font-semibold text-slate-800 mb-4">Molecular Structure Comparison</h3>
+      <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('infringement.comparison.title', 'Molecular Structure Comparison')}</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start relative">
         {/* Trigger Molecule */}
         <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
           <div className="flex justify-between items-center mb-2">
-            <h4 className="font-medium text-slate-700">Trigger Molecule</h4>
+            <h4 className="font-medium text-slate-700">{t('infringement.comparison.trigger', 'Trigger Molecule')}</h4>
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
               {triggerMolecule?.id || triggerMoleculeId}
             </span>
           </div>
-          <div className="bg-white p-3 rounded border border-slate-200 flex justify-center h-48">
+          <div className="bg-white p-3 rounded border border-slate-200 flex justify-center h-48 overflow-hidden">
             {triggerMolecule?.smiles ? (
-              <MoleculeViewer smiles={triggerMolecule.smiles} width={250} height={180} />
+              <MoleculeViewer smiles={triggerMolecule.smiles} width={300} height={200} />
             ) : (
               <span className="text-slate-400 self-center">No structure available</span>
             )}
           </div>
-          <div className="mt-2 text-xs text-slate-400 font-mono truncate">
+          <div className="mt-2 text-xs text-slate-400 font-mono truncate" title={triggerMolecule?.smiles}>
             {triggerMolecule?.smiles}
           </div>
         </div>
 
         {/* Similarity Bridge (Visual) */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 py-1 z-10 hidden md:block">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 py-1 z-10 hidden md:block shadow-sm rounded-lg border border-slate-100">
            <div className="flex flex-col items-center">
              <span className="text-xs font-bold text-slate-400 mb-1">Similarity</span>
              <div className="w-16 h-1 bg-slate-200 rounded-full">
@@ -79,16 +81,16 @@ const MoleculeComparison: React.FC<MoleculeComparisonProps> = ({ triggerMolecule
         {/* Patent Molecule */}
         <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
           <div className="flex justify-between items-center mb-2">
-            <h4 className="font-medium text-slate-700">Patent Coverage</h4>
+            <h4 className="font-medium text-slate-700">{t('infringement.comparison.patent_coverage', 'Patent Coverage')}</h4>
             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
               Claim 1 (Markush)
             </span>
           </div>
-          <div className="bg-white p-3 rounded border border-slate-200 flex justify-center h-48">
-            <MoleculeViewer smiles={mockPatentMoleculeSmiles} width={250} height={180} />
+          <div className="bg-white p-3 rounded border border-slate-200 flex justify-center h-48 overflow-hidden">
+            <MoleculeViewer smiles={mockPatentMoleculeSmiles} width={300} height={200} />
           </div>
           <div className="mt-2 text-xs text-slate-400">
-            Extracted from Claim 1
+            {t('infringement.comparison.extracted', 'Extracted from Claim 1')}
           </div>
         </div>
       </div>

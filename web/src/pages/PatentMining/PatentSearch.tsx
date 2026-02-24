@@ -6,6 +6,7 @@ import { Search } from 'lucide-react';
 import { patentService } from '../../services/patent.service';
 import { Patent } from '../../types/domain';
 import { useTranslation } from 'react-i18next';
+import MoleculeViewer from '../../components/ui/MoleculeViewer';
 
 const PatentSearch: React.FC = () => {
   const { t } = useTranslation();
@@ -37,6 +38,20 @@ const PatentSearch: React.FC = () => {
   };
 
   const columns: Column<Patent>[] = [
+    {
+      header: 'Structure',
+      accessor: (row) => {
+        // Mocking structure extraction from abstract or claims for preview
+        // In real app, patent object should have a `previewSmiles` or similar field
+        // For demo, we use a placeholder or extract if available
+        const demoSmiles = "C1=CC=CC=C1";
+        return (
+          <div className="w-24 h-16">
+             <MoleculeViewer smiles={demoSmiles} width={96} height={64} />
+          </div>
+        );
+      }
+    },
     { header: 'Relevance', accessor: () => <span className="text-green-600 font-bold">{(0.85 + Math.random() * 0.14).toFixed(2)}</span> },
     { header: 'Patent No.', accessor: 'publicationNumber' },
     { header: 'Title', accessor: (row) => <span className="font-medium text-blue-600 hover:underline cursor-pointer">{row.title}</span> },
@@ -89,13 +104,21 @@ const PatentSearch: React.FC = () => {
             <>
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-slate-500 mb-1">SMILES Structure</label>
-                <input
-                  type="text"
-                  value={smiles}
-                  onChange={(e) => setSmiles(e.target.value)}
-                  placeholder={t('mining.search.placeholder_smiles', 'Enter SMILES string...')}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={smiles}
+                    onChange={(e) => setSmiles(e.target.value)}
+                    placeholder={t('mining.search.placeholder_smiles', 'Enter SMILES string...')}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 mb-2"
+                  />
+                  {/* Preview of entered SMILES */}
+                  {smiles && (
+                    <div className="absolute top-full left-0 z-10 bg-white border border-slate-200 shadow-lg rounded-lg p-2 mt-1">
+                      <MoleculeViewer smiles={smiles} width={200} height={100} />
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">{t('mining.search.similarity', 'Similarity Threshold')}: {similarity}</label>
