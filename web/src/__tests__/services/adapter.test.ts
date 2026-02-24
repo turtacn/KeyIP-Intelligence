@@ -31,7 +31,7 @@ describe('ApiAdapter', () => {
       expect.stringContaining('/test?param=value'),
       expect.objectContaining({ method: 'GET' })
     );
-    expect(result).toEqual(mockResponse.data);
+    expect(result).toEqual(mockResponse);
   });
 
   it('should handle non-JSON responses', async () => {

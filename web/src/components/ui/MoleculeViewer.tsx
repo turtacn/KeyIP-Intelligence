@@ -49,7 +49,10 @@ const MoleculeViewer: React.FC<MoleculeViewerProps> = ({
       } finally {
         if (mounted) {
           setLoading(false);
-          if (molecule) molecule.delete();
+          if (molecule) {
+            molecule.delete();
+            molecule = null;
+          }
         }
       }
     };
