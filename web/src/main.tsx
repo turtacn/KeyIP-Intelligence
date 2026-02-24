@@ -9,30 +9,38 @@ async function enableMocking() {
   const isMockMode = import.meta.env.VITE_API_MODE === 'mock';
   const isDev = import.meta.env.DEV;
 
-  // We enable mocking if:
-  // 1. It's development mode (unless explicitly disabled, but we default to enabled for dev convenience if needed,
-  //    though here we rely on VITE_API_MODE or just dev env).
-  // 2. OR if VITE_API_MODE is explicitly 'mock' (this handles the Production Docker "Demo Mode").
+  console.log('[App] Starting...', { isDev, isMockMode, VITE_API_MODE: import.meta.env.VITE_API_MODE });
 
-  // If in prod and not mock mode, skip
-  if (!isDev && !isMockMode) {
+  // If we are NOT in mock mode, and NOT in dev mode (unless dev mode is forcing mock), we don't start MSW.
+  // But wait, the default behavior in Dockerfile is VITE_API_MODE=mock.
+
+  if (!isMockMode && !isDev) {
+    console.log('[App] MSW skipped: Production mode without VITE_API_MODE=mock');
     return;
   }
 
-  // If in dev, but VITE_API_MODE is set to something else (e.g. 'real'), skip
-  if (isDev && import.meta.env.VITE_API_MODE && !isMockMode) {
+  // If explicitly 'real', skip
+  if (import.meta.env.VITE_API_MODE === 'real') {
+    console.log('[App] MSW skipped: VITE_API_MODE is real');
     return;
   }
 
-  const { worker } = await import('./mocks/browser')
+  console.log('[App] Initializing MSW...');
 
-  // Start the worker
-  return worker.start({
-    onUnhandledRequest: 'bypass',
-    serviceWorker: {
-      url: '/mockServiceWorker.js', // Explicit path ensures it works in nested routes if any, or standard location
-    }
-  })
+  try {
+    const { worker } = await import('./mocks/browser');
+
+    // Start the worker
+    await worker.start({
+      onUnhandledRequest: 'bypass',
+      serviceWorker: {
+        url: '/mockServiceWorker.js',
+      }
+    });
+    console.log('[App] MSW started successfully');
+  } catch (error) {
+    console.error('[App] Failed to start MSW:', error);
+  }
 }
 
 enableMocking().then(() => {
@@ -41,4 +49,4 @@ enableMocking().then(() => {
       <App />
     </React.StrictMode>,
   )
-})
+});
