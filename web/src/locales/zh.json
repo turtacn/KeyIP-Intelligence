@@ -138,9 +138,11 @@
       "mode_text": "文本检索",
       "mode_structure": "结构检索",
       "btn_search": "检索",
-      "placeholder_text": "关键词 / 专利号",
+      "placeholder_text": "例如：蓝色 OLED 主体材料",
       "placeholder_smiles": "输入 SMILES 字符串...",
-      "similarity": "相似度阈值"
+      "similarity": "相似度阈值",
+      "label_keywords": "关键词 / 专利号",
+      "label_smiles": "SMILES 结构"
     }
   },
   "infringement": {
@@ -407,5 +409,24 @@
       "copy": "复制",
       "copied": "已复制"
     }
+  },
+  "table": {
+    "select": "选择",
+    "structure": "结构",
+    "relevance": "相关性",
+    "patent_no": "专利号",
+    "title": "标题",
+    "assignee": "受让人",
+    "pub_date": "公开日",
+    "patent_id": "专利号",
+    "event_type": "事件类型",
+    "jurisdiction": "管辖区",
+    "due_date": "截止日期",
+    "fee": "费用",
+    "status": "状态",
+    "no_data": "暂无数据"
+  },
+  "pagination": {
+    "showing": "显示页面"
   }
 }

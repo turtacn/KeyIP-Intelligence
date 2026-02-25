@@ -138,9 +138,11 @@
       "mode_text": "テキスト検索",
       "mode_structure": "構造検索",
       "btn_search": "検索",
-      "placeholder_text": "キーワード / 特許番号",
+      "placeholder_text": "例：青色OLEDホスト材料",
       "placeholder_smiles": "SMILES文字列を入力...",
-      "similarity": "類似度しきい値"
+      "similarity": "類似度しきい値",
+      "label_keywords": "キーワード / 特許番号",
+      "label_smiles": "SMILES 構造"
     }
   },
   "infringement": {
@@ -407,5 +409,24 @@
       "copy": "コピー",
       "copied": "コピー完了"
     }
+  },
+  "table": {
+    "select": "選択",
+    "structure": "構造",
+    "relevance": "関連性",
+    "patent_no": "特許番号",
+    "title": "タイトル",
+    "assignee": "譲受人",
+    "pub_date": "公開日",
+    "patent_id": "特許ID",
+    "event_type": "イベントタイプ",
+    "jurisdiction": "管轄",
+    "due_date": "期日",
+    "fee": "料金",
+    "status": "ステータス",
+    "no_data": "データなし"
+  },
+  "pagination": {
+    "showing": "表示ページ"
   }
 }

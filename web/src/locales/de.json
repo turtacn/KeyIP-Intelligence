@@ -138,9 +138,11 @@
       "mode_text": "Textsuche",
       "mode_structure": "Struktursuche",
       "btn_search": "Suchen",
-      "placeholder_text": "Schlüsselwörter / Patentnummer",
+      "placeholder_text": "z.B. Blaues OLED-Wirtsmaterial",
       "placeholder_smiles": "SMILES-String eingeben...",
-      "similarity": "Ähnlichkeitsschwelle"
+      "similarity": "Ähnlichkeitsschwelle",
+      "label_keywords": "Stichworte / Patentnummer",
+      "label_smiles": "SMILES Struktur"
     }
   },
   "infringement": {
@@ -407,5 +409,24 @@
       "copy": "Kopieren",
       "copied": "Kopiert"
     }
+  },
+  "table": {
+    "select": "AUSWAHL",
+    "structure": "STRUKTUR",
+    "relevance": "RELEVANZ",
+    "patent_no": "PATENT NR.",
+    "title": "TITEL",
+    "assignee": "INHABER",
+    "pub_date": "VERÖFF. DATUM",
+    "patent_id": "PATENT ID",
+    "event_type": "EREIGNISTYP",
+    "jurisdiction": "GERICHTSBARKEIT",
+    "due_date": "FÄLLIGKEIT",
+    "fee": "GEBÜHR",
+    "status": "STATUS",
+    "no_data": "Keine Daten verfügbar"
+  },
+  "pagination": {
+    "showing": "Zeige Seite"
   }
 }

@@ -86,7 +86,7 @@ const PatentSearch: React.FC = () => {
           {mode === 'text' ? (
             <>
               <div className="md:col-span-3">
-                <label className="block text-xs font-medium text-slate-500 mb-1">Keywords / Patent Number</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">{t('mining.search.label_keywords')}</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <input
@@ -103,7 +103,7 @@ const PatentSearch: React.FC = () => {
           ) : (
             <>
               <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-slate-500 mb-1">SMILES Structure</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">{t('mining.search.label_smiles')}</label>
                 <div className="relative">
                   <input
                     type="text"

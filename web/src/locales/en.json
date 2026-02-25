@@ -138,9 +138,11 @@
       "mode_text": "Text Search",
       "mode_structure": "Structure Search",
       "btn_search": "Search",
-      "placeholder_text": "Keywords / Patent Number",
+      "placeholder_text": "e.g., Blue OLED Host Material",
       "placeholder_smiles": "Enter SMILES string...",
-      "similarity": "Similarity Threshold"
+      "similarity": "Similarity Threshold",
+      "label_keywords": "Keywords / Patent Number",
+      "label_smiles": "SMILES Structure"
     }
   },
   "infringement": {
@@ -407,5 +409,24 @@
       "copy": "Copy",
       "copied": "Copied"
     }
+  },
+  "table": {
+    "select": "SELECT",
+    "structure": "STRUCTURE",
+    "relevance": "RELEVANCE",
+    "patent_no": "PATENT NO.",
+    "title": "TITLE",
+    "assignee": "ASSIGNEE",
+    "pub_date": "PUB. DATE",
+    "patent_id": "PATENT ID",
+    "event_type": "EVENT TYPE",
+    "jurisdiction": "JURISDICTION",
+    "due_date": "DUE DATE",
+    "fee": "FEE",
+    "status": "STATUS",
+    "no_data": "No data available"
+  },
+  "pagination": {
+    "showing": "Showing page"
   }
 }

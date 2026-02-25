@@ -138,9 +138,11 @@
       "mode_text": "텍스트 검색",
       "mode_structure": "구조 검색",
       "btn_search": "검색",
-      "placeholder_text": "키워드 / 특허 번호",
+      "placeholder_text": "예: 청색 OLED 호스트 재료",
       "placeholder_smiles": "SMILES 문자열 입력...",
-      "similarity": "유사도 임계값"
+      "similarity": "유사도 임계값",
+      "label_keywords": "키워드 / 특허 번호",
+      "label_smiles": "SMILES 구조"
     }
   },
   "infringement": {
@@ -407,5 +409,24 @@
       "copy": "복사",
       "copied": "복사됨"
     }
+  },
+  "table": {
+    "select": "선택",
+    "structure": "구조",
+    "relevance": "관련성",
+    "patent_no": "특허 번호",
+    "title": "제목",
+    "assignee": "양수인",
+    "pub_date": "공개일",
+    "patent_id": "특허 ID",
+    "event_type": "이벤트 유형",
+    "jurisdiction": "관할 구역",
+    "due_date": "마감일",
+    "fee": "수수료",
+    "status": "상태",
+    "no_data": "데이터 없음"
+  },
+  "pagination": {
+    "showing": "페이지 표시"
   }
 }

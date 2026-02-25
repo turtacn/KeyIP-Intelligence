@@ -138,9 +138,11 @@
       "mode_text": "Recherche textuelle",
       "mode_structure": "Recherche structurelle",
       "btn_search": "Rechercher",
-      "placeholder_text": "Mots-clés / Numéro de brevet",
+      "placeholder_text": "ex: Matériau hôte OLED bleu",
       "placeholder_smiles": "Entrez la chaîne SMILES...",
-      "similarity": "Seuil de similarité"
+      "similarity": "Seuil de similarité",
+      "label_keywords": "Mots-clés / Numéro de brevet",
+      "label_smiles": "Structure SMILES"
     }
   },
   "infringement": {
@@ -407,5 +409,24 @@
       "copy": "Copier",
       "copied": "Copié"
     }
+  },
+  "table": {
+    "select": "SÉLECT",
+    "structure": "STRUCTURE",
+    "relevance": "PERTINENCE",
+    "patent_no": "N° BREVET",
+    "title": "TITRE",
+    "assignee": "TITULAIRE",
+    "pub_date": "DATE PUB.",
+    "patent_id": "ID BREVET",
+    "event_type": "TYPE ÉVÉNEMENT",
+    "jurisdiction": "JURIDICTION",
+    "due_date": "ÉCHÉANCE",
+    "fee": "FRAIS",
+    "status": "STATUT",
+    "no_data": "Aucune donnée disponible"
+  },
+  "pagination": {
+    "showing": "Affichage page"
   }
 }

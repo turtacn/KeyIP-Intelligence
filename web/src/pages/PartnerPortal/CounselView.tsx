@@ -98,7 +98,7 @@ const CounselView: React.FC = () => {
             <textarea
               value={reviewNote}
               onChange={(e) => setReviewNote(e.target.value)}
-              placeholder="Enter your legal assessment, recommendations, and risk mitigation strategies..."
+              placeholder={t('partners.counsel.opinion_placeholder')}
               className="w-full h-40 p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
           </div>

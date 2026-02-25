@@ -46,7 +46,7 @@ const PatentabilityAssessor: React.FC = () => {
             <textarea
               value={smiles}
               onChange={(e) => setSmiles(e.target.value)}
-              placeholder="e.g., c1ccc2c(c1)c3ccccc3n2-c4ccc(cc4)N(c5ccccc5)c6ccccc6"
+              placeholder={t('mining.assessment.smiles_placeholder')}
               className="w-full h-32 p-3 border border-slate-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             {smiles && (

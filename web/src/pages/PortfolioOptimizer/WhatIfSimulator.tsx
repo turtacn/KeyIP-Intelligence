@@ -35,7 +35,7 @@ const WhatIfSimulator: React.FC = () => {
               type="text"
               value={scenarioName}
               onChange={(e) => setScenarioName(e.target.value)}
-              placeholder="e.g., Acquisition of Startup X"
+              placeholder={t('portfolio.simulator.name_placeholder')}
               className="w-full border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
