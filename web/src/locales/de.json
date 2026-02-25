@@ -92,14 +92,47 @@
       "enter_molecule_hint": "Geben Sie die Molekülstruktur ein, um die Bewertung zu starten."
     },
     "draft": {
+      "scope_title": "Erfindungsumfang",
+      "desc_label": "Detaillierte Beschreibung",
       "desc_placeholder": "Beschreiben Sie die Erfindung im Detail...",
-      "keywords_placeholder": "z.B. deuterierter Kern, hohe T1-Energie, thermisch stabil"
+      "features_label": "Wichtige Unterscheidungsmerkmale (kommagetrennt)",
+      "keywords_placeholder": "z.B. deuterierter Kern, hohe T1-Energie, thermisch stabil",
+      "btn_generate": "Anspruchsentwurf generieren",
+      "draft_title": "Anspruchsentwürfe",
+      "synthesizing": "Synthetisiere Rechtssprache...",
+      "independent": "Unabhängiger Anspruch",
+      "dependent": "Abhängiger Anspruch",
+      "empty_state": "Geben Sie Details ein, um Patentansprüche zu generieren.",
+      "export_filename": "anspruchsentwurf.txt"
     },
     "prior_art": {
-      "claim_placeholder": "Fügen Sie hier Ihren Anspruchstext für die Stand-der-Technik-Analyse ein..."
+      "input_title": "Eingabeanspruch",
+      "claim_placeholder": "Fügen Sie hier Ihren Anspruchstext für die Stand-der-Technik-Analyse ein...",
+      "btn_analyze": "Stand der Technik analysieren",
+      "report_title": "Analysebericht",
+      "scanning": "Scanne 50M+ Dokumente...",
+      "overall_assessment": "Gesamtneuheitsbewertung",
+      "closest_docs": "Ähnlichste Stand-der-Technik-Dokumente",
+      "match": "Übereinstimmung",
+      "overlaps": "Überschneidungen",
+      "differs": "Unterschiede",
+      "empty_state": "Geben Sie Anspruchstext ein, um Analyseergebnisse zu sehen."
     },
     "whitespace": {
-      "search_placeholder": "z.B. Anthracen"
+      "params_title": "Entdeckungsparameter",
+      "domain_label": "Technologiebereich",
+      "scaffold_label": "Kerngerüst (Optional)",
+      "search_placeholder": "z.B. Anthracen",
+      "properties_title": "Zieleigenschaften",
+      "btn_identify": "White Spaces identifizieren",
+      "map_title": "Molekülraumkarte",
+      "map_desc": "Visualisierung des patentierten vs. potenziellen Kandidatenraums basierend auf elektronischen Eigenschaften.",
+      "axis_homo": "HOMO-Niveau (eV)",
+      "axis_eqe": "Externe Quanteneffizienz (%)",
+      "legend_patented": "Patentiert",
+      "legend_candidate": "Kandidat",
+      "legend_whitespace": "White Space",
+      "empty_state": "Wählen Sie einen Bereich und klicken Sie auf Analysieren, um den Molekülraum zu visualisieren."
     },
     "search": {
       "mode_text": "Textsuche",
@@ -165,7 +198,19 @@
     "panorama": {
       "title": "Portfolio-Panorama",
       "desc": "Überblick über Portfoliogesundheit, Wert und Bereichsabdeckung.",
-      "domain_analysis": "Bereichsabdeckungsanalyse"
+      "total_patents": "PATENTE GESAMT",
+      "granted": "ERTEILT",
+      "pending": "ANHÄNGIG",
+      "lapsed": "VERFALLEN",
+      "est_value": "GESCHÄTZTER WERT",
+      "health_grade": "GESUNDHEITSNOTE",
+      "domain_analysis": "Bereichsabdeckungsanalyse",
+      "compare_desc": "Vergleichen Sie die Patentabdeckung mit wichtigen Wettbewerbern in verschiedenen Technologiebereichen.",
+      "citation_impact": "Zitationseinfluss",
+      "radar_depth": "Tiefe",
+      "radar_breadth": "Breite",
+      "radar_quality": "Qualität",
+      "radar_freshness": "Aktualität"
     },
     "treemap": {
       "title": "Technologie-Abdeckungskarte"
@@ -193,7 +238,16 @@
       "chart_title": "Jährliche Wartungskosten nach Gerichtsbarkeit",
       "rec_title": "Optimierungsempfehlungen",
       "savings": "Potenzielle jährliche Einsparungen",
-      "apply_btn": "Optimierungsplan anwenden"
+      "analysis_note": "Basierend auf Kosten-Nutzen-Analyse",
+      "apply_btn": "Optimierungsplan anwenden",
+      "confirm_title": "Portfolio-Optimierung bestätigen",
+      "confirm_desc": "Diese Aktion markiert {{count}} Patente zur Aufgabe.",
+      "confirm_warning": "Nach Bestätigung werden Anweisungen an externe Anwälte gesendet, die Rentenzahlungen einzustellen. Diese Aktion kann nach Ablauf der Frist nicht einfach rückgängig gemacht werden.",
+      "cancel": "Abbrechen",
+      "confirm_apply": "Bestätigen & Anwenden",
+      "abandon": "Aufgeben",
+      "review": "Überprüfen",
+      "year_suffix": "/ Jahr"
     },
     "simulator": {
       "title": "Was-wäre-wenn Simulator",
@@ -208,7 +262,9 @@
       "coverage": "Portfolioabdeckung",
       "value": "Gesamtwert",
       "risk": "Risikoexposition",
-      "current": "Aktuell"
+      "current": "Aktuell",
+      "improved": "Verbessert",
+      "ai_analysis_title": "KI-Analyse"
     }
   },
   "lifecycle": {
@@ -242,12 +298,19 @@
     },
     "table": {
       "select": "AUSWAHL",
+      "structure": "STRUKTUR",
+      "relevance": "RELEVANZ",
+      "patent_no": "PATENT NR.",
+      "title": "TITEL",
+      "assignee": "INHABER",
+      "pub_date": "VERÖFF. DATUM",
       "patent_id": "PATENT ID",
       "event_type": "EREIGNISTYP",
       "jurisdiction": "GERICHTSBARKEIT",
       "due_date": "FÄLLIGKEIT",
       "fee": "GEBÜHR",
-      "status": "STATUS"
+      "status": "STATUS",
+      "no_data": "Keine Daten verfügbar"
     },
     "pagination": {
       "showing": "Zeige Seite"
@@ -258,11 +321,16 @@
       "pending": "Ausstehende Zahlungen",
       "projected": "Prognose nächstes Jahr",
       "table_title": "Annuitätenzahlungen",
-      "pay_btn": "Bezahlen"
+      "pay_btn": "Bezahlen",
+      "year": "JAHR",
+      "fee_amount": "GEBÜHRENBETRAG",
+      "usd_equiv": "USD-GEGENWERT",
+      "other": "Andere"
     },
     "status": {
       "active_family": "Aktive Familie",
-      "last_sync": "Letzte Synchronisierung"
+      "last_sync": "Letzte Synchronisierung",
+      "today": "Heute"
     }
   },
   "partners": {

@@ -2,6 +2,7 @@ import React from 'react';
 import Card from '../../components/ui/Card';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip } from 'recharts';
 import CoverageTreemap from './CoverageTreemap';
+import { useTranslation } from 'react-i18next';
 
 interface PanoramaViewProps {
   summary: any;
@@ -11,6 +12,8 @@ interface PanoramaViewProps {
 }
 
 const PanoramaView: React.FC<PanoramaViewProps> = ({ summary, loading, coverageData = {}, scoresData = {} }) => {
+  const { t } = useTranslation();
+
   if (loading || !summary) {
     return (
       <Card className="h-64 animate-pulse bg-slate-100">
@@ -20,11 +23,11 @@ const PanoramaView: React.FC<PanoramaViewProps> = ({ summary, loading, coverageD
   }
 
   const radarData = [
-    { subject: 'Depth', A: 85, fullMark: 100 },
-    { subject: 'Breadth', A: 70, fullMark: 100 },
-    { subject: 'Quality', A: 92, fullMark: 100 },
-    { subject: 'Freshness', A: 88, fullMark: 100 },
-    { subject: 'Citation Impact', A: 75, fullMark: 100 },
+    { subject: t('portfolio.panorama.radar_depth'), A: 85, fullMark: 100 },
+    { subject: t('portfolio.panorama.radar_breadth'), A: 70, fullMark: 100 },
+    { subject: t('portfolio.panorama.radar_quality'), A: 92, fullMark: 100 },
+    { subject: t('portfolio.panorama.radar_freshness'), A: 88, fullMark: 100 },
+    { subject: t('portfolio.panorama.citation_impact'), A: 75, fullMark: 100 },
   ];
 
   return (
@@ -32,12 +35,12 @@ const PanoramaView: React.FC<PanoramaViewProps> = ({ summary, loading, coverageD
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { label: 'Total Patents', value: summary.totalPatents },
-          { label: 'Granted', value: summary.granted, color: 'text-green-600' },
-          { label: 'Pending', value: summary.pending, color: 'text-blue-600' },
-          { label: 'Lapsed', value: summary.lapsed, color: 'text-slate-400' },
-          { label: 'Est. Value', value: `$${(summary.totalValue / 1000000).toFixed(1)}M`, color: 'text-indigo-600' },
-          { label: 'Health Grade', value: summary.healthGrade, color: 'text-purple-600' },
+          { label: t('portfolio.panorama.total_patents'), value: summary.totalPatents },
+          { label: t('portfolio.panorama.granted'), value: summary.granted, color: 'text-green-600' },
+          { label: t('portfolio.panorama.pending'), value: summary.pending, color: 'text-blue-600' },
+          { label: t('portfolio.panorama.lapsed'), value: summary.lapsed, color: 'text-slate-400' },
+          { label: t('portfolio.panorama.est_value'), value: `$${(summary.totalValue / 1000000).toFixed(1)}M`, color: 'text-indigo-600' },
+          { label: t('portfolio.panorama.health_grade'), value: summary.healthGrade, color: 'text-purple-600' },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm text-center">
             <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{stat.label}</div>
@@ -47,7 +50,7 @@ const PanoramaView: React.FC<PanoramaViewProps> = ({ summary, loading, coverageD
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card header="Domain Coverage Analysis" className="h-[400px]">
+        <Card header={t('portfolio.panorama.domain_analysis')} className="h-[400px]">
            <ResponsiveContainer width="100%" height="100%">
              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
                <PolarGrid />

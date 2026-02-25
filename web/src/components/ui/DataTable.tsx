@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export interface Column<T> {
   header: string;
@@ -26,6 +27,8 @@ const DataTable = <T,>({
   pagination,
   onRowClick
 }: DataTableProps<T>) => {
+  const { t } = useTranslation();
+
   return (
     <div className="overflow-hidden bg-white border border-slate-200 rounded-lg shadow-sm">
       <div className="overflow-x-auto">
@@ -55,7 +58,7 @@ const DataTable = <T,>({
             ) : data.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-6 py-8 text-center text-slate-500">
-                  No data available
+                  {t('table.no_data', 'No data available')}
                 </td>
               </tr>
             ) : (
@@ -100,7 +103,7 @@ const DataTable = <T,>({
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-slate-700">
-                Showing page <span className="font-medium">{pagination.currentPage}</span> of{' '}
+                {t('pagination.showing')} <span className="font-medium">{pagination.currentPage}</span> /{' '}
                 <span className="font-medium">{pagination.totalPages}</span>
               </p>
             </div>

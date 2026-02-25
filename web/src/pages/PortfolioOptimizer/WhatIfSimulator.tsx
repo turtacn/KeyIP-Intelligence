@@ -72,35 +72,35 @@ const WhatIfSimulator: React.FC = () => {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="bg-white p-4 rounded-lg border border-slate-200">
-                <div className="text-sm text-slate-500 mb-2">Portfolio Coverage</div>
+                <div className="text-sm text-slate-500 mb-2">{t('portfolio.simulator.coverage')}</div>
                 <div className="text-3xl font-bold text-slate-800">{result.simulated.coverage}%</div>
                 <div className="text-sm font-medium text-green-600 flex items-center justify-center mt-1">
                   <TrendingUp className="w-3 h-3 mr-1" /> +{result.delta.coverage}%
                 </div>
-                <div className="text-xs text-slate-400 mt-2">Current: {result.current.coverage}%</div>
+                <div className="text-xs text-slate-400 mt-2">{t('portfolio.simulator.current')}: {result.current.coverage}%</div>
               </div>
 
               <div className="bg-white p-4 rounded-lg border border-slate-200">
-                <div className="text-sm text-slate-500 mb-2">Total Value</div>
+                <div className="text-sm text-slate-500 mb-2">{t('portfolio.simulator.value')}</div>
                 <div className="text-3xl font-bold text-indigo-600">${(result.simulated.value / 1000000).toFixed(1)}M</div>
                 <div className="text-sm font-medium text-green-600 flex items-center justify-center mt-1">
                   <TrendingUp className="w-3 h-3 mr-1" /> +${(result.delta.value / 1000000).toFixed(1)}M
                 </div>
-                <div className="text-xs text-slate-400 mt-2">Current: ${(result.current.value / 1000000).toFixed(1)}M</div>
+                <div className="text-xs text-slate-400 mt-2">{t('portfolio.simulator.current')}: ${(result.current.value / 1000000).toFixed(1)}M</div>
               </div>
 
               <div className="bg-white p-4 rounded-lg border border-slate-200">
-                <div className="text-sm text-slate-500 mb-2">Risk Exposure</div>
+                <div className="text-sm text-slate-500 mb-2">{t('portfolio.simulator.risk')}</div>
                 <div className="text-3xl font-bold text-red-600">{result.simulated.risk}%</div>
                 <div className="text-sm font-medium text-green-600 flex items-center justify-center mt-1">
-                  <TrendingDown className="w-3 h-3 mr-1" /> {result.delta.risk}% (Improved)
+                  <TrendingDown className="w-3 h-3 mr-1" /> {result.delta.risk}% {t('portfolio.simulator.improved')}
                 </div>
-                <div className="text-xs text-slate-400 mt-2">Current: {result.current.risk}%</div>
+                <div className="text-xs text-slate-400 mt-2">{t('portfolio.simulator.current')}: {result.current.risk}%</div>
               </div>
             </div>
 
             <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg text-sm text-blue-800">
-              <h4 className="font-semibold mb-2">AI Analysis</h4>
+              <h4 className="font-semibold mb-2">{t('portfolio.simulator.ai_analysis_title')}</h4>
               <p>
                 Adding a new Blue Host patent significantly improves portfolio coverage in the OLED domain (+7%) and increases overall valuation. Risk exposure decreases due to better defensive positioning against competitors in the blue emitter space.
               </p>

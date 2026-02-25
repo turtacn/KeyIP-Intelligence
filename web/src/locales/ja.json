@@ -92,14 +92,47 @@
       "enter_molecule_hint": "分子構造を入力して評価を開始してください。"
     },
     "draft": {
+      "scope_title": "発明の範囲",
+      "desc_label": "詳細説明",
       "desc_placeholder": "発明の詳細を記述してください...",
-      "keywords_placeholder": "例：重水素化コア、高T1エネルギー、熱安定性"
+      "features_label": "主な差別化機能（カンマ区切り）",
+      "keywords_placeholder": "例：重水素化コア、高T1エネルギー、熱安定性",
+      "btn_generate": "請求項ドラフトを生成",
+      "draft_title": "請求項ドラフト",
+      "synthesizing": "法的言語を合成中...",
+      "independent": "独立請求項",
+      "dependent": "従属請求項",
+      "empty_state": "詳細を入力して特許請求項を生成します。",
+      "export_filename": "請求項ドラフト.txt"
     },
     "prior_art": {
-      "claim_placeholder": "先行技術分析のために請求項のテキストをここに貼り付けてください..."
+      "input_title": "入力請求項",
+      "claim_placeholder": "先行技術分析のために請求項のテキストをここに貼り付けてください...",
+      "btn_analyze": "先行技術を分析",
+      "report_title": "分析レポート",
+      "scanning": "5000万件以上のドキュメントをスキャン中...",
+      "overall_assessment": "全体的な新規性評価",
+      "closest_docs": "最も近い先行技術文献",
+      "match": "一致",
+      "overlaps": "重複",
+      "differs": "差異",
+      "empty_state": "請求項テキストを入力して分析結果を表示します。"
     },
     "whitespace": {
-      "search_placeholder": "例：アントラセン"
+      "params_title": "発見パラメータ",
+      "domain_label": "技術領域",
+      "scaffold_label": "コア骨格（オプション）",
+      "search_placeholder": "例：アントラセン",
+      "properties_title": "ターゲット特性",
+      "btn_identify": "ホワイトスペースを特定",
+      "map_title": "分子空間マップ",
+      "map_desc": "電子的特性に基づいて特許済み空間と潜在的候補空間を可視化します。",
+      "axis_homo": "HOMO準位 (eV)",
+      "axis_eqe": "外部量子効率 (%)",
+      "legend_patented": "特許済み",
+      "legend_candidate": "候補",
+      "legend_whitespace": "ホワイトスペース",
+      "empty_state": "領域を選択し、分析をクリックして分子空間を可視化します。"
     },
     "search": {
       "mode_text": "テキスト検索",
@@ -165,7 +198,19 @@
     "panorama": {
       "title": "ポートフォリオパノラマ",
       "desc": "ポートフォリオの健全性、価値、領域カバレッジの概要。",
-      "domain_analysis": "領域カバレッジ分析"
+      "total_patents": "特許総数",
+      "granted": "登録済み",
+      "pending": "係属中",
+      "lapsed": "失効",
+      "est_value": "推定価値",
+      "health_grade": "健全性評価",
+      "domain_analysis": "領域カバレッジ分析",
+      "compare_desc": "技術領域全体で主要な競合他社に対する特許カバレッジを比較します。",
+      "citation_impact": "引用インパクト",
+      "radar_depth": "深さ",
+      "radar_breadth": "広さ",
+      "radar_quality": "品質",
+      "radar_freshness": "新鮮さ"
     },
     "treemap": {
       "title": "技術カバレッジマップ"
@@ -193,7 +238,16 @@
       "chart_title": "管轄区域別の年間維持費",
       "rec_title": "最適化の推奨事項",
       "savings": "潜在的な年間節約額",
-      "apply_btn": "最適化プランを適用"
+      "analysis_note": "費用対効果分析に基づく",
+      "apply_btn": "最適化プランを適用",
+      "confirm_title": "ポートフォリオ最適化の確認",
+      "confirm_desc": "この操作により、{{count}}件の特許が放棄対象としてマークされます。",
+      "confirm_warning": "確認後、年金支払いを停止するよう外部弁護士に指示が送信されます。期限を過ぎると、この操作を簡単に元に戻すことはできません。",
+      "cancel": "キャンセル",
+      "confirm_apply": "確認して適用",
+      "abandon": "放棄",
+      "review": "レビュー",
+      "year_suffix": "/ 年"
     },
     "simulator": {
       "title": "What-Ifシミュレータ",
@@ -208,7 +262,9 @@
       "coverage": "ポートフォリオカバレッジ",
       "value": "総価値",
       "risk": "リスクエクスポージャー",
-      "current": "現在"
+      "current": "現在",
+      "improved": "改善",
+      "ai_analysis_title": "AI分析"
     }
   },
   "lifecycle": {
@@ -242,12 +298,19 @@
     },
     "table": {
       "select": "選択",
+      "structure": "構造",
+      "relevance": "関連性",
+      "patent_no": "特許番号",
+      "title": "タイトル",
+      "assignee": "譲受人",
+      "pub_date": "公開日",
       "patent_id": "特許ID",
       "event_type": "イベントタイプ",
       "jurisdiction": "管轄",
       "due_date": "期日",
       "fee": "料金",
-      "status": "ステータス"
+      "status": "ステータス",
+      "no_data": "データなし"
     },
     "pagination": {
       "showing": "表示ページ"
@@ -258,11 +321,16 @@
       "pending": "支払待ち",
       "projected": "来年の予測",
       "table_title": "年金支払い",
-      "pay_btn": "支払う"
+      "pay_btn": "支払う",
+      "year": "年",
+      "fee_amount": "料金額",
+      "usd_equiv": "USD相当額",
+      "other": "その他"
     },
     "status": {
       "active_family": "アクティブなファミリー",
-      "last_sync": "最終同期"
+      "last_sync": "最終同期",
+      "today": "今日"
     }
   },
   "partners": {

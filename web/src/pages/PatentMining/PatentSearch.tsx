@@ -39,7 +39,7 @@ const PatentSearch: React.FC = () => {
 
   const columns: Column<Patent>[] = [
     {
-      header: 'Structure',
+      header: t('table.structure'),
       accessor: (_) => {
         // Mocking structure extraction from abstract or claims for preview
         // In real app, patent object should have a `previewSmiles` or similar field
@@ -52,11 +52,11 @@ const PatentSearch: React.FC = () => {
         );
       }
     },
-    { header: 'Relevance', accessor: () => <span className="text-green-600 font-bold">{(0.85 + Math.random() * 0.14).toFixed(2)}</span> },
-    { header: 'Patent No.', accessor: 'publicationNumber' },
-    { header: 'Title', accessor: (row) => <span className="font-medium text-blue-600 hover:underline cursor-pointer">{row.title}</span> },
-    { header: 'Assignee', accessor: 'assignee' },
-    { header: 'Pub. Date', accessor: 'publicationDate' },
+    { header: t('table.relevance'), accessor: () => <span className="text-green-600 font-bold">{(0.85 + Math.random() * 0.14).toFixed(2)}</span> },
+    { header: t('table.patent_no'), accessor: 'publicationNumber' },
+    { header: t('table.title'), accessor: (row) => <span className="font-medium text-blue-600 hover:underline cursor-pointer">{row.title}</span> },
+    { header: t('table.assignee'), accessor: 'assignee' },
+    { header: t('table.pub_date'), accessor: 'publicationDate' },
     { header: 'IPC', accessor: (row) => row.ipcCodes[0] },
   ];
 

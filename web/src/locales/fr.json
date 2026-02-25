@@ -92,14 +92,47 @@
       "enter_molecule_hint": "Entrez la structure moléculaire pour commencer l'évaluation."
     },
     "draft": {
+      "scope_title": "Portée de l'invention",
+      "desc_label": "Description détaillée",
       "desc_placeholder": "Décrivez l'invention en détail...",
-      "keywords_placeholder": "ex: noyau deutéré, haute énergie T1, stable thermiquement"
+      "features_label": "Principales caractéristiques différenciantes (séparées par des virgules)",
+      "keywords_placeholder": "ex: noyau deutéré, haute énergie T1, stable thermiquement",
+      "btn_generate": "Générer projet de revendication",
+      "draft_title": "Projets de revendications",
+      "synthesizing": "Synthèse du langage juridique...",
+      "independent": "Revendication indépendante",
+      "dependent": "Revendication dépendante",
+      "empty_state": "Entrez les détails pour générer des revendications de brevet.",
+      "export_filename": "projet_revendications.txt"
     },
     "prior_art": {
-      "claim_placeholder": "Collez ici le texte de votre revendication pour l'analyse de l'art antérieur..."
+      "input_title": "Revendication d'entrée",
+      "claim_placeholder": "Collez ici le texte de votre revendication pour l'analyse de l'art antérieur...",
+      "btn_analyze": "Analyser l'art antérieur",
+      "report_title": "Rapport d'analyse",
+      "scanning": "Scan de 50M+ documents...",
+      "overall_assessment": "Évaluation globale de la nouveauté",
+      "closest_docs": "Documents de l'art antérieur les plus proches",
+      "match": "Correspondance",
+      "overlaps": "Chevauchements",
+      "differs": "Diffère",
+      "empty_state": "Entrez le texte de la revendication pour voir les résultats de l'analyse."
     },
     "whitespace": {
-      "search_placeholder": "ex: Anthracène"
+      "params_title": "Paramètres de découverte",
+      "domain_label": "Domaine technologique",
+      "scaffold_label": "Échafaudage central (optionnel)",
+      "search_placeholder": "ex: Anthracène",
+      "properties_title": "Propriétés cibles",
+      "btn_identify": "Identifier les espaces blancs",
+      "map_title": "Carte de l'espace moléculaire",
+      "map_desc": "Visualisation de l'espace breveté vs candidat potentiel basé sur les propriétés électroniques.",
+      "axis_homo": "Niveau HOMO (eV)",
+      "axis_eqe": "Efficacité quantique externe (%)",
+      "legend_patented": "Breveté",
+      "legend_candidate": "Candidat",
+      "legend_whitespace": "Espace blanc",
+      "empty_state": "Sélectionnez un domaine et cliquez sur Analyser pour visualiser l'espace moléculaire."
     },
     "search": {
       "mode_text": "Recherche textuelle",
@@ -165,7 +198,19 @@
     "panorama": {
       "title": "Panorama portefeuille",
       "desc": "Aperçu santé, valeur et couverture domaine.",
-      "domain_analysis": "Analyse couverture domaine"
+      "total_patents": "TOTAL BREVETS",
+      "granted": "ACCORDÉ",
+      "pending": "EN ATTENTE",
+      "lapsed": "EXPIRÉ",
+      "est_value": "VALEUR EST.",
+      "health_grade": "NOTE SANTÉ",
+      "domain_analysis": "Analyse couverture domaine",
+      "compare_desc": "Comparez la couverture des brevets par rapport aux principaux concurrents dans les domaines technologiques.",
+      "citation_impact": "Impact citation",
+      "radar_depth": "Profondeur",
+      "radar_breadth": "Largeur",
+      "radar_quality": "Qualité",
+      "radar_freshness": "Fraîcheur"
     },
     "treemap": {
       "title": "Carte couverture technologique"
@@ -193,7 +238,16 @@
       "chart_title": "Coût maintenance annuel par juridiction",
       "rec_title": "Recommandations optimisation",
       "savings": "Économies annuelles potentielles",
-      "apply_btn": "Appliquer plan"
+      "analysis_note": "Basé sur l'analyse valeur-coût",
+      "apply_btn": "Appliquer plan",
+      "confirm_title": "Confirmer l'optimisation du portefeuille",
+      "confirm_desc": "Cette action marquera {{count}} brevets pour abandon.",
+      "confirm_warning": "Une fois confirmé, des instructions seront envoyées au conseil externe pour arrêter les paiements d'annuités. Cette action ne peut pas être facilement annulée après la date limite.",
+      "cancel": "Annuler",
+      "confirm_apply": "Confirmer et appliquer",
+      "abandon": "Abandonner",
+      "review": "Examiner",
+      "year_suffix": "/ an"
     },
     "simulator": {
       "title": "Simulateur What-If",
@@ -208,7 +262,9 @@
       "coverage": "Couverture portefeuille",
       "value": "Valeur totale",
       "risk": "Exposition risque",
-      "current": "Actuel"
+      "current": "Actuel",
+      "improved": "Amélioré",
+      "ai_analysis_title": "Analyse IA"
     }
   },
   "lifecycle": {
@@ -242,12 +298,19 @@
     },
     "table": {
       "select": "SÉLECT",
+      "structure": "STRUCTURE",
+      "relevance": "PERTINENCE",
+      "patent_no": "N° BREVET",
+      "title": "TITRE",
+      "assignee": "TITULAIRE",
+      "pub_date": "DATE PUB.",
       "patent_id": "ID BREVET",
       "event_type": "TYPE ÉVÉNEMENT",
       "jurisdiction": "JURIDICTION",
       "due_date": "ÉCHÉANCE",
       "fee": "FRAIS",
-      "status": "STATUT"
+      "status": "STATUT",
+      "no_data": "Aucune donnée disponible"
     },
     "pagination": {
       "showing": "Affichage page"
@@ -258,11 +321,16 @@
       "pending": "Paiements en attente",
       "projected": "Projeté année prochaine",
       "table_title": "Paiements annuités",
-      "pay_btn": "Payer"
+      "pay_btn": "Payer",
+      "year": "ANNÉE",
+      "fee_amount": "MONTANT FRAIS",
+      "usd_equiv": "ÉQUIVALENT USD",
+      "other": "Autre"
     },
     "status": {
       "active_family": "Famille active",
-      "last_sync": "Dernière synchro"
+      "last_sync": "Dernière synchro",
+      "today": "Aujourd'hui"
     }
   },
   "partners": {

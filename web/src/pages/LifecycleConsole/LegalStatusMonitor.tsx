@@ -2,6 +2,7 @@ import React from 'react';
 import Card from '../../components/ui/Card';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { LifecycleEvent, Jurisdiction } from '../../types/domain';
+import { useTranslation } from 'react-i18next';
 
 interface LegalStatusMonitorProps {
   events: LifecycleEvent[];
@@ -9,6 +10,7 @@ interface LegalStatusMonitorProps {
 }
 
 const LegalStatusMonitor: React.FC<LegalStatusMonitorProps> = ({ events }) => {
+  const { t } = useTranslation();
   // Mock grouping by patent (since events are flattened)
   const patents = Array.from(new Set(events.map(e => e.patentId)));
 
@@ -25,7 +27,7 @@ const LegalStatusMonitor: React.FC<LegalStatusMonitorProps> = ({ events }) => {
         <Card key={patentId} padding="none" className="overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
             <h3 className="font-semibold text-slate-800">{patentId}</h3>
-            <StatusBadge status="active" label="Active Family" />
+            <StatusBadge status="active" label={t('lifecycle.status.active_family')} />
           </div>
           <div className="p-6 space-y-4">
             {['CN', 'US', 'EP', 'JP', 'KR'].map((jurisdiction) => (
@@ -41,12 +43,12 @@ const LegalStatusMonitor: React.FC<LegalStatusMonitorProps> = ({ events }) => {
                        jurisdiction === 'EP' ? 'EPO' :
                        jurisdiction === 'JP' ? 'JPO' : 'KIPO'}
                     </p>
-                    <p className="text-xs text-slate-400">Last sync: Today</p>
+                    <p className="text-xs text-slate-400">{t('lifecycle.status.last_sync')}: {t('lifecycle.status.today')}</p>
                   </div>
                 </div>
                 <StatusBadge
                   status={getStatusForJurisdiction(patentId, jurisdiction as Jurisdiction) === 'completed' ? 'active' : 'pending'}
-                  label={getStatusForJurisdiction(patentId, jurisdiction as Jurisdiction) === 'completed' ? 'Granted' : 'Pending'}
+                  label={getStatusForJurisdiction(patentId, jurisdiction as Jurisdiction) === 'completed' ? t('portfolio.panorama.granted') : t('portfolio.panorama.pending')}
                   className="scale-90"
                 />
               </div>

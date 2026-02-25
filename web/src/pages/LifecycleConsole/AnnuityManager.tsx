@@ -5,6 +5,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { LifecycleEvent } from '../../types/domain';
 import { DollarSign, PieChart, TrendingUp, CheckCircle } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import { useTranslation } from 'react-i18next';
 
 interface AnnuityManagerProps {
   events: LifecycleEvent[];
@@ -13,16 +14,17 @@ interface AnnuityManagerProps {
 }
 
 const AnnuityManager: React.FC<AnnuityManagerProps> = ({ events, loading, onPay }) => {
+  const { t } = useTranslation();
   const annuityEvents = events.filter(e => e.eventType === 'annuity_due');
   const totalDue = annuityEvents.reduce((acc, curr) => acc + (curr.feeAmount || 0), 0);
   const pendingCount = annuityEvents.filter(e => e.status !== 'completed').length;
 
   const columns: Column<LifecycleEvent>[] = [
-    { header: 'Patent ID', accessor: 'patentId' },
-    { header: 'Jurisdiction', accessor: 'jurisdiction' },
-    { header: 'Year', accessor: () => new Date().getFullYear() }, // Mock year
+    { header: t('lifecycle.table.patent_id'), accessor: 'patentId' },
+    { header: t('lifecycle.table.jurisdiction'), accessor: 'jurisdiction' },
+    { header: t('lifecycle.annuity.year'), accessor: () => new Date().getFullYear() }, // Mock year
     {
-      header: 'Fee Amount',
+      header: t('lifecycle.annuity.fee_amount'),
       accessor: (row) => (
         <span className="font-mono">
           {row.currency} {row.feeAmount?.toLocaleString()}
@@ -30,7 +32,7 @@ const AnnuityManager: React.FC<AnnuityManagerProps> = ({ events, loading, onPay 
       )
     },
     {
-      header: 'USD Equivalent',
+      header: t('lifecycle.annuity.usd_equiv'),
       accessor: (row) => {
         // Mock conversion rates
         const rates: Record<string, number> = { 'USD': 1, 'CNY': 0.14, 'EUR': 1.08, 'JPY': 0.0067, 'KRW': 0.00075 };
@@ -38,13 +40,13 @@ const AnnuityManager: React.FC<AnnuityManagerProps> = ({ events, loading, onPay 
         return <span className="text-slate-500 text-xs">≈ ${usd.toFixed(2)}</span>;
       }
     },
-    { header: 'Due Date', accessor: 'dueDate' },
-    { header: 'Status', accessor: (row) => <StatusBadge status={row.status === 'completed' ? 'completed' : 'pending'} label={row.status} /> },
+    { header: t('lifecycle.table.due_date'), accessor: 'dueDate' },
+    { header: t('lifecycle.table.status'), accessor: (row) => <StatusBadge status={row.status === 'completed' ? 'completed' : 'pending'} label={row.status} /> },
     {
-      header: 'Actions',
+      header: t('partners.admin.table.actions'),
       accessor: (row) => (
         row.status !== 'completed' ? (
-          <Button size="sm" variant="primary" onClick={() => onPay([row.id])}>Pay</Button>
+          <Button size="sm" variant="primary" onClick={() => onPay([row.id])}>{t('lifecycle.annuity.pay_btn')}</Button>
         ) : <span className="text-green-600 text-xs font-medium flex items-center"><CheckCircle className="w-3 h-3 mr-1" /> Paid</span>
       )
     }
@@ -60,7 +62,7 @@ const AnnuityManager: React.FC<AnnuityManagerProps> = ({ events, loading, onPay 
               <DollarSign className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-blue-600 font-medium">Total Due This Year</p>
+              <p className="text-sm text-blue-600 font-medium">{t('lifecycle.annuity.total_due')}</p>
               <h3 className="text-2xl font-bold text-blue-900">${(totalDue * 0.14).toLocaleString()}</h3> {/* Mock total conversion */}
             </div>
           </div>
@@ -72,7 +74,7 @@ const AnnuityManager: React.FC<AnnuityManagerProps> = ({ events, loading, onPay 
               <CheckCircle className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <p className="text-sm text-green-600 font-medium">Completed Payments</p>
+              <p className="text-sm text-green-600 font-medium">{t('lifecycle.annuity.completed')}</p>
               <h3 className="text-2xl font-bold text-green-900">{annuityEvents.length - pendingCount}</h3>
             </div>
           </div>
@@ -84,7 +86,7 @@ const AnnuityManager: React.FC<AnnuityManagerProps> = ({ events, loading, onPay 
               <PieChart className="w-6 h-6 text-amber-600" />
             </div>
             <div>
-              <p className="text-sm text-amber-600 font-medium">Pending Payments</p>
+              <p className="text-sm text-amber-600 font-medium">{t('lifecycle.annuity.pending')}</p>
               <h3 className="text-2xl font-bold text-amber-900">{pendingCount}</h3>
             </div>
           </div>
@@ -96,7 +98,7 @@ const AnnuityManager: React.FC<AnnuityManagerProps> = ({ events, loading, onPay 
               <TrendingUp className="w-6 h-6 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm text-purple-600 font-medium">Projected Next Year</p>
+              <p className="text-sm text-purple-600 font-medium">{t('lifecycle.annuity.projected')}</p>
               <h3 className="text-2xl font-bold text-purple-900">+12%</h3>
             </div>
           </div>
@@ -105,7 +107,7 @@ const AnnuityManager: React.FC<AnnuityManagerProps> = ({ events, loading, onPay 
 
       <Card padding="none">
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 rounded-t-lg">
-          <h3 className="font-semibold text-slate-800">Annuity Payments</h3>
+          <h3 className="font-semibold text-slate-800">{t('lifecycle.annuity.table_title')}</h3>
         </div>
         <DataTable columns={columns} data={annuityEvents} isLoading={loading} />
       </Card>

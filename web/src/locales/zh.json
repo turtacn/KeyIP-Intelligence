@@ -92,14 +92,47 @@
       "enter_molecule_hint": "输入分子结构以开始评估。"
     },
     "draft": {
+      "scope_title": "发明范围",
+      "desc_label": "详细描述",
       "desc_placeholder": "详细描述发明...",
-      "keywords_placeholder": "例如：氘代核心，高T1能量，热稳定性"
+      "features_label": "关键区别特征（逗号分隔）",
+      "keywords_placeholder": "例如：氘代核心，高T1能量，热稳定性",
+      "btn_generate": "生成权利要求草案",
+      "draft_title": "权利要求草案",
+      "synthesizing": "正在合成法律语言...",
+      "independent": "独立权利要求",
+      "dependent": "从属权利要求",
+      "empty_state": "输入详细信息以生成专利权利要求。",
+      "export_filename": "权利要求草案.txt"
     },
     "prior_art": {
-      "claim_placeholder": "在此粘贴权利要求文本以进行现有技术分析..."
+      "input_title": "输入权利要求",
+      "claim_placeholder": "在此粘贴权利要求文本以进行现有技术分析...",
+      "btn_analyze": "分析现有技术",
+      "report_title": "分析报告",
+      "scanning": "正在扫描 5000万+ 文档...",
+      "overall_assessment": "整体新颖性评估",
+      "closest_docs": "最接近的现有技术文档",
+      "match": "匹配度",
+      "overlaps": "重叠点",
+      "differs": "不同点",
+      "empty_state": "输入权利要求文本以查看分析结果。"
     },
     "whitespace": {
-      "search_placeholder": "例如：蒽"
+      "params_title": "发现参数",
+      "domain_label": "技术领域",
+      "scaffold_label": "核心骨架 (可选)",
+      "search_placeholder": "例如：蒽",
+      "properties_title": "目标属性",
+      "btn_identify": "识别空白点",
+      "map_title": "分子空间图",
+      "map_desc": "基于电子属性可视化已专利与潜在候选空间。",
+      "axis_homo": "HOMO 能级 (eV)",
+      "axis_eqe": "外量子效率 (%)",
+      "legend_patented": "已专利",
+      "legend_candidate": "候选者",
+      "legend_whitespace": "空白点",
+      "empty_state": "选择领域并点击分析以可视化分子空间。"
     },
     "search": {
       "mode_text": "文本检索",
@@ -165,7 +198,19 @@
     "panorama": {
       "title": "组合全景",
       "desc": "专利组合健康度、价值和领域覆盖概览。",
-      "domain_analysis": "领域覆盖分析"
+      "total_patents": "专利总数",
+      "granted": "已授权",
+      "pending": "审查中",
+      "lapsed": "已失效",
+      "est_value": "估值",
+      "health_grade": "健康评级",
+      "domain_analysis": "领域覆盖分析",
+      "compare_desc": "跨技术领域比较与主要竞争对手的专利覆盖范围。",
+      "citation_impact": "引用影响力",
+      "radar_depth": "深度",
+      "radar_breadth": "广度",
+      "radar_quality": "质量",
+      "radar_freshness": "新鲜度"
     },
     "treemap": {
       "title": "技术覆盖热力图"
@@ -193,7 +238,16 @@
       "chart_title": "各管辖区年度维护成本",
       "rec_title": "优化建议",
       "savings": "潜在年度节省",
-      "apply_btn": "应用优化方案"
+      "analysis_note": "基于价值成本分析",
+      "apply_btn": "应用优化方案",
+      "confirm_title": "确认组合优化",
+      "confirm_desc": "此操作将标记 {{count}} 项专利为放弃。",
+      "confirm_warning": "确认后，将向外部律师发送停止年金支付的指令。截止日期过后，此操作无法轻易撤销。",
+      "cancel": "取消",
+      "confirm_apply": "确认并应用",
+      "abandon": "放弃",
+      "review": "审查",
+      "year_suffix": "/ 年"
     },
     "simulator": {
       "title": "情景模拟器",
@@ -208,7 +262,9 @@
       "coverage": "组合覆盖率",
       "value": "总价值",
       "risk": "风险暴露",
-      "current": "当前"
+      "current": "当前",
+      "improved": "已改善",
+      "ai_analysis_title": "AI 分析"
     }
   },
   "lifecycle": {
@@ -242,12 +298,19 @@
     },
     "table": {
       "select": "选择",
+      "structure": "结构",
+      "relevance": "相关性",
+      "patent_no": "专利号",
+      "title": "标题",
+      "assignee": "受让人",
+      "pub_date": "公开日",
       "patent_id": "专利号",
       "event_type": "事件类型",
       "jurisdiction": "管辖区",
       "due_date": "截止日期",
       "fee": "费用",
-      "status": "状态"
+      "status": "状态",
+      "no_data": "暂无数据"
     },
     "pagination": {
       "showing": "显示页面"
@@ -258,11 +321,16 @@
       "pending": "待支付",
       "projected": "明年预计",
       "table_title": "年金支付",
-      "pay_btn": "支付"
+      "pay_btn": "支付",
+      "year": "年份",
+      "fee_amount": "金额",
+      "usd_equiv": "美元等值",
+      "other": "其他"
     },
     "status": {
       "active_family": "有效同族",
-      "last_sync": "上次同步"
+      "last_sync": "上次同步",
+      "today": "今天"
     }
   },
   "partners": {

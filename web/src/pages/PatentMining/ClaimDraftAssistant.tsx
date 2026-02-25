@@ -37,7 +37,7 @@ const ClaimDraftAssistant: React.FC = () => {
     const element = document.createElement("a");
     const file = new Blob([draft.join('\n\n')], {type: 'text/plain'});
     element.href = URL.createObjectURL(file);
-    element.download = "draft_claims.txt";
+    element.download = t('mining.draft.export_filename');
     document.body.appendChild(element);
     element.click();
   };
@@ -51,10 +51,10 @@ const ClaimDraftAssistant: React.FC = () => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
       <Card className="flex flex-col h-full">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Invention Scope</h3>
+        <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('mining.draft.scope_title')}</h3>
         <div className="space-y-4 flex-1">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Detailed Description</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('mining.draft.desc_label')}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -63,7 +63,7 @@ const ClaimDraftAssistant: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Key Differentiating Features (comma-separated)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('mining.draft.features_label')}</label>
             <input
               type="text"
               value={features}
@@ -81,14 +81,14 @@ const ClaimDraftAssistant: React.FC = () => {
             className="w-full"
             leftIcon={<PenTool className="w-4 h-4" />}
           >
-            Generate Claim Draft
+            {t('mining.draft.btn_generate')}
           </Button>
         </div>
       </Card>
 
       <Card className="flex flex-col h-full bg-slate-50/50">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-slate-800">Draft Claims</h3>
+          <h3 className="text-lg font-semibold text-slate-800">{t('mining.draft.draft_title')}</h3>
           {draft.length > 0 && (
             <div className="flex space-x-2">
               <Button size="sm" variant="secondary" onClick={handleCopy} leftIcon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}>
@@ -104,14 +104,14 @@ const ClaimDraftAssistant: React.FC = () => {
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
             <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-4" />
-            <p>Synthesizing legal language...</p>
+            <p>{t('mining.draft.synthesizing')}</p>
           </div>
         ) : draft.length > 0 ? (
           <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             {draft.map((claim, index) => (
               <div key={index} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${index * 100}ms` }}>
                 <div className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">
-                  {index === 0 ? 'Independent Claim' : 'Dependent Claim'}
+                  {index === 0 ? t('mining.draft.independent') : t('mining.draft.dependent')}
                 </div>
                 <textarea
                   value={claim}
@@ -124,7 +124,7 @@ const ClaimDraftAssistant: React.FC = () => {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-sm">
             <PenTool className="w-12 h-12 mb-4 opacity-20" />
-            <p>Enter details to generate patent claims.</p>
+            <p>{t('mining.draft.empty_state')}</p>
           </div>
         )}
       </Card>

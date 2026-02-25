@@ -31,10 +31,10 @@ const WhiteSpaceDiscovery: React.FC = () => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
       <Card className="lg:col-span-1 h-full flex flex-col" bodyClassName="flex flex-col">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Discovery Parameters</h3>
+        <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('mining.whitespace.params_title')}</h3>
         <div className="space-y-4 flex-1">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Technology Domain</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('mining.whitespace.domain_label')}</label>
             <select
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
@@ -46,7 +46,7 @@ const WhiteSpaceDiscovery: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Core Scaffold (Optional)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('mining.whitespace.scaffold_label')}</label>
             <input
               type="text"
               placeholder={t('mining.whitespace.search_placeholder')}
@@ -54,7 +54,7 @@ const WhiteSpaceDiscovery: React.FC = () => {
             />
           </div>
           <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-800 border border-blue-100 mt-4">
-            <h4 className="font-semibold mb-2">Target Properties</h4>
+            <h4 className="font-semibold mb-2">{t('mining.whitespace.properties_title')}</h4>
             <ul className="list-disc list-inside space-y-1 opacity-80">
               <li>HOMO: -5.0 to -6.5 eV</li>
               <li>LUMO: -2.0 to -3.0 eV</li>
@@ -64,14 +64,14 @@ const WhiteSpaceDiscovery: React.FC = () => {
         </div>
         <div className="mt-6 pt-4 border-t border-slate-100">
           <Button onClick={handleAnalyze} isLoading={loading} className="w-full" leftIcon={<Search className="w-4 h-4" />}>
-            Identify White Spaces
+            {t('mining.whitespace.btn_identify')}
           </Button>
         </div>
       </Card>
 
       <Card className="lg:col-span-2 h-[500px] flex flex-col" bodyClassName="flex flex-col">
-        <h3 className="text-lg font-semibold text-slate-800 mb-2">Molecular Space Map</h3>
-        <p className="text-sm text-slate-500 mb-4">Visualizing patented vs. potential candidate space based on electronic properties.</p>
+        <h3 className="text-lg font-semibold text-slate-800 mb-2">{t('mining.whitespace.map_title')}</h3>
+        <p className="text-sm text-slate-500 mb-4">{t('mining.whitespace.map_desc')}</p>
 
         {data.length > 0 ? (
           <div className="flex-1 w-full relative">
@@ -84,7 +84,7 @@ const WhiteSpaceDiscovery: React.FC = () => {
                   name="HOMO Level"
                   unit=" eV"
                   domain={[-6.5, -5.0]}
-                  label={{ value: 'HOMO Level (eV)', position: 'bottom', offset: 0 }}
+                  label={{ value: t('mining.whitespace.axis_homo'), position: 'bottom', offset: 0 }}
                 />
                 <YAxis
                   type="number"
@@ -92,33 +92,33 @@ const WhiteSpaceDiscovery: React.FC = () => {
                   name="EQE"
                   unit="%"
                   domain={[0, 30]}
-                  label={{ value: 'External Quantum Efficiency (%)', angle: -90, position: 'insideLeft' }}
+                  label={{ value: t('mining.whitespace.axis_eqe'), angle: -90, position: 'insideLeft' }}
                 />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} />
 
                 {/* Highlight White Space */}
                 <ReferenceArea x1={-6.0} x2={-5.5} y1={20} y2={28} stroke="none" fill="#10b981" fillOpacity={0.1} />
 
-                <Scatter name="Patented Molecules" data={data.filter(d => d.patented)} fill="#94a3b8" shape="circle" />
-                <Scatter name="Potential Candidates" data={data.filter(d => !d.patented)} fill="#3b82f6" shape="star" />
+                <Scatter name={t('mining.whitespace.legend_patented')} data={data.filter(d => d.patented)} fill="#94a3b8" shape="circle" />
+                <Scatter name={t('mining.whitespace.legend_candidate')} data={data.filter(d => !d.patented)} fill="#3b82f6" shape="star" />
               </ScatterChart>
             </ResponsiveContainer>
 
             <div className="absolute top-4 right-4 bg-white/90 p-2 rounded border border-slate-200 text-xs shadow-sm">
               <div className="flex items-center gap-2 mb-1">
-                <span className="w-3 h-3 rounded-full bg-slate-400"></span> Patented
+                <span className="w-3 h-3 rounded-full bg-slate-400"></span> {t('mining.whitespace.legend_patented')}
               </div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="w-3 h-3 text-blue-500 font-bold">★</span> Candidate
+                <span className="w-3 h-3 text-blue-500 font-bold">★</span> {t('mining.whitespace.legend_candidate')}
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 bg-green-100 border border-green-200 block"></span> White Space
+                <span className="w-3 h-3 bg-green-100 border border-green-200 block"></span> {t('mining.whitespace.legend_whitespace')}
               </div>
             </div>
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50 rounded-lg border-2 border-dashed border-slate-200">
-            <p>Select domain and click Analyze to visualize molecular space.</p>
+            <p>{t('mining.whitespace.empty_state')}</p>
           </div>
         )}
       </Card>

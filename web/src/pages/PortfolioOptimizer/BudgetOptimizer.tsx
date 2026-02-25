@@ -21,9 +21,9 @@ const BudgetOptimizer: React.FC = () => {
   ];
 
   const recommendations = [
-    { id: 'US7654321', cost: 3500, score: 42, reason: "High maintenance cost, low strategic value (Score: 42)", action: "Abandon" },
-    { id: 'JP20185678', cost: 1200, score: 55, reason: "Duplicate coverage in better jurisdiction", action: "Review" },
-    { id: 'EP1234567', cost: 2800, score: 38, reason: "Technology obsolete", action: "Abandon" },
+    { id: 'US7654321', cost: 3500, score: 42, reason: "High maintenance cost, low strategic value (Score: 42)", action: t('portfolio.budget.abandon') },
+    { id: 'JP20185678', cost: 1200, score: 55, reason: "Duplicate coverage in better jurisdiction", action: t('portfolio.budget.review') },
+    { id: 'EP1234567', cost: 2800, score: 38, reason: "Technology obsolete", action: t('portfolio.budget.abandon') },
   ];
 
   const totalSavings = recommendations.reduce((acc, r) => acc + r.cost, 0);
@@ -67,7 +67,7 @@ const BudgetOptimizer: React.FC = () => {
         <div className="bg-green-50 p-4 rounded-lg border border-green-100 mb-4 flex items-center justify-between flex-shrink-0">
           <div>
             <h4 className="font-semibold text-green-800">{t('portfolio.budget.savings')}</h4>
-            <p className="text-sm text-green-600">Based on value-to-cost analysis</p>
+            <p className="text-sm text-green-600">{t('portfolio.budget.analysis_note')}</p>
           </div>
           <div className="text-2xl font-bold text-green-700">
             ${totalSavings.toLocaleString()}
@@ -80,7 +80,7 @@ const BudgetOptimizer: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-mono font-medium text-slate-700">{rec.id}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${rec.action === 'Abandon' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${rec.action === t('portfolio.budget.abandon') ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                     {rec.action}
                   </span>
                 </div>
@@ -88,7 +88,7 @@ const BudgetOptimizer: React.FC = () => {
               </div>
               <div className="text-right">
                 <div className="font-bold text-slate-700">${rec.cost.toLocaleString()}</div>
-                <div className="text-xs text-slate-400">/ year</div>
+                <div className="text-xs text-slate-400">{t('portfolio.budget.year_suffix')}</div>
               </div>
             </div>
           ))}
@@ -109,12 +109,12 @@ const BudgetOptimizer: React.FC = () => {
       <Modal
         isOpen={showConfirm}
         onClose={() => setShowConfirm(false)}
-        title="Confirm Portfolio Optimization"
+        title={t('portfolio.budget.confirm_title')}
         size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setShowConfirm(false)}>Cancel</Button>
-            <Button variant="danger" onClick={handleApply} isLoading={optimizing}>Confirm & Apply</Button>
+            <Button variant="secondary" onClick={() => setShowConfirm(false)}>{t('portfolio.budget.cancel')}</Button>
+            <Button variant="danger" onClick={handleApply} isLoading={optimizing}>{t('portfolio.budget.confirm_apply')}</Button>
           </>
         }
       >
@@ -123,10 +123,10 @@ const BudgetOptimizer: React.FC = () => {
             <AlertOctagon className="w-6 h-6 text-red-600" />
           </div>
           <p className="text-slate-700 font-medium">
-            This action will mark {recommendations.filter(r => r.action === 'Abandon').length} patents for abandonment.
+            {t('portfolio.budget.confirm_desc', { count: recommendations.filter(r => r.action === t('portfolio.budget.abandon')).length })}
           </p>
           <p className="text-sm text-slate-500">
-            Once confirmed, instructions will be sent to external counsel to stop annuity payments. This action cannot be easily undone after the deadline passes.
+            {t('portfolio.budget.confirm_warning')}
           </p>
         </div>
       </Modal>

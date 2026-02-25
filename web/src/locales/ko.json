@@ -92,14 +92,47 @@
       "enter_molecule_hint": "평가를 시작하려면 분자 구조를 입력하십시오."
     },
     "draft": {
+      "scope_title": "발명 범위",
+      "desc_label": "상세 설명",
       "desc_placeholder": "발명을 자세히 설명하십시오...",
-      "keywords_placeholder": "예: 중수소화 코어, 높은 T1 에너지, 열 안정성"
+      "features_label": "주요 차별화 기능 (쉼표로 구분)",
+      "keywords_placeholder": "예: 중수소화 코어, 높은 T1 에너지, 열 안정성",
+      "btn_generate": "청구항 초안 생성",
+      "draft_title": "청구항 초안",
+      "synthesizing": "법적 언어 합성 중...",
+      "independent": "독립 청구항",
+      "dependent": "종속 청구항",
+      "empty_state": "특허 청구항을 생성하려면 세부 정보를 입력하십시오.",
+      "export_filename": "청구항_초안.txt"
     },
     "prior_art": {
-      "claim_placeholder": "선행 기술 분석을 위해 여기에 청구항 텍스트를 붙여넣으십시오..."
+      "input_title": "입력 청구항",
+      "claim_placeholder": "선행 기술 분석을 위해 여기에 청구항 텍스트를 붙여넣으십시오...",
+      "btn_analyze": "선행 기술 분석",
+      "report_title": "분석 보고서",
+      "scanning": "5000만 개 이상의 문서를 스캔 중...",
+      "overall_assessment": "전반적인 신규성 평가",
+      "closest_docs": "가장 가까운 선행 기술 문서",
+      "match": "일치",
+      "overlaps": "중복",
+      "differs": "차이점",
+      "empty_state": "분석 결과를 보려면 청구항 텍스트를 입력하십시오."
     },
     "whitespace": {
-      "search_placeholder": "예: 안트라센"
+      "params_title": "발견 매개변수",
+      "domain_label": "기술 도메인",
+      "scaffold_label": "핵심 골격 (선택 사항)",
+      "search_placeholder": "예: 안트라센",
+      "properties_title": "목표 속성",
+      "btn_identify": "공백 영역 식별",
+      "map_title": "분자 공간 지도",
+      "map_desc": "전자적 특성을 기반으로 특허 등록된 공간 대 잠재적 후보 공간을 시각화합니다.",
+      "axis_homo": "HOMO 준위 (eV)",
+      "axis_eqe": "외부 양자 효율 (%)",
+      "legend_patented": "특허 등록됨",
+      "legend_candidate": "후보",
+      "legend_whitespace": "공백 영역",
+      "empty_state": "도메인을 선택하고 분석을 클릭하여 분자 공간을 시각화하십시오."
     },
     "search": {
       "mode_text": "텍스트 검색",
@@ -165,7 +198,19 @@
     "panorama": {
       "title": "포트폴리오 파노라마",
       "desc": "포트폴리오 건전성, 가치 및 도메인 범위 개요.",
-      "domain_analysis": "도메인 범위 분석"
+      "total_patents": "총 특허",
+      "granted": "등록됨",
+      "pending": "심사 중",
+      "lapsed": "소멸됨",
+      "est_value": "추정 가치",
+      "health_grade": "건전성 등급",
+      "domain_analysis": "도메인 범위 분석",
+      "compare_desc": "기술 도메인 전반에 걸쳐 주요 경쟁사와 특허 범위를 비교합니다.",
+      "citation_impact": "인용 영향력",
+      "radar_depth": "깊이",
+      "radar_breadth": "너비",
+      "radar_quality": "품질",
+      "radar_freshness": "최신성"
     },
     "treemap": {
       "title": "기술 범위 지도"
@@ -193,7 +238,16 @@
       "chart_title": "관할 구역별 연간 유지 관리 비용",
       "rec_title": "최적화 권장 사항",
       "savings": "잠재적 연간 절감액",
-      "apply_btn": "최적화 계획 적용"
+      "analysis_note": "가치 대 비용 분석 기반",
+      "apply_btn": "최적화 계획 적용",
+      "confirm_title": "포트폴리오 최적화 확인",
+      "confirm_desc": "이 작업은 {{count}}개의 특허를 포기 대상으로 표시합니다.",
+      "confirm_warning": "확인되면 외부 변호사에게 연금 지급을 중단하라는 지시가 전송됩니다. 마감일이 지나면 이 작업을 쉽게 취소할 수 없습니다.",
+      "cancel": "취소",
+      "confirm_apply": "확인 및 적용",
+      "abandon": "포기",
+      "review": "검토",
+      "year_suffix": "/ 년"
     },
     "simulator": {
       "title": "가상 시뮬레이터",
@@ -208,7 +262,9 @@
       "coverage": "포트폴리오 범위",
       "value": "총 가치",
       "risk": "위험 노출",
-      "current": "현재"
+      "current": "현재",
+      "improved": "개선됨",
+      "ai_analysis_title": "AI 분석"
     }
   },
   "lifecycle": {
@@ -242,12 +298,19 @@
     },
     "table": {
       "select": "선택",
+      "structure": "구조",
+      "relevance": "관련성",
+      "patent_no": "특허 번호",
+      "title": "제목",
+      "assignee": "양수인",
+      "pub_date": "공개일",
       "patent_id": "특허 ID",
       "event_type": "이벤트 유형",
       "jurisdiction": "관할 구역",
       "due_date": "마감일",
       "fee": "수수료",
-      "status": "상태"
+      "status": "상태",
+      "no_data": "데이터 없음"
     },
     "pagination": {
       "showing": "페이지 표시"
@@ -258,11 +321,16 @@
       "pending": "보류 중인 지불",
       "projected": "내년 예상",
       "table_title": "연금 지불",
-      "pay_btn": "지불"
+      "pay_btn": "지불",
+      "year": "연도",
+      "fee_amount": "수수료 금액",
+      "usd_equiv": "USD 등가",
+      "other": "기타"
     },
     "status": {
       "active_family": "활성 패밀리",
-      "last_sync": "마지막 동기화"
+      "last_sync": "마지막 동기화",
+      "today": "오늘"
     }
   },
   "partners": {

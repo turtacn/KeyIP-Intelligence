@@ -92,14 +92,47 @@
       "enter_molecule_hint": "Enter molecule structure to begin assessment."
     },
     "draft": {
+      "scope_title": "Invention Scope",
+      "desc_label": "Detailed Description",
       "desc_placeholder": "Describe the invention in detail...",
-      "keywords_placeholder": "e.g., deuterated core, high T1 energy, thermally stable"
+      "features_label": "Key Differentiating Features (comma-separated)",
+      "keywords_placeholder": "e.g., deuterated core, high T1 energy, thermally stable",
+      "btn_generate": "Generate Claim Draft",
+      "draft_title": "Draft Claims",
+      "synthesizing": "Synthesizing legal language...",
+      "independent": "Independent Claim",
+      "dependent": "Dependent Claim",
+      "empty_state": "Enter details to generate patent claims.",
+      "export_filename": "draft_claims.txt"
     },
     "prior_art": {
-      "claim_placeholder": "Paste your claim text here for prior art analysis..."
+      "input_title": "Input Claim",
+      "claim_placeholder": "Paste your claim text here for prior art analysis...",
+      "btn_analyze": "Analyze Prior Art",
+      "report_title": "Analysis Report",
+      "scanning": "Scanning 50M+ documents...",
+      "overall_assessment": "Overall Novelty Assessment",
+      "closest_docs": "Closest Prior Art Documents",
+      "match": "Match",
+      "overlaps": "Overlaps",
+      "differs": "Differs",
+      "empty_state": "Enter claim text to see analysis results."
     },
     "whitespace": {
-      "search_placeholder": "e.g., Anthracene"
+      "params_title": "Discovery Parameters",
+      "domain_label": "Technology Domain",
+      "scaffold_label": "Core Scaffold (Optional)",
+      "search_placeholder": "e.g., Anthracene",
+      "properties_title": "Target Properties",
+      "btn_identify": "Identify White Spaces",
+      "map_title": "Molecular Space Map",
+      "map_desc": "Visualizing patented vs. potential candidate space based on electronic properties.",
+      "axis_homo": "HOMO Level (eV)",
+      "axis_eqe": "External Quantum Efficiency (%)",
+      "legend_patented": "Patented",
+      "legend_candidate": "Candidate",
+      "legend_whitespace": "White Space",
+      "empty_state": "Select domain and click Analyze to visualize molecular space."
     },
     "search": {
       "mode_text": "Text Search",
@@ -165,7 +198,19 @@
     "panorama": {
       "title": "Portfolio Panorama",
       "desc": "Overview of portfolio health, value, and domain coverage.",
-      "domain_analysis": "Domain Coverage Analysis"
+      "total_patents": "TOTAL PATENTS",
+      "granted": "GRANTED",
+      "pending": "PENDING",
+      "lapsed": "LAPSED",
+      "est_value": "EST. VALUE",
+      "health_grade": "HEALTH GRADE",
+      "domain_analysis": "Domain Coverage Analysis",
+      "compare_desc": "Compare patent coverage against key competitors across technology domains.",
+      "citation_impact": "Citation Impact",
+      "radar_depth": "Depth",
+      "radar_breadth": "Breadth",
+      "radar_quality": "Quality",
+      "radar_freshness": "Freshness"
     },
     "treemap": {
       "title": "Technology Coverage Map"
@@ -193,7 +238,16 @@
       "chart_title": "Annual Maintenance Cost by Jurisdiction",
       "rec_title": "Optimization Recommendations",
       "savings": "Potential Annual Savings",
-      "apply_btn": "Apply Optimization Plan"
+      "analysis_note": "Based on value-to-cost analysis",
+      "apply_btn": "Apply Optimization Plan",
+      "confirm_title": "Confirm Portfolio Optimization",
+      "confirm_desc": "This action will mark {{count}} patents for abandonment.",
+      "confirm_warning": "Once confirmed, instructions will be sent to external counsel to stop annuity payments. This action cannot be easily undone after the deadline passes.",
+      "cancel": "Cancel",
+      "confirm_apply": "Confirm & Apply",
+      "abandon": "Abandon",
+      "review": "Review",
+      "year_suffix": "/ year"
     },
     "simulator": {
       "title": "What-If Simulator",
@@ -208,7 +262,9 @@
       "coverage": "Portfolio Coverage",
       "value": "Total Value",
       "risk": "Risk Exposure",
-      "current": "Current"
+      "current": "Current",
+      "improved": "Improved",
+      "ai_analysis_title": "AI Analysis"
     }
   },
   "lifecycle": {
@@ -242,12 +298,19 @@
     },
     "table": {
       "select": "SELECT",
+      "structure": "STRUCTURE",
+      "relevance": "RELEVANCE",
+      "patent_no": "PATENT NO.",
+      "title": "TITLE",
+      "assignee": "ASSIGNEE",
+      "pub_date": "PUB. DATE",
       "patent_id": "PATENT ID",
       "event_type": "EVENT TYPE",
       "jurisdiction": "JURISDICTION",
       "due_date": "DUE DATE",
       "fee": "FEE",
-      "status": "STATUS"
+      "status": "STATUS",
+      "no_data": "No data available"
     },
     "pagination": {
       "showing": "Showing page"
@@ -258,11 +321,16 @@
       "pending": "Pending Payments",
       "projected": "Projected Next Year",
       "table_title": "Annuity Payments",
-      "pay_btn": "Pay"
+      "pay_btn": "Pay",
+      "year": "YEAR",
+      "fee_amount": "FEE AMOUNT",
+      "usd_equiv": "USD EQUIVALENT",
+      "other": "Other"
     },
     "status": {
       "active_family": "Active Family",
-      "last_sync": "Last Sync"
+      "last_sync": "Last Sync",
+      "today": "Today"
     }
   },
   "partners": {
