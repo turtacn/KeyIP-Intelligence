@@ -3,6 +3,12 @@
     "title": "KeyIP Intelligence",
     "role": "Responsable PI"
   },
+  "search": {
+    "global_placeholder": "Rechercher sur la plateforme..."
+  },
+  "knowledge_graph": {
+    "search_placeholder": "Rechercher dans le graphe..."
+  },
   "nav": {
     "home": "Accueil",
     "dashboard": "Tableau de bord",
@@ -16,13 +22,20 @@
     "title": "Tableau de bord exécutif",
     "subtitle": "Aperçu en temps réel de votre portefeuille de brevets et KPI stratégiques.",
     "search_placeholder": "Rechercher brevets, molécules, entreprises...",
+    "nl_query_placeholder": "Posez une question sur votre portefeuille, ex: 'Combien de brevets US déposés l'an dernier ?'",
     "export": "Exporter rapport",
     "add_patent": "Ajouter brevet",
     "kpi": {
       "total_patents": "Total Brevets",
       "active_patents": "Brevets Actifs",
       "high_risk": "Alertes Haut Risque",
-      "due_month": "Échéance ce mois"
+      "due_month": "Échéance ce mois",
+      "vs_last_month": "vs mois dernier",
+      "portfolio_size": "Taille du portefeuille",
+      "citation_index": "Indice de citation",
+      "tech_coverage": "Couverture technologique",
+      "grant_rate": "Taux d'octroi",
+      "filing_rate": "Taux de dépôt"
     },
     "trend": {
       "title": "Tendance mensuelle des dépôts",
@@ -66,6 +79,7 @@
     "assessment": {
       "title": "Détails de la nouvelle invention",
       "smiles_label": "Structure moléculaire cible (SMILES)",
+      "smiles_placeholder": "ex: c1ccc2c(c1)c3ccccc3n2-c4ccc(cc4)N(c5ccccc5)c6ccccc6",
       "desc_label": "Description technique",
       "desc_placeholder": "Décrire le problème technique, la solution et les avantages...",
       "btn_assess": "Évaluer brevetabilité",
@@ -74,7 +88,18 @@
       "inventive": "Activité inventive",
       "utility": "Évaluation d'utilité",
       "similar": "Art antérieur similaire",
-      "recommendation": "Recommandation"
+      "recommendation": "Recommandation",
+      "enter_molecule_hint": "Entrez la structure moléculaire pour commencer l'évaluation."
+    },
+    "draft": {
+      "desc_placeholder": "Décrivez l'invention en détail...",
+      "keywords_placeholder": "ex: noyau deutéré, haute énergie T1, stable thermiquement"
+    },
+    "prior_art": {
+      "claim_placeholder": "Collez ici le texte de votre revendication pour l'analyse de l'art antérieur..."
+    },
+    "whitespace": {
+      "search_placeholder": "ex: Anthracène"
     },
     "search": {
       "mode_text": "Recherche textuelle",
@@ -88,6 +113,8 @@
   "infringement": {
     "title": "Centre de surveillance contrefaçon",
     "list_title": "Alertes de surveillance",
+    "alerts_label": "Alertes",
+    "search_placeholder": "Rechercher brevet ou molécule...",
     "refresh": "Actualiser",
     "filter_risk": "Niveau de risque",
     "detail": {
@@ -106,18 +133,24 @@
     },
     "claims": {
       "title": "Analyse des revendications",
+      "claim_label": "Revendication",
       "match": "Correspondance éléments"
     },
     "actions": {
       "title": "Actions d'atténuation des risques",
       "report": "Générer rapport FTO",
-      "design": "Suggestions de contournement",
+      "design": "Design-Around",
       "assign": "Assigner à l'équipe juridique",
-      "reviewed": "Marquer comme vu"
+      "reviewed": "Marquer comme vu",
+      "reviewed_done": "Vu"
     },
     "feed": {
       "title": "Flux brevets mondial",
-      "new": "NOUVEAU"
+      "new": "Nouveau",
+      "high_risk_detected": "HAUT RISQUE DÉTECTÉ",
+      "waiting": "En attente de nouvelles publications de brevets...",
+      "pause": "Suspendre le flux",
+      "resume": "Reprendre le flux"
     }
   },
   "portfolio": {
@@ -140,11 +173,12 @@
     "gap": {
       "title": "Matrice écart concurrentiel",
       "select_comp": "Sélectionner concurrents",
-      "domain": "Domaine technologique",
-      "my_org": "Mon Org"
+      "domain": "DOMAINE TECHNOLOGIQUE",
+      "my_org": "MON ORG"
     },
     "scoring": {
       "title": "Score valeur brevet",
+      "desc": "Évaluation IA des actifs brevets basée sur des facteurs techniques, juridiques et commerciaux.",
       "rank": "Rang",
       "composite": "Score composite",
       "recommendation": "Recommandation",
@@ -166,8 +200,10 @@
       "desc": "Simuler mouvements stratégiques et impact.",
       "builder_title": "Constructeur scénario",
       "name_label": "Nom scénario",
+      "name_placeholder": "ex: Acquisition de la Startup X",
       "action_label": "Action simulation",
       "run_btn": "Lancer simulation",
+      "hint": "Configurez un scénario et lancez la simulation pour voir l'impact.",
       "results_title": "Résultats simulation",
       "coverage": "Couverture portefeuille",
       "value": "Valeur totale",
@@ -189,12 +225,32 @@
       "date_range": "Plage dates",
       "urgency": "Urgence",
       "reset": "Réinitialiser",
+      "overdue": "En retard",
+      "all": "Tous",
+      "due_7d": "Échéance 7j",
+      "due_30d": "Échéance 30j",
+      "due_90d": "Échéance 90j",
       "apply": "Appliquer"
     },
     "calendar": {
       "title": "Calendrier échéances",
+      "upcoming": "événements à venir",
+      "select_all": "Tout sélectionner",
+      "deselect_all": "Tout désélectionner",
       "mark_handled": "Marquer traité",
       "export": "Exporter CSV"
+    },
+    "table": {
+      "select": "SÉLECT",
+      "patent_id": "ID BREVET",
+      "event_type": "TYPE ÉVÉNEMENT",
+      "jurisdiction": "JURIDICTION",
+      "due_date": "ÉCHÉANCE",
+      "fee": "FRAIS",
+      "status": "STATUT"
+    },
+    "pagination": {
+      "showing": "Affichage page"
     },
     "annuity": {
       "total_due": "Total dû cette année",
@@ -220,33 +276,68 @@
       "title": "Gestion partenaires",
       "add_btn": "Ajouter partenaire",
       "table": {
-        "name": "Nom",
-        "type": "Type",
-        "country": "Pays",
-        "projects": "Projets actifs",
-        "performance": "Performance",
-        "status": "Statut",
-        "actions": "Actions"
+        "name": "NOM PARTENAIRE",
+        "type": "TYPE",
+        "country": "PAYS",
+        "projects": "PROJETS ACTIFS",
+        "performance": "PERFORMANCE",
+        "status": "STATUT",
+        "actions": "ACTIONS"
       }
     },
     "agency": {
-      "tasks_title": "Tâches en attente",
+      "tasks_title": "Tâches actives",
       "files_title": "Échange fichiers",
-      "comm_title": "Journal communication",
+      "comm_title": "Communication",
+      "chat_placeholder": "Tapez un message...",
       "upload_hint": "Glisser-déposer ou cliquer pour uploader",
-      "recent_files": "Fichiers récents"
+      "upload_subhint": "PDF, DOCX, ZIP jusqu'à 50Mo",
+      "recent_files": "Fichiers récents",
+      "table": {
+        "task_id": "ID TÂCHE",
+        "patent_no": "N° BREVET",
+        "type": "TYPE",
+        "deadline": "ÉCHÉANCE",
+        "priority": "PRIORITÉ",
+        "status": "STATUT"
+      }
     },
     "counsel": {
-      "title": "Revue conseil juridique externe",
+      "title": "Revues conseil juridique externe",
       "submit_btn": "Soumettre avis",
       "opinion_label": "Avis juridique",
-      "rating_label": "Notation risque final"
+      "opinion_placeholder": "Saisissez votre évaluation juridique, vos recommandations et vos stratégies d'atténuation des risques...",
+      "rating_label": "Notation risque final",
+      "table": {
+        "review_id": "ID REVUE",
+        "report_title": "TITRE RAPPORT",
+        "created": "CRÉÉ LE",
+        "deadline": "ÉCHÉANCE",
+        "status": "STATUT",
+        "action": "ACTION"
+      },
+      "actions": {
+        "review": "Examiner",
+        "view": "Voir"
+      }
     },
     "api": {
+      "doc_title": "Documentation API",
       "intro_title": "Introduction",
+      "intro_desc": "Bienvenue dans l'API KeyIP Intelligence. Intégrez les données de brevets, l'analyse moléculaire et les alertes de risque directement dans vos systèmes internes.",
       "endpoints_title": "Points de terminaison",
       "auth_title": "Authentification",
-      "limits_title": "Limites de taux"
+      "key_label": "Clé API",
+      "key_warning": "Gardez cette clé secrète. Ne la partagez pas dans le code côté client.",
+      "gen_key_btn": "Générer nouvelle clé",
+      "limits_title": "Limites de taux",
+      "limit_rpm": "Requêtes / Minute",
+      "limit_quota": "Quota journalier"
+    },
+    "common": {
+      "download": "Télécharger",
+      "copy": "Copier",
+      "copied": "Copié"
     }
   }
 }

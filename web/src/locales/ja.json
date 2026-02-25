@@ -3,6 +3,12 @@
     "title": "KeyIP Intelligence",
     "role": "IPマネージャー"
   },
+  "search": {
+    "global_placeholder": "プラットフォーム全体を検索..."
+  },
+  "knowledge_graph": {
+    "search_placeholder": "グラフを検索..."
+  },
   "nav": {
     "home": "ホーム",
     "dashboard": "ダッシュボード",
@@ -16,13 +22,20 @@
     "title": "エグゼクティブ・ダッシュボード",
     "subtitle": "特許ポートフォリオと戦略的KPIのリアルタイム概要。",
     "search_placeholder": "特許、分子、企業を検索...",
+    "nl_query_placeholder": "特許ポートフォリオについて質問してください。例：「昨年の米国特許出願数は？」",
     "export": "レポートをエクスポート",
     "add_patent": "特許を追加",
     "kpi": {
       "total_patents": "特許総数",
       "active_patents": "有効特許",
       "high_risk": "高リスクアラート",
-      "due_month": "今月の期限"
+      "due_month": "今月の期限",
+      "vs_last_month": "対先月比",
+      "portfolio_size": "ポートフォリオ規模",
+      "citation_index": "引用指数",
+      "tech_coverage": "技術カバレッジ",
+      "grant_rate": "特許査定率",
+      "filing_rate": "出願率"
     },
     "trend": {
       "title": "月次出願傾向",
@@ -66,6 +79,7 @@
     "assessment": {
       "title": "新規発明の詳細",
       "smiles_label": "ターゲット分子構造 (SMILES)",
+      "smiles_placeholder": "例：c1ccc2c(c1)c3ccccc3n2-c4ccc(cc4)N(c5ccccc5)c6ccccc6",
       "desc_label": "技術的説明",
       "desc_placeholder": "技術的な課題、解決策、利点を説明してください...",
       "btn_assess": "特許性を評価",
@@ -74,7 +88,18 @@
       "inventive": "進歩性",
       "utility": "有用性評価",
       "similar": "類似先行技術",
-      "recommendation": "推奨事項"
+      "recommendation": "推奨事項",
+      "enter_molecule_hint": "分子構造を入力して評価を開始してください。"
+    },
+    "draft": {
+      "desc_placeholder": "発明の詳細を記述してください...",
+      "keywords_placeholder": "例：重水素化コア、高T1エネルギー、熱安定性"
+    },
+    "prior_art": {
+      "claim_placeholder": "先行技術分析のために請求項のテキストをここに貼り付けてください..."
+    },
+    "whitespace": {
+      "search_placeholder": "例：アントラセン"
     },
     "search": {
       "mode_text": "テキスト検索",
@@ -88,6 +113,8 @@
   "infringement": {
     "title": "侵害監視センター",
     "list_title": "監視アラート",
+    "alerts_label": "アラート",
+    "search_placeholder": "特許または分子を検索...",
     "refresh": "更新",
     "filter_risk": "リスクレベル",
     "detail": {
@@ -106,6 +133,7 @@
     },
     "claims": {
       "title": "請求項分析",
+      "claim_label": "請求項",
       "match": "要素一致"
     },
     "actions": {
@@ -113,11 +141,16 @@
       "report": "FTOレポート作成",
       "design": "回避設計案",
       "assign": "法務チームに割り当て",
-      "reviewed": "レビュー済みにする"
+      "reviewed": "レビュー済みにする",
+      "reviewed_done": "レビュー済"
     },
     "feed": {
       "title": "世界特許ライブフィード",
-      "new": "新規"
+      "new": "新規",
+      "high_risk_detected": "高リスク検知",
+      "waiting": "新しい特許公開を待機中...",
+      "pause": "フィード一時停止",
+      "resume": "フィード再開"
     }
   },
   "portfolio": {
@@ -145,6 +178,7 @@
     },
     "scoring": {
       "title": "特許価値スコアリング",
+      "desc": "技術的、法的、商業的要因に基づく個々の特許資産のAI主導評価。",
       "rank": "ランク",
       "composite": "総合スコア",
       "recommendation": "推奨",
@@ -166,8 +200,10 @@
       "desc": "戦略的動きとポートフォリオ指標への影響をシミュレート。",
       "builder_title": "シナリオビルダー",
       "name_label": "シナリオ名",
+      "name_placeholder": "例：スタートアップXの買収",
       "action_label": "シミュレーションアクション",
       "run_btn": "シミュレーション実行",
+      "hint": "シナリオを設定し、シミュレーションを実行して影響を確認してください。",
       "results_title": "シミュレーション結果",
       "coverage": "ポートフォリオカバレッジ",
       "value": "総価値",
@@ -189,12 +225,32 @@
       "date_range": "期日範囲",
       "urgency": "緊急度",
       "reset": "リセット",
+      "overdue": "期限切れ",
+      "all": "すべて",
+      "due_7d": "7日以内",
+      "due_30d": "30日以内",
+      "due_90d": "90日以内",
       "apply": "フィルター適用"
     },
     "calendar": {
       "title": "期限カレンダー",
+      "upcoming": "今後のイベント",
+      "select_all": "すべて選択",
+      "deselect_all": "選択解除",
       "mark_handled": "処理済みにする",
       "export": "CSVエクスポート"
+    },
+    "table": {
+      "select": "選択",
+      "patent_id": "特許ID",
+      "event_type": "イベントタイプ",
+      "jurisdiction": "管轄",
+      "due_date": "期日",
+      "fee": "料金",
+      "status": "ステータス"
+    },
+    "pagination": {
+      "showing": "表示ページ"
     },
     "annuity": {
       "total_due": "今年の支払総額",
@@ -220,7 +276,7 @@
       "title": "パートナー管理",
       "add_btn": "パートナー追加",
       "table": {
-        "name": "名前",
+        "name": "パートナー名",
         "type": "タイプ",
         "country": "国",
         "projects": "アクティブなプロジェクト",
@@ -230,23 +286,58 @@
       }
     },
     "agency": {
-      "tasks_title": "保留中のタスク",
+      "tasks_title": "アクティブなタスク",
       "files_title": "ファイル交換",
-      "comm_title": "通信ログ",
+      "comm_title": "通信",
+      "chat_placeholder": "メッセージを入力...",
       "upload_hint": "ファイルをここにドラッグ＆ドロップまたはクリックしてアップロード",
-      "recent_files": "最近のファイル"
+      "upload_subhint": "PDF, DOCX, ZIP (最大50MB)",
+      "recent_files": "最近のファイル",
+      "table": {
+        "task_id": "タスクID",
+        "patent_no": "特許番号",
+        "type": "タイプ",
+        "deadline": "期限",
+        "priority": "優先度",
+        "status": "ステータス"
+      }
     },
     "counsel": {
       "title": "外部法務顧問レビュー",
       "submit_btn": "レビュー意見を提出",
       "opinion_label": "法的意見",
-      "rating_label": "最終リスク評価"
+      "opinion_placeholder": "法的評価、推奨事項、リスク軽減戦略を入力してください...",
+      "rating_label": "最終リスク評価",
+      "table": {
+        "review_id": "レビューID",
+        "report_title": "レポートタイトル",
+        "created": "作成日",
+        "deadline": "期限",
+        "status": "ステータス",
+        "action": "アクション"
+      },
+      "actions": {
+        "review": "レビュー",
+        "view": "表示"
+      }
     },
     "api": {
+      "doc_title": "APIドキュメント",
       "intro_title": "はじめに",
+      "intro_desc": "KeyIP Intelligence APIへようこそ。特許データ、分子分析、リスクアラートを社内システムに直接統合します。",
       "endpoints_title": "エンドポイント",
       "auth_title": "認証",
-      "limits_title": "レート制限"
+      "key_label": "APIキー",
+      "key_warning": "このキーは秘密にしてください。クライアント側のコードで共有しないでください。",
+      "gen_key_btn": "新しいキーを生成",
+      "limits_title": "レート制限",
+      "limit_rpm": "リクエスト / 分",
+      "limit_quota": "1日あたりのクォータ"
+    },
+    "common": {
+      "download": "ダウンロード",
+      "copy": "コピー",
+      "copied": "コピー完了"
     }
   }
 }

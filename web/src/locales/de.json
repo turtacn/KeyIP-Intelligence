@@ -3,6 +3,12 @@
     "title": "KeyIP Intelligence",
     "role": "IP Manager"
   },
+  "search": {
+    "global_placeholder": "Plattformweit suchen..."
+  },
+  "knowledge_graph": {
+    "search_placeholder": "Graphen durchsuchen..."
+  },
   "nav": {
     "home": "Startseite",
     "dashboard": "Dashboard",
@@ -16,13 +22,20 @@
     "title": "Executive Dashboard",
     "subtitle": "Echtzeit-Überblick über Ihr Patentportfolio und strategische KPIs.",
     "search_placeholder": "Suche Patente, Moleküle, Firmen...",
+    "nl_query_placeholder": "Fragen Sie nach Ihrem Patentportfolio, z.B. 'Wie viele US-Patente wurden letztes Jahr angemeldet?'",
     "export": "Bericht exportieren",
     "add_patent": "Patent hinzufügen",
     "kpi": {
       "total_patents": "Patente Gesamt",
       "active_patents": "Aktive Patente",
       "high_risk": "Hohes Risiko Warnungen",
-      "due_month": "Fällig diesen Monat"
+      "due_month": "Fällig diesen Monat",
+      "vs_last_month": "ggü. Vormonat",
+      "portfolio_size": "Portfoliogröße",
+      "citation_index": "Zitierindex",
+      "tech_coverage": "Technologieabdeckung",
+      "grant_rate": "Erteilungsquote",
+      "filing_rate": "Anmeldequote"
     },
     "trend": {
       "title": "Monatlicher Anmeldetrend",
@@ -66,6 +79,7 @@
     "assessment": {
       "title": "Details zur neuen Erfindung",
       "smiles_label": "Zielmolekülstruktur (SMILES)",
+      "smiles_placeholder": "z.B. c1ccc2c(c1)c3ccccc3n2-c4ccc(cc4)N(c5ccccc5)c6ccccc6",
       "desc_label": "Technische Beschreibung",
       "desc_placeholder": "Beschreiben Sie das technische Problem, die Lösung und Vorteile...",
       "btn_assess": "Patentierbarkeit bewerten",
@@ -74,7 +88,18 @@
       "inventive": "Erfinderische Tätigkeit",
       "utility": "Nützlichkeitsbewertung",
       "similar": "Ähnlicher Stand der Technik",
-      "recommendation": "Empfehlung"
+      "recommendation": "Empfehlung",
+      "enter_molecule_hint": "Geben Sie die Molekülstruktur ein, um die Bewertung zu starten."
+    },
+    "draft": {
+      "desc_placeholder": "Beschreiben Sie die Erfindung im Detail...",
+      "keywords_placeholder": "z.B. deuterierter Kern, hohe T1-Energie, thermisch stabil"
+    },
+    "prior_art": {
+      "claim_placeholder": "Fügen Sie hier Ihren Anspruchstext für die Stand-der-Technik-Analyse ein..."
+    },
+    "whitespace": {
+      "search_placeholder": "z.B. Anthracen"
     },
     "search": {
       "mode_text": "Textsuche",
@@ -88,6 +113,8 @@
   "infringement": {
     "title": "Verletzungsüberwachungszentrum",
     "list_title": "Überwachungswarnungen",
+    "alerts_label": "Warnungen",
+    "search_placeholder": "Suche Patent oder Molekül...",
     "refresh": "Aktualisieren",
     "filter_risk": "Risikostufe",
     "detail": {
@@ -106,18 +133,24 @@
     },
     "claims": {
       "title": "Anspruchsanalyse",
+      "claim_label": "Anspruch",
       "match": "Elementübereinstimmung"
     },
     "actions": {
       "title": "Risikominderungsmaßnahmen",
       "report": "FTO-Bericht generieren",
-      "design": "Design-Around Vorschläge",
+      "design": "Design-Around",
       "assign": "An Rechtsteam zuweisen",
-      "reviewed": "Als geprüft markieren"
+      "reviewed": "Als geprüft markieren",
+      "reviewed_done": "Geprüft"
     },
     "feed": {
       "title": "Globaler Patent Live-Feed",
-      "new": "NEU"
+      "new": "Neu",
+      "high_risk_detected": "HOHES RISIKO ERKANNT",
+      "waiting": "Warte auf neue Patentveröffentlichungen...",
+      "pause": "Feed pausieren",
+      "resume": "Feed fortsetzen"
     }
   },
   "portfolio": {
@@ -140,11 +173,12 @@
     "gap": {
       "title": "Wettbewerbslückenmatrix",
       "select_comp": "Wettbewerber auswählen",
-      "domain": "Technologiebereich",
-      "my_org": "Meine Org"
+      "domain": "TECHNOLOGIEBEREICH",
+      "my_org": "MEINE ORG"
     },
     "scoring": {
       "title": "Patentwertbewertung",
+      "desc": "KI-gestützte Bewertung einzelner Patentwerte basierend auf technischen, rechtlichen und kommerziellen Faktoren.",
       "rank": "Rang",
       "composite": "Gesamtwert",
       "recommendation": "Empfehlung",
@@ -166,8 +200,10 @@
       "desc": "Strategische Schritte und deren Auswirkungen simulieren.",
       "builder_title": "Szenario-Ersteller",
       "name_label": "Szenarioname",
+      "name_placeholder": "z.B. Akquisition von Startup X",
       "action_label": "Simulationsaktion",
       "run_btn": "Simulation starten",
+      "hint": "Konfigurieren Sie ein Szenario und starten Sie die Simulation, um die Auswirkungen zu sehen.",
       "results_title": "Simulationsergebnisse",
       "coverage": "Portfolioabdeckung",
       "value": "Gesamtwert",
@@ -189,12 +225,32 @@
       "date_range": "Fälligkeitszeitraum",
       "urgency": "Dringlichkeit",
       "reset": "Zurücksetzen",
+      "overdue": "Überfällig",
+      "all": "Alle",
+      "due_7d": "Fällig in 7 Tagen",
+      "due_30d": "Fällig in 30 Tagen",
+      "due_90d": "Fällig in 90 Tagen",
       "apply": "Filter anwenden"
     },
     "calendar": {
       "title": "Fristenkalender",
+      "upcoming": "kommende Ereignisse",
+      "select_all": "Alle auswählen",
+      "deselect_all": "Alle abwählen",
       "mark_handled": "Als erledigt markieren",
       "export": "CSV exportieren"
+    },
+    "table": {
+      "select": "AUSWAHL",
+      "patent_id": "PATENT ID",
+      "event_type": "EREIGNISTYP",
+      "jurisdiction": "GERICHTSBARKEIT",
+      "due_date": "FÄLLIGKEIT",
+      "fee": "GEBÜHR",
+      "status": "STATUS"
+    },
+    "pagination": {
+      "showing": "Zeige Seite"
     },
     "annuity": {
       "total_due": "Gesamt fällig dieses Jahr",
@@ -220,33 +276,68 @@
       "title": "Partnermanagement",
       "add_btn": "Partner hinzufügen",
       "table": {
-        "name": "Name",
-        "type": "Typ",
-        "country": "Land",
-        "projects": "Aktive Projekte",
-        "performance": "Leistung",
-        "status": "Status",
-        "actions": "Aktionen"
+        "name": "PARTNERNAME",
+        "type": "TYP",
+        "country": "LAND",
+        "projects": "AKTIVE PROJEKTE",
+        "performance": "LEISTUNG",
+        "status": "STATUS",
+        "actions": "AKTIONEN"
       }
     },
     "agency": {
-      "tasks_title": "Ausstehende Aufgaben",
+      "tasks_title": "Aktive Aufgaben",
       "files_title": "Dateiaustausch",
-      "comm_title": "Kommunikationsprotokoll",
+      "comm_title": "Kommunikation",
+      "chat_placeholder": "Nachricht eingeben...",
       "upload_hint": "Dateien hierher ziehen oder zum Hochladen klicken",
-      "recent_files": "Aktuelle Dateien"
+      "upload_subhint": "PDF, DOCX, ZIP bis zu 50MB",
+      "recent_files": "Aktuelle Dateien",
+      "table": {
+        "task_id": "AUFGABEN ID",
+        "patent_no": "PATENT NR.",
+        "type": "TYP",
+        "deadline": "FRIST",
+        "priority": "PRIORITÄT",
+        "status": "STATUS"
+      }
     },
     "counsel": {
-      "title": "Externe Rechtsberater-Überprüfung",
+      "title": "Externe Rechtsberater-Überprüfungen",
       "submit_btn": "Prüfungsmeinung einreichen",
       "opinion_label": "Rechtsmeinung",
-      "rating_label": "Endgültige Risikobewertung"
+      "opinion_placeholder": "Geben Sie Ihre rechtliche Einschätzung, Empfehlungen und Risikominderungsstrategien ein...",
+      "rating_label": "Endgültige Risikobewertung",
+      "table": {
+        "review_id": "PRÜFUNG ID",
+        "report_title": "BERICHTSTITEL",
+        "created": "ERSTELLT",
+        "deadline": "FRIST",
+        "status": "STATUS",
+        "action": "AKTION"
+      },
+      "actions": {
+        "review": "Prüfen",
+        "view": "Ansehen"
+      }
     },
     "api": {
+      "doc_title": "API-Dokumentation",
       "intro_title": "Einführung",
+      "intro_desc": "Willkommen bei der KeyIP Intelligence API. Integrieren Sie Patentdaten, Molekülanalysen und Risikowarnungen direkt in Ihre internen Systeme.",
       "endpoints_title": "Endpunkte",
       "auth_title": "Authentifizierung",
-      "limits_title": "Ratenbegrenzungen"
+      "key_label": "API-Schlüssel",
+      "key_warning": "Halten Sie diesen Schlüssel geheim. Teilen Sie ihn nicht im Client-Code.",
+      "gen_key_btn": "Neuen Schlüssel generieren",
+      "limits_title": "Ratenbegrenzungen",
+      "limit_rpm": "Anfragen / Minute",
+      "limit_quota": "Tägliches Kontingent"
+    },
+    "common": {
+      "download": "Herunterladen",
+      "copy": "Kopieren",
+      "copied": "Kopiert"
     }
   }
 }
