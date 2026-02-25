@@ -1,397 +1,419 @@
 package cli
 
 import (
-	"strings"
+	"context"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 )
 
-func TestNewSearchCmd(t *testing.T) {
-	cmd := NewSearchCmd()
-	if cmd == nil {
-		t.Fatal("NewSearchCmd should return a command")
+// MockSimilaritySearchService is a mock implementation of SimilaritySearchService
+type MockSimilaritySearchService struct {
+	mock.Mock
+}
+
+func (m *MockSimilaritySearchService) Search(ctx context.Context, req *patent_mining.SimilaritySearchRequest) ([]*patent_mining.MoleculeSearchResult, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	if cmd.Use != "search" {
-		t.Errorf("expected Use='search', got %q", cmd.Use)
+	return args.Get(0).([]*patent_mining.MoleculeSearchResult), args.Error(1)
+}
+
+func (m *MockSimilaritySearchService) SearchByText(ctx context.Context, req *patent_mining.PatentSearchRequest) ([]*patent_mining.PatentSearchResult, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*patent_mining.PatentSearchResult), args.Error(1)
+}
+
+func TestParseFingerprints(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		expected  []string
+		expectErr bool
+	}{
+		{"All valid", "morgan,gnn,maccs", []string{"morgan", "gnn", "maccs"}, false},
+		{"Single valid", "topological", []string{"topological"}, false},
+		{"With spaces", " morgan , gnn ", []string{"morgan", "gnn"}, false},
+		{"Invalid type", "morgan,invalid", nil, true},
+		{"Empty string", "", nil, true},
+		{"Case insensitive", "MORGAN,GNN", []string{"morgan", "gnn"}, false},
 	}
 
-	// Verify subcommands are registered
-	subs := cmd.Commands()
-	if len(subs) < 2 {
-		t.Errorf("expected at least 2 subcommands, got %d", len(subs))
-	}
-
-	subNames := make(map[string]bool)
-	for _, sub := range subs {
-		subNames[sub.Use] = true
-	}
-	expectedSubs := []string{"molecule", "patent"}
-	for _, name := range expectedSubs {
-		if !subNames[name] {
-			t.Errorf("expected subcommand %q not found", name)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseFingerprints(tt.input)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
 	}
 }
 
-func TestSearchMoleculeCmd_BySMILES(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--smiles", "c1ccccc1"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
+func TestParseOffices(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{"Empty", "", nil},
+		{"Single", "CN", []string{"CN"}},
+		{"Multiple", "CN,US,EP", []string{"CN", "US", "EP"}},
+		{"With spaces", " cn , us ", []string{"CN", "US"}},
+		{"Lowercase", "cn,us", []string{"CN", "US"}},
 	}
-}
 
-func TestSearchMoleculeCmd_ByInChI(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--inchi", "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseOffices(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }
 
 func TestSearchMoleculeCmd_BothSMILESAndInChI(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--smiles", "c1ccccc1", "--inchi", "InChI=1S/C6H6/c1-2-4-6-5-3-1/h1-6H"})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for providing both smiles and inchi")
-	}
-	if !strings.Contains(err.Error(), "mutually exclusive") {
-		t.Errorf("unexpected error message: %v", err)
-	}
+	mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+
+	ctx := context.Background()
+	searchSMILES = "CCO"
+	searchInChI = "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3"
+
+	err := runSearchMolecule(ctx, mockService, mockLogger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
 }
 
 func TestSearchMoleculeCmd_NeitherSMILESNorInChI(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error when neither smiles nor inchi provided")
-	}
-	if !strings.Contains(err.Error(), "must be provided") {
-		t.Errorf("unexpected error message: %v", err)
-	}
+	ctx := context.Background()
+	searchSMILES = ""
+	searchInChI = ""
+
+	err := runSearchMolecule(ctx, mockService, mockLogger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "either --smiles or --inchi must be provided")
 }
 
 func TestSearchMoleculeCmd_InvalidThreshold_TooLow(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--smiles", "c1ccccc1", "--threshold", "-0.1"})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for threshold below 0")
-	}
-	if !strings.Contains(err.Error(), "threshold must be between") {
-		t.Errorf("unexpected error message: %v", err)
-	}
+	ctx := context.Background()
+	searchSMILES = "CCO"
+	searchThreshold = -0.1
+
+	err := runSearchMolecule(ctx, mockService, mockLogger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "threshold must be between 0.0 and 1.0")
 }
 
 func TestSearchMoleculeCmd_InvalidThreshold_TooHigh(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--smiles", "c1ccccc1", "--threshold", "1.5"})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for threshold above 1")
-	}
-	if !strings.Contains(err.Error(), "threshold must be between") {
-		t.Errorf("unexpected error message: %v", err)
-	}
-}
+	ctx := context.Background()
+	searchSMILES = "CCO"
+	searchThreshold = 1.5
 
-func TestSearchMoleculeCmd_CustomFingerprints(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--smiles", "c1ccccc1", "--fingerprints", "morgan,maccs"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
-	}
-}
-
-func TestSearchMoleculeCmd_InvalidFingerprint(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--smiles", "c1ccccc1", "--fingerprints", "invalid_fp"})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for invalid fingerprint type")
-	}
-	if !strings.Contains(err.Error(), "invalid fingerprint type") {
-		t.Errorf("unexpected error message: %v", err)
-	}
-}
-
-func TestSearchMoleculeCmd_WithRiskAssessment(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--smiles", "c1ccccc1", "--include-risk"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
-	}
+	err := runSearchMolecule(ctx, mockService, mockLogger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "threshold must be between 0.0 and 1.0")
 }
 
 func TestSearchMoleculeCmd_MaxResultsLimit(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--smiles", "c1ccccc1", "--max-results", "600"})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for max-results above 500")
+	ctx := context.Background()
+	searchSMILES = "CCO"
+	searchMaxResults = 600
+
+	err := runSearchMolecule(ctx, mockService, mockLogger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "max-results must be between 1 and 500")
+}
+
+func TestSearchMoleculeCmd_InvalidFingerprint(t *testing.T) {
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
+
+	ctx := context.Background()
+	searchSMILES = "CCO"
+	searchThreshold = 0.7
+	searchMaxResults = 20
+	searchFingerprints = "morgan,invalid"
+
+	err := runSearchMolecule(ctx, mockService, mockLogger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid fingerprint type")
+}
+
+func TestSearchMoleculeCmd_BySMILES(t *testing.T) {
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
+
+	results := []*patent_mining.MoleculeSearchResult{
+		{
+			PatentNumber: "CN115123456A",
+			MoleculeName: "Ethanol",
+			SMILES:       "CCO",
+			Similarity:   0.95,
+			RiskLevel:    "LOW",
+		},
+		{
+			PatentNumber: "US11987654B2",
+			MoleculeName: "Methanol derivative",
+			SMILES:       "CO",
+			Similarity:   0.72,
+			RiskLevel:    "MEDIUM",
+		},
 	}
-	if !strings.Contains(err.Error(), "max-results must be between") {
-		t.Errorf("unexpected error message: %v", err)
-	}
+
+	mockService.On("Search", mock.Anything, mock.MatchedBy(func(req *patent_mining.SimilaritySearchRequest) bool {
+		return req.SMILES == "CCO" && req.Threshold == 0.65
+	})).Return(results, nil)
+
+	mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+
+	ctx := context.Background()
+	searchSMILES = "CCO"
+	searchInChI = ""
+	searchThreshold = 0.65
+	searchMaxResults = 20
+	searchFingerprints = "morgan,gnn"
+	searchIncludeRisk = true
+	searchOutput = "stdout"
+
+	err := runSearchMolecule(ctx, mockService, mockLogger)
+	assert.NoError(t, err)
+
+	mockService.AssertExpectations(t)
 }
 
 func TestSearchMoleculeCmd_EmptyResults(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--smiles", "c1ccccc1", "--threshold", "0.99"})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
-	}
+	mockService.On("Search", mock.Anything, mock.Anything).Return([]*patent_mining.MoleculeSearchResult{}, nil)
+	mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+
+	ctx := context.Background()
+	searchSMILES = "CCO"
+	searchThreshold = 0.99
+	searchMaxResults = 20
+	searchFingerprints = "morgan"
+
+	err := runSearchMolecule(ctx, mockService, mockLogger)
+	assert.NoError(t, err)
+
+	mockService.AssertExpectations(t)
 }
 
 func TestSearchMoleculeCmd_JSONOutput(t *testing.T) {
-	cmd := newSearchMoleculeCmd()
-	cmd.SetArgs([]string{"--smiles", "c1ccccc1", "--output", "json"})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
+	results := []*patent_mining.MoleculeSearchResult{
+		{
+			PatentNumber: "CN115123456A",
+			MoleculeName: "Ethanol",
+			SMILES:       "CCO",
+			Similarity:   0.95,
+		},
 	}
+
+	mockService.On("Search", mock.Anything, mock.Anything).Return(results, nil)
+	mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+
+	output, err := formatMoleculeResults(results, "json")
+	require.NoError(t, err)
+	assert.Contains(t, output, "CN115123456A")
+	assert.Contains(t, output, "0.95")
 }
 
 func TestSearchPatentCmd_BasicQuery(t *testing.T) {
-	cmd := newSearchPatentCmd()
-	cmd.SetArgs([]string{"--query", "OLED emitter"})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
+	now := time.Now()
+	results := []*patent_mining.PatentSearchResult{
+		{
+			PatentNumber: "CN115123456A",
+			Title:        "Machine learning method for patent analysis",
+			FilingDate:   now,
+			IPC:          "G06N 3/08",
+			Relevance:    0.85,
+		},
 	}
-}
 
-func TestSearchPatentCmd_WithIPCFilter(t *testing.T) {
-	cmd := newSearchPatentCmd()
-	cmd.SetArgs([]string{"--query", "OLED", "--ipc", "H10K"})
+	mockService.On("SearchByText", mock.Anything, mock.MatchedBy(func(req *patent_mining.PatentSearchRequest) bool {
+		return req.Query == "machine learning" && req.Sort == "relevance"
+	})).Return(results, nil)
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
-	}
-}
+	mockLogger.On("Info", mock.Anything, mock.Anything).Return()
 
-func TestSearchPatentCmd_WithDateRange(t *testing.T) {
-	cmd := newSearchPatentCmd()
-	cmd.SetArgs([]string{"--query", "OLED", "--date-from", "2020-01-01", "--date-to", "2023-12-31"})
+	ctx := context.Background()
+	searchQuery = "machine learning"
+	searchMaxResults = 50
+	searchSort = "relevance"
+	searchOutput = "stdout"
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
-	}
+	err := runSearchPatent(ctx, mockService, mockLogger)
+	assert.NoError(t, err)
+
+	mockService.AssertExpectations(t)
 }
 
 func TestSearchPatentCmd_InvalidDateFormat(t *testing.T) {
-	cmd := newSearchPatentCmd()
-	cmd.SetArgs([]string{"--query", "OLED", "--date-from", "01-01-2020"})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for invalid date format")
-	}
-	if !strings.Contains(err.Error(), "invalid date-from format") {
-		t.Errorf("unexpected error message: %v", err)
-	}
+	ctx := context.Background()
+	searchQuery = "test"
+	searchDateFrom = "2024/01/01"
+	searchMaxResults = 50
+	searchSort = "relevance"
+
+	err := runSearchPatent(ctx, mockService, mockLogger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid date-from format")
 }
 
 func TestSearchPatentCmd_DateRangeInverted(t *testing.T) {
-	cmd := newSearchPatentCmd()
-	cmd.SetArgs([]string{"--query", "OLED", "--date-from", "2023-12-31", "--date-to", "2020-01-01"})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for inverted date range")
-	}
-	if !strings.Contains(err.Error(), "date-from cannot be later than date-to") {
-		t.Errorf("unexpected error message: %v", err)
-	}
-}
+	ctx := context.Background()
+	searchQuery = "test"
+	searchDateFrom = "2024-12-31"
+	searchDateTo = "2024-01-01"
+	searchMaxResults = 50
+	searchSort = "relevance"
 
-func TestSearchPatentCmd_SortByDate(t *testing.T) {
-	cmd := newSearchPatentCmd()
-	cmd.SetArgs([]string{"--query", "OLED", "--sort", "date"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
-	}
-}
-
-func TestSearchPatentCmd_SortByCitations(t *testing.T) {
-	cmd := newSearchPatentCmd()
-	cmd.SetArgs([]string{"--query", "OLED", "--sort", "citations"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
-	}
+	err := runSearchPatent(ctx, mockService, mockLogger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "date-from cannot be later than date-to")
 }
 
 func TestSearchPatentCmd_InvalidSort(t *testing.T) {
-	cmd := newSearchPatentCmd()
-	cmd.SetArgs([]string{"--query", "OLED", "--sort", "invalid"})
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for invalid sort option")
-	}
-	if !strings.Contains(err.Error(), "invalid sort option") {
-		t.Errorf("unexpected error message: %v", err)
-	}
+	ctx := context.Background()
+	searchQuery = "test"
+	searchMaxResults = 50
+	searchSort = "popularity"
+
+	err := runSearchPatent(ctx, mockService, mockLogger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid sort parameter")
 }
 
-func TestSearchPatentCmd_ServiceError(t *testing.T) {
-	// Test missing required flag (simulates service error scenario)
-	cmd := newSearchPatentCmd()
-	cmd.SetArgs([]string{})
+func TestSearchPatentCmd_WithIPCFilter(t *testing.T) {
+	mockService := new(MockSimilaritySearchService)
+	mockLogger := new(MockLogger)
 
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for missing query")
+	now := time.Now()
+	results := []*patent_mining.PatentSearchResult{
+		{
+			PatentNumber: "CN115123456A",
+			Title:        "Chemical compound",
+			FilingDate:   now,
+			IPC:          "C07D 213/30",
+			Relevance:    0.90,
+		},
 	}
+
+	mockService.On("SearchByText", mock.Anything, mock.MatchedBy(func(req *patent_mining.PatentSearchRequest) bool {
+		return req.IPC == "C07D"
+	})).Return(results, nil)
+
+	mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+
+	ctx := context.Background()
+	searchQuery = "chemical"
+	searchIPC = "C07D"
+	searchMaxResults = 50
+	searchSort = "relevance"
+
+	err := runSearchPatent(ctx, mockService, mockLogger)
+	assert.NoError(t, err)
+
+	mockService.AssertExpectations(t)
 }
 
 func TestFormatMoleculeResults_Table(t *testing.T) {
-	results := []MoleculeSearchResult{
-		{Rank: 1, Similarity: 0.95, PatentNumber: "CN123", MoleculeName: "Test-Mol-1", SMILES: "c1ccccc1", RiskLevel: "LOW"},
+	results := []*patent_mining.MoleculeSearchResult{
+		{
+			PatentNumber: "CN115123456A",
+			MoleculeName: "Ethanol",
+			SMILES:       "CCO",
+			Similarity:   0.95,
+			RiskLevel:    "LOW",
+		},
 	}
 
-	output, err := formatMoleculeResults(results, "stdout", false)
-	if err != nil {
-		t.Fatalf("formatting failed: %v", err)
-	}
+	searchThreshold = 0.7
+	searchIncludeRisk = true
 
-	if !strings.Contains(output, "CN123") {
-		t.Error("output should contain patent number")
-	}
-	if !strings.Contains(output, "0.95") {
-		t.Error("output should contain similarity score")
-	}
+	output, err := formatMoleculeResults(results, "stdout")
+	require.NoError(t, err)
+	assert.Contains(t, output, "CN115123456A")
+	assert.Contains(t, output, "95.00%")
+	assert.Contains(t, output, "LOW")
 }
 
 func TestFormatPatentResults_Table(t *testing.T) {
-	results := []PatentSearchResult{
-		{Rank: 1, Relevance: 0.95, PatentNumber: "CN123", Title: "Test Patent", ApplicationDate: "2021-01-01", IPC: "H10K50/11"},
+	now := time.Now()
+	results := []*patent_mining.PatentSearchResult{
+		{
+			PatentNumber: "CN115123456A",
+			Title:        "Test Patent",
+			FilingDate:   now,
+			IPC:          "G06N 3/08",
+			Relevance:    0.85,
+		},
 	}
 
 	output, err := formatPatentResults(results, "stdout")
-	if err != nil {
-		t.Fatalf("formatting failed: %v", err)
-	}
-
-	if !strings.Contains(output, "CN123") {
-		t.Error("output should contain patent number")
-	}
-	if !strings.Contains(output, "H10K50/11") {
-		t.Error("output should contain IPC classification")
-	}
+	require.NoError(t, err)
+	assert.Contains(t, output, "CN115123456A")
+	assert.Contains(t, output, "Test Patent")
+	assert.Contains(t, output, "85.00%")
 }
 
 func TestColorizeRiskLevel_AllLevels(t *testing.T) {
 	tests := []struct {
-		level         string
-		expectsColor  bool
-		expectedColor string
+		level    string
+		contains string
 	}{
-		{"HIGH", true, "\033[31m"},    // Red
-		{"MEDIUM", true, "\033[33m"},  // Yellow
-		{"LOW", true, "\033[32m"},     // Green
-		{"UNKNOWN", false, ""},
+		{"HIGH", "HIGH"},
+		{"MEDIUM", "MEDIUM"},
+		{"LOW", "LOW"},
+		{"UNKNOWN", "UNKNOWN"},
 	}
 
 	for _, tt := range tests {
-		result := colorizeRiskLevel(tt.level)
-		if tt.expectsColor {
-			if !strings.Contains(result, tt.expectedColor) {
-				t.Errorf("colorizeRiskLevel(%q) should contain %q, got %q", tt.level, tt.expectedColor, result)
-			}
-		}
-		if !strings.Contains(result, tt.level) {
-			t.Errorf("colorizeRiskLevel(%q) should contain level text, got %q", tt.level, result)
-		}
-	}
-}
-
-func TestIsValidFingerprint(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected bool
-	}{
-		{"morgan", true},
-		{"topological", true},
-		{"maccs", true},
-		{"gnn", true},
-		{"invalid", false},
-		{"", false},
-	}
-
-	for _, tt := range tests {
-		if got := isValidFingerprint(tt.input); got != tt.expected {
-			t.Errorf("isValidFingerprint(%q) = %v, want %v", tt.input, got, tt.expected)
-		}
-	}
-}
-
-func TestIsValidSortOption(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected bool
-	}{
-		{"relevance", true},
-		{"date", true},
-		{"citations", true},
-		{"invalid", false},
-		{"", false},
-	}
-
-	for _, tt := range tests {
-		if got := isValidSortOption(tt.input); got != tt.expected {
-			t.Errorf("isValidSortOption(%q) = %v, want %v", tt.input, got, tt.expected)
-		}
-	}
-}
-
-func TestTruncateString(t *testing.T) {
-	tests := []struct {
-		input    string
-		maxLen   int
-		expected string
-	}{
-		{"short", 10, "short"},
-		{"this is a long string", 10, "this is..."},
-		{"exactly10!", 10, "exactly10!"},
-	}
-
-	for _, tt := range tests {
-		result := truncateString(tt.input, tt.maxLen)
-		if result != tt.expected {
-			t.Errorf("truncateString(%q, %d) = %q, want %q", tt.input, tt.maxLen, result, tt.expected)
-		}
-	}
-}
-
-func TestSearchCmd_Exists(t *testing.T) {
-	if SearchCmd == nil {
-		t.Error("SearchCmd should exist")
+		t.Run(tt.level, func(t *testing.T) {
+			result := colorizeRiskLevel(tt.level)
+			assert.Contains(t, result, tt.contains)
+		})
 	}
 }
 

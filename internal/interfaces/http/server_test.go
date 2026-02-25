@@ -1,279 +1,578 @@
+// ---
+//
+// 继续输出 285 `internal/interfaces/http/server_test.go` 要实现 HTTP 服务器单元测试。
+//
+// 实现要求:
+//
+// * **功能定位**：验证 Server 的创建、启动、优雅关闭、TLS 模式、超时配置、并发安全
+// * **测试用例**：
+//   * `TestNewServer_DefaultConfig`：零值配置应用默认值
+//   * `TestNewServer_CustomConfig`：自定义配置正确传递
+//   * `TestServer_StartAndShutdown`：正常启动和优雅关闭
+//   * `TestServer_StartWithEphemeralPort`：端口 0 分配临时端口
+//   * `TestServer_DoubleStart_Error`：重复启动返回错误
+//   * `TestServer_ShutdownBeforeStart`：未启动时关闭不报错
+//   * `TestServer_IsRunning`：运行状态正确反映
+//   * `TestServer_Addr_AfterStart`：启动后返回实际地址
+//   * `TestServer_TLSEnabled`：TLS 配置检测
+//   * `TestServer_GracefulShutdown_WaitsForActiveRequests`：优雅关闭等待活跃请求
+//   * `TestServer_ShutdownTimeout_ForcesClose`：超时后强制关闭
+//   * `TestServerConfig_ApplyDefaults`：默认值填充逻辑
+//   * `TestServerConfig_IsTLSEnabled`：TLS 启用判断
+//   * `TestServerConfig_ListenAddr`：地址格式化
+// * **Mock 依赖**：stubLogger、slowHandler（模拟慢请求）
+// * **断言验证**：状态码、地址格式、超时行为、并发安全
+// * **强制约束**：文件最后一行必须为 `//Personal.AI order the ending`
+//
+// ---
 package http
 
 import (
-"context"
-"net/http"
-"testing"
-"time"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestDefaultServerConfig(t *testing.T) {
-cfg := DefaultServerConfig()
-if cfg == nil {
-t.Fatal("DefaultServerConfig should not return nil")
-}
-if cfg.Host != "0.0.0.0" {
-t.Errorf("expected Host=0.0.0.0, got %s", cfg.Host)
-}
-if cfg.Port != 8080 {
-t.Errorf("expected Port=8080, got %d", cfg.Port)
-}
-if cfg.ReadTimeout != 30*time.Second {
-t.Errorf("expected ReadTimeout=30s, got %v", cfg.ReadTimeout)
-}
+// --- ServerConfig unit tests ---
+
+func TestServerConfig_ApplyDefaults(t *testing.T) {
+	cfg := ServerConfig{}
+	cfg.applyDefaults()
+
+	assert.Equal(t, defaultHost, cfg.Host)
+	assert.Equal(t, defaultPort, cfg.Port)
+	assert.Equal(t, defaultReadTimeout, cfg.ReadTimeout)
+	assert.Equal(t, defaultWriteTimeout, cfg.WriteTimeout)
+	assert.Equal(t, defaultIdleTimeout, cfg.IdleTimeout)
+	assert.Equal(t, defaultReadHeaderTimeout, cfg.ReadHeaderTimeout)
+	assert.Equal(t, defaultMaxHeaderBytes, cfg.MaxHeaderBytes)
+	assert.Equal(t, defaultShutdownTimeout, cfg.ShutdownTimeout)
 }
 
-func TestNewServer_Success(t *testing.T) {
-handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-w.WriteHeader(http.StatusOK)
-})
+func TestServerConfig_ApplyDefaults_PreservesCustomValues(t *testing.T) {
+	cfg := ServerConfig{
+		Host:            "127.0.0.1",
+		Port:            9090,
+		ReadTimeout:     5 * time.Second,
+		WriteTimeout:    10 * time.Second,
+		IdleTimeout:     60 * time.Second,
+		ShutdownTimeout: 15 * time.Second,
+	}
+	cfg.applyDefaults()
 
-server, err := NewServer(nil, handler)
-if err != nil {
-t.Fatalf("NewServer failed: %v", err)
-}
-if server == nil {
-t.Fatal("server should not be nil")
-}
-}
-
-func TestNewServer_NilHandler(t *testing.T) {
-_, err := NewServer(nil, nil)
-if err == nil {
-t.Error("expected error for nil handler")
-}
+	assert.Equal(t, "127.0.0.1", cfg.Host)
+	assert.Equal(t, 9090, cfg.Port)
+	assert.Equal(t, 5*time.Second, cfg.ReadTimeout)
+	assert.Equal(t, 10*time.Second, cfg.WriteTimeout)
+	assert.Equal(t, 60*time.Second, cfg.IdleTimeout)
+	assert.Equal(t, 15*time.Second, cfg.ShutdownTimeout)
 }
 
-func TestNewServer_InvalidPort(t *testing.T) {
-handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-cfg := &ServerConfig{Port: -1}
+func TestServerConfig_IsTLSEnabled(t *testing.T) {
+	tests := []struct {
+		name     string
+		cert     string
+		key      string
+		expected bool
+	}{
+		{"both set", "/path/cert.pem", "/path/key.pem", true},
+		{"cert only", "/path/cert.pem", "", false},
+		{"key only", "", "/path/key.pem", false},
+		{"neither set", "", "", false},
+	}
 
-_, err := NewServer(cfg, handler)
-if err == nil {
-t.Error("expected error for invalid port")
-}
-}
-
-func TestNewServer_ApplyDefaults(t *testing.T) {
-handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-cfg := &ServerConfig{} // All zero values
-
-server, err := NewServer(cfg, handler)
-if err != nil {
-t.Fatalf("NewServer failed: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := ServerConfig{TLSCertFile: tt.cert, TLSKeyFile: tt.key}
+			assert.Equal(t, tt.expected, cfg.isTLSEnabled())
+		})
+	}
 }
 
-if server.httpServer.ReadTimeout != 30*time.Second {
-t.Error("ReadTimeout default not applied")
+func TestServerConfig_ListenAddr(t *testing.T) {
+	cfg := ServerConfig{Host: "192.168.1.1", Port: 3000}
+	assert.Equal(t, "192.168.1.1:3000", cfg.listenAddr())
 }
-if server.httpServer.WriteTimeout != 60*time.Second {
-t.Error("WriteTimeout default not applied")
+
+func TestServerConfig_ListenAddr_Default(t *testing.T) {
+	cfg := ServerConfig{}
+	cfg.applyDefaults()
+	assert.Equal(t, "0.0.0.0:8080", cfg.listenAddr())
 }
+
+// --- Server creation tests ---
+
+func TestNewServer_DefaultConfig(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	logger := &stubLogger{}
+
+	srv := NewServer(ServerConfig{}, handler, logger)
+
+	assert.NotNil(t, srv)
+	assert.Equal(t, defaultHost, srv.config.Host)
+	assert.Equal(t, defaultPort, srv.config.Port)
+	assert.Equal(t, defaultReadTimeout, srv.config.ReadTimeout)
+	assert.False(t, srv.IsRunning())
 }
+
+func TestNewServer_CustomConfig(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	logger := &stubLogger{}
+
+	cfg := ServerConfig{
+		Host:         "127.0.0.1",
+		Port:         9999,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	srv := NewServer(cfg, handler, logger)
+
+	assert.Equal(t, "127.0.0.1", srv.config.Host)
+	assert.Equal(t, 9999, srv.config.Port)
+	assert.Equal(t, 5*time.Second, srv.config.ReadTimeout)
+	assert.Equal(t, 10*time.Second, srv.config.WriteTimeout)
+	// Defaults should be applied for unset fields
+	assert.Equal(t, defaultIdleTimeout, srv.config.IdleTimeout)
+}
+
+func TestNewServer_TLSConfig(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	logger := &stubLogger{}
+
+	cfg := ServerConfig{
+		TLSCertFile: "/path/to/cert.pem",
+		TLSKeyFile:  "/path/to/key.pem",
+	}
+
+	srv := NewServer(cfg, handler, logger)
+
+	assert.True(t, srv.config.isTLSEnabled())
+	assert.NotNil(t, srv.httpServer.TLSConfig)
+}
+
+// --- Server lifecycle tests ---
 
 func TestServer_StartAndShutdown(t *testing.T) {
-handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-w.WriteHeader(http.StatusOK)
-})
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	logger := &stubLogger{}
 
-cfg := &ServerConfig{
-Host: "127.0.0.1",
-Port: 0, // Random port
+	srv := NewServer(ServerConfig{
+		Host: "127.0.0.1",
+		Port: 0, // ephemeral port
+	}, handler, logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start server in background
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- srv.Start(ctx)
+	}()
+
+	// Wait for server to be ready
+	require.Eventually(t, func() bool {
+		return srv.IsRunning()
+	}, 2*time.Second, 10*time.Millisecond)
+
+	// Make a request
+	addr := srv.Addr()
+	require.NotEmpty(t, addr)
+
+	resp, err := http.Get(fmt.Sprintf("http://%s/", addr))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "ok", string(body))
+
+	// Shutdown
+	cancel()
+
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not shut down in time")
+	}
+
+	assert.False(t, srv.IsRunning())
 }
 
-server, err := NewServer(cfg, handler)
-if err != nil {
-t.Fatalf("NewServer failed: %v", err)
+func TestServer_StartWithEphemeralPort(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	logger := &stubLogger{}
+
+	srv := NewServer(ServerConfig{
+		Host: "127.0.0.1",
+		Port: 0,
+	}, handler, logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		_ = srv.Start(ctx)
+	}()
+
+	require.Eventually(t, func() bool {
+		return srv.IsRunning()
+	}, 2*time.Second, 10*time.Millisecond)
+
+	addr := srv.Addr()
+	assert.NotEmpty(t, addr)
+	assert.NotContains(t, addr, ":0",
+		"ephemeral port should be resolved to actual port")
+
+	cancel()
 }
 
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel()
+func TestServer_DoubleStart_Error(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	logger := &stubLogger{}
 
-go func() {
-if err := server.Start(ctx); err != nil {
-t.Logf("Start returned: %v", err)
-}
-}()
+	srv := NewServer(ServerConfig{
+		Host: "127.0.0.1",
+		Port: 0,
+	}, handler, logger)
 
-<-server.WaitForReady()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-if !server.IsRunning() {
-t.Error("server should be running")
-}
+	go func() {
+		_ = srv.Start(ctx)
+	}()
 
-// Make a test request
-resp, err := http.Get("http://" + server.Addr() + "/")
-if err != nil {
-t.Fatalf("request failed: %v", err)
-}
-resp.Body.Close()
+	require.Eventually(t, func() bool {
+		return srv.IsRunning()
+	}, 2*time.Second, 10*time.Millisecond)
 
-if resp.StatusCode != http.StatusOK {
-t.Errorf("expected status 200, got %d", resp.StatusCode)
-}
+	// Second start should fail
+	err := srv.Start(ctx)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "already started")
 
-// Shutdown
-if err := server.Shutdown(); err != nil {
-t.Errorf("Shutdown failed: %v", err)
+	cancel()
 }
 
-if server.IsRunning() {
-t.Error("server should not be running after shutdown")
-}
-}
+func TestServer_ShutdownBeforeStart(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	logger := &stubLogger{}
 
-func TestServer_Shutdown_Idempotent(t *testing.T) {
-handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-cfg := &ServerConfig{Port: 0}
+	srv := NewServer(ServerConfig{}, handler, logger)
 
-server, err := NewServer(cfg, handler)
-if err != nil {
-t.Fatalf("NewServer failed: %v", err)
+	err := srv.Shutdown(context.Background())
+	assert.NoError(t, err, "shutdown before start should not error")
 }
 
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel()
+func TestServer_IsRunning(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	logger := &stubLogger{}
 
-go server.Start(ctx)
-<-server.WaitForReady()
+	srv := NewServer(ServerConfig{
+		Host: "127.0.0.1",
+		Port: 0,
+	}, handler, logger)
 
-// First shutdown
-err1 := server.Shutdown()
-// Second shutdown
-err2 := server.Shutdown()
+	assert.False(t, srv.IsRunning(), "should not be running before start")
 
-// Should not panic, second call should be no-op
-if err1 != nil {
-t.Errorf("first Shutdown failed: %v", err1)
-}
-if err2 != nil {
-t.Logf("second Shutdown returned: %v (expected, idempotent)", err2)
-}
-}
+	ctx, cancel := context.WithCancel(context.Background())
 
-func TestServer_Addr_BeforeStart(t *testing.T) {
-handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-cfg := &ServerConfig{Host: "127.0.0.1", Port: 8080}
+	go func() {
+		_ = srv.Start(ctx)
+	}()
 
-server, err := NewServer(cfg, handler)
-if err != nil {
-t.Fatalf("NewServer failed: %v", err)
-}
+	require.Eventually(t, func() bool {
+		return srv.IsRunning()
+	}, 2*time.Second, 10*time.Millisecond)
 
-addr := server.Addr()
-if addr != "127.0.0.1:8080" {
-t.Errorf("expected addr=127.0.0.1:8080, got %s", addr)
-}
+	assert.True(t, srv.IsRunning(), "should be running after start")
+
+	cancel()
+
+	require.Eventually(t, func() bool {
+		return !srv.IsRunning()
+	}, 5*time.Second, 50*time.Millisecond)
+
+	assert.False(t, srv.IsRunning(), "should not be running after shutdown")
 }
 
 func TestServer_Addr_AfterStart(t *testing.T) {
-handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-cfg := &ServerConfig{Port: 0} // Random port
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	logger := &stubLogger{}
 
-server, err := NewServer(cfg, handler)
-if err != nil {
-t.Fatalf("NewServer failed: %v", err)
+	srv := NewServer(ServerConfig{
+		Host: "127.0.0.1",
+		Port: 0,
+	}, handler, logger)
+
+	assert.Empty(t, srv.Addr(), "addr should be empty before start")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		_ = srv.Start(ctx)
+	}()
+
+	require.Eventually(t, func() bool {
+		return srv.IsRunning()
+	}, 2*time.Second, 10*time.Millisecond)
+
+	addr := srv.Addr()
+	assert.NotEmpty(t, addr)
+	assert.Contains(t, addr, "127.0.0.1:")
+
+	cancel()
 }
 
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel()
+func TestServer_GracefulShutdown_WaitsForActiveRequests(t *testing.T) {
+	requestStarted := make(chan struct{})
+	requestCanFinish := make(chan struct{})
 
-go server.Start(ctx)
-<-server.WaitForReady()
-defer server.Shutdown()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(requestStarted)
+		<-requestCanFinish
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("completed"))
+	})
+	logger := &stubLogger{}
 
-addr := server.Addr()
-if addr == "" || addr == "0.0.0.0:0" {
-t.Errorf("expected actual address, got %s", addr)
-}
-}
+	srv := NewServer(ServerConfig{
+		Host:            "127.0.0.1",
+		Port:            0,
+		ShutdownTimeout: 10 * time.Second,
+	}, handler, logger)
 
-func TestServer_WaitForReady_Channel(t *testing.T) {
-handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-cfg := &ServerConfig{Port: 0}
+	ctx, cancel := context.WithCancel(context.Background())
 
-server, err := NewServer(cfg, handler)
-if err != nil {
-t.Fatalf("NewServer failed: %v", err)
-}
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- srv.Start(ctx)
+	}()
 
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel()
+	require.Eventually(t, func() bool {
+		return srv.IsRunning()
+	}, 2*time.Second, 10*time.Millisecond)
 
-go server.Start(ctx)
+	// Start a slow request
+	var resp *http.Response
+	var reqErr error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		resp, reqErr = http.Get(fmt.Sprintf("http://%s/slow", srv.Addr()))
+	}()
 
-// Wait for ready with timeout
-select {
-case <-server.WaitForReady():
-// Success
-case <-time.After(2 * time.Second):
-t.Fatal("server did not become ready in time")
-}
+	// Wait for the request to reach the handler
+	<-requestStarted
 
-server.Shutdown()
-}
+	// Initiate shutdown while request is in-flight
+	cancel()
 
-func TestServer_DoubleStart(t *testing.T) {
-handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-cfg := &ServerConfig{Port: 0}
+	// Allow the request to complete
+	time.Sleep(100 * time.Millisecond)
+	close(requestCanFinish)
 
-server, err := NewServer(cfg, handler)
-if err != nil {
-t.Fatalf("NewServer failed: %v", err)
-}
+	// Wait for the request goroutine to finish
+	wg.Wait()
 
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel()
+	require.NoError(t, reqErr)
+	if resp != nil {
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "completed", string(body))
+	}
 
-go server.Start(ctx)
-<-server.WaitForReady()
-defer server.Shutdown()
-
-// Try to start again
-err = server.Start(ctx)
-if err == nil {
-t.Error("expected error when starting already running server")
-}
-}
-
-func TestLogWriter_Write(t *testing.T) {
-lw := &logWriter{}
-
-n, err := lw.Write([]byte("test message\n"))
-if err != nil {
-t.Errorf("Write failed: %v", err)
-}
-if n != 13 {
-t.Errorf("expected n=13, got %d", n)
-}
+	// Wait for server to finish
+	select {
+	case err := <-errCh:
+		assert.NoError(t, err)
+	case <-time.After(15 * time.Second):
+		t.Fatal("server did not shut down in time")
+	}
 }
 
-func TestLogWriter_EmptyWrite(t *testing.T) {
-lw := &logWriter{}
+func TestServer_ShutdownTimeout_ForcesClose(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Simulate a request that takes forever
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(60 * time.Second):
+			return
+		}
+	})
+	logger := &stubLogger{}
 
-n, err := lw.Write([]byte(""))
-if err != nil {
-t.Errorf("Write failed: %v", err)
-}
-if n != 0 {
-t.Errorf("expected n=0, got %d", n)
-}
+	srv := NewServer(ServerConfig{
+		Host:            "127.0.0.1",
+		Port:            0,
+		ShutdownTimeout: 500 * time.Millisecond, // Very short timeout
+	}, handler, logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- srv.Start(ctx)
+	}()
+
+	require.Eventually(t, func() bool {
+		return srv.IsRunning()
+	}, 2*time.Second, 10*time.Millisecond)
+
+	// Start a request that will hang
+	go func() {
+		resp, err := http.Get(fmt.Sprintf("http://%s/hang", srv.Addr()))
+		if err == nil && resp != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	// Give the request time to reach the handler
+	time.Sleep(100 * time.Millisecond)
+
+	// Trigger shutdown
+	cancel()
+
+	// Server should shut down within shutdown timeout + buffer
+	select {
+	case <-errCh:
+		// Shutdown completed (may or may not have error due to forced close)
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not shut down even after timeout")
+	}
 }
 
-func TestNewServer_TLS_CertFileNotExist(t *testing.T) {
-handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-cfg := &ServerConfig{
-TLS: &TLSConfig{
-Enabled:  true,
-CertFile: "/nonexistent/cert.pem",
-KeyFile:  "/nonexistent/key.pem",
-},
+func TestServer_Config(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	logger := &stubLogger{}
+
+	cfg := ServerConfig{
+		Host: "10.0.0.1",
+		Port: 4444,
+	}
+
+	srv := NewServer(cfg, handler, logger)
+	got := srv.Config()
+
+	assert.Equal(t, "10.0.0.1", got.Host)
+	assert.Equal(t, 4444, got.Port)
 }
 
-_, err := NewServer(cfg, handler)
-if err == nil {
-t.Error("expected error for nonexistent cert file")
+func TestServer_ConcurrentRequests(t *testing.T) {
+	var counter int64
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Atomic increment to verify concurrency safety
+		val := atomic.AddInt64(&counter, 1)
+		time.Sleep(10 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprintf(w, "req-%d", val)
+	})
+	logger := &stubLogger{}
+
+	srv := NewServer(ServerConfig{
+		Host: "127.0.0.1",
+		Port: 0,
+	}, handler, logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		_ = srv.Start(ctx)
+	}()
+
+	require.Eventually(t, func() bool {
+		return srv.IsRunning()
+	}, 2*time.Second, 10*time.Millisecond)
+
+	// Fire 50 concurrent requests
+	const numRequests = 50
+	var wg sync.WaitGroup
+	results := make([]int, numRequests)
+
+	for i := 0; i < numRequests; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			resp, err := http.Get(fmt.Sprintf("http://%s/", srv.Addr()))
+			if err != nil {
+				results[idx] = -1
+				return
+			}
+			defer resp.Body.Close()
+			results[idx] = resp.StatusCode
+		}(i)
+	}
+
+	wg.Wait()
+
+	successCount := 0
+	for _, code := range results {
+		if code == http.StatusOK {
+			successCount++
+		}
+	}
+
+	assert.Equal(t, numRequests, successCount,
+		"all concurrent requests should succeed")
+	assert.Equal(t, int64(numRequests), atomic.LoadInt64(&counter),
+		"handler should have been called exactly %d times", numRequests)
+
+	cancel()
 }
+
+func TestServer_RequestAfterShutdown(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	logger := &stubLogger{}
+
+	srv := NewServer(ServerConfig{
+		Host: "127.0.0.1",
+		Port: 0,
+	}, handler, logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- srv.Start(ctx)
+	}()
+
+	require.Eventually(t, func() bool {
+		return srv.IsRunning()
+	}, 2*time.Second, 10*time.Millisecond)
+
+	addr := srv.Addr()
+
+	// Shutdown
+	cancel()
+	<-errCh
+
+	// Request after shutdown should fail
+	client := &http.Client{Timeout: 1 * time.Second}
+	_, err := client.Get(fmt.Sprintf("http://%s/", addr))
+	assert.Error(t, err, "request after shutdown should fail")
 }
 
 //Personal.AI order the ending
+

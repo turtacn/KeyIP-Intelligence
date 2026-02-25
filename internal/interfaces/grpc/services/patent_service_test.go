@@ -1,625 +1,653 @@
+// File: internal/interfaces/grpc/services/patent_service_test.go
 package services
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/reporting"
+	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/patent/v1"
 )
 
-// mockPatentApp 模拟专利应用服务
-type mockPatentApp struct {
-	patents map[string]*Patent
-	err     error
+// Mock patent repository
+type mockPatentRepository struct {
+	mock.Mock
 }
 
-func newMockPatentApp() *mockPatentApp {
-	return &mockPatentApp{
-		patents: map[string]*Patent{
-			"CN202110123456": {
-				Number:       "CN202110123456",
-				Title:        "OLED Material Composition",
-				Abstract:     "A novel organic light-emitting material...",
-				FilingDate:   "2021-01-15",
-				Status:       "Granted",
-				Jurisdiction: "CN",
-				Applicant:    "Acme Corp",
-				Inventor:     "John Doe",
-				IPCCodes:     []string{"H10K85/60"},
-				CPCCodes:     []string{"H10K2101/10"},
-			},
-		},
+func (m *mockPatentRepository) FindByNumber(ctx context.Context, number string) (*patent.Patent, error) {
+	args := m.Called(ctx, number)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
+	return args.Get(0).(*patent.Patent), args.Error(1)
 }
 
-func (m *mockPatentApp) GetByNumber(ctx context.Context, number string) (*Patent, error) {
-	if m.err != nil {
-		return nil, m.err
+func (m *mockPatentRepository) Search(ctx context.Context, filter *patent.SearchFilter) ([]*patent.Patent, int64, error) {
+	args := m.Called(ctx, filter)
+	if args.Get(0) == nil {
+		return nil, args.Get(1).(int64), args.Error(2)
 	}
-	patent, ok := m.patents[number]
-	if !ok {
-		return nil, errors.New("patent not found")
-	}
-	return patent, nil
+	return args.Get(0).([]*patent.Patent), args.Get(1).(int64), args.Error(2)
 }
 
-func (m *mockPatentApp) Search(ctx context.Context, opts *PatentSearchOptions) (*PatentSearchResult, error) {
-	if m.err != nil {
-		return nil, m.err
+func (m *mockPatentRepository) GetFamily(ctx context.Context, patentNumber string) (*patent.PatentFamily, error) {
+	args := m.Called(ctx, patentNumber)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	var patents []*Patent
-	for _, p := range m.patents {
-		patents = append(patents, p)
-	}
-	return &PatentSearchResult{
-		Patents:    patents,
-		TotalCount: len(patents),
-	}, nil
+	return args.Get(0).(*patent.PatentFamily), args.Error(1)
 }
 
-func (m *mockPatentApp) AnalyzeClaims(ctx context.Context, patentNumber string) (*ClaimAnalysis, error) {
-	if m.err != nil {
-		return nil, m.err
+func (m *mockPatentRepository) GetCitationNetwork(ctx context.Context, query *patent.CitationNetworkQuery) (*patent.CitationNetwork, error) {
+	args := m.Called(ctx, query)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	if _, ok := m.patents[patentNumber]; !ok {
-		return nil, errors.New("patent not found")
-	}
-	return &ClaimAnalysis{
-		IndependentClaims: []*Claim{
-			{Number: 1, Text: "A compound...", Type: "independent"},
-		},
-		DependentClaims: []*Claim{
-			{Number: 2, Text: "The compound of claim 1...", Type: "dependent", DependsOn: 1},
-		},
-		TotalClaims: 2,
-	}, nil
+	return args.Get(0).(*patent.CitationNetwork), args.Error(1)
 }
 
-func (m *mockPatentApp) GetFamily(ctx context.Context, patentNumber string) ([]*Patent, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	if _, ok := m.patents[patentNumber]; !ok {
-		return nil, errors.New("patent not found")
-	}
-	return []*Patent{
-		{Number: patentNumber, Jurisdiction: "CN"},
-		{Number: "US20210123456", Jurisdiction: "US"},
-	}, nil
+// Mock FTO service
+type mockFTOReportService struct {
+	mock.Mock
 }
 
-func (m *mockPatentApp) GetCitationNetwork(ctx context.Context, patentNumber string, depth int) (*CitationNetwork, error) {
-	if m.err != nil {
-		return nil, m.err
+func (m *mockFTOReportService) QuickCheck(ctx context.Context, req *reporting.FTOQuickCheckRequest) (*reporting.FTOQuickCheckResult, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	return &CitationNetwork{
-		Nodes: []*CitationNode{
-			{PatentNumber: patentNumber, Depth: 0},
-			{PatentNumber: "US20200123456", Depth: 1, CitationType: "backward"},
-		},
-		Edges: []*CitationEdge{
-			{From: patentNumber, To: "US20200123456", Type: "backward"},
-		},
-		TotalNodes: 2,
-	}, nil
+	return args.Get(0).(*reporting.FTOQuickCheckResult), args.Error(1)
 }
 
-// mockFTOService 模拟 FTO 服务
-type mockFTOService struct {
-	result *FTOCheckResult
-	err    error
+func createTestPatent(number string) *patent.Patent {
+	pat, _ := patent.NewPatent(
+		number,
+		"Test Patent Title",
+		"This is a test abstract",
+		[]string{"Applicant Corp"},
+		[]string{"John Inventor"},
+		[]string{"C07D"},
+		time.Now(),
+	)
+	return pat
 }
 
-func (m *mockFTOService) QuickCheck(ctx context.Context, smiles string, jurisdictions []string) (*FTOCheckResult, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.result != nil {
-		return m.result, nil
-	}
-	return &FTOCheckResult{
-		RiskLevel:       "LOW",
-		Confidence:      0.85,
-		BlockingPatents: []*Patent{},
-		Summary:         "No risks found",
-	}, nil
-}
-
-// mockPatentLogger 模拟日志
-type mockPatentLogger struct {
-	messages []string
-}
-
-func (l *mockPatentLogger) Info(msg string, fields ...interface{})  { l.messages = append(l.messages, msg) }
-func (l *mockPatentLogger) Error(msg string, fields ...interface{}) { l.messages = append(l.messages, msg) }
-func (l *mockPatentLogger) Debug(msg string, fields ...interface{}) { l.messages = append(l.messages, msg) }
-
-// TestNewPatentService 测试创建服务
-func TestNewPatentService(t *testing.T) {
-	svc := NewPatentService()
-	if svc == nil {
-		t.Fatal("NewPatentService should not return nil")
-	}
-}
-
-// TestNewPatentServiceServer 测试创建完整服务
-func TestNewPatentServiceServer(t *testing.T) {
-	app := newMockPatentApp()
-	fto := &mockFTOService{}
-	logger := &mockPatentLogger{}
-
-	svc := NewPatentServiceServer(app, fto, logger)
-	if svc == nil {
-		t.Fatal("NewPatentServiceServer should not return nil")
-	}
-	if svc.patentApp != app {
-		t.Error("patentApp not set correctly")
-	}
-}
-
-// TestGetPatent_Success 正常获取专利
 func TestGetPatent_Success(t *testing.T) {
-	app := newMockPatentApp()
-	svc := NewPatentServiceServer(app, nil, nil)
-	ctx := context.Background()
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
 
-	resp, err := svc.GetPatent(ctx, &GetPatentRequest{Number: "CN202110123456"})
-	if err != nil {
-		t.Fatalf("GetPatent failed: %v", err)
-	}
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
 
-	if resp.Patent.Number != "CN202110123456" {
-		t.Errorf("expected CN202110123456, got %s", resp.Patent.Number)
-	}
-	if resp.Patent.Title == "" {
-		t.Error("expected non-empty title")
-	}
+	expectedPatent := createTestPatent("CN115123456A")
+	mockRepo.On("FindByNumber", mock.Anything, "CN115123456A").Return(expectedPatent, nil)
+
+	resp, err := service.GetPatent(context.Background(), &pb.GetPatentRequest{
+		PatentNumber: "CN115123456A",
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Equal(t, "CN115123456A", resp.Patent.PatentNumber)
+	mockRepo.AssertExpectations(t)
 }
 
-// TestGetPatent_NotFound 专利不存在
 func TestGetPatent_NotFound(t *testing.T) {
-	app := newMockPatentApp()
-	svc := NewPatentServiceServer(app, nil, nil)
-	ctx := context.Background()
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
 
-	_, err := svc.GetPatent(ctx, &GetPatentRequest{Number: "CN999999999999"})
-	if err == nil {
-		t.Fatal("expected error for nonexistent patent")
-	}
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
 
-	st, ok := status.FromError(err)
-	if !ok {
-		t.Fatal("expected gRPC status error")
-	}
-	if st.Code() != codes.NotFound {
-		t.Errorf("expected NotFound, got %v", st.Code())
-	}
+	mockRepo.On("FindByNumber", mock.Anything, "CN999999999A").Return(nil, errors.NewNotFoundError("patent not found"))
+	mockLog.On("Error", mock.Anything, mock.Anything).Return()
+
+	resp, err := service.GetPatent(context.Background(), &pb.GetPatentRequest{
+		PatentNumber: "CN999999999A",
+	})
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, codes.NotFound, status.Code(err))
 }
 
-// TestGetPatent_InvalidNumber 非法专利号格式
 func TestGetPatent_InvalidNumber(t *testing.T) {
-	svc := NewPatentService()
-	ctx := context.Background()
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
 
-	_, err := svc.GetPatent(ctx, &GetPatentRequest{Number: "INVALID"})
-	if err == nil {
-		t.Fatal("expected error for invalid patent number")
-	}
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
 
-	st, ok := status.FromError(err)
-	if !ok {
-		t.Fatal("expected gRPC status error")
-	}
-	if st.Code() != codes.InvalidArgument {
-		t.Errorf("expected InvalidArgument, got %v", st.Code())
-	}
+	resp, err := service.GetPatent(context.Background(), &pb.GetPatentRequest{
+		PatentNumber: "INVALID",
+	})
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	assert.Contains(t, err.Error(), "invalid patent number format")
 }
 
-// TestSearchPatents_BasicQuery 基本全文搜索
 func TestSearchPatents_BasicQuery(t *testing.T) {
-	app := newMockPatentApp()
-	svc := NewPatentServiceServer(app, nil, nil)
-	ctx := context.Background()
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
 
-	resp, err := svc.SearchPatents(ctx, &SearchPatentsProtoRequest{Query: "OLED"})
-	if err != nil {
-		t.Fatalf("SearchPatents failed: %v", err)
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	patents := []*patent.Patent{
+		createTestPatent("CN115123456A"),
+		createTestPatent("CN115123457A"),
 	}
 
-	if resp.TotalCount == 0 {
-		t.Error("expected at least one result")
-	}
+	mockRepo.On("Search", mock.Anything, mock.AnythingOfType("*patent.SearchFilter")).Return(patents, int64(50), nil)
+
+	resp, err := service.SearchPatents(context.Background(), &pb.SearchPatentsRequest{
+		Query:    "organic light emitting",
+		PageSize: 20,
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Len(t, resp.Patents, 2)
+	assert.Equal(t, int64(50), resp.TotalCount)
+	mockRepo.AssertExpectations(t)
 }
 
-// TestSearchPatents_WithFilters 带 IPC/日期/专利局过滤
 func TestSearchPatents_WithFilters(t *testing.T) {
-	app := newMockPatentApp()
-	svc := NewPatentServiceServer(app, nil, nil)
-	ctx := context.Background()
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
 
-	resp, err := svc.SearchPatents(ctx, &SearchPatentsProtoRequest{
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	patents := []*patent.Patent{createTestPatent("CN115123456A")}
+	mockRepo.On("Search", mock.Anything, mock.AnythingOfType("*patent.SearchFilter")).Return(patents, int64(1), nil)
+
+	resp, err := service.SearchPatents(context.Background(), &pb.SearchPatentsRequest{
 		Query:         "OLED",
-		IpcCodes:      []string{"H10K85/60"},
-		Jurisdictions: []string{"CN", "US"},
-		DateFrom:      "2020-01-01",
-		DateTo:        "2022-12-31",
+		IpcClasses:    []string{"C07D"},
+		PatentOffices: []string{"CN"},
+		PageSize:      10,
 	})
-	if err != nil {
-		t.Fatalf("SearchPatents with filters failed: %v", err)
-	}
 
-	if resp == nil {
-		t.Error("expected response")
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Len(t, resp.Patents, 1)
 }
 
-// TestSearchPatents_Pagination 分页查询
 func TestSearchPatents_Pagination(t *testing.T) {
-	svc := NewPatentService()
-	ctx := context.Background()
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
 
-	resp, err := svc.SearchPatents(ctx, &SearchPatentsProtoRequest{
-		Query:    "OLED",
-		PageSize: 10,
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	// First page
+	patents := make([]*patent.Patent, 20)
+	for i := 0; i < 20; i++ {
+		patents[i] = createTestPatent("CN11512345" + string(rune('0'+i)) + "A")
+	}
+
+	mockRepo.On("Search", mock.Anything, mock.AnythingOfType("*patent.SearchFilter")).Return(patents, int64(100), nil)
+
+	resp, err := service.SearchPatents(context.Background(), &pb.SearchPatentsRequest{
+		Query:    "test",
+		PageSize: 20,
 	})
-	if err != nil {
-		t.Fatalf("SearchPatents pagination failed: %v", err)
-	}
 
-	if resp == nil {
-		t.Error("expected response")
-	}
+	assert.NoError(t, err)
+	assert.NotEmpty(t, resp.NextPageToken)
 }
 
-// TestSearchPatents_EmptyResults 无结果
 func TestSearchPatents_EmptyResults(t *testing.T) {
-	app := &mockPatentApp{patents: map[string]*Patent{}}
-	svc := NewPatentServiceServer(app, nil, nil)
-	ctx := context.Background()
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
 
-	resp, err := svc.SearchPatents(ctx, &SearchPatentsProtoRequest{Query: "nonexistent"})
-	if err != nil {
-		t.Fatalf("SearchPatents failed: %v", err)
-	}
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
 
-	if resp.TotalCount != 0 {
-		t.Errorf("expected 0 results, got %d", resp.TotalCount)
-	}
-}
+	mockRepo.On("Search", mock.Anything, mock.AnythingOfType("*patent.SearchFilter")).Return([]*patent.Patent{}, int64(0), nil)
 
-// TestAnalyzeClaims_Success 权利要求解析成功
-func TestAnalyzeClaims_Success(t *testing.T) {
-	app := newMockPatentApp()
-	svc := NewPatentServiceServer(app, nil, nil)
-	ctx := context.Background()
-
-	resp, err := svc.AnalyzeClaims(ctx, &AnalyzeClaimsRequest{PatentNumber: "CN202110123456"})
-	if err != nil {
-		t.Fatalf("AnalyzeClaims failed: %v", err)
-	}
-
-	if resp.ClaimTree == nil {
-		t.Fatal("expected claim tree")
-	}
-	if len(resp.ClaimTree.IndependentClaims) == 0 {
-		t.Error("expected independent claims")
-	}
-}
-
-// TestAnalyzeClaims_NotFound 专利不存在
-func TestAnalyzeClaims_NotFound(t *testing.T) {
-	app := newMockPatentApp()
-	svc := NewPatentServiceServer(app, nil, nil)
-	ctx := context.Background()
-
-	_, err := svc.AnalyzeClaims(ctx, &AnalyzeClaimsRequest{PatentNumber: "CN999999999999"})
-	if err == nil {
-		t.Fatal("expected error for nonexistent patent")
-	}
-
-	st, ok := status.FromError(err)
-	if !ok {
-		t.Fatal("expected gRPC status error")
-	}
-	if st.Code() != codes.NotFound {
-		t.Errorf("expected NotFound, got %v", st.Code())
-	}
-}
-
-// TestCheckFTO_NoRisk FTO 检查无风险
-func TestCheckFTO_NoRisk(t *testing.T) {
-	fto := &mockFTOService{
-		result: &FTOCheckResult{
-			RiskLevel:       "LOW",
-			Confidence:      0.9,
-			BlockingPatents: []*Patent{},
-			Summary:         "No FTO risks",
-		},
-	}
-	svc := NewPatentServiceServer(nil, fto, nil)
-	ctx := context.Background()
-
-	resp, err := svc.CheckFTO(ctx, &CheckFTORequest{Smiles: "C1=CC=CC=C1"})
-	if err != nil {
-		t.Fatalf("CheckFTO failed: %v", err)
-	}
-
-	if resp.RiskLevel != "LOW" {
-		t.Errorf("expected LOW risk, got %s", resp.RiskLevel)
-	}
-}
-
-// TestCheckFTO_HighRisk FTO 检查高风险
-func TestCheckFTO_HighRisk(t *testing.T) {
-	fto := &mockFTOService{
-		result: &FTOCheckResult{
-			RiskLevel:  "HIGH",
-			Confidence: 0.95,
-			BlockingPatents: []*Patent{
-				{Number: "CN202110123456", Title: "Blocking patent"},
-			},
-			Summary: "High FTO risk detected",
-		},
-	}
-	svc := NewPatentServiceServer(nil, fto, nil)
-	ctx := context.Background()
-
-	resp, err := svc.CheckFTO(ctx, &CheckFTORequest{Smiles: "C1=CC=CC=C1"})
-	if err != nil {
-		t.Fatalf("CheckFTO failed: %v", err)
-	}
-
-	if resp.RiskLevel != "HIGH" {
-		t.Errorf("expected HIGH risk, got %s", resp.RiskLevel)
-	}
-	if len(resp.BlockingPatents) == 0 {
-		t.Error("expected blocking patents")
-	}
-}
-
-// TestCheckFTO_InvalidSMILES 非法 SMILES
-func TestCheckFTO_InvalidSMILES(t *testing.T) {
-	svc := NewPatentService()
-	ctx := context.Background()
-
-	_, err := svc.CheckFTO(ctx, &CheckFTORequest{Smiles: "!!!invalid!!!"})
-	if err == nil {
-		t.Fatal("expected error for invalid SMILES")
-	}
-
-	st, ok := status.FromError(err)
-	if !ok {
-		t.Fatal("expected gRPC status error")
-	}
-	if st.Code() != codes.InvalidArgument {
-		t.Errorf("expected InvalidArgument, got %v", st.Code())
-	}
-}
-
-// TestGetPatentFamily_Success 同族专利查询成功
-func TestGetPatentFamily_Success(t *testing.T) {
-	app := newMockPatentApp()
-	svc := NewPatentServiceServer(app, nil, nil)
-	ctx := context.Background()
-
-	resp, err := svc.GetPatentFamily(ctx, &GetPatentFamilyRequest{PatentNumber: "CN202110123456"})
-	if err != nil {
-		t.Fatalf("GetPatentFamily failed: %v", err)
-	}
-
-	if len(resp.FamilyMembers) == 0 {
-		t.Error("expected family members")
-	}
-}
-
-// TestGetCitationNetwork_DefaultDepth 默认深度引用网络
-func TestGetCitationNetwork_DefaultDepth(t *testing.T) {
-	app := newMockPatentApp()
-	svc := NewPatentServiceServer(app, nil, nil)
-	ctx := context.Background()
-
-	resp, err := svc.GetCitationNetwork(ctx, &GetCitationNetworkRequest{PatentNumber: "CN202110123456"})
-	if err != nil {
-		t.Fatalf("GetCitationNetwork failed: %v", err)
-	}
-
-	if len(resp.Nodes) == 0 {
-		t.Error("expected nodes")
-	}
-}
-
-// TestGetCitationNetwork_ExceedDepthLimit 超出深度限制
-func TestGetCitationNetwork_ExceedDepthLimit(t *testing.T) {
-	svc := NewPatentService()
-	ctx := context.Background()
-
-	_, err := svc.GetCitationNetwork(ctx, &GetCitationNetworkRequest{
-		PatentNumber: "CN202110123456",
-		Depth:        10,
+	resp, err := service.SearchPatents(context.Background(), &pb.SearchPatentsRequest{
+		Query: "nonexistent query xyz123",
 	})
-	if err == nil {
-		t.Fatal("expected error for exceeding depth limit")
-	}
 
-	st, ok := status.FromError(err)
-	if !ok {
-		t.Fatal("expected gRPC status error")
-	}
-	if st.Code() != codes.InvalidArgument {
-		t.Errorf("expected InvalidArgument, got %v", st.Code())
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Empty(t, resp.Patents)
+	assert.Equal(t, int64(0), resp.TotalCount)
 }
 
-// TestPatentDomainToProto_FullConversion 完整字段转换
-func TestPatentDomainToProto_FullConversion(t *testing.T) {
-	patent := &Patent{
-		Number:       "CN202110123456",
-		Title:        "OLED Material",
-		Abstract:     "Novel material...",
-		FilingDate:   "2021-01-15",
-		Status:       "Granted",
+func TestAnalyzeClaims_Success(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	testPatent := createTestPatent("CN115123456A")
+	mockRepo.On("FindByNumber", mock.Anything, "CN115123456A").Return(testPatent, nil)
+
+	resp, err := service.AnalyzeClaims(context.Background(), &pb.AnalyzeClaimsRequest{
+		PatentNumber: "CN115123456A",
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Equal(t, "CN115123456A", resp.PatentNumber)
+	assert.NotNil(t, resp.ClaimTree)
+}
+
+func TestAnalyzeClaims_ComplexClaimTree(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	testPatent := createTestPatent("CN115123456A")
+	// Assume patent has complex claim structure
+	mockRepo.On("FindByNumber", mock.Anything, "CN115123456A").Return(testPatent, nil)
+
+	resp, err := service.AnalyzeClaims(context.Background(), &pb.AnalyzeClaimsRequest{
+		PatentNumber: "CN115123456A",
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Greater(t, resp.TotalClaims, int32(0))
+}
+
+func TestAnalyzeClaims_NotFound(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	mockRepo.On("FindByNumber", mock.Anything, "CN999999999A").Return(nil, errors.NewNotFoundError("patent not found"))
+	mockLog.On("Error", mock.Anything, mock.Anything).Return()
+
+	resp, err := service.AnalyzeClaims(context.Background(), &pb.AnalyzeClaimsRequest{
+		PatentNumber: "CN999999999A",
+	})
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, codes.NotFound, status.Code(err))
+}
+
+func TestCheckFTO_NoRisk(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	ftoResult := &reporting.FTOQuickCheckResult{
+		CanOperate:      true,
+		RiskLevel:       "low",
+		Confidence:      0.95,
+		BlockingPatents: []*reporting.BlockingPatent{},
+		Recommendation:  "Free to operate",
+	}
+
+	mockFTO.On("QuickCheck", mock.Anything, mock.AnythingOfType("*reporting.FTOQuickCheckRequest")).Return(ftoResult, nil)
+
+	resp, err := service.CheckFTO(context.Background(), &pb.CheckFTORequest{
+		TargetSmiles:  "c1ccccc1",
+		Jurisdiction:  "CN",
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.True(t, resp.CanOperate)
+	assert.Equal(t, "low", resp.RiskLevel)
+	assert.Empty(t, resp.BlockingPatents)
+}
+
+func TestCheckFTO_HighRisk(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	ftoResult := &reporting.FTOQuickCheckResult{
+		CanOperate: false,
+		RiskLevel:  "high",
+		Confidence: 0.88,
+		BlockingPatents: []*reporting.BlockingPatent{
+			{
+				PatentNumber:  "CN115123456A",
+				Title:         "Blocking Patent",
+				RiskLevel:     "high",
+				Similarity:    0.92,
+				ExpiryDate:    time.Now().Add(5 * 365 * 24 * time.Hour),
+				LegalStatus:   "granted",
+				MatchedClaims: []string{"1", "3"},
+			},
+		},
+		Recommendation: "High infringement risk detected",
+	}
+
+	mockFTO.On("QuickCheck", mock.Anything, mock.AnythingOfType("*reporting.FTOQuickCheckRequest")).Return(ftoResult, nil)
+
+	resp, err := service.CheckFTO(context.Background(), &pb.CheckFTORequest{
+		TargetSmiles: "c1ccc2ccccc2c1",
 		Jurisdiction: "CN",
-		Applicant:    "Acme Corp",
-		Inventor:     "John Doe",
-		IPCCodes:     []string{"H10K85/60"},
-		CPCCodes:     []string{"H10K2101/10"},
-	}
+	})
 
-	proto := patentDomainToProto(patent)
-
-	if proto.Number != patent.Number {
-		t.Errorf("Number mismatch")
-	}
-	if proto.Title != patent.Title {
-		t.Errorf("Title mismatch")
-	}
-	if proto.Jurisdiction != patent.Jurisdiction {
-		t.Errorf("Jurisdiction mismatch")
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.False(t, resp.CanOperate)
+	assert.Equal(t, "high", resp.RiskLevel)
+	assert.Len(t, resp.BlockingPatents, 1)
 }
 
-// TestPatentDomainToProto_NilInput nil 输入处理
-func TestPatentDomainToProto_NilInput(t *testing.T) {
-	proto := patentDomainToProto(nil)
-	if proto != nil {
-		t.Error("expected nil for nil input")
-	}
+func TestCheckFTO_Timeout(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	mockFTO.On("QuickCheck", mock.Anything, mock.AnythingOfType("*reporting.FTOQuickCheckRequest")).Return(
+		nil, context.DeadlineExceeded)
+	mockLog.On("Error", mock.Anything, mock.Anything).Return()
+
+	resp, err := service.CheckFTO(context.Background(), &pb.CheckFTORequest{
+		TargetSmiles: "c1ccccc1",
+		Jurisdiction: "CN",
+	})
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	// Note: In actual implementation, the timeout context would trigger
+	assert.Contains(t, err.Error(), "timeout")
 }
 
-// TestMapPatentError_AllCodes 全部错误码映射
+func TestCheckFTO_InvalidSMILES(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	resp, err := service.CheckFTO(context.Background(), &pb.CheckFTORequest{
+		TargetSmiles: "",
+		Jurisdiction: "CN",
+	})
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+func TestGetPatentFamily_Success(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	family := &patent.PatentFamily{
+		FamilyID: "FAM123",
+		Members: []*patent.FamilyMember{
+			{
+				PatentNumber:      "CN115123456A",
+				PatentOffice:      "CN",
+				ApplicationDate:   time.Now(),
+				PublicationDate:   time.Now(),
+				LegalStatus:       "granted",
+				IsRepresentative:  true,
+			},
+			{
+				PatentNumber:      "US11234567B2",
+				PatentOffice:      "US",
+				ApplicationDate:   time.Now(),
+				PublicationDate:   time.Now(),
+				LegalStatus:       "granted",
+				IsRepresentative:  false,
+			},
+		},
+	}
+
+	mockRepo.On("GetFamily", mock.Anything, "CN115123456A").Return(family, nil)
+
+	resp, err := service.GetPatentFamily(context.Background(), &pb.GetPatentFamilyRequest{
+		PatentNumber: "CN115123456A",
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Equal(t, "FAM123", resp.FamilyId)
+	assert.Len(t, resp.FamilyMembers, 2)
+	assert.Equal(t, int32(2), resp.TotalMembers)
+}
+
+func TestGetPatentFamily_NoFamily(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	family := &patent.PatentFamily{
+		FamilyID: "",
+		Members:  []*patent.FamilyMember{},
+	}
+
+	mockRepo.On("GetFamily", mock.Anything, "CN115123456A").Return(family, nil)
+
+	resp, err := service.GetPatentFamily(context.Background(), &pb.GetPatentFamilyRequest{
+		PatentNumber: "CN115123456A",
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Empty(t, resp.FamilyMembers)
+}
+
+func TestGetCitationNetwork_DefaultDepth(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	network := &patent.CitationNetwork{
+		Nodes: []*patent.CitationNode{
+			{PatentNumber: "CN115123456A", IsRoot: true, Level: 0},
+			{PatentNumber: "CN115123457A", IsRoot: false, Level: 1},
+		},
+		Edges: []*patent.CitationEdge{
+			{FromPatent: "CN115123456A", ToPatent: "CN115123457A", EdgeType: "cites"},
+		},
+		IsTruncated: false,
+	}
+
+	mockRepo.On("GetCitationNetwork", mock.Anything, mock.AnythingOfType("*patent.CitationNetworkQuery")).Return(network, nil)
+
+	resp, err := service.GetCitationNetwork(context.Background(), &pb.GetCitationNetworkRequest{
+		PatentNumber:  "CN115123456A",
+		IncludeCiting: true,
+		IncludeCited:  true,
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Len(t, resp.Nodes, 2)
+	assert.Len(t, resp.Edges, 1)
+	assert.False(t, resp.IsTruncated)
+}
+
+func TestGetCitationNetwork_MaxDepth(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	network := &patent.CitationNetwork{
+		Nodes:       []*patent.CitationNode{},
+		Edges:       []*patent.CitationEdge{},
+		IsTruncated: false,
+	}
+
+	mockRepo.On("GetCitationNetwork", mock.Anything, mock.AnythingOfType("*patent.CitationNetworkQuery")).Return(network, nil)
+
+	resp, err := service.GetCitationNetwork(context.Background(), &pb.GetCitationNetworkRequest{
+		PatentNumber: "CN115123456A",
+		Depth:        5, // Max allowed
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+}
+
+func TestGetCitationNetwork_ExceedDepthLimit(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	resp, err := service.GetCitationNetwork(context.Background(), &pb.GetCitationNetworkRequest{
+		PatentNumber: "CN115123456A",
+		Depth:        10, // Exceeds max
+	})
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+func TestGetCitationNetwork_Truncated(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockFTO := new(mockFTOReportService)
+	mockLog := new(mockLogger)
+
+	service := NewPatentServiceServer(mockRepo, mockFTO, mockLog)
+
+	// Create large network that exceeds limit
+	nodes := make([]*patent.CitationNode, 1001)
+	for i := range nodes {
+		nodes[i] = &patent.CitationNode{
+			PatentNumber: fmt.Sprintf("CN11512%04dA", i),
+			Level:        i / 100,
+		}
+	}
+
+	network := &patent.CitationNetwork{
+		Nodes:       nodes[:1000], // Truncated to max
+		Edges:       []*patent.CitationEdge{},
+		IsTruncated: true,
+	}
+
+	mockRepo.On("GetCitationNetwork", mock.Anything, mock.AnythingOfType("*patent.CitationNetworkQuery")).Return(network, nil)
+
+	resp, err := service.GetCitationNetwork(context.Background(), &pb.GetCitationNetworkRequest{
+		PatentNumber: "CN115123456A",
+		Depth:        3,
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.True(t, resp.IsTruncated)
+	assert.LessOrEqual(t, resp.TotalNodes, int32(maxNetworkNodes))
+}
+
+func TestPatentDomainToProto_FullConversion(t *testing.T) {
+	domainPatent := createTestPatent("CN115123456A")
+
+	protoPatent := patentDomainToProto(domainPatent)
+
+	assert.Equal(t, "CN115123456A", protoPatent.PatentNumber)
+	assert.Equal(t, "Test Patent Title", protoPatent.Title)
+	assert.NotEmpty(t, protoPatent.Applicants)
+	assert.NotEmpty(t, protoPatent.Inventors)
+}
+
+func TestClaimTreeToProto_NestedStructure(t *testing.T) {
+	// Create nested claim tree
+	claimTree := &patent.ClaimTree{
+		IndependentClaims: []*patent.Claim{
+			{
+				ClaimNumber:   "1",
+				ClaimText:     "Independent claim 1",
+				IsIndependent: true,
+				DependentClaims: []*patent.Claim{
+					{
+						ClaimNumber:   "2",
+						ClaimText:     "Dependent claim 2",
+						IsIndependent: false,
+						DependsOn:     []string{"1"},
+					},
+				},
+			},
+		},
+	}
+
+	protoTree := claimTreeToProto(claimTree)
+
+	assert.NotNil(t, protoTree)
+	assert.Len(t, protoTree.IndependentClaims, 1)
+	assert.Len(t, protoTree.IndependentClaims[0].DependentClaims, 1)
+}
+
 func TestMapPatentError_AllCodes(t *testing.T) {
 	tests := []struct {
-		name     string
-		err      error
-		expected codes.Code
+		name         string
+		domainError  error
+		expectedCode codes.Code
 	}{
-		{"NotFound", errors.New("patent not found"), codes.NotFound},
-		{"AlreadyExists", errors.New("already exists"), codes.AlreadyExists},
-		{"Invalid", errors.New("invalid input"), codes.InvalidArgument},
-		{"Unauthorized", errors.New("unauthorized access"), codes.PermissionDenied},
-		{"Generic", errors.New("unknown error"), codes.Internal},
-		{"Nil", nil, codes.OK},
+		{"NotFound", errors.NewNotFoundError("not found"), codes.NotFound},
+		{"Validation", errors.NewValidationError("invalid"), codes.InvalidArgument},
+		{"Conflict", errors.NewConflictError("conflict"), codes.AlreadyExists},
+		{"Unauthorized", errors.NewUnauthorizedError("unauthorized"), codes.PermissionDenied},
+		{"Internal", errors.New("unknown"), codes.Internal},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			err := mapPatentError(tc.err)
-			if tc.err == nil {
-				if err != nil {
-					t.Errorf("expected nil error, got %v", err)
-				}
-				return
-			}
-
-			st, ok := status.FromError(err)
-			if !ok {
-				t.Fatal("expected gRPC status error")
-			}
-			if st.Code() != tc.expected {
-				t.Errorf("expected %v, got %v", tc.expected, st.Code())
-			}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			grpcErr := mapPatentError(tt.domainError)
+			assert.Equal(t, tt.expectedCode, status.Code(grpcErr))
 		})
 	}
 }
 
-// TestIsValidPatentNumber 验证专利号格式
 func TestIsValidPatentNumber(t *testing.T) {
 	tests := []struct {
 		number string
 		valid  bool
 	}{
-		{"CN202110123456", true},
-		{"US20210123456", true},
-		{"EP3456789", true},
-		{"JP2021123456", true},
-		{"KR20210123456", true},
-		{"WO2021123456", true},
-		{"", false},
+		{"CN115123456A", true},
+		{"US1234567B2", true},
+		{"EP1234567A1", true},
+		{"JP2021123456A", true},
+		{"KR1020210001234B1", true},
+		{"WO2021/123456A1", true},
 		{"INVALID", false},
-		{"12345", false},
+		{"CN123", false},
+		{"US123456789012345", false},
 	}
 
-	for _, tc := range tests {
-		result := isValidPatentNumber(tc.number)
-		if result != tc.valid {
-			t.Errorf("isValidPatentNumber(%s) = %v, want %v", tc.number, result, tc.valid)
-		}
-	}
-}
-
-// TestExtractJurisdiction 从专利号提取法域
-func TestExtractJurisdiction(t *testing.T) {
-	tests := []struct {
-		number       string
-		jurisdiction string
-	}{
-		{"CN202110123456", "CN"},
-		{"US20210123456", "US"},
-		{"EP3456789", "EP"},
-		{"jp2021123456", "JP"},
-		{"UNKNOWN123", "UNKNOWN"},
-	}
-
-	for _, tc := range tests {
-		result := extractJurisdiction(tc.number)
-		if result != tc.jurisdiction {
-			t.Errorf("extractJurisdiction(%s) = %s, want %s", tc.number, result, tc.jurisdiction)
-		}
-	}
-}
-
-// 向后兼容测试
-func TestPatentService_GetPatent(t *testing.T) {
-	svc := NewPatentService()
-	ctx := context.Background()
-
-	req := &GetPatentRequest{Number: "CN202110123456"}
-	resp, err := svc.GetPatent(ctx, req)
-	if err != nil {
-		t.Fatalf("GetPatent failed: %v", err)
-	}
-
-	if resp.Patent.Number != "CN202110123456" {
-		t.Errorf("expected Number=CN202110123456, got %s", resp.Patent.Number)
-	}
-}
-
-func TestPatentService_SearchPatents(t *testing.T) {
-	svc := NewPatentService()
-	ctx := context.Background()
-
-	req := &SearchPatentsProtoRequest{Query: "OLED"}
-	resp, err := svc.SearchPatents(ctx, req)
-	if err != nil {
-		t.Fatalf("SearchPatents failed: %v", err)
-	}
-
-	if resp.TotalCount == 0 {
-		t.Error("expected at least one result")
-	}
-}
-
-func TestPatentService_AnalyzeInfringement(t *testing.T) {
-	svc := NewPatentService()
-	ctx := context.Background()
-
-	req := &InfringementRequestLegacy{
-		PatentNumber: "CN202110123456",
-		MoleculeId:   "mol-123",
-	}
-	resp, err := svc.AnalyzeInfringement(ctx, req)
-	if err != nil {
-		t.Fatalf("AnalyzeInfringement failed: %v", err)
-	}
-
-	if resp.RiskLevel == "" {
-		t.Error("expected non-empty risk level")
-	}
-
-	if resp.Confidence < 0 || resp.Confidence > 1 {
-		t.Errorf("confidence should be in [0,1], got %f", resp.Confidence)
+	for _, tt := range tests {
+		t.Run(tt.number, func(t *testing.T) {
+			result := isValidPatentNumber(tt.number)
+			assert.Equal(t, tt.valid, result)
+		})
 	}
 }
 

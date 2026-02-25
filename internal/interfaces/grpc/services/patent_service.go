@@ -1,729 +1,464 @@
+// File: internal/interfaces/grpc/services/patent_service.go
 package services
 
 import (
 	"context"
-	"log"
+	"encoding/base64"
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/reporting"
+	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
 )
 
-// PatentApplicationService 专利应用服务接口
-type PatentApplicationService interface {
-	GetByNumber(ctx context.Context, number string) (*Patent, error)
-	Search(ctx context.Context, opts *PatentSearchOptions) (*PatentSearchResult, error)
-	AnalyzeClaims(ctx context.Context, patentNumber string) (*ClaimAnalysis, error)
-	GetFamily(ctx context.Context, patentNumber string) ([]*Patent, error)
-	GetCitationNetwork(ctx context.Context, patentNumber string, depth int) (*CitationNetwork, error)
-}
+const (
+	maxCitationDepth     = 5
+	defaultCitationDepth = 2
+	ftoCheckTimeout      = 30 * time.Second
+	maxNetworkNodes      = 1000
+)
 
-// FTOReportService FTO 报告服务接口
-type FTOReportService interface {
-	QuickCheck(ctx context.Context, smiles string, jurisdictions []string) (*FTOCheckResult, error)
-}
-
-// PatentServiceLogger 专利服务日志接口
-type PatentServiceLogger interface {
-	Info(msg string, fields ...interface{})
-	Error(msg string, fields ...interface{})
-	Debug(msg string, fields ...interface{})
-}
-
-// defaultPatentLogger 默认日志实现
-type defaultPatentLogger struct{}
-
-func (l *defaultPatentLogger) Info(msg string, fields ...interface{}) {
-	log.Printf("[INFO] %s %v", msg, fields)
-}
-func (l *defaultPatentLogger) Error(msg string, fields ...interface{}) {
-	log.Printf("[ERROR] %s %v", msg, fields)
-}
-func (l *defaultPatentLogger) Debug(msg string, fields ...interface{}) {
-	log.Printf("[DEBUG] %s %v", msg, fields)
-}
-
-// PatentServiceServer 实现 gRPC PatentService 接口
+// PatentServiceServer implements the gRPC PatentService
 type PatentServiceServer struct {
-	UnimplementedPatentServiceServer
-	patentApp  PatentApplicationService
-	ftoService FTOReportService
-	logger     PatentServiceLogger
+	pb.UnimplementedPatentServiceServer
+	patentRepo  patent.PatentRepository
+	ftoService  reporting.FTOReportService
+	logger      logging.Logger
 }
 
-// NewPatentServiceServer 创建专利服务
-func NewPatentServiceServer(patentApp PatentApplicationService, ftoService FTOReportService, logger PatentServiceLogger) *PatentServiceServer {
-	if logger == nil {
-		logger = &defaultPatentLogger{}
-	}
+// NewPatentServiceServer creates a new PatentServiceServer instance
+func NewPatentServiceServer(
+	patentRepo patent.PatentRepository,
+	ftoService reporting.FTOReportService,
+	logger logging.Logger,
+) *PatentServiceServer {
 	return &PatentServiceServer{
-		patentApp:  patentApp,
+		patentRepo: patentRepo,
 		ftoService: ftoService,
 		logger:     logger,
 	}
 }
 
-// PatentService 向后兼容的别名
-type PatentService = PatentServiceServer
-
-// NewPatentService 向后兼容的创建函数
-func NewPatentService() *PatentService {
-	return NewPatentServiceServer(nil, nil, nil)
-}
-
-// GetPatent 获取专利
-func (s *PatentServiceServer) GetPatent(ctx context.Context, req *GetPatentRequest) (*GetPatentResponse, error) {
-	if req == nil || req.GetNumber() == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "patent_number is required")
+// GetPatent retrieves a patent by patent number
+func (s *PatentServiceServer) GetPatent(
+	ctx context.Context,
+	req *pb.GetPatentRequest,
+) (*pb.GetPatentResponse, error) {
+	if req.PatentNumber == "" {
+		return nil, status.Error(codes.InvalidArgument, "patent_number is required")
 	}
 
-	// 专利号格式校验
-	if !isValidPatentNumber(req.GetNumber()) {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid patent number format")
+	// Validate patent number format
+	if !isValidPatentNumber(req.PatentNumber) {
+		return nil, status.Error(codes.InvalidArgument, "invalid patent number format")
 	}
 
-	ctx = s.extractPatentContext(ctx)
-	s.logger.Debug("GetPatent called", "number", req.GetNumber())
-
-	if s.patentApp == nil {
-		// 模拟返回
-		return &GetPatentResponse{
-			Patent: &PatentProto{
-				Number:       req.GetNumber(),
-				Title:        "OLED Material Composition",
-				Abstract:     "A novel organic light-emitting material...",
-				FilingDate:   "2021-01-15",
-				Status:       "Granted",
-				Jurisdiction: extractJurisdiction(req.GetNumber()),
-			},
-		}, nil
-	}
-
-	patent, err := s.patentApp.GetByNumber(ctx, req.GetNumber())
+	pat, err := s.patentRepo.FindByNumber(ctx, req.PatentNumber)
 	if err != nil {
+		s.logger.Error("failed to get patent", "error", err, "patent_number", req.PatentNumber)
 		return nil, mapPatentError(err)
 	}
 
-	return &GetPatentResponse{
-		Patent: patentDomainToProto(patent),
+	return &pb.GetPatentResponse{
+		Patent: patentDomainToProto(pat),
 	}, nil
 }
 
-// SearchPatents 搜索专利
-func (s *PatentServiceServer) SearchPatents(ctx context.Context, req *SearchPatentsProtoRequest) (*SearchPatentsProtoResponse, error) {
-	if req == nil || req.Query == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "query is required")
-	}
-
-	pageSize := int(req.PageSize)
+// SearchPatents searches patents with filters and pagination
+func (s *PatentServiceServer) SearchPatents(
+	ctx context.Context,
+	req *pb.SearchPatentsRequest,
+) (*pb.SearchPatentsResponse, error) {
+	// Validate page size
+	pageSize := req.PageSize
 	if pageSize <= 0 {
 		pageSize = 20
 	}
 	if pageSize > 100 {
-		return nil, status.Errorf(codes.InvalidArgument, "page_size must be between 1 and 100")
+		return nil, status.Error(codes.InvalidArgument, "page_size must be between 1 and 100")
 	}
 
-	ctx = s.extractPatentContext(ctx)
-	s.logger.Debug("SearchPatents called", "query", req.Query)
-
-	if s.patentApp == nil {
-		// 模拟返回
-		return &SearchPatentsProtoResponse{
-			Results: []*PatentProto{
-				{
-					Number:       "CN202110123456",
-					Title:        "OLED Material Composition",
-					Abstract:     "A novel organic light-emitting material...",
-					FilingDate:   "2021-01-15",
-					Status:       "Granted",
-					Jurisdiction: "CN",
-				},
-			},
-			TotalCount: 1,
-		}, nil
+	// Decode page token
+	var offset int64
+	if req.PageToken != "" {
+		decoded, err := base64.StdEncoding.DecodeString(req.PageToken)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "invalid page_token")
+		}
+		offset, _ = strconv.ParseInt(string(decoded), 10, 64)
 	}
 
-	opts := &PatentSearchOptions{
-		Query:         req.Query,
-		PageSize:      pageSize,
-		IPCCodes:      req.IpcCodes,
-		CPCCodes:      req.CpcCodes,
-		Jurisdictions: req.Jurisdictions,
-		DateFrom:      req.DateFrom,
-		DateTo:        req.DateTo,
-		SortBy:        req.SortBy,
+	// Build search filter
+	filter := &patent.SearchFilter{
+		Query:          req.Query,
+		IpcClasses:     req.IpcClasses,
+		CpcClasses:     req.CpcClasses,
+		PatentOffices:  req.PatentOffices,
+		ApplicationDateFrom: parseDate(req.ApplicationDateFrom),
+		ApplicationDateTo:   parseDate(req.ApplicationDateTo),
+		PublicationDateFrom: parseDate(req.PublicationDateFrom),
+		PublicationDateTo:   parseDate(req.PublicationDateTo),
+		Offset:         offset,
+		Limit:          int64(pageSize),
+		SortBy:         req.SortBy,
+		SortOrder:      req.SortOrder,
 	}
 
-	result, err := s.patentApp.Search(ctx, opts)
+	// Execute search
+	patents, total, err := s.patentRepo.Search(ctx, filter)
 	if err != nil {
+		s.logger.Error("failed to search patents", "error", err, "query", req.Query)
 		return nil, mapPatentError(err)
 	}
 
-	patents := make([]*PatentProto, 0, len(result.Patents))
-	for _, p := range result.Patents {
-		patents = append(patents, patentDomainToProto(p))
+	// Convert patents to proto
+	pbPatents := make([]*pb.Patent, len(patents))
+	for i, pat := range patents {
+		pbPatents[i] = patentDomainToProto(pat)
 	}
 
-	return &SearchPatentsProtoResponse{
-		Results:       patents,
-		TotalCount:   int32(result.TotalCount),
-		NextPageToken: result.NextPageToken,
+	// Generate next page token
+	var nextPageToken string
+	if int64(len(patents)) == int64(pageSize) {
+		nextOffset := offset + int64(len(patents))
+		nextPageToken = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d", nextOffset)))
+	}
+
+	return &pb.SearchPatentsResponse{
+		Patents:       pbPatents,
+		NextPageToken: nextPageToken,
+		TotalCount:    total,
 	}, nil
 }
 
-// AnalyzeClaims 权利要求解析
-func (s *PatentServiceServer) AnalyzeClaims(ctx context.Context, req *AnalyzeClaimsRequest) (*AnalyzeClaimsResponse, error) {
-	if req == nil || req.PatentNumber == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "patent_number is required")
+// AnalyzeClaims analyzes patent claims structure
+func (s *PatentServiceServer) AnalyzeClaims(
+	ctx context.Context,
+	req *pb.AnalyzeClaimsRequest,
+) (*pb.AnalyzeClaimsResponse, error) {
+	if req.PatentNumber == "" {
+		return nil, status.Error(codes.InvalidArgument, "patent_number is required")
 	}
 
-	ctx = s.extractPatentContext(ctx)
-	s.logger.Debug("AnalyzeClaims called", "number", req.PatentNumber)
-
-	if s.patentApp == nil {
-		// 模拟返回
-		return &AnalyzeClaimsResponse{
-			ClaimTree: &ClaimTreeProto{
-				IndependentClaims: []*ClaimProto{
-					{
-						Number:   1,
-						Text:     "A compound having the formula...",
-						Type:     "independent",
-						Features: []string{"organic molecule", "OLED material"},
-					},
-				},
-				TotalClaims: 10,
-			},
-		}, nil
+	// Validate patent number format
+	if !isValidPatentNumber(req.PatentNumber) {
+		return nil, status.Error(codes.InvalidArgument, "invalid patent number format")
 	}
 
-	analysis, err := s.patentApp.AnalyzeClaims(ctx, req.PatentNumber)
+	// Fetch patent
+	pat, err := s.patentRepo.FindByNumber(ctx, req.PatentNumber)
 	if err != nil {
+		s.logger.Error("failed to get patent for claims analysis", "error", err, "patent_number", req.PatentNumber)
 		return nil, mapPatentError(err)
 	}
 
-	return &AnalyzeClaimsResponse{
-		ClaimTree: claimAnalysisToProto(analysis),
+	// Analyze claims structure
+	claimTree := pat.AnalyzeClaims()
+
+	return &pb.AnalyzeClaimsResponse{
+		PatentNumber:       req.PatentNumber,
+		ClaimTree:          claimTreeToProto(claimTree),
+		IndependentCount:   int32(claimTree.IndependentCount()),
+		DependentCount:     int32(claimTree.DependentCount()),
+		TotalClaims:        int32(claimTree.TotalCount()),
+		MaxDependencyDepth: int32(claimTree.MaxDepth()),
 	}, nil
 }
 
-// CheckFTO FTO 检查
-func (s *PatentServiceServer) CheckFTO(ctx context.Context, req *CheckFTORequest) (*CheckFTOResponse, error) {
-	if req == nil || req.Smiles == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "SMILES is required")
+// CheckFTO performs quick FTO (Freedom to Operate) check
+func (s *PatentServiceServer) CheckFTO(
+	ctx context.Context,
+	req *pb.CheckFTORequest,
+) (*pb.CheckFTOResponse, error) {
+	if req.TargetSmiles == "" {
+		return nil, status.Error(codes.InvalidArgument, "target_smiles is required")
+	}
+	if req.Jurisdiction == "" {
+		return nil, status.Error(codes.InvalidArgument, "jurisdiction is required")
 	}
 
-	if !isValidSMILES(req.Smiles) {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid SMILES format")
-	}
-
-	// 30 秒超时
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// Set timeout for FTO check
+	checkCtx, cancel := context.WithTimeout(ctx, ftoCheckTimeout)
 	defer cancel()
 
-	s.logger.Debug("CheckFTO called", "smiles", req.Smiles)
-
-	if s.ftoService == nil {
-		// 模拟返回
-		return &CheckFTOResponse{
-			RiskLevel:    "LOW",
-			Confidence:   0.85,
-			BlockingPatents: []*PatentProto{},
-			Summary:      "No significant FTO risks identified",
-		}, nil
+	// Build FTO request
+	ftoReq := &reporting.FTOQuickCheckRequest{
+		TargetMolecule: req.TargetSmiles,
+		Jurisdiction:   req.Jurisdiction,
+		IncludeExpired: req.IncludeExpired,
 	}
 
-	result, err := s.ftoService.QuickCheck(ctx, req.Smiles, req.Jurisdictions)
+	// Perform FTO check
+	result, err := s.ftoService.QuickCheck(checkCtx, ftoReq)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, status.Errorf(codes.DeadlineExceeded, "FTO check timed out")
+		s.logger.Error("failed to perform FTO check", "error", err, "smiles", req.TargetSmiles)
+		if checkCtx.Err() == context.DeadlineExceeded {
+			return nil, status.Error(codes.DeadlineExceeded, "FTO check timeout")
 		}
 		return nil, mapPatentError(err)
 	}
 
-	blocking := make([]*PatentProto, 0, len(result.BlockingPatents))
-	for _, p := range result.BlockingPatents {
-		blocking = append(blocking, patentDomainToProto(p))
+	// Convert blocking patents
+	blockingPatents := make([]*pb.BlockingPatent, len(result.BlockingPatents))
+	for i, bp := range result.BlockingPatents {
+		blockingPatents[i] = &pb.BlockingPatent{
+			PatentNumber:    bp.PatentNumber,
+			Title:           bp.Title,
+			RiskLevel:       bp.RiskLevel,
+			Similarity:      bp.Similarity,
+			ExpiryDate:      bp.ExpiryDate.Unix(),
+			LegalStatus:     bp.LegalStatus,
+			MatchedClaims:   bp.MatchedClaims,
+		}
 	}
 
-	return &CheckFTOResponse{
+	return &pb.CheckFTOResponse{
+		CanOperate:      result.CanOperate,
 		RiskLevel:       result.RiskLevel,
 		Confidence:      result.Confidence,
-		BlockingPatents: blocking,
-		Summary:         result.Summary,
+		BlockingPatents: blockingPatents,
+		Recommendation:  result.Recommendation,
+		CheckedAt:       time.Now().Unix(),
 	}, nil
 }
 
-// GetPatentFamily 获取同族专利
-func (s *PatentServiceServer) GetPatentFamily(ctx context.Context, req *GetPatentFamilyRequest) (*GetPatentFamilyResponse, error) {
-	if req == nil || req.PatentNumber == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "patent_number is required")
+// GetPatentFamily retrieves patent family members
+func (s *PatentServiceServer) GetPatentFamily(
+	ctx context.Context,
+	req *pb.GetPatentFamilyRequest,
+) (*pb.GetPatentFamilyResponse, error) {
+	if req.PatentNumber == "" {
+		return nil, status.Error(codes.InvalidArgument, "patent_number is required")
 	}
 
-	ctx = s.extractPatentContext(ctx)
-	s.logger.Debug("GetPatentFamily called", "number", req.PatentNumber)
-
-	if s.patentApp == nil {
-		// 模拟返回
-		return &GetPatentFamilyResponse{
-			FamilyMembers: []*PatentProto{
-				{Number: req.PatentNumber, Jurisdiction: extractJurisdiction(req.PatentNumber)},
-				{Number: "US20210123456", Jurisdiction: "US"},
-				{Number: "EP3456789", Jurisdiction: "EP"},
-			},
-			FamilyId: "INPADOC-12345",
-		}, nil
+	// Validate patent number format
+	if !isValidPatentNumber(req.PatentNumber) {
+		return nil, status.Error(codes.InvalidArgument, "invalid patent number format")
 	}
 
-	family, err := s.patentApp.GetFamily(ctx, req.PatentNumber)
+	// Get patent family
+	family, err := s.patentRepo.GetFamily(ctx, req.PatentNumber)
 	if err != nil {
+		s.logger.Error("failed to get patent family", "error", err, "patent_number", req.PatentNumber)
 		return nil, mapPatentError(err)
 	}
 
-	members := make([]*PatentProto, 0, len(family))
-	for _, p := range family {
-		members = append(members, patentDomainToProto(p))
+	// Convert family members
+	familyMembers := make([]*pb.FamilyMember, len(family.Members))
+	for i, member := range family.Members {
+		familyMembers[i] = &pb.FamilyMember{
+			PatentNumber:      member.PatentNumber,
+			PatentOffice:      member.PatentOffice,
+			ApplicationDate:   member.ApplicationDate.Unix(),
+			PublicationDate:   member.PublicationDate.Unix(),
+			LegalStatus:       member.LegalStatus,
+			IsRepresentative:  member.IsRepresentative,
+		}
 	}
 
-	return &GetPatentFamilyResponse{
-		FamilyMembers: members,
-		FamilyId:      "INPADOC-" + req.PatentNumber,
+	return &pb.GetPatentFamilyResponse{
+		FamilyId:      family.FamilyID,
+		FamilyMembers: familyMembers,
+		TotalMembers:  int32(len(family.Members)),
 	}, nil
 }
 
-// GetCitationNetwork 获取引用网络
-func (s *PatentServiceServer) GetCitationNetwork(ctx context.Context, req *GetCitationNetworkRequest) (*GetCitationNetworkResponse, error) {
-	if req == nil || req.PatentNumber == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "patent_number is required")
+// GetCitationNetwork retrieves citation network for a patent
+func (s *PatentServiceServer) GetCitationNetwork(
+	ctx context.Context,
+	req *pb.GetCitationNetworkRequest,
+) (*pb.GetCitationNetworkResponse, error) {
+	if req.PatentNumber == "" {
+		return nil, status.Error(codes.InvalidArgument, "patent_number is required")
 	}
 
-	depth := int(req.Depth)
+	// Validate patent number format
+	if !isValidPatentNumber(req.PatentNumber) {
+		return nil, status.Error(codes.InvalidArgument, "invalid patent number format")
+	}
+
+	// Validate depth
+	depth := req.Depth
 	if depth <= 0 {
-		depth = 2 // 默认深度
+		depth = defaultCitationDepth
 	}
-	if depth > 5 {
-		return nil, status.Errorf(codes.InvalidArgument, "depth must be between 1 and 5")
-	}
-
-	ctx = s.extractPatentContext(ctx)
-	s.logger.Debug("GetCitationNetwork called", "number", req.PatentNumber, "depth", depth)
-
-	if s.patentApp == nil {
-		// 模拟返回
-		return &GetCitationNetworkResponse{
-			Nodes: []*CitationNodeProto{
-				{PatentNumber: req.PatentNumber, Depth: 0},
-				{PatentNumber: "US20200123456", Depth: 1, CitationType: "backward"},
-				{PatentNumber: "CN202210123456", Depth: 1, CitationType: "forward"},
-			},
-			Edges: []*CitationEdgeProto{
-				{From: req.PatentNumber, To: "US20200123456", Type: "backward"},
-				{From: "CN202210123456", To: req.PatentNumber, Type: "forward"},
-			},
-			TotalNodes:  3,
-			IsTruncated: false,
-		}, nil
+	if depth > maxCitationDepth {
+		return nil, status.Errorf(codes.InvalidArgument, "depth must be between 1 and %d", maxCitationDepth)
 	}
 
-	network, err := s.patentApp.GetCitationNetwork(ctx, req.PatentNumber, depth)
+	// Build network query
+	query := &patent.CitationNetworkQuery{
+		PatentNumber:     req.PatentNumber,
+		Depth:            int(depth),
+		IncludeCiting:    req.IncludeCiting,
+		IncludeCited:     req.IncludeCited,
+		MaxNodes:         maxNetworkNodes,
+	}
+
+	// Get citation network
+	network, err := s.patentRepo.GetCitationNetwork(ctx, query)
 	if err != nil {
+		s.logger.Error("failed to get citation network", "error", err, "patent_number", req.PatentNumber)
 		return nil, mapPatentError(err)
 	}
 
-	nodes := make([]*CitationNodeProto, 0, len(network.Nodes))
-	for _, n := range network.Nodes {
-		nodes = append(nodes, &CitationNodeProto{
-			PatentNumber: n.PatentNumber,
-			Depth:        int32(n.Depth),
-			CitationType: n.CitationType,
-		})
+	// Convert nodes
+	nodes := make([]*pb.CitationNode, len(network.Nodes))
+	for i, node := range network.Nodes {
+		nodes[i] = &pb.CitationNode{
+			PatentNumber:    node.PatentNumber,
+			Title:           node.Title,
+			PublicationDate: node.PublicationDate.Unix(),
+			CitationLevel:   int32(node.Level),
+			IsRoot:          node.IsRoot,
+		}
 	}
 
-	edges := make([]*CitationEdgeProto, 0, len(network.Edges))
-	for _, e := range network.Edges {
-		edges = append(edges, &CitationEdgeProto{
-			From: e.From,
-			To:   e.To,
-			Type: e.Type,
-		})
+	// Convert edges
+	edges := make([]*pb.CitationEdge, len(network.Edges))
+	for i, edge := range network.Edges {
+		edges[i] = &pb.CitationEdge{
+			FromPatent: edge.FromPatent,
+			ToPatent:   edge.ToPatent,
+			EdgeType:   edge.EdgeType,
+		}
 	}
 
-	// 大型网络截断（超过 1000 节点）
-	isTruncated := len(nodes) > 1000
-	if isTruncated {
-		nodes = nodes[:1000]
-	}
-
-	return &GetCitationNetworkResponse{
+	return &pb.GetCitationNetworkResponse{
 		Nodes:       nodes,
 		Edges:       edges,
-		TotalNodes:  int32(network.TotalNodes),
-		IsTruncated: isTruncated,
+		TotalNodes:  int32(len(network.Nodes)),
+		TotalEdges:  int32(len(network.Edges)),
+		IsTruncated: network.IsTruncated,
 	}, nil
 }
 
-// 向后兼容方法
-func (s *PatentServiceServer) GetPatentLegacy(ctx context.Context, req *GetPatentRequestLegacy) (*PatentResponseLegacy, error) {
-	resp, err := s.GetPatent(ctx, &GetPatentRequest{Number: req.GetNumber()})
-	if err != nil {
-		return nil, err
-	}
-	return &PatentResponseLegacy{
-		Number:       resp.Patent.Number,
-		Title:        resp.Patent.Title,
-		Abstract:     resp.Patent.Abstract,
-		FilingDate:   resp.Patent.FilingDate,
-		Status:       resp.Patent.Status,
-		Jurisdiction: resp.Patent.Jurisdiction,
-	}, nil
-}
-
-func (s *PatentServiceServer) SearchPatentsLegacy(ctx context.Context, req *SearchPatentsRequestLegacy) (*SearchPatentsResponseLegacy, error) {
-	resp, err := s.SearchPatents(ctx, &SearchPatentsProtoRequest{Query: req.Query})
-	if err != nil {
-		return nil, err
-	}
-
-	results := make([]*PatentResponseLegacy, 0, len(resp.Results))
-	for _, p := range resp.Results {
-		results = append(results, &PatentResponseLegacy{
-			Number:       p.Number,
-			Title:        p.Title,
-			Abstract:     p.Abstract,
-			FilingDate:   p.FilingDate,
-			Status:       p.Status,
-			Jurisdiction: p.Jurisdiction,
-		})
-	}
-
-	return &SearchPatentsResponseLegacy{
-		Results:    results,
-		TotalCount: resp.TotalCount,
-	}, nil
-}
-
-func (s *PatentServiceServer) AnalyzeInfringement(ctx context.Context, req *InfringementRequestLegacy) (*InfringementResponseLegacy, error) {
-	// 模拟侵权分析
-	return &InfringementResponseLegacy{
-		RiskLevel:  "MEDIUM",
-		Confidence: 0.75,
-		Details:    "Potential overlap in claim 1...",
-	}, nil
-}
-
-// extractPatentContext 从 gRPC metadata 提取上下文
-func (s *PatentServiceServer) extractPatentContext(ctx context.Context) context.Context {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return ctx
-	}
-
-	if tenantIDs := md.Get("x-tenant-id"); len(tenantIDs) > 0 {
-		ctx = context.WithValue(ctx, "tenant_id", tenantIDs[0])
-	}
-	if userIDs := md.Get("x-user-id"); len(userIDs) > 0 {
-		ctx = context.WithValue(ctx, "user_id", userIDs[0])
-	}
-
-	return ctx
-}
-
-// patentDomainToProto 将专利领域模型转换为 Protobuf
-func patentDomainToProto(patent *Patent) *PatentProto {
-	if patent == nil {
-		return nil
-	}
-	return &PatentProto{
-		Number:       patent.Number,
-		Title:        patent.Title,
-		Abstract:     patent.Abstract,
-		FilingDate:   patent.FilingDate,
-		Status:       patent.Status,
-		Jurisdiction: patent.Jurisdiction,
-		Applicant:    patent.Applicant,
-		Inventor:     patent.Inventor,
-		IPCCodes:     patent.IPCCodes,
-		CPCCodes:     patent.CPCCodes,
-	}
-}
-
-// claimAnalysisToProto 将权利要求分析转换为 Protobuf
-func claimAnalysisToProto(analysis *ClaimAnalysis) *ClaimTreeProto {
-	if analysis == nil {
+// patentDomainToProto converts domain patent to protobuf message
+func patentDomainToProto(pat *patent.Patent) *pb.Patent {
+	if pat == nil {
 		return nil
 	}
 
-	independentClaims := make([]*ClaimProto, 0, len(analysis.IndependentClaims))
-	for _, c := range analysis.IndependentClaims {
-		independentClaims = append(independentClaims, &ClaimProto{
-			Number:      int32(c.Number),
-			Text:        c.Text,
-			Type:        c.Type,
-			Features:    c.Features,
-			DependsOn:   int32(c.DependsOn),
-		})
+	return &pb.Patent{
+		PatentNumber:      pat.PatentNumber(),
+		Title:             pat.Title(),
+		Abstract:          pat.Abstract(),
+		Applicants:        pat.Applicants(),
+		Inventors:         pat.Inventors(),
+		IpcClasses:        pat.IPCClasses(),
+		CpcClasses:        pat.CPCClasses(),
+		PatentOffice:      pat.PatentOffice(),
+		ApplicationDate:   pat.ApplicationDate().Unix(),
+		PublicationDate:   pat.PublicationDate().Unix(),
+		GrantDate:         pat.GrantDate().Unix(),
+		LegalStatus:       pat.LegalStatus(),
+		ClaimsCount:       int32(pat.ClaimsCount()),
+		CitationsCount:    int32(pat.CitationsCount()),
+		FamilyId:          pat.FamilyID(),
+		PriorityNumber:    pat.PriorityNumber(),
+		PriorityDate:      pat.PriorityDate().Unix(),
+	}
+}
+
+// claimTreeToProto converts domain claim tree to protobuf message
+func claimTreeToProto(tree *patent.ClaimTree) *pb.ClaimTree {
+	if tree == nil {
+		return nil
 	}
 
-	dependentClaims := make([]*ClaimProto, 0, len(analysis.DependentClaims))
-	for _, c := range analysis.DependentClaims {
-		dependentClaims = append(dependentClaims, &ClaimProto{
-			Number:      int32(c.Number),
-			Text:        c.Text,
-			Type:        c.Type,
-			Features:    c.Features,
-			DependsOn:   int32(c.DependsOn),
-		})
+	// Convert independent claims
+	independentClaims := make([]*pb.Claim, len(tree.IndependentClaims))
+	for i, claim := range tree.IndependentClaims {
+		independentClaims[i] = claimToProto(claim)
 	}
 
-	return &ClaimTreeProto{
+	return &pb.ClaimTree{
 		IndependentClaims: independentClaims,
-		DependentClaims:   dependentClaims,
-		TotalClaims:       int32(analysis.TotalClaims),
+		TotalClaims:       int32(tree.TotalCount()),
+		MaxDepth:          int32(tree.MaxDepth()),
 	}
 }
 
-// mapPatentError 将领域错误映射为 gRPC 状态码
+// claimToProto converts domain claim to protobuf message
+func claimToProto(claim *patent.Claim) *pb.Claim {
+	if claim == nil {
+		return nil
+	}
+
+	// Convert dependent claims recursively
+	dependentClaims := make([]*pb.Claim, len(claim.DependentClaims))
+	for i, dep := range claim.DependentClaims {
+		dependentClaims[i] = claimToProto(dep)
+	}
+
+	return &pb.Claim{
+		ClaimNumber:       claim.ClaimNumber,
+		ClaimText:         claim.ClaimText,
+		ClaimType:         claim.ClaimType,
+		IsIndependent:     claim.IsIndependent,
+		DependsOn:         claim.DependsOn,
+		DependentClaims:   dependentClaims,
+		TechnicalFeatures: claim.TechnicalFeatures,
+	}
+}
+
+// isValidPatentNumber validates patent number format
+func isValidPatentNumber(patentNumber string) bool {
+	// Support common patent office prefixes: CN, US, EP, JP, KR, WO
+	validFormats := []string{
+		`^CN\d{9}[A-Z]?$`,                    // CN123456789A
+		`^US\d{7,8}[A-Z]\d?$`,                // US1234567B2
+		`^EP\d{7}[A-Z]\d?$`,                  // EP1234567A1
+		`^JP\d{7,10}[A-Z]?$`,                 // JP2021123456A
+		`^KR\d{10}[A-Z]\d?$`,                 // KR1020210001234B1
+		`^WO\d{4}/\d{6}[A-Z]\d?$`,            // WO2021/123456A1
+	}
+
+	for _, pattern := range validFormats {
+		matched, _ := regexp.MatchString(pattern, patentNumber)
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+// parseDate parses Unix timestamp to time.Time
+func parseDate(timestamp int64) *time.Time {
+	if timestamp <= 0 {
+		return nil
+	}
+	t := time.Unix(timestamp, 0)
+	return &t
+}
+
+// mapPatentError maps domain errors to gRPC status codes
 func mapPatentError(err error) error {
 	if err == nil {
 		return nil
 	}
 
-	errMsg := err.Error()
-	if strings.Contains(errMsg, "not found") {
-		return status.Errorf(codes.NotFound, errMsg)
+	switch {
+	case errors.IsNotFound(err):
+		return status.Error(codes.NotFound, err.Error())
+	case errors.IsValidation(err):
+		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.IsConflict(err):
+		return status.Error(codes.AlreadyExists, err.Error())
+	case errors.IsUnauthorized(err):
+		return status.Error(codes.PermissionDenied, err.Error())
+	default:
+		return status.Error(codes.Internal, "internal server error")
 	}
-	if strings.Contains(errMsg, "already exists") || strings.Contains(errMsg, "duplicate") {
-		return status.Errorf(codes.AlreadyExists, errMsg)
-	}
-	if strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "validation") {
-		return status.Errorf(codes.InvalidArgument, errMsg)
-	}
-	if strings.Contains(errMsg, "unauthorized") || strings.Contains(errMsg, "permission") {
-		return status.Errorf(codes.PermissionDenied, errMsg)
-	}
-
-	return status.Errorf(codes.Internal, "internal error: %v", err)
-}
-
-// isValidPatentNumber 验证专利号格式
-func isValidPatentNumber(number string) bool {
-	if number == "" {
-		return false
-	}
-	// 支持 CN/US/EP/JP/KR/WO 前缀格式
-	validPattern := regexp.MustCompile(`^(CN|US|EP|JP|KR|WO)[0-9A-Z]+$`)
-	return validPattern.MatchString(strings.ToUpper(number))
-}
-
-// extractJurisdiction 从专利号提取法域
-func extractJurisdiction(number string) string {
-	upper := strings.ToUpper(number)
-	for _, prefix := range []string{"CN", "US", "EP", "JP", "KR", "WO"} {
-		if strings.HasPrefix(upper, prefix) {
-			return prefix
-		}
-	}
-	return "UNKNOWN"
-}
-
-// 领域模型类型
-type Patent struct {
-	Number       string
-	Title        string
-	Abstract     string
-	FilingDate   string
-	Status       string
-	Jurisdiction string
-	Applicant    string
-	Inventor     string
-	IPCCodes     []string
-	CPCCodes     []string
-}
-
-type PatentSearchOptions struct {
-	Query         string
-	PageSize      int
-	PageToken     string
-	IPCCodes      []string
-	CPCCodes      []string
-	Jurisdictions []string
-	DateFrom      string
-	DateTo        string
-	SortBy        string
-}
-
-type PatentSearchResult struct {
-	Patents       []*Patent
-	TotalCount    int
-	NextPageToken string
-}
-
-type Claim struct {
-	Number    int
-	Text      string
-	Type      string
-	Features  []string
-	DependsOn int
-}
-
-type ClaimAnalysis struct {
-	IndependentClaims []*Claim
-	DependentClaims   []*Claim
-	TotalClaims       int
-}
-
-type CitationNode struct {
-	PatentNumber string
-	Depth        int
-	CitationType string
-}
-
-type CitationEdge struct {
-	From string
-	To   string
-	Type string
-}
-
-type CitationNetwork struct {
-	Nodes      []*CitationNode
-	Edges      []*CitationEdge
-	TotalNodes int
-}
-
-type FTOCheckResult struct {
-	RiskLevel       string
-	Confidence      float64
-	BlockingPatents []*Patent
-	Summary         string
-}
-
-// Protobuf 消息类型
-type UnimplementedPatentServiceServer struct{}
-
-type GetPatentRequest struct{ Number string }
-
-func (req *GetPatentRequest) GetNumber() string { return req.Number }
-
-type GetPatentResponse struct{ Patent *PatentProto }
-
-type PatentProto struct {
-	Number       string
-	Title        string
-	Abstract     string
-	FilingDate   string
-	Status       string
-	Jurisdiction string
-	Applicant    string
-	Inventor     string
-	IPCCodes     []string
-	CPCCodes     []string
-}
-
-type SearchPatentsProtoRequest struct {
-	Query         string
-	PageSize      int32
-	PageToken     string
-	IpcCodes      []string
-	CpcCodes      []string
-	Jurisdictions []string
-	DateFrom      string
-	DateTo        string
-	SortBy        string
-}
-
-type SearchPatentsProtoResponse struct {
-	Results       []*PatentProto
-	TotalCount    int32
-	NextPageToken string
-}
-
-type AnalyzeClaimsRequest struct{ PatentNumber string }
-type AnalyzeClaimsResponse struct{ ClaimTree *ClaimTreeProto }
-
-type ClaimTreeProto struct {
-	IndependentClaims []*ClaimProto
-	DependentClaims   []*ClaimProto
-	TotalClaims       int32
-}
-
-type ClaimProto struct {
-	Number    int32
-	Text      string
-	Type      string
-	Features  []string
-	DependsOn int32
-}
-
-type CheckFTORequest struct {
-	Smiles        string
-	Jurisdictions []string
-}
-
-type CheckFTOResponse struct {
-	RiskLevel       string
-	Confidence      float64
-	BlockingPatents []*PatentProto
-	Summary         string
-}
-
-type GetPatentFamilyRequest struct{ PatentNumber string }
-type GetPatentFamilyResponse struct {
-	FamilyMembers []*PatentProto
-	FamilyId      string
-}
-
-type GetCitationNetworkRequest struct {
-	PatentNumber string
-	Depth        int32
-}
-
-type GetCitationNetworkResponse struct {
-	Nodes       []*CitationNodeProto
-	Edges       []*CitationEdgeProto
-	TotalNodes  int32
-	IsTruncated bool
-}
-
-type CitationNodeProto struct {
-	PatentNumber string
-	Depth        int32
-	CitationType string
-}
-
-type CitationEdgeProto struct {
-	From string
-	To   string
-	Type string
-}
-
-// 向后兼容的旧类型
-type GetPatentRequestLegacy struct{ Number string }
-
-func (req *GetPatentRequestLegacy) GetNumber() string { return req.Number }
-
-type PatentResponseLegacy struct {
-	Number       string
-	Title        string
-	Abstract     string
-	FilingDate   string
-	Status       string
-	Jurisdiction string
-}
-
-type SearchPatentsRequestLegacy struct{ Query string }
-type SearchPatentsResponseLegacy struct {
-	Results    []*PatentResponseLegacy
-	TotalCount int32
-}
-
-type InfringementRequestLegacy struct{ PatentNumber, MoleculeId string }
-type InfringementResponseLegacy struct {
-	RiskLevel  string
-	Confidence float64
-	Details    string
 }
 
 //Personal.AI order the ending

@@ -1,445 +1,406 @@
 package cli
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/reporting"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+)
+
+var (
+	reportType           string
+	reportTarget         string
+	reportFormat         string
+	reportOutputDir      string
+	reportTemplate       string
+	reportLanguage       string
+	reportIncludeAppendix bool
+	reportJobID          string
 )
 
 const (
-	colorReset  = "\033[0m"
-	colorRed    = "\033[31m"
-	colorGreen  = "\033[32m"
-	colorYellow = "\033[33m"
-	colorCyan   = "\033[36m"
+	// Large report threshold (pages)
+	largeReportThreshold = 100
+	// Async mode for large reports
+	asyncModeEnabled = true
 )
 
-// NewReportCmd creates the report generation command
-func NewReportCmd() *cobra.Command {
-	cmd := &cobra.Command{
+// NewReportCmd creates the report command
+func NewReportCmd(
+	ftoReportService reporting.FTOReportService,
+	infringementReportService reporting.InfringementReportService,
+	portfolioReportService reporting.PortfolioReportService,
+	templateService reporting.TemplateService,
+	logger logging.Logger,
+) *cobra.Command {
+	reportCmd := &cobra.Command{
 		Use:   "report",
-		Short: "Generate patent analysis reports",
-		Long: `Generate various types of patent reports including FTO analysis, 
-infringement reports, portfolio analysis, and annual IP reports.`,
+		Short: "Generate IP reports",
+		Long:  `Generate FTO, infringement, portfolio, and annual IP reports in various formats`,
 	}
 
-	cmd.AddCommand(newGenerateCmd())
-	cmd.AddCommand(newListTemplatesCmd())
-	cmd.AddCommand(newStatusCmd())
-
-	return cmd
-}
-
-// Generate command flags
-var (
-	generateType            string
-	generateTarget          string
-	generateFormat          string
-	generateOutputDir       string
-	generateTemplate        string
-	generateLanguage        string
-	generateIncludeAppendix bool
-)
-
-// List templates command flags
-var (
-	listTemplatesType string
-)
-
-// Status command flags
-var (
-	statusJobID string
-)
-
-func newGenerateCmd() *cobra.Command {
-	cmd := &cobra.Command{
+	// Subcommand: report generate
+	generateCmd := &cobra.Command{
 		Use:   "generate",
-		Short: "Generate a patent report",
-		RunE:  runGenerate,
+		Short: "Generate a report",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runReportGenerate(
+				cmd.Context(),
+				ftoReportService,
+				infringementReportService,
+				portfolioReportService,
+				logger,
+			)
+		},
 	}
 
-	cmd.Flags().StringVar(&generateType, "type", "", "Report type: fto/infringement/portfolio/annual (required)")
-	cmd.Flags().StringVar(&generateTarget, "target", "", "Target identifier: patent number, portfolio ID, etc. (required)")
-	cmd.Flags().StringVar(&generateFormat, "format", "pdf", "Output format: pdf/docx/json")
-	cmd.Flags().StringVar(&generateOutputDir, "output-dir", ".", "Output directory")
-	cmd.Flags().StringVar(&generateTemplate, "template", "", "Custom template path")
-	cmd.Flags().StringVar(&generateLanguage, "language", "zh", "Report language: zh/en")
-	cmd.Flags().BoolVar(&generateIncludeAppendix, "include-appendix", true, "Include appendix sections")
+	generateCmd.Flags().StringVar(&reportType, "type", "", "Report type: fto|infringement|portfolio|annual (required)")
+	generateCmd.Flags().StringVar(&reportTarget, "target", "", "Target identifier (patent number, portfolio ID, etc.) (required)")
+	generateCmd.Flags().StringVar(&reportFormat, "format", "pdf", "Output format: pdf|docx|json")
+	generateCmd.Flags().StringVar(&reportOutputDir, "output-dir", ".", "Output directory")
+	generateCmd.Flags().StringVar(&reportTemplate, "template", "", "Custom template path (optional)")
+	generateCmd.Flags().StringVar(&reportLanguage, "language", "zh", "Report language: zh|en")
+	generateCmd.Flags().BoolVar(&reportIncludeAppendix, "include-appendix", true, "Include appendices")
+	generateCmd.MarkFlagRequired("type")
+	generateCmd.MarkFlagRequired("target")
 
-	cmd.MarkFlagRequired("type")
-	cmd.MarkFlagRequired("target")
-
-	return cmd
-}
-
-func newListTemplatesCmd() *cobra.Command {
-	cmd := &cobra.Command{
+	// Subcommand: report list-templates
+	listTemplatesCmd := &cobra.Command{
 		Use:   "list-templates",
 		Short: "List available report templates",
-		RunE:  runListTemplates,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runReportListTemplates(cmd.Context(), templateService, logger)
+		},
 	}
 
-	cmd.Flags().StringVar(&listTemplatesType, "type", "", "Filter by report type")
+	listTemplatesCmd.Flags().StringVar(&reportType, "type", "", "Filter by report type (optional)")
 
-	return cmd
-}
-
-func newStatusCmd() *cobra.Command {
-	cmd := &cobra.Command{
+	// Subcommand: report status
+	statusCmd := &cobra.Command{
 		Use:   "status",
-		Short: "Check report generation job status",
-		RunE:  runStatus,
+		Short: "Check report generation status",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runReportStatus(cmd.Context(), ftoReportService, logger)
+		},
 	}
 
-	cmd.Flags().StringVar(&statusJobID, "job-id", "", "Job ID (required)")
-	cmd.MarkFlagRequired("job-id")
+	statusCmd.Flags().StringVar(&reportJobID, "job-id", "", "Report generation job ID (required)")
+	statusCmd.MarkFlagRequired("job-id")
 
-	return cmd
+	reportCmd.AddCommand(generateCmd, listTemplatesCmd, statusCmd)
+	return reportCmd
 }
 
-// ReportResult represents report generation result
-type ReportResult struct {
-	FilePath       string
-	Pages          int
-	Sections       int
-	DataSources    int
-	GenerationTime time.Duration
-	JobID          string // For async mode
-	IsAsync        bool
-}
-
-// TemplateInfo represents a report template
-type TemplateInfo struct {
-	ID          string
-	Name        string
-	Type        string
-	Language    string
-	Version     string
-	Description string
-}
-
-// JobStatus represents async job status
-type JobStatus struct {
-	JobID          string
-	Status         string // in_progress/completed/failed
-	Progress       int    // 0-100
-	EstimatedTime  string
-	ErrorMessage   string
-	ResultFilePath string
-}
-
-func runGenerate(cmd *cobra.Command, args []string) error {
-	// Validate parameters
-	if !isValidReportType(generateType) {
-		return fmt.Errorf("invalid report type: %s (allowed: fto, infringement, portfolio, annual)", generateType)
+func runReportGenerate(
+	ctx context.Context,
+	ftoReportService reporting.FTOReportService,
+	infringementReportService reporting.InfringementReportService,
+	portfolioReportService reporting.PortfolioReportService,
+	logger logging.Logger,
+) error {
+	// Validate report type
+	validTypes := []string{"fto", "infringement", "portfolio", "annual"}
+	if !contains(validTypes, strings.ToLower(reportType)) {
+		return errors.Errorf("invalid report type: %s (must be fto|infringement|portfolio|annual)", reportType)
 	}
 
-	if !isValidFormat(generateFormat) {
-		return fmt.Errorf("invalid format: %s (allowed: pdf, docx, json)", generateFormat)
+	// Validate output format
+	validFormats := []string{"pdf", "docx", "json"}
+	if !contains(validFormats, strings.ToLower(reportFormat)) {
+		return errors.Errorf("invalid output format: %s (must be pdf|docx|json)", reportFormat)
 	}
 
-	if !isValidLanguage(generateLanguage) {
-		return fmt.Errorf("invalid language: %s (allowed: zh, en)", generateLanguage)
+	// Validate language
+	validLanguages := []string{"zh", "en"}
+	if !contains(validLanguages, strings.ToLower(reportLanguage)) {
+		return errors.Errorf("invalid language: %s (must be zh|en)", reportLanguage)
 	}
 
 	// Ensure output directory exists
-	if err := ensureOutputDir(generateOutputDir); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
+	if err := ensureOutputDir(reportOutputDir); err != nil {
+		return errors.Wrap(err, "failed to create output directory")
 	}
 
-	// Check if large report (simulate estimation)
-	estimatedPages := estimateReportSize(generateType, generateTarget)
-	isAsync := estimatedPages > 100
+	logger.Info("Starting report generation",
+		"type", reportType,
+		"target", reportTarget,
+		"format", reportFormat,
+		"language", reportLanguage)
 
-	if isAsync {
-		// Async mode
-		fmt.Println(colorYellow + "Large report detected. Switching to async generation mode..." + colorReset)
-		jobID := generateJobID()
+	startTime := time.Now()
 
-		fmt.Printf("\n%s✓ Report generation job submitted%s\n", colorGreen, colorReset)
-		fmt.Printf("  Job ID: %s%s%s\n", colorCyan, jobID, colorReset)
-		fmt.Printf("  Type: %s\n", generateType)
-		fmt.Printf("  Target: %s\n", generateTarget)
-		fmt.Printf("  Format: %s\n", generateFormat)
-		fmt.Printf("  Estimated pages: %d\n", estimatedPages)
-		fmt.Printf("\nUse '%skeyip report status --job-id %s%s' to check progress\n",
-			colorCyan, jobID, colorReset)
+	// Build base request
+	baseReq := &reporting.BaseReportRequest{
+		Target:          reportTarget,
+		Format:          strings.ToLower(reportFormat),
+		Language:        strings.ToLower(reportLanguage),
+		IncludeAppendix: reportIncludeAppendix,
+		CustomTemplate:  reportTemplate,
+		Context:         ctx,
+	}
+
+	// Dispatch to appropriate service based on report type
+	var result *reporting.ReportResult
+	var err error
+
+	switch strings.ToLower(reportType) {
+	case "fto":
+		req := &reporting.FTOReportRequest{
+			BaseReportRequest: *baseReq,
+		}
+		result, err = ftoReportService.Generate(ctx, req)
+
+	case "infringement":
+		req := &reporting.InfringementReportRequest{
+			BaseReportRequest: *baseReq,
+		}
+		result, err = infringementReportService.Generate(ctx, req)
+
+	case "portfolio":
+		req := &reporting.PortfolioReportRequest{
+			BaseReportRequest: *baseReq,
+		}
+		result, err = portfolioReportService.Generate(ctx, req)
+
+	case "annual":
+		req := &reporting.AnnualReportRequest{
+			BaseReportRequest: *baseReq,
+			Year:              time.Now().Year(),
+		}
+		// For annual reports, we can reuse portfolio service with year context
+		result, err = portfolioReportService.GenerateAnnual(ctx, req)
+
+	default:
+		return errors.Errorf("unhandled report type: %s", reportType)
+	}
+
+	if err != nil {
+		logger.Error("Report generation failed", "error", err)
+		return errors.Wrap(err, "report generation failed")
+	}
+
+	// Check if async mode was triggered
+	if result.Async {
+		fmt.Printf("\n📊 Large report detected - processing asynchronously\n")
+		fmt.Printf("Job ID: %s\n", result.JobID)
+		fmt.Printf("Estimated pages: %d\n", result.EstimatedPages)
+		fmt.Printf("Estimated completion: %s\n\n", result.EstimatedCompletion.Format("2006-01-02 15:04:05"))
+		fmt.Printf("Check status with: keyip report status --job-id %s\n", result.JobID)
+
+		logger.Info("Report queued for async generation",
+			"job_id", result.JobID,
+			"estimated_pages", result.EstimatedPages)
 
 		return nil
 	}
 
-	// Synchronous mode
-	fmt.Printf("Generating %s report for %s...\n", generateType, generateTarget)
+	// Resolve output path
+	outputPath := resolveOutputPath(reportOutputDir, reportType, reportFormat)
 
-	startTime := time.Now()
-
-	// Simulate report generation
-	result := &ReportResult{
-		FilePath:       resolveOutputPath(generateOutputDir, generateType, generateFormat),
-		Pages:          estimatedPages,
-		Sections:       getSectionCount(generateType),
-		DataSources:    getDataSourceCount(generateType),
-		GenerationTime: time.Since(startTime),
-		IsAsync:        false,
+	// Write report content to file
+	if err := writeReportToFile(result.Content, outputPath); err != nil {
+		return errors.Wrap(err, "failed to write report to file")
 	}
 
-	// Simulate file creation
-	if err := createDummyFile(result.FilePath); err != nil {
-		return fmt.Errorf("failed to write report file: %w", err)
-	}
+	generationTime := time.Since(startTime)
 
 	// Print summary
+	fmt.Printf("\n✓ Report generated successfully\n\n")
+	fmt.Printf("Output: %s\n", outputPath)
 	printReportSummary(result)
+	fmt.Printf("Generation time: %.2fs\n", generationTime.Seconds())
+
+	logger.Info("Report generation completed",
+		"type", reportType,
+		"output_path", outputPath,
+		"pages", result.PageCount,
+		"generation_time_seconds", generationTime.Seconds())
 
 	return nil
 }
 
-func runListTemplates(cmd *cobra.Command, args []string) error {
-	// Simulate template listing
-	templates := []TemplateInfo{
-		{
-			ID:          "fto-standard-zh-v1",
-			Name:        "FTO Standard Report (Chinese)",
-			Type:        "fto",
-			Language:    "zh",
-			Version:     "1.0",
-			Description: "Standard FTO analysis template with risk assessment",
-		},
-		{
-			ID:          "fto-standard-en-v1",
-			Name:        "FTO Standard Report (English)",
-			Type:        "fto",
-			Language:    "en",
-			Version:     "1.0",
-			Description: "Standard FTO analysis template with risk assessment",
-		},
-		{
-			ID:          "infringement-detailed-zh-v1",
-			Name:        "Infringement Analysis (Chinese)",
-			Type:        "infringement",
-			Language:    "zh",
-			Version:     "1.0",
-			Description: "Detailed infringement analysis with claim mapping",
-		},
-		{
-			ID:          "portfolio-analysis-zh-v1",
-			Name:        "Portfolio Analysis (Chinese)",
-			Type:        "portfolio",
-			Language:    "zh",
-			Version:     "1.0",
-			Description: "Comprehensive portfolio health and optimization report",
-		},
-		{
-			ID:          "annual-ip-zh-v1",
-			Name:        "Annual IP Report (Chinese)",
-			Type:        "annual",
-			Language:    "zh",
-			Version:     "1.0",
-			Description: "Executive summary and strategic recommendations",
-		},
+func runReportListTemplates(ctx context.Context, templateService reporting.TemplateService, logger logging.Logger) error {
+	logger.Info("Listing report templates", "filter_type", reportType)
+
+	req := &reporting.ListTemplatesRequest{
+		Type:    reportType,
+		Context: ctx,
 	}
 
-	// Filter by type if specified
-	if listTemplatesType != "" {
-		filtered := []TemplateInfo{}
-		for _, t := range templates {
-			if t.Type == listTemplatesType {
-				filtered = append(filtered, t)
-			}
+	templates, err := templateService.ListTemplates(ctx, req)
+	if err != nil {
+		logger.Error("Failed to list templates", "error", err)
+		return errors.Wrap(err, "failed to list templates")
+	}
+
+	if len(templates) == 0 {
+		fmt.Println("\nNo templates found.")
+		return nil
+	}
+
+	fmt.Printf("\n=== Available Report Templates ===\n\n")
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"ID", "Name", "Type", "Language", "Version", "Description"})
+	table.SetBorder(true)
+
+	for _, tmpl := range templates {
+		table.Append([]string{
+			tmpl.ID,
+			tmpl.Name,
+			tmpl.Type,
+			tmpl.Language,
+			tmpl.Version,
+			truncateString(tmpl.Description, 50),
+		})
+	}
+
+	table.Render()
+
+	fmt.Printf("\nTotal templates: %d\n", len(templates))
+
+	logger.Info("Templates listed", "count", len(templates))
+
+	return nil
+}
+
+func runReportStatus(ctx context.Context, ftoReportService reporting.FTOReportService, logger logging.Logger) error {
+	logger.Info("Checking report status", "job_id", reportJobID)
+
+	status, err := ftoReportService.GetJobStatus(ctx, reportJobID)
+	if err != nil {
+		logger.Error("Failed to get job status", "error", err)
+		return errors.Wrap(err, "failed to get job status")
+	}
+
+	fmt.Printf("\n=== Report Generation Status ===\n\n")
+	fmt.Printf("Job ID: %s\n", status.JobID)
+	fmt.Printf("Status: %s\n", colorizeStatus(status.Status))
+	fmt.Printf("Progress: %d%%\n", status.Progress)
+
+	if status.Status == "in_progress" {
+		fmt.Printf("Estimated completion: %s\n", status.EstimatedCompletion.Format("2006-01-02 15:04:05"))
+		remainingTime := time.Until(status.EstimatedCompletion)
+		if remainingTime > 0 {
+			fmt.Printf("Time remaining: %s\n", formatDuration(remainingTime))
 		}
-		templates = filtered
 	}
 
-	// Print templates
-	fmt.Println("Available Report Templates:")
-	fmt.Println(strings.Repeat("═", 80))
-
-	for _, t := range templates {
-		fmt.Printf("\n%s[%s]%s %s\n", colorCyan, t.ID, colorReset, t.Name)
-		fmt.Printf("  Type: %s | Language: %s | Version: %s\n", t.Type, t.Language, t.Version)
-		fmt.Printf("  %s\n", t.Description)
+	if status.Status == "completed" {
+		fmt.Printf("\n✓ Report ready for download\n")
+		fmt.Printf("Output: %s\n", status.OutputPath)
+		fmt.Printf("Pages: %d\n", status.PageCount)
+		fmt.Printf("Generated at: %s\n", status.CompletedAt.Format("2006-01-02 15:04:05"))
 	}
 
-	fmt.Println("\n" + strings.Repeat("═", 80))
-	fmt.Printf("Total: %d template(s)\n", len(templates))
-
-	return nil
-}
-
-func runStatus(cmd *cobra.Command, args []string) error {
-	// Simulate status check
-	status := &JobStatus{
-		JobID:         statusJobID,
-		Status:        "in_progress",
-		Progress:      65,
-		EstimatedTime: "5 minutes",
+	if status.Status == "failed" {
+		fmt.Printf("\n✗ Report generation failed\n")
+		fmt.Printf("Error: %s\n", status.ErrorMessage)
 	}
 
-	// Random status for demo
-	if len(statusJobID) > 10 && statusJobID[10] == 'a' {
-		status.Status = "completed"
-		status.Progress = 100
-		status.ResultFilePath = "/tmp/report_fto_20240223_143022.pdf"
-	} else if len(statusJobID) > 10 && statusJobID[10] == 'z' {
-		status.Status = "failed"
-		status.ErrorMessage = "Template rendering failed: missing data source"
-	}
-
-	fmt.Printf("Report Generation Job Status\n")
-	fmt.Println(strings.Repeat("═", 60))
-	fmt.Printf("  Job ID: %s\n", status.JobID)
-
-	switch status.Status {
-	case "in_progress":
-		fmt.Printf("  Status: %s%s%s\n", colorYellow, status.Status, colorReset)
-		fmt.Printf("  Progress: [%s] %d%%\n", progressBar(status.Progress), status.Progress)
-		fmt.Printf("  Estimated time remaining: %s\n", status.EstimatedTime)
-
-	case "completed":
-		fmt.Printf("  Status: %s%s%s\n", colorGreen, status.Status, colorReset)
-		fmt.Printf("  Progress: [%s] %d%%\n", progressBar(status.Progress), status.Progress)
-		fmt.Printf("  Result: %s\n", status.ResultFilePath)
-
-	case "failed":
-		fmt.Printf("  Status: %s%s%s\n", colorRed, status.Status, colorReset)
-		fmt.Printf("  Error: %s\n", status.ErrorMessage)
-	}
-
-	fmt.Println(strings.Repeat("═", 60))
+	logger.Info("Status retrieved",
+		"job_id", reportJobID,
+		"status", status.Status,
+		"progress", status.Progress)
 
 	return nil
 }
 
 func resolveOutputPath(dir string, reportType string, format string) string {
 	timestamp := time.Now().Format("20060102_150405")
-	filename := fmt.Sprintf("report_%s_%s.%s", reportType, timestamp, format)
-	path := filepath.Join(dir, filename)
+	baseName := fmt.Sprintf("%s_report_%s.%s", reportType, timestamp, format)
+	outputPath := filepath.Join(dir, baseName)
 
-	// Handle filename conflicts
-	if _, err := os.Stat(path); err == nil {
-		seq := 1
-		for {
-			filename = fmt.Sprintf("report_%s_%s_%d.%s", reportType, timestamp, seq, format)
-			path = filepath.Join(dir, filename)
-			if _, err := os.Stat(path); os.IsNotExist(err) {
+	// Handle file name conflicts
+	if _, err := os.Stat(outputPath); err == nil {
+		// File exists, append sequence number
+		for i := 1; ; i++ {
+			sequencedName := fmt.Sprintf("%s_report_%s_%d.%s", reportType, timestamp, i, format)
+			outputPath = filepath.Join(dir, sequencedName)
+			if _, err := os.Stat(outputPath); os.IsNotExist(err) {
 				break
 			}
-			seq++
 		}
 	}
 
-	return path
-}
-
-func printReportSummary(result *ReportResult) {
-	fmt.Println("\n" + strings.Repeat("═", 70))
-	fmt.Printf("%s✓ Report Generated Successfully%s\n\n", colorGreen, colorReset)
-	fmt.Printf("  File:         %s%s%s\n", colorCyan, result.FilePath, colorReset)
-	fmt.Printf("  Pages:        %d\n", result.Pages)
-	fmt.Printf("  Sections:     %d\n", result.Sections)
-	fmt.Printf("  Data sources: %d\n", result.DataSources)
-	fmt.Printf("  Generation time: %.2f seconds\n", result.GenerationTime.Seconds())
-	fmt.Println(strings.Repeat("═", 70))
+	return outputPath
 }
 
 func ensureOutputDir(dir string) error {
-	if dir == "" || dir == "." {
-		return nil
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
 	}
-	return os.MkdirAll(dir, 0755)
+	return nil
 }
 
-func createDummyFile(path string) error {
+func writeReportToFile(content []byte, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	_, err = file.WriteString("KeyIP-Intelligence Report (Demo)\n")
-	return err
-}
-
-func isValidReportType(t string) bool {
-	valid := map[string]bool{
-		"fto":          true,
-		"infringement": true,
-		"portfolio":    true,
-		"annual":       true,
+	if _, err := file.Write(content); err != nil {
+		return err
 	}
-	return valid[t]
+
+	return nil
 }
 
-func isValidFormat(f string) bool {
-	valid := map[string]bool{
-		"pdf":  true,
-		"docx": true,
-		"json": true,
+func printReportSummary(result *reporting.ReportResult) {
+	fmt.Printf("Pages: %d\n", result.PageCount)
+	fmt.Printf("Sections: %d\n", result.SectionCount)
+	fmt.Printf("Data sources: %d\n", result.DataSourceCount)
+
+	if len(result.Warnings) > 0 {
+		fmt.Printf("\n⚠ Warnings (%d):\n", len(result.Warnings))
+		for _, warning := range result.Warnings {
+			fmt.Printf("  - %s\n", warning)
+		}
 	}
-	return valid[f]
 }
 
-func isValidLanguage(l string) bool {
-	valid := map[string]bool{
-		"zh": true,
-		"en": true,
+func colorizeStatus(status string) string {
+	switch strings.ToLower(status) {
+	case "completed":
+		return fmt.Sprintf("\033[32m%s\033[0m", status) // Green
+	case "in_progress":
+		return fmt.Sprintf("\033[33m%s\033[0m", status) // Yellow
+	case "failed":
+		return fmt.Sprintf("\033[31m%s\033[0m", status) // Red
+	default:
+		return status
 	}
-	return valid[l]
 }
 
-func estimateReportSize(reportType string, target string) int {
-	// Simulate size estimation
-	sizes := map[string]int{
-		"fto":          45,
-		"infringement": 35,
-		"portfolio":    120, // Large report
-		"annual":       80,
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%.0f seconds", d.Seconds())
 	}
-	return sizes[reportType]
-}
-
-func getSectionCount(reportType string) int {
-	counts := map[string]int{
-		"fto":          7,
-		"infringement": 6,
-		"portfolio":    12,
-		"annual":       10,
+	if d < time.Hour {
+		return fmt.Sprintf("%.0f minutes", d.Minutes())
 	}
-	return counts[reportType]
+	return fmt.Sprintf("%.1f hours", d.Hours())
 }
 
-func getDataSourceCount(reportType string) int {
-	counts := map[string]int{
-		"fto":          15,
-		"infringement": 12,
-		"portfolio":    25,
-		"annual":       30,
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
 	}
-	return counts[reportType]
-}
-
-func generateJobID() string {
-	return fmt.Sprintf("job-%d-%s", time.Now().Unix(), randomString(8))
-}
-
-func randomString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[time.Now().UnixNano()%int64(len(letters))]
-	}
-	return string(b)
-}
-
-func progressBar(progress int) string {
-	width := 30
-	filled := progress * width / 100
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
-	return bar
+	return s[:maxLen-3] + "..."
 }
 
 //Personal.AI order the ending

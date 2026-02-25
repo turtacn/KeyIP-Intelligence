@@ -1,384 +1,339 @@
+// ---
+// 252 `internal/interfaces/grpc/server.go`
+// 实现 gRPC 服务器核心骨架。
+//
+// 功能定位：gRPC 传输层入口，负责服务器生命周期管理、服务注册、拦截器链组装、
+// 健康检查与优雅关停。
+//
+// 核心实现：
+//   - Server 结构体：grpcServer, listener, config, logger, metrics, healthServer
+//   - Option 函数选项：WithLogger, WithMetrics, WithTLSConfig, WithMaxRecvMsgSize,
+//     WithMaxSendMsgSize, WithKeepaliveParams
+//   - NewServer：创建 TCP listener、组装拦截器链、注册 health/reflection 服务
+//   - RegisterService：委派到底层 grpc.Server
+//   - Start：启动 listener.Accept 循环
+//   - Stop：GracefulStop 带超时 → ForceStop → 关闭 listener
+//   - Addr：返回实际监听地址
+//   - 拦截器：recovery, logging(unary/stream), metrics(unary/stream), validation
+//
+// 业务逻辑：
+//   - 默认最大消息大小 16MB
+//   - Keepalive: MaxConnectionIdle=15min, MaxConnectionAge=30min, Time=5min, Timeout=1s
+//   - Recovery 拦截器捕获 panic → 日志堆栈 → codes.Internal
+//   - Logging 拦截器记录 method/duration/status_code，排除 health check
+//   - Metrics 拦截器按 service/method/code 维度采集
+//   - Validation 拦截器对实现 Validate() error 的请求自动调用
+//   - GracefulStop 超时默认 10 秒
+//   - Reflection 仅在 config.Debug=true 时注册
+//
+// 依赖：internal/config, internal/infrastructure/monitoring/logging,
+//       internal/infrastructure/monitoring/prometheus, pkg/errors,
+//       google.golang.org/grpc, grpc/health, grpc/reflection
+// 被依赖：cmd/apiserver/main.go, grpc/services/*
+// ---
 package grpc
 
 import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net"
-	"os"
 	"runtime/debug"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/grpc/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/config"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/prometheus"
 )
 
-// GRPCServerConfig 定义 gRPC 服务器配置
-type GRPCServerConfig struct {
-	Port                 int           // 监听端口
-	MaxRecvMsgSize       int           // 最大接收消息大小，默认 10MB
-	MaxSendMsgSize       int           // 最大发送消息大小，默认 10MB
-	MaxConcurrentStreams uint32        // 最大并发流，默认 100
-	TLSCertFile          string        // 可选，TLS 证书路径
-	TLSKeyFile           string        // 可选，TLS 私钥路径
-	EnableReflection     bool          // 是否启用 gRPC 反射，开发环境用
-	ShutdownTimeout      time.Duration // 优雅停止超时时间，默认 30 秒
+const (
+	defaultMaxRecvMsgSize = 16 * 1024 * 1024 // 16MB
+	defaultMaxSendMsgSize = 16 * 1024 * 1024 // 16MB
+	defaultGracefulTimeout = 10 * time.Second
+)
+
+var defaultKeepaliveParams = keepalive.ServerParameters{
+	MaxConnectionIdle:     15 * time.Minute,
+	MaxConnectionAge:      30 * time.Minute,
+	MaxConnectionAgeGrace: 5 * time.Second,
+	Time:                  5 * time.Minute,
+	Timeout:               1 * time.Second,
 }
 
-// DefaultGRPCServerConfig 返回默认配置
-func DefaultGRPCServerConfig() *GRPCServerConfig {
-	return &GRPCServerConfig{
-		Port:                 9090,
-		MaxRecvMsgSize:       10 * 1024 * 1024, // 10MB
-		MaxSendMsgSize:       10 * 1024 * 1024, // 10MB
-		MaxConcurrentStreams: 100,
-		EnableReflection:     true,
-		ShutdownTimeout:      30 * time.Second,
-	}
+var defaultKeepalivePolicy = keepalive.EnforcementPolicy{
+	MinTime:             5 * time.Second,
+	PermitWithoutStream: true,
 }
 
-// GRPCServices 聚合全部 gRPC 服务实现
-type GRPCServices struct {
-	MoleculeService *services.MoleculeServiceServer
-	PatentService   *services.PatentServiceServer
-}
-
-// Logger 定义 gRPC 服务器日志接口
-type Logger interface {
-	Info(msg string, fields ...interface{})
-	Error(msg string, fields ...interface{})
-	Warn(msg string, fields ...interface{})
-	Debug(msg string, fields ...interface{})
-}
-
-// defaultLogger 提供默认日志实现
-type defaultLogger struct{}
-
-func (l *defaultLogger) Info(msg string, fields ...interface{}) {
-	log.Printf("[INFO] %s %v", msg, formatFields(fields))
-}
-func (l *defaultLogger) Error(msg string, fields ...interface{}) {
-	log.Printf("[ERROR] %s %v", msg, formatFields(fields))
-}
-func (l *defaultLogger) Warn(msg string, fields ...interface{}) {
-	log.Printf("[WARN] %s %v", msg, formatFields(fields))
-}
-func (l *defaultLogger) Debug(msg string, fields ...interface{}) {
-	log.Printf("[DEBUG] %s %v", msg, formatFields(fields))
-}
-
-func formatFields(fields []interface{}) string {
-	if len(fields) == 0 {
-		return ""
-	}
-	var parts []string
-	for i := 0; i < len(fields)-1; i += 2 {
-		parts = append(parts, fmt.Sprintf("%v=%v", fields[i], fields[i+1]))
-	}
-	return strings.Join(parts, " ")
-}
-
-// GRPCServer 封装 gRPC 服务器生命周期管理
-type GRPCServer struct {
-	server   *grpc.Server
-	config   *GRPCServerConfig
-	listener net.Listener
-	logger   Logger
-	services *GRPCServices
-	mu       sync.RWMutex
-	running  bool
-
-	// 指标统计
-	requestCount   int64
-	requestLatency int64 // 纳秒累计
-}
-
-// Server 为向后兼容保留的类型别名
-type Server = GRPCServer
-
-// NewServer 创建 gRPC 服务器（向后兼容接口）
-func NewServer(port int) *Server {
-	cfg := DefaultGRPCServerConfig()
-	cfg.Port = port
-	srv, _ := NewGRPCServer(cfg, nil, nil)
-	return srv
-}
-
-// NewGRPCServer 创建完整配置的 gRPC 服务器
-func NewGRPCServer(config *GRPCServerConfig, svcs *GRPCServices, logger Logger) (*GRPCServer, error) {
-	if config == nil {
-		config = DefaultGRPCServerConfig()
-	}
-
-	if logger == nil {
-		logger = &defaultLogger{}
-	}
-
-	// 应用默认值
-	applyGRPCDefaults(config)
-
-	// 验证端口
-	if config.Port < 0 || config.Port > 65535 {
-		return nil, fmt.Errorf("invalid port: %d, must be between 0 and 65535", config.Port)
-	}
-
-	// 验证 TLS 配置
-	if err := validateTLSConfig(config); err != nil {
-		return nil, err
-	}
-
-	return &GRPCServer{
-		config:   config,
-		logger:   logger,
-		services: svcs,
-	}, nil
-}
-
-// validateTLSConfig 验证 TLS 配置
-func validateTLSConfig(config *GRPCServerConfig) error {
-	if config.TLSCertFile == "" && config.TLSKeyFile == "" {
-		return nil // 无 TLS 配置
-	}
-
-	if config.TLSCertFile == "" || config.TLSKeyFile == "" {
-		return fmt.Errorf("both TLSCertFile and TLSKeyFile must be provided for TLS")
-	}
-
-	if _, err := os.Stat(config.TLSCertFile); os.IsNotExist(err) {
-		return fmt.Errorf("TLS certificate file not found: %s", config.TLSCertFile)
-	}
-
-	if _, err := os.Stat(config.TLSKeyFile); os.IsNotExist(err) {
-		return fmt.Errorf("TLS key file not found: %s", config.TLSKeyFile)
-	}
-
-	return nil
-}
-
-// applyGRPCDefaults 为零值字段应用默认值
-func applyGRPCDefaults(cfg *GRPCServerConfig) {
-	if cfg.MaxRecvMsgSize == 0 {
-		cfg.MaxRecvMsgSize = 10 * 1024 * 1024
-	}
-	if cfg.MaxSendMsgSize == 0 {
-		cfg.MaxSendMsgSize = 10 * 1024 * 1024
-	}
-	if cfg.MaxConcurrentStreams == 0 {
-		cfg.MaxConcurrentStreams = 100
-	}
-	if cfg.ShutdownTimeout == 0 {
-		cfg.ShutdownTimeout = 30 * time.Second
-	}
-}
-
-// Start 启动 gRPC 服务器，阻塞监听
-func (s *GRPCServer) Start() error {
-	s.mu.Lock()
-	if s.running {
-		s.mu.Unlock()
-		return fmt.Errorf("gRPC server already running")
-	}
-
-	// 创建 TCP listener
-	addr := fmt.Sprintf(":%d", s.config.Port)
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		s.mu.Unlock()
-		return fmt.Errorf("failed to listen on port %d: %w", s.config.Port, err)
-	}
-	s.listener = lis
-	s.running = true
-	s.mu.Unlock()
-
-	// 构建服务器选项
-	opts := s.buildServerOptions()
-
-	// 创建 gRPC 服务器
-	s.server = grpc.NewServer(opts...)
-
-	// 注册全部服务
-	s.registerServices()
-
-	// 可选启用反射
-	if s.config.EnableReflection {
-		reflection.Register(s.server)
-	}
-
-	s.logger.Info("gRPC server starting",
-		"addr", lis.Addr().String(),
-		"tls", s.config.TLSCertFile != "",
-		"reflection", s.config.EnableReflection)
-
-	// 阻塞监听
-	if err := s.server.Serve(lis); err != nil {
-		s.mu.Lock()
-		s.running = false
-		s.mu.Unlock()
-		return err
-	}
-
-	return nil
-}
-
-// buildServerOptions 构建 gRPC 服务器选项
-func (s *GRPCServer) buildServerOptions() []grpc.ServerOption {
-	opts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(s.config.MaxRecvMsgSize),
-		grpc.MaxSendMsgSize(s.config.MaxSendMsgSize),
-		grpc.MaxConcurrentStreams(s.config.MaxConcurrentStreams),
-	}
-
-	// 配置 TLS
-	if s.config.TLSCertFile != "" && s.config.TLSKeyFile != "" {
-		creds, err := credentials.NewServerTLSFromFile(s.config.TLSCertFile, s.config.TLSKeyFile)
-		if err == nil {
-			opts = append(opts, grpc.Creds(creds))
-			s.logger.Info("TLS enabled for gRPC server")
-		} else {
-			s.logger.Error("Failed to load TLS credentials", "error", err)
-		}
-	}
-
-	// 配置 UnaryInterceptor 链：recovery → logging → metrics → auth → validation
-	opts = append(opts, grpc.ChainUnaryInterceptor(
-		recoveryInterceptor(s.logger),
-		loggingInterceptor(s.logger),
-		metricsInterceptor(&s.requestCount, &s.requestLatency),
-		authInterceptor(s.logger),
-		validationInterceptor(),
-	))
-
-	// 配置 StreamInterceptor 链：recovery → logging → metrics → auth
-	opts = append(opts, grpc.ChainStreamInterceptor(
-		streamRecoveryInterceptor(s.logger),
-		streamLoggingInterceptor(s.logger),
-		streamMetricsInterceptor(&s.requestCount, &s.requestLatency),
-		streamAuthInterceptor(s.logger),
-	))
-
-	return opts
-}
-
-// registerServices 注册全部 gRPC 服务
-func (s *GRPCServer) registerServices() {
-	if s.services == nil {
-		return
-	}
-	// 注册 MoleculeService
-	if s.services.MoleculeService != nil {
-		s.logger.Debug("Registering MoleculeService")
-		// pb.RegisterMoleculeServiceServer(s.server, s.services.MoleculeService)
-	}
-	// 注册 PatentService
-	if s.services.PatentService != nil {
-		s.logger.Debug("Registering PatentService")
-		// pb.RegisterPatentServiceServer(s.server, s.services.PatentService)
-	}
-}
-
-// Stop 优雅停止 gRPC 服务器
-func (s *GRPCServer) Stop(ctx context.Context) error {
-	s.mu.Lock()
-	if !s.running || s.server == nil {
-		s.mu.Unlock()
-		return nil
-	}
-	s.mu.Unlock()
-
-	s.logger.Info("gRPC server shutting down", "timeout", s.config.ShutdownTimeout)
-
-	done := make(chan struct{})
-	go func() {
-		s.server.GracefulStop()
-		close(done)
-	}()
-
-	// 创建超时 context
-	var cancel context.CancelFunc
-	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		ctx, cancel = context.WithTimeout(ctx, s.config.ShutdownTimeout)
-		defer cancel()
-	}
-
-	select {
-	case <-ctx.Done():
-		// 优雅停止超时，强制停止
-		s.logger.Warn("gRPC server shutdown timed out, forcing stop")
-		s.server.Stop()
-		s.mu.Lock()
-		s.running = false
-		s.mu.Unlock()
-		return ctx.Err()
-	case <-done:
-		s.mu.Lock()
-		s.running = false
-		s.mu.Unlock()
-		s.logger.Info("gRPC server stopped gracefully")
-		return nil
-	}
-}
-
-// Addr 返回监听地址
-func (s *GRPCServer) Addr() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.listener != nil {
-		return s.listener.Addr().String()
-	}
-	return fmt.Sprintf(":%d", s.config.Port)
-}
-
-// IsRunning 返回服务器运行状态
-func (s *GRPCServer) IsRunning() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.running
-}
-
-// GetConfig 返回服务器配置
-func (s *GRPCServer) GetConfig() *GRPCServerConfig {
-	return s.config
-}
-
-// GetServices 返回注册的服务
-func (s *GRPCServer) GetServices() *GRPCServices {
-	return s.services
-}
-
-// GetMetrics 返回指标统计
-func (s *GRPCServer) GetMetrics() (requestCount int64, avgLatencyMs float64) {
-	count := atomic.LoadInt64(&s.requestCount)
-	latency := atomic.LoadInt64(&s.requestLatency)
-	if count > 0 {
-		avgLatencyMs = float64(latency) / float64(count) / 1e6
-	}
-	return count, avgLatencyMs
-}
-
-// Validator 定义请求验证接口
+// Validator is an interface for requests that support self-validation.
 type Validator interface {
 	Validate() error
 }
 
-// recoveryInterceptor 捕获 panic，转换为 Internal 错误码
-func recoveryInterceptor(logger Logger) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+// Option configures the gRPC Server.
+type Option func(*serverOptions)
+
+type serverOptions struct {
+	logger          logging.Logger
+	metrics         *prometheus.GRPCMetrics
+	tlsConfig       *tls.Config
+	maxRecvMsgSize  int
+	maxSendMsgSize  int
+	keepaliveParams keepalive.ServerParameters
+	gracefulTimeout time.Duration
+}
+
+// WithLogger sets the logger for the gRPC server.
+func WithLogger(l logging.Logger) Option {
+	return func(o *serverOptions) {
+		o.logger = l
+	}
+}
+
+// WithMetrics sets the Prometheus metrics collector for gRPC.
+func WithMetrics(m *prometheus.GRPCMetrics) Option {
+	return func(o *serverOptions) {
+		o.metrics = m
+	}
+}
+
+// WithTLSConfig sets TLS configuration for the gRPC server.
+func WithTLSConfig(tc *tls.Config) Option {
+	return func(o *serverOptions) {
+		o.tlsConfig = tc
+	}
+}
+
+// WithMaxRecvMsgSize sets the maximum receive message size in bytes.
+func WithMaxRecvMsgSize(size int) Option {
+	return func(o *serverOptions) {
+		if size > 0 {
+			o.maxRecvMsgSize = size
+		}
+	}
+}
+
+// WithMaxSendMsgSize sets the maximum send message size in bytes.
+func WithMaxSendMsgSize(size int) Option {
+	return func(o *serverOptions) {
+		if size > 0 {
+			o.maxSendMsgSize = size
+		}
+	}
+}
+
+// WithKeepaliveParams sets keepalive parameters for the gRPC server.
+func WithKeepaliveParams(params keepalive.ServerParameters) Option {
+	return func(o *serverOptions) {
+		o.keepaliveParams = params
+	}
+}
+
+// WithGracefulTimeout sets the graceful shutdown timeout.
+func WithGracefulTimeout(d time.Duration) Option {
+	return func(o *serverOptions) {
+		if d > 0 {
+			o.gracefulTimeout = d
+		}
+	}
+}
+
+// Server wraps a gRPC server with lifecycle management, interceptor chains,
+// health checking, and graceful shutdown.
+type Server struct {
+	grpcServer   *grpc.Server
+	listener     net.Listener
+	cfg          *config.GRPCConfig
+	opts         *serverOptions
+	healthServer *health.Server
+	mu           sync.Mutex
+	started      bool
+}
+
+// NewServer creates a new gRPC Server. It binds a TCP listener, assembles
+// the interceptor chain, and registers health and (optionally) reflection services.
+func NewServer(cfg *config.GRPCConfig, opts ...Option) (*Server, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("grpc config must not be nil")
+	}
+
+	// Apply options with defaults.
+	sopts := &serverOptions{
+		maxRecvMsgSize:  defaultMaxRecvMsgSize,
+		maxSendMsgSize:  defaultMaxSendMsgSize,
+		keepaliveParams: defaultKeepaliveParams,
+		gracefulTimeout: defaultGracefulTimeout,
+	}
+	for _, o := range opts {
+		o(sopts)
+	}
+
+	// Ensure a logger is available (noop fallback).
+	if sopts.logger == nil {
+		sopts.logger = logging.NewNoop()
+	}
+
+	// Bind TCP listener.
+	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen on %s: %w", addr, err)
+	}
+
+	// Build unary interceptor chain: recovery → logging → metrics → validation
+	unaryChain := chainUnaryInterceptors(
+		recoveryUnaryInterceptor(sopts.logger),
+		loggingUnaryInterceptor(sopts.logger),
+		metricsUnaryInterceptor(sopts.metrics),
+		validationUnaryInterceptor(),
+	)
+
+	// Build stream interceptor chain: recovery → logging → metrics
+	streamChain := chainStreamInterceptors(
+		recoveryStreamInterceptor(sopts.logger),
+		loggingStreamInterceptor(sopts.logger),
+		metricsStreamInterceptor(sopts.metrics),
+	)
+
+	// Assemble grpc.ServerOption slice.
+	grpcOpts := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(sopts.maxRecvMsgSize),
+		grpc.MaxSendMsgSize(sopts.maxSendMsgSize),
+		grpc.KeepaliveParams(sopts.keepaliveParams),
+		grpc.KeepaliveEnforcementPolicy(defaultKeepalivePolicy),
+		grpc.UnaryInterceptor(unaryChain),
+		grpc.StreamInterceptor(streamChain),
+	}
+
+	if sopts.tlsConfig != nil {
+		grpcOpts = append(grpcOpts, grpc.Creds(credentials.NewTLS(sopts.tlsConfig)))
+	}
+
+	gs := grpc.NewServer(grpcOpts...)
+
+	// Register health service.
+	hs := health.NewServer()
+	healthpb.RegisterHealthServer(gs, hs)
+	hs.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+
+	// Register reflection service in debug mode only.
+	if cfg.Debug {
+		reflection.Register(gs)
+		sopts.logger.Info("grpc reflection service registered (debug mode)")
+	}
+
+	return &Server{
+		grpcServer:   gs,
+		listener:     lis,
+		cfg:          cfg,
+		opts:         sopts,
+		healthServer: hs,
+	}, nil
+}
+
+// RegisterService registers a gRPC service implementation with the server.
+// Must be called before Start.
+func (s *Server) RegisterService(desc *grpc.ServiceDesc, impl interface{}) {
+	s.grpcServer.RegisterService(desc, impl)
+	s.healthServer.SetServingStatus(desc.ServiceName, healthpb.HealthCheckResponse_SERVING)
+	s.opts.logger.Info("grpc service registered", "service", desc.ServiceName)
+}
+
+// Start begins serving gRPC requests. It blocks until the server is stopped.
+func (s *Server) Start() error {
+	s.mu.Lock()
+	if s.started {
+		s.mu.Unlock()
+		return fmt.Errorf("server already started")
+	}
+	s.started = true
+	s.mu.Unlock()
+
+	s.opts.logger.Info("grpc server starting", "address", s.listener.Addr().String())
+	return s.grpcServer.Serve(s.listener)
+}
+
+// Stop performs a graceful shutdown. If the graceful period expires, it forces
+// an immediate stop.
+func (s *Server) Stop(ctx context.Context) error {
+	s.mu.Lock()
+	if !s.started {
+		s.mu.Unlock()
+		return nil
+	}
+	s.mu.Unlock()
+
+	s.opts.logger.Info("grpc server stopping")
+
+	// Mark health as NOT_SERVING so load balancers drain traffic.
+	s.healthServer.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
+
+	timeout := s.opts.gracefulTimeout
+	gracefulCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	stopped := make(chan struct{})
+	go func() {
+		s.grpcServer.GracefulStop()
+		close(stopped)
+	}()
+
+	select {
+	case <-stopped:
+		s.opts.logger.Info("grpc server stopped gracefully")
+	case <-gracefulCtx.Done():
+		s.opts.logger.Warn("grpc graceful stop timed out, forcing stop")
+		s.grpcServer.Stop()
+	}
+
+	return nil
+}
+
+// Addr returns the actual network address the server is listening on.
+// Useful when port 0 is specified to get the OS-assigned port.
+func (s *Server) Addr() string {
+	if s.listener == nil {
+		return ""
+	}
+	return s.listener.Addr().String()
+}
+
+// GRPCServer returns the underlying grpc.Server for advanced use cases.
+func (s *Server) GRPCServer() *grpc.Server {
+	return s.grpcServer
+}
+
+// ---------------------------------------------------------------------------
+// Interceptors
+// ---------------------------------------------------------------------------
+
+// recoveryUnaryInterceptor returns a unary interceptor that recovers from panics.
+func recoveryUnaryInterceptor(logger logging.Logger) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (resp interface{}, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				stack := debug.Stack()
-				logger.Error("panic recovered in gRPC handler",
+				stack := string(debug.Stack())
+				logger.Error("grpc panic recovered",
 					"method", info.FullMethod,
-					"panic", r,
-					"stack", string(stack))
+					"panic", fmt.Sprintf("%v", r),
+					"stack", stack,
+				)
 				err = status.Errorf(codes.Internal, "internal server error")
 			}
 		}()
@@ -386,189 +341,217 @@ func recoveryInterceptor(logger Logger) grpc.UnaryServerInterceptor {
 	}
 }
 
-// loggingInterceptor 记录请求方法、耗时、状态码
-func loggingInterceptor(logger Logger) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+// recoveryStreamInterceptor returns a stream interceptor that recovers from panics.
+func recoveryStreamInterceptor(logger logging.Logger) grpc.StreamServerInterceptor {
+	return func(
+		srv interface{},
+		ss grpc.ServerStream,
+		info *grpc.StreamServerInfo,
+		handler grpc.StreamHandler,
+	) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				stack := string(debug.Stack())
+				logger.Error("grpc stream panic recovered",
+					"method", info.FullMethod,
+					"panic", fmt.Sprintf("%v", r),
+					"stack", stack,
+				)
+				err = status.Errorf(codes.Internal, "internal server error")
+			}
+		}()
+		return handler(srv, ss)
+	}
+}
+
+// isHealthCheck returns true if the method belongs to the gRPC health service.
+func isHealthCheck(method string) bool {
+	return strings.HasPrefix(method, "/grpc.health.v1.Health/")
+}
+
+// loggingUnaryInterceptor returns a unary interceptor that logs request metadata.
+func loggingUnaryInterceptor(logger logging.Logger) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (interface{}, error) {
+		if isHealthCheck(info.FullMethod) {
+			return handler(ctx, req)
+		}
+
 		start := time.Now()
 		resp, err := handler(ctx, req)
 		duration := time.Since(start)
 
-		code := codes.OK
-		if err != nil {
-			if st, ok := status.FromError(err); ok {
-				code = st.Code()
-			}
-		}
-
-		logger.Info("gRPC request completed",
+		code := status.Code(err)
+		logger.Info("grpc request",
 			"method", info.FullMethod,
 			"duration_ms", duration.Milliseconds(),
-			"code", code.String())
-
+			"code", code.String(),
+		)
 		return resp, err
 	}
 }
 
-// metricsInterceptor 记录请求计数与延迟直方图
-func metricsInterceptor(requestCount, requestLatency *int64) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+// loggingStreamInterceptor returns a stream interceptor that logs stream lifecycle.
+func loggingStreamInterceptor(logger logging.Logger) grpc.StreamServerInterceptor {
+	return func(
+		srv interface{},
+		ss grpc.ServerStream,
+		info *grpc.StreamServerInfo,
+		handler grpc.StreamHandler,
+	) error {
+		if isHealthCheck(info.FullMethod) {
+			return handler(srv, ss)
+		}
+
+		start := time.Now()
+		err := handler(srv, ss)
+		duration := time.Since(start)
+
+		code := status.Code(err)
+		logger.Info("grpc stream",
+			"method", info.FullMethod,
+			"duration_ms", duration.Milliseconds(),
+			"code", code.String(),
+		)
+		return err
+	}
+}
+
+// metricsUnaryInterceptor returns a unary interceptor that records Prometheus metrics.
+func metricsUnaryInterceptor(m *prometheus.GRPCMetrics) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (interface{}, error) {
+		if m == nil {
+			return handler(ctx, req)
+		}
+
 		start := time.Now()
 		resp, err := handler(ctx, req)
 		duration := time.Since(start)
 
-		atomic.AddInt64(requestCount, 1)
-		atomic.AddInt64(requestLatency, duration.Nanoseconds())
-
+		code := status.Code(err)
+		service, method := splitMethodName(info.FullMethod)
+		m.RecordUnaryRequest(service, method, code.String(), duration)
 		return resp, err
 	}
 }
 
-// authInterceptor 从 metadata 提取 Bearer token 并验证
-func authInterceptor(logger Logger) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		// 跳过反射和健康检查
-		if strings.HasPrefix(info.FullMethod, "/grpc.reflection.") ||
-			strings.HasPrefix(info.FullMethod, "/grpc.health.") {
-			return handler(ctx, req)
+// metricsStreamInterceptor returns a stream interceptor that records Prometheus metrics.
+func metricsStreamInterceptor(m *prometheus.GRPCMetrics) grpc.StreamServerInterceptor {
+	return func(
+		srv interface{},
+		ss grpc.ServerStream,
+		info *grpc.StreamServerInfo,
+		handler grpc.StreamHandler,
+	) error {
+		if m == nil {
+			return handler(srv, ss)
 		}
 
-		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok {
-			return handler(ctx, req)
-		}
+		start := time.Now()
+		err := handler(srv, ss)
+		duration := time.Since(start)
 
-		// 提取 authorization header
-		authHeaders := md.Get("authorization")
-		if len(authHeaders) > 0 {
-			token := authHeaders[0]
-			// Bearer token 验证
-			if strings.HasPrefix(token, "Bearer ") {
-				token = strings.TrimPrefix(token, "Bearer ")
-				// 实际 token 验证逻辑在此实现
-				// 验证失败返回:
-				// return nil, status.Errorf(codes.Unauthenticated, "invalid token")
-			}
-		}
-
-		// 提取 tenant_id 和 user_id 注入 context
-		if tenantIDs := md.Get("x-tenant-id"); len(tenantIDs) > 0 {
-			ctx = context.WithValue(ctx, contextKeyTenantID, tenantIDs[0])
-		}
-		if userIDs := md.Get("x-user-id"); len(userIDs) > 0 {
-			ctx = context.WithValue(ctx, contextKeyUserID, userIDs[0])
-		}
-
-		return handler(ctx, req)
+		code := status.Code(err)
+		service, method := splitMethodName(info.FullMethod)
+		m.RecordStreamRequest(service, method, code.String(), duration)
+		return err
 	}
 }
 
-// validationInterceptor 对实现了 Validate() error 接口的请求消息自动校验
-func validationInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+// validationUnaryInterceptor returns a unary interceptor that validates requests
+// implementing the Validator interface.
+func validationUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (interface{}, error) {
 		if v, ok := req.(Validator); ok {
 			if err := v.Validate(); err != nil {
-				return nil, status.Errorf(codes.InvalidArgument, "validation failed: %v", err)
+				return nil, status.Errorf(codes.InvalidArgument, "validation failed: %s", err.Error())
 			}
 		}
 		return handler(ctx, req)
 	}
 }
 
-// Stream 拦截器
+// ---------------------------------------------------------------------------
+// Interceptor chaining helpers
+// ---------------------------------------------------------------------------
 
-func streamRecoveryInterceptor(logger Logger) grpc.StreamServerInterceptor {
-	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				stack := debug.Stack()
-				logger.Error("panic recovered in gRPC stream handler",
-					"method", info.FullMethod,
-					"panic", r,
-					"stack", string(stack))
-				err = status.Errorf(codes.Internal, "internal server error")
-			}
-		}()
-		return handler(srv, ss)
+// chainUnaryInterceptors chains multiple unary interceptors into one.
+// Execution order follows the slice order (first interceptor is outermost).
+func chainUnaryInterceptors(interceptors ...grpc.UnaryServerInterceptor) grpc.UnaryServerInterceptor {
+	n := len(interceptors)
+	if n == 0 {
+		return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+			return handler(ctx, req)
+		}
 	}
-}
+	if n == 1 {
+		return interceptors[0]
+	}
 
-func streamLoggingInterceptor(logger Logger) grpc.StreamServerInterceptor {
-	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		start := time.Now()
-		err := handler(srv, ss)
-		duration := time.Since(start)
-
-		code := codes.OK
-		if err != nil {
-			if st, ok := status.FromError(err); ok {
-				code = st.Code()
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		buildChain := func(current grpc.UnaryServerInterceptor, next grpc.UnaryHandler) grpc.UnaryHandler {
+			return func(currentCtx context.Context, currentReq interface{}) (interface{}, error) {
+				return current(currentCtx, currentReq, info, next)
 			}
 		}
 
-		logger.Info("gRPC stream completed",
-			"method", info.FullMethod,
-			"duration_ms", duration.Milliseconds(),
-			"code", code.String())
-
-		return err
+		chain := handler
+		for i := n - 1; i >= 0; i-- {
+			chain = buildChain(interceptors[i], chain)
+		}
+		return chain(ctx, req)
 	}
 }
 
-func streamMetricsInterceptor(requestCount, requestLatency *int64) grpc.StreamServerInterceptor {
+// chainStreamInterceptors chains multiple stream interceptors into one.
+func chainStreamInterceptors(interceptors ...grpc.StreamServerInterceptor) grpc.StreamServerInterceptor {
+	n := len(interceptors)
+	if n == 0 {
+		return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+			return handler(srv, ss)
+		}
+	}
+	if n == 1 {
+		return interceptors[0]
+	}
+
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		start := time.Now()
-		err := handler(srv, ss)
-		duration := time.Since(start)
+		buildChain := func(current grpc.StreamServerInterceptor, next grpc.StreamHandler) grpc.StreamHandler {
+			return func(currentSrv interface{}, currentStream grpc.ServerStream) error {
+				return current(currentSrv, currentStream, info, next)
+			}
+		}
 
-		atomic.AddInt64(requestCount, 1)
-		atomic.AddInt64(requestLatency, duration.Nanoseconds())
-
-		return err
+		chain := handler
+		for i := n - 1; i >= 0; i-- {
+			chain = buildChain(interceptors[i], chain)
+		}
+		return chain(srv, ss)
 	}
 }
 
-func streamAuthInterceptor(logger Logger) grpc.StreamServerInterceptor {
-	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		// Stream auth 实现与 unary 类似
-		return handler(srv, ss)
+// splitMethodName splits "/package.Service/Method" into ("package.Service", "Method").
+func splitMethodName(fullMethod string) (string, string) {
+	fullMethod = strings.TrimPrefix(fullMethod, "/")
+	idx := strings.LastIndex(fullMethod, "/")
+	if idx < 0 {
+		return "unknown", fullMethod
 	}
-}
-
-// Context keys
-type contextKey string
-
-const (
-	contextKeyTenantID contextKey = "tenant_id"
-	contextKeyUserID   contextKey = "user_id"
-)
-
-// GetTenantID 从 context 获取 tenant_id
-func GetTenantID(ctx context.Context) string {
-	if v := ctx.Value(contextKeyTenantID); v != nil {
-		return v.(string)
-	}
-	return ""
-}
-
-// GetUserID 从 context 获取 user_id
-func GetUserID(ctx context.Context) string {
-	if v := ctx.Value(contextKeyUserID); v != nil {
-		return v.(string)
-	}
-	return ""
-}
-
-// LoadTLSConfig 从证书文件加载 TLS 配置
-func LoadTLSConfig(certFile, keyFile string) (*tls.Config, error) {
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load TLS key pair: %w", err)
-	}
-
-	return &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
-	}, nil
+	return fullMethod[:idx], fullMethod[idx+1:]
 }
 
 //Personal.AI order the ending

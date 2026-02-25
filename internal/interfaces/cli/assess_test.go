@@ -1,297 +1,382 @@
 package cli
 
 import (
-	"encoding/json"
+	"bytes"
+	"context"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
-func TestNewAssessCmd(t *testing.T) {
-	cmd := NewAssessCmd()
-	if cmd == nil {
-		t.Fatal("NewAssessCmd should not return nil")
-	}
-	if cmd.Use != "assess" {
-		t.Errorf("expected Use='assess', got %s", cmd.Use)
-	}
-	// Verify subcommands are registered
-	subs := cmd.Commands()
-	if len(subs) < 2 {
-		t.Errorf("expected at least 2 subcommands, got %d", len(subs))
-	}
+// MockValuationService is a mock implementation of ValuationService
+type MockValuationService struct {
+	mock.Mock
 }
 
-func TestAssessPatentCmd_ValidSinglePatent(t *testing.T) {
-	cmd := newAssessPatentCmd()
-	cmd.SetArgs([]string{"--patent-number", "CN202110123456"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
+func (m *MockValuationService) Assess(ctx context.Context, req *portfolio.ValuationRequest) (*portfolio.ValuationResult, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
+	return args.Get(0).(*portfolio.ValuationResult), args.Error(1)
 }
 
-func TestAssessPatentCmd_ValidMultiplePatents(t *testing.T) {
-	cmd := newAssessPatentCmd()
-	cmd.SetArgs([]string{"--patent-number", "CN123,US456,EP789"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
+func (m *MockValuationService) AssessPortfolio(ctx context.Context, req *portfolio.PortfolioAssessRequest) (*portfolio.PortfolioAssessResult, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
+	return args.Get(0).(*portfolio.PortfolioAssessResult), args.Error(1)
 }
 
-func TestAssessPatentCmd_InvalidPatentNumber(t *testing.T) {
-	cmd := newAssessPatentCmd()
-	cmd.SetArgs([]string{"--patent-number", "INVALID123"})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for invalid patent number")
-	}
-	if !strings.Contains(err.Error(), "invalid patent number") {
-		t.Errorf("unexpected error: %v", err)
-	}
+// MockLogger is a mock implementation of Logger
+type MockLogger struct {
+	mock.Mock
 }
 
-func TestAssessPatentCmd_MissingRequiredFlag(t *testing.T) {
-	cmd := newAssessPatentCmd()
-	cmd.SetArgs([]string{})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for missing required flag")
-	}
+func (m *MockLogger) Info(msg string, keysAndValues ...interface{}) {
+	m.Called(msg, keysAndValues)
 }
 
-func TestAssessPatentCmd_InvalidDimension(t *testing.T) {
-	cmd := newAssessPatentCmd()
-	cmd.SetArgs([]string{"--patent-number", "CN123", "--dimensions", "invalid"})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for invalid dimension")
-	}
-	if !strings.Contains(err.Error(), "invalid dimension") {
-		t.Errorf("unexpected error message: %v", err)
-	}
+func (m *MockLogger) Error(msg string, keysAndValues ...interface{}) {
+	m.Called(msg, keysAndValues)
 }
 
-func TestAssessPatentCmd_JSONOutput(t *testing.T) {
-	tmpfile := t.TempDir() + "/output.json"
-	cmd := newAssessPatentCmd()
-	cmd.SetArgs([]string{"--patent-number", "CN123", "--output", "json", "--file", tmpfile})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
-	}
-
-	content, err := os.ReadFile(tmpfile)
-	if err != nil {
-		t.Fatalf("failed to read output file: %v", err)
-	}
-
-	// Verify JSON structure
-	var result ValuationResult
-	if err := json.Unmarshal(content, &result); err != nil {
-		t.Fatalf("invalid JSON output: %v", err)
-	}
-	if len(result.Patents) == 0 {
-		t.Error("expected at least one patent in result")
-	}
+func (m *MockLogger) Debug(msg string, keysAndValues ...interface{}) {
+	m.Called(msg, keysAndValues)
 }
 
-func TestAssessPatentCmd_CSVOutput(t *testing.T) {
-	tmpfile := t.TempDir() + "/output.csv"
-	cmd := newAssessPatentCmd()
-	cmd.SetArgs([]string{"--patent-number", "CN123", "--output", "csv", "--file", tmpfile})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
-	}
-
-	content, err := os.ReadFile(tmpfile)
-	if err != nil {
-		t.Fatalf("failed to read output file: %v", err)
-	}
-
-	// Verify CSV has header and data
-	lines := strings.Split(string(content), "\n")
-	if len(lines) < 2 {
-		t.Error("CSV should have header and at least one data row")
-	}
-	if !strings.Contains(lines[0], "Patent Number") {
-		t.Error("CSV header should contain 'Patent Number'")
-	}
+func (m *MockLogger) Warn(msg string, keysAndValues ...interface{}) {
+	m.Called(msg, keysAndValues)
 }
 
-func TestAssessPatentCmd_FileOutput(t *testing.T) {
-	tmpfile := t.TempDir() + "/output.txt"
-
-	cmd := newAssessPatentCmd()
-	cmd.SetArgs([]string{"--patent-number", "CN123", "--file", tmpfile})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
+func TestParsePatentNumbers(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{"Single patent", "CN115123456", []string{"CN115123456"}},
+		{"Multiple patents", "CN115123456, US11987654", []string{"CN115123456", "US11987654"}},
+		{"With spaces", " CN115123456 , US11987654 ", []string{"CN115123456", "US11987654"}},
+		{"Empty string", "", []string{}},
+		{"Trailing comma", "CN115123456,", []string{"CN115123456"}},
 	}
 
-	content, err := os.ReadFile(tmpfile)
-	if err != nil {
-		t.Fatalf("failed to read output file: %v", err)
-	}
-
-	if len(content) == 0 {
-		t.Error("output file should not be empty")
-	}
-	if !strings.Contains(string(content), "CN123") {
-		t.Error("output should contain patent number")
-	}
-}
-
-func TestAssessPortfolioCmd_ValidPortfolio(t *testing.T) {
-	cmd := newAssessPortfolioCmd()
-	cmd.SetArgs([]string{"--portfolio-id", "pf-123"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("execution failed: %v", err)
-	}
-}
-
-func TestAssessPortfolioCmd_ServiceError(t *testing.T) {
-	// Test missing required flag (simulates service error scenario)
-	cmd := newAssessPortfolioCmd()
-	cmd.SetArgs([]string{})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Error("expected error for missing portfolio-id")
-	}
-}
-
-func TestFormatAssessOutput_Table(t *testing.T) {
-	result := &ValuationResult{
-		Patents: []PatentValuation{
-			{PatentNumber: "CN123", TechnicalScore: 85.0, LegalScore: 78.0, CommercialScore: 92.0, StrategicScore: 88.0, OverallScore: 85.75, RiskLevel: "LOW"},
-		},
-	}
-
-	output, err := formatAssessOutput(result, "stdout")
-	if err != nil {
-		t.Fatalf("formatting failed: %v", err)
-	}
-
-	if !strings.Contains(output, "CN123") {
-		t.Error("output should contain patent number")
-	}
-	if !strings.Contains(output, "85.75") {
-		t.Error("output should contain overall score")
-	}
-	if !strings.Contains(output, "LOW") {
-		t.Error("output should contain risk level")
-	}
-}
-
-func TestFormatAssessOutput_UnknownFormat(t *testing.T) {
-	result := &ValuationResult{}
-
-	_, err := formatAssessOutput(result, "unknown")
-	if err == nil {
-		t.Error("expected error for unknown format")
-	}
-	if !strings.Contains(err.Error(), "unknown format") {
-		t.Errorf("unexpected error message: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parsePatentNumbers(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }
 
 func TestIsValidPatentNumber(t *testing.T) {
 	tests := []struct {
+		name     string
 		input    string
 		expected bool
 	}{
-		{"CN202110123456", true},
-		{"US11234567B2", true},
-		{"EP3456789A1", true},
-		{"JP2021123456", true},
-		{"KR1020210123456", true},
-		{"INVALID123", false},
-		{"", false},
-		{"XX123", false},
+		{"Valid CN", "CN115123456", true},
+		{"Valid US", "US11987654", true},
+		{"Valid EP", "EP3456789", true},
+		{"Valid JP", "JP2021123456", true},
+		{"Valid KR", "KR1020210123456", true},
+		{"Invalid prefix", "XX123456", false},
+		{"Too short", "CN12", false},
+		{"No prefix", "123456", false},
+		{"Lowercase valid", "cn115123456", true},
 	}
 
 	for _, tt := range tests {
-		if got := isValidPatentNumber(tt.input); got != tt.expected {
-			t.Errorf("isValidPatentNumber(%q) = %v, want %v", tt.input, got, tt.expected)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			result := isValidPatentNumber(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }
 
-func TestIsValidDimension(t *testing.T) {
+func TestParseDimensions(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected bool
+		name      string
+		input     string
+		expected  []string
+		expectErr bool
 	}{
-		{"technical", true},
-		{"legal", true},
-		{"commercial", true},
-		{"strategic", true},
-		{"invalid", false},
-		{"", false},
+		{"All dimensions", "technical,legal,commercial,strategic", []string{"technical", "legal", "commercial", "strategic"}, false},
+		{"Partial dimensions", "technical,legal", []string{"technical", "legal"}, false},
+		{"With spaces", " technical , legal ", []string{"technical", "legal"}, false},
+		{"Invalid dimension", "technical,invalid", nil, true},
+		{"Empty string", "", nil, true},
+		{"Case insensitive", "Technical,LEGAL", []string{"technical", "legal"}, false},
 	}
 
 	for _, tt := range tests {
-		if got := isValidDimension(tt.input); got != tt.expected {
-			t.Errorf("isValidDimension(%q) = %v, want %v", tt.input, got, tt.expected)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseDimensions(tt.input)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
 	}
 }
 
 func TestIsValidOutputFormat(t *testing.T) {
 	tests := []struct {
+		name     string
 		input    string
 		expected bool
 	}{
-		{"stdout", true},
-		{"json", true},
-		{"csv", true},
-		{"xml", false},
-		{"", false},
+		{"stdout", "stdout", true},
+		{"json", "json", true},
+		{"csv", "csv", true},
+		{"uppercase", "JSON", true},
+		{"invalid", "xml", false},
 	}
 
 	for _, tt := range tests {
-		if got := isValidOutputFormat(tt.input); got != tt.expected {
-			t.Errorf("isValidOutputFormat(%q) = %v, want %v", tt.input, got, tt.expected)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			result := isValidOutputFormat(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }
 
-func TestWriteOutput_ToFile(t *testing.T) {
-	tmpfile := t.TempDir() + "/test_output.txt"
-	content := "test content"
-
-	err := writeOutput(content, tmpfile)
-	if err != nil {
-		t.Fatalf("writeOutput failed: %v", err)
+func TestFormatTableOutput(t *testing.T) {
+	result := &portfolio.ValuationResult{
+		Items: []*patent.ValuationItem{
+			{
+				PatentNumber:    "CN115123456",
+				OverallScore:    85.5,
+				TechnicalScore:  90.0,
+				LegalScore:      80.0,
+				CommercialScore: 85.0,
+				StrategicScore:  87.0,
+			},
+		},
+		AverageScore: 85.5,
+		HighRiskPatents: []*patent.HighRiskPatent{
+			{
+				PatentNumber: "CN115123456",
+				RiskReason:   "Expiring soon",
+			},
+		},
 	}
 
-	data, err := os.ReadFile(tmpfile)
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
+	output := formatTableOutput(result)
+
+	assert.Contains(t, output, "Patent Value Assessment")
+	assert.Contains(t, output, "CN115123456")
+	assert.Contains(t, output, "85.50")
+	assert.Contains(t, output, "High Risk Patents")
+	assert.Contains(t, output, "Expiring soon")
+}
+
+func TestFormatCSVOutput(t *testing.T) {
+	result := &portfolio.ValuationResult{
+		Items: []*patent.ValuationItem{
+			{
+				PatentNumber:    "CN115123456",
+				OverallScore:    85.5,
+				TechnicalScore:  90.0,
+				LegalScore:      80.0,
+				CommercialScore: 85.0,
+				StrategicScore:  87.0,
+			},
+			{
+				PatentNumber:    "US11987654",
+				OverallScore:    35.0,
+				TechnicalScore:  40.0,
+				LegalScore:      25.0,
+				CommercialScore: 30.0,
+				StrategicScore:  45.0,
+			},
+		},
 	}
 
-	if string(data) != content {
-		t.Errorf("file content mismatch: got %q, want %q", string(data), content)
+	output, err := formatCSVOutput(result)
+	require.NoError(t, err)
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	assert.Len(t, lines, 3) // header + 2 data rows
+
+	assert.Contains(t, lines[0], "PatentNumber")
+	assert.Contains(t, lines[1], "CN115123456")
+	assert.Contains(t, lines[1], "LOW")
+	assert.Contains(t, lines[2], "US11987654")
+	assert.Contains(t, lines[2], "HIGH")
+}
+
+func TestWriteOutput_Stdout(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	content := "test output"
+	err := writeOutput(content, "")
+
+	w.Close()
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	os.Stdout = oldStdout
+
+	assert.NoError(t, err)
+	assert.Equal(t, content, buf.String())
+}
+
+func TestWriteOutput_File(t *testing.T) {
+	tmpFile := "test_output.txt"
+	defer os.Remove(tmpFile)
+
+	content := "test output content"
+	err := writeOutput(content, tmpFile)
+
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(tmpFile)
+	require.NoError(t, err)
+	assert.Equal(t, content, string(data))
+}
+
+func TestHasHighRiskItems(t *testing.T) {
+	tests := []struct {
+		name     string
+		result   *portfolio.ValuationResult
+		expected bool
+	}{
+		{
+			name: "With high risk",
+			result: &portfolio.ValuationResult{
+				HighRiskPatents: []*patent.HighRiskPatent{
+					{PatentNumber: "CN115123456"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "No high risk",
+			result: &portfolio.ValuationResult{
+				HighRiskPatents: []*patent.HighRiskPatent{},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasHighRiskItems(tt.result)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }
 
-func TestWriteOutput_InvalidPath(t *testing.T) {
-	err := writeOutput("content", "/nonexistent/path/file.txt")
-	if err == nil {
-		t.Error("expected error for invalid path")
+func TestIsHighRiskItem(t *testing.T) {
+	tests := []struct {
+		name     string
+		item     *patent.ValuationItem
+		expected bool
+	}{
+		{
+			name: "Low overall score",
+			item: &patent.ValuationItem{
+				OverallScore:    35.0,
+				LegalScore:      50.0,
+				CommercialScore: 40.0,
+			},
+			expected: true,
+		},
+		{
+			name: "Low legal score",
+			item: &patent.ValuationItem{
+				OverallScore:    60.0,
+				LegalScore:      25.0,
+				CommercialScore: 50.0,
+			},
+			expected: true,
+		},
+		{
+			name: "Low commercial score",
+			item: &patent.ValuationItem{
+				OverallScore:    60.0,
+				LegalScore:      50.0,
+				CommercialScore: 20.0,
+			},
+			expected: true,
+		},
+		{
+			name: "All scores acceptable",
+			item: &patent.ValuationItem{
+				OverallScore:    70.0,
+				LegalScore:      65.0,
+				CommercialScore: 60.0,
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isHighRiskItem(tt.item)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFormatAssessOutput_UnknownFormat(t *testing.T) {
+	result := &portfolio.ValuationResult{
+		Items: []*patent.ValuationItem{},
+	}
+
+	_, err := formatAssessOutput(result, "xml")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown output format")
+}
+
+func TestHasHighRiskPortfolioItems(t *testing.T) {
+	tests := []struct {
+		name     string
+		result   *portfolio.PortfolioAssessResult
+		expected bool
+	}{
+		{
+			name: "High risk level",
+			result: &portfolio.PortfolioAssessResult{
+				RiskLevel: common.RiskHigh,
+			},
+			expected: true,
+		},
+		{
+			name: "Critical risk level",
+			result: &portfolio.PortfolioAssessResult{
+				RiskLevel: common.RiskCritical,
+			},
+			expected: true,
+		},
+		{
+			name: "Medium risk level",
+			result: &portfolio.PortfolioAssessResult{
+				RiskLevel: common.RiskMedium,
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasHighRiskPortfolioItems(tt.result)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }
 

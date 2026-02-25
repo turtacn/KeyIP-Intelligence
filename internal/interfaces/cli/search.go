@@ -1,356 +1,402 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
-// NewSearchCmd returns the keyip search top-level subcommand.
-// It provides molecule similarity search and patent text search capabilities.
-func NewSearchCmd() *cobra.Command {
-	cmd := &cobra.Command{
+var (
+	searchSMILES        string
+	searchInChI         string
+	searchThreshold     float64
+	searchFingerprints  string
+	searchMaxResults    int
+	searchOffices       string
+	searchIncludeRisk   bool
+	searchOutput        string
+	searchQuery         string
+	searchIPC           string
+	searchCPC           string
+	searchDateFrom      string
+	searchDateTo        string
+	searchSort          string
+)
+
+// NewSearchCmd creates the search command
+func NewSearchCmd(
+	similaritySearchService patent_mining.SimilaritySearchService,
+	logger logging.Logger,
+) *cobra.Command {
+	searchCmd := &cobra.Command{
 		Use:   "search",
-		Short: "Molecule and patent search",
-		Long: `Search for molecules by structure similarity or patents by text/classification.
-
-Provides tools for researchers and IP analysts:
-  - Molecule similarity search using SMILES/InChI input
-  - Patent text search with IPC/CPC classification filtering
-  - Configurable fingerprint types and similarity thresholds`,
+		Short: "Search patents by molecule similarity or text query",
+		Long:  `Perform similarity search using molecular structures (SMILES/InChI) or text-based patent search`,
 	}
 
-	cmd.AddCommand(newSearchMoleculeCmd())
-	cmd.AddCommand(newSearchPatentCmd())
-
-	return cmd
-}
-
-func newSearchMoleculeCmd() *cobra.Command {
-	var (
-		smiles       string
-		inchi        string
-		threshold    float64
-		fingerprints string
-		maxResults   int
-		offices      string
-		includeRisk  bool
-		output       string
-	)
-
-	cmd := &cobra.Command{
+	// Subcommand: search molecule
+	moleculeCmd := &cobra.Command{
 		Use:   "molecule",
-		Short: "Search by molecular structure similarity",
-		Long:  "Search patents by molecular structure similarity using SMILES or InChI notation",
+		Short: "Search patents by molecular similarity",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Mutual exclusion: smiles/inchi must provide exactly one
-			if smiles == "" && inchi == "" {
-				return fmt.Errorf("either --smiles or --inchi must be provided")
-			}
-			if smiles != "" && inchi != "" {
-				return fmt.Errorf("--smiles and --inchi are mutually exclusive")
-			}
-
-			// Validate threshold range: 0.0-1.0
-			if threshold < 0.0 || threshold > 1.0 {
-				return fmt.Errorf("threshold must be between 0.0 and 1.0, got %.2f", threshold)
-			}
-
-			// Validate max-results range: 1-500
-			if maxResults < 1 || maxResults > 500 {
-				return fmt.Errorf("max-results must be between 1 and 500, got %d", maxResults)
-			}
-
-			// Validate fingerprints
-			fps := strings.Split(fingerprints, ",")
-			for _, fp := range fps {
-				fp = strings.TrimSpace(fp)
-				if fp != "" && !isValidFingerprint(fp) {
-					return fmt.Errorf("invalid fingerprint type: %s (must be morgan/topological/maccs/gnn)", fp)
-				}
-			}
-
-			// Build SimilaritySearchRequest and call SimilaritySearchService.Search()
-			// In production, this would integrate with application/patent_mining.SimilaritySearchService
-			inputStructure := smiles
-			if inputStructure == "" {
-				inputStructure = inchi
-			}
-
-			results := []MoleculeSearchResult{
-				{Rank: 1, Similarity: 0.95, PatentNumber: "CN202110123456", MoleculeName: "OLED-Blue-Emitter-1", SMILES: "c1ccc2c(c1)ccc3ccccc32", RiskLevel: "LOW"},
-				{Rank: 2, Similarity: 0.87, PatentNumber: "US11234567B2", MoleculeName: "OLED-Blue-Emitter-2", SMILES: "c1ccc2nc3ccccc3cc2c1", RiskLevel: "MEDIUM"},
-				{Rank: 3, Similarity: 0.82, PatentNumber: "EP3456789A1", MoleculeName: "OLED-Host-Material", SMILES: "c1ccc(cc1)c2ccc3ccccc3c2", RiskLevel: "HIGH"},
-			}
-
-			// Filter by threshold
-			filtered := make([]MoleculeSearchResult, 0)
-			for _, r := range results {
-				if r.Similarity >= threshold {
-					filtered = append(filtered, r)
-				}
-			}
-			results = filtered
-
-			// Limit results
-			if len(results) > maxResults {
-				results = results[:maxResults]
-			}
-
-			// Format output
-			content, err := formatMoleculeResults(results, output, includeRisk)
-			if err != nil {
-				return fmt.Errorf("failed to format output: %w", err)
-			}
-
-			fmt.Print(content)
-			return nil
+			return runSearchMolecule(cmd.Context(), similaritySearchService, logger)
 		},
 	}
 
-	cmd.Flags().StringVar(&smiles, "smiles", "", "Molecule SMILES string (mutually exclusive with --inchi)")
-	cmd.Flags().StringVar(&inchi, "inchi", "", "Molecule InChI string (mutually exclusive with --smiles)")
-	cmd.Flags().Float64Var(&threshold, "threshold", 0.65, "Similarity threshold (0.0-1.0)")
-	cmd.Flags().StringVar(&fingerprints, "fingerprints", "morgan,gnn", "Fingerprint types (comma-separated)")
-	cmd.Flags().IntVar(&maxResults, "max-results", 20, "Maximum number of results (1-500)")
-	cmd.Flags().StringVar(&offices, "offices", "", "Patent office filter (comma-separated)")
-	cmd.Flags().BoolVar(&includeRisk, "include-risk", false, "Include infringement risk assessment")
-	cmd.Flags().StringVar(&output, "output", "stdout", "Output format (stdout/json)")
+	moleculeCmd.Flags().StringVar(&searchSMILES, "smiles", "", "Molecule SMILES string (mutually exclusive with --inchi)")
+	moleculeCmd.Flags().StringVar(&searchInChI, "inchi", "", "Molecule InChI string (mutually exclusive with --smiles)")
+	moleculeCmd.Flags().Float64Var(&searchThreshold, "threshold", 0.65, "Similarity threshold (0.0-1.0)")
+	moleculeCmd.Flags().StringVar(&searchFingerprints, "fingerprints", "morgan,gnn", "Fingerprint types: morgan,topological,maccs,gnn")
+	moleculeCmd.Flags().IntVar(&searchMaxResults, "max-results", 20, "Maximum number of results (1-500)")
+	moleculeCmd.Flags().StringVar(&searchOffices, "offices", "", "Patent office filter (e.g., CN,US,EP)")
+	moleculeCmd.Flags().BoolVar(&searchIncludeRisk, "include-risk", false, "Include infringement risk assessment")
+	moleculeCmd.Flags().StringVar(&searchOutput, "output", "stdout", "Output format: stdout|json")
 
-	return cmd
-}
-
-func newSearchPatentCmd() *cobra.Command {
-	var (
-		query      string
-		ipc        string
-		cpc        string
-		dateFrom   string
-		dateTo     string
-		offices    string
-		maxResults int
-		sortBy     string
-		output     string
-	)
-
-	cmd := &cobra.Command{
+	// Subcommand: search patent
+	patentCmd := &cobra.Command{
 		Use:   "patent",
-		Short: "Search patents by text/classification",
-		Long:  "Search patents by keywords, IPC/CPC classification, and date range",
+		Short: "Search patents by text query",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate max-results range: 1-500
-			if maxResults < 1 || maxResults > 500 {
-				return fmt.Errorf("max-results must be between 1 and 500, got %d", maxResults)
-			}
-
-			// Validate sort parameter
-			if !isValidSortOption(sortBy) {
-				return fmt.Errorf("invalid sort option: %s (must be relevance/date/citations)", sortBy)
-			}
-
-			// Validate date format and range
-			if dateFrom != "" {
-				if _, err := time.Parse("2006-01-02", dateFrom); err != nil {
-					return fmt.Errorf("invalid date-from format: %s (must be YYYY-MM-DD)", dateFrom)
-				}
-			}
-			if dateTo != "" {
-				if _, err := time.Parse("2006-01-02", dateTo); err != nil {
-					return fmt.Errorf("invalid date-to format: %s (must be YYYY-MM-DD)", dateTo)
-				}
-			}
-			if dateFrom != "" && dateTo != "" {
-				from, _ := time.Parse("2006-01-02", dateFrom)
-				to, _ := time.Parse("2006-01-02", dateTo)
-				if from.After(to) {
-					return fmt.Errorf("date-from cannot be later than date-to")
-				}
-			}
-
-			// Build PatentSearchRequest and call SimilaritySearchService.SearchByText()
-			// In production, this would integrate with application/patent_mining.SimilaritySearchService
-			results := []PatentSearchResult{
-				{Rank: 1, Relevance: 0.95, PatentNumber: "CN202110123456", Title: "Blue OLED Emitter with High Efficiency", ApplicationDate: "2021-01-15", IPC: "H10K50/11"},
-				{Rank: 2, Relevance: 0.88, PatentNumber: "US11234567B2", Title: "Organic Light Emitting Material", ApplicationDate: "2020-06-20", IPC: "H10K50/12"},
-				{Rank: 3, Relevance: 0.82, PatentNumber: "EP3456789A1", Title: "OLED Host Material Composition", ApplicationDate: "2019-03-10", IPC: "H10K85/60"},
-			}
-
-			// Filter by IPC if specified
-			if ipc != "" {
-				filtered := make([]PatentSearchResult, 0)
-				for _, r := range results {
-					if strings.HasPrefix(r.IPC, ipc) {
-						filtered = append(filtered, r)
-					}
-				}
-				results = filtered
-			}
-
-			// Limit results
-			if len(results) > maxResults {
-				results = results[:maxResults]
-			}
-
-			// Format output
-			content, err := formatPatentResults(results, output)
-			if err != nil {
-				return fmt.Errorf("failed to format output: %w", err)
-			}
-
-			fmt.Print(content)
-			return nil
+			return runSearchPatent(cmd.Context(), similaritySearchService, logger)
 		},
 	}
 
-	cmd.Flags().StringVar(&query, "query", "", "Keyword query string [REQUIRED]")
-	cmd.Flags().StringVar(&ipc, "ipc", "", "IPC classification filter")
-	cmd.Flags().StringVar(&cpc, "cpc", "", "CPC classification filter")
-	cmd.Flags().StringVar(&dateFrom, "date-from", "", "Application date start (YYYY-MM-DD)")
-	cmd.Flags().StringVar(&dateTo, "date-to", "", "Application date end (YYYY-MM-DD)")
-	cmd.Flags().StringVar(&offices, "offices", "", "Patent office filter (comma-separated)")
-	cmd.Flags().IntVar(&maxResults, "max-results", 50, "Maximum number of results (1-500)")
-	cmd.Flags().StringVar(&sortBy, "sort", "relevance", "Sort by (relevance/date/citations)")
-	cmd.Flags().StringVar(&output, "output", "stdout", "Output format (stdout/json)")
-	_ = cmd.MarkFlagRequired("query")
+	patentCmd.Flags().StringVar(&searchQuery, "query", "", "Keyword query (required)")
+	patentCmd.Flags().StringVar(&searchIPC, "ipc", "", "IPC classification filter")
+	patentCmd.Flags().StringVar(&searchCPC, "cpc", "", "CPC classification filter")
+	patentCmd.Flags().StringVar(&searchDateFrom, "date-from", "", "Application date from (YYYY-MM-DD)")
+	patentCmd.Flags().StringVar(&searchDateTo, "date-to", "", "Application date to (YYYY-MM-DD)")
+	patentCmd.Flags().StringVar(&searchOffices, "offices", "", "Patent office filter (e.g., CN,US,EP)")
+	patentCmd.Flags().IntVar(&searchMaxResults, "max-results", 50, "Maximum number of results (1-500)")
+	patentCmd.Flags().StringVar(&searchSort, "sort", "relevance", "Sort by: relevance|date|citations")
+	patentCmd.Flags().StringVar(&searchOutput, "output", "stdout", "Output format: stdout|json")
+	patentCmd.MarkFlagRequired("query")
 
-	return cmd
+	searchCmd.AddCommand(moleculeCmd, patentCmd)
+	return searchCmd
 }
 
-// MoleculeSearchResult represents a molecule similarity search result.
-type MoleculeSearchResult struct {
-	Rank         int     `json:"rank"`
-	Similarity   float64 `json:"similarity"`
-	PatentNumber string  `json:"patent_number"`
-	MoleculeName string  `json:"molecule_name"`
-	SMILES       string  `json:"smiles"`
-	RiskLevel    string  `json:"risk_level,omitempty"`
+func runSearchMolecule(ctx context.Context, service patent_mining.SimilaritySearchService, logger logging.Logger) error {
+	// Validate mutually exclusive flags
+	if searchSMILES == "" && searchInChI == "" {
+		return errors.New("either --smiles or --inchi must be provided")
+	}
+	if searchSMILES != "" && searchInChI != "" {
+		return errors.New("--smiles and --inchi are mutually exclusive, provide only one")
+	}
+
+	// Validate threshold range
+	if searchThreshold < 0.0 || searchThreshold > 1.0 {
+		return errors.Errorf("threshold must be between 0.0 and 1.0, got %.2f", searchThreshold)
+	}
+
+	// Validate max results range
+	if searchMaxResults < 1 || searchMaxResults > 500 {
+		return errors.Errorf("max-results must be between 1 and 500, got %d", searchMaxResults)
+	}
+
+	// Parse and validate fingerprints
+	fingerprints, err := parseFingerprints(searchFingerprints)
+	if err != nil {
+		return err
+	}
+
+	// Parse offices
+	offices := parseOffices(searchOffices)
+
+	logger.Info("Starting molecule similarity search",
+		"smiles", searchSMILES,
+		"inchi", searchInChI,
+		"threshold", searchThreshold,
+		"fingerprints", fingerprints,
+		"max_results", searchMaxResults,
+		"include_risk", searchIncludeRisk)
+
+	// Build search request
+	req := &patent_mining.SimilaritySearchRequest{
+		SMILES:        searchSMILES,
+		InChI:         searchInChI,
+		Threshold:     searchThreshold,
+		Fingerprints:  fingerprints,
+		MaxResults:    searchMaxResults,
+		Offices:       offices,
+		IncludeRisk:   searchIncludeRisk,
+		Context:       ctx,
+	}
+
+	// Execute search
+	results, err := service.Search(ctx, req)
+	if err != nil {
+		logger.Error("Molecule search failed", "error", err)
+		return errors.Wrap(err, "molecule similarity search failed")
+	}
+
+	// Check empty results
+	if len(results) == 0 {
+		fmt.Println("\n💡 No similar molecules found.")
+		fmt.Printf("Try lowering the similarity threshold (current: %.2f)\n", searchThreshold)
+		return nil
+	}
+
+	// Format output
+	output, err := formatMoleculeResults(results, searchOutput)
+	if err != nil {
+		return errors.Wrap(err, "failed to format results")
+	}
+
+	fmt.Print(output)
+
+	logger.Info("Molecule search completed",
+		"results_count", len(results))
+
+	return nil
 }
 
-// PatentSearchResult represents a patent text search result.
-type PatentSearchResult struct {
-	Rank            int     `json:"rank"`
-	Relevance       float64 `json:"relevance"`
-	PatentNumber    string  `json:"patent_number"`
-	Title           string  `json:"title"`
-	ApplicationDate string  `json:"application_date"`
-	IPC             string  `json:"ipc"`
+func runSearchPatent(ctx context.Context, service patent_mining.SimilaritySearchService, logger logging.Logger) error {
+	// Validate max results range
+	if searchMaxResults < 1 || searchMaxResults > 500 {
+		return errors.Errorf("max-results must be between 1 and 500, got %d", searchMaxResults)
+	}
+
+	// Validate sort parameter
+	validSorts := []string{"relevance", "date", "citations"}
+	if !contains(validSorts, strings.ToLower(searchSort)) {
+		return errors.Errorf("invalid sort parameter: %s (must be relevance|date|citations)", searchSort)
+	}
+
+	// Validate and parse date range
+	var dateFrom, dateTo *time.Time
+	if searchDateFrom != "" {
+		df, err := time.Parse("2006-01-02", searchDateFrom)
+		if err != nil {
+			return errors.Errorf("invalid date-from format: %s (must be YYYY-MM-DD)", searchDateFrom)
+		}
+		dateFrom = &df
+	}
+	if searchDateTo != "" {
+		dt, err := time.Parse("2006-01-02", searchDateTo)
+		if err != nil {
+			return errors.Errorf("invalid date-to format: %s (must be YYYY-MM-DD)", searchDateTo)
+		}
+		dateTo = &dt
+	}
+
+	// Validate date range logic
+	if dateFrom != nil && dateTo != nil && dateFrom.After(*dateTo) {
+		return errors.New("date-from cannot be later than date-to")
+	}
+
+	// Parse offices
+	offices := parseOffices(searchOffices)
+
+	logger.Info("Starting patent text search",
+		"query", searchQuery,
+		"ipc", searchIPC,
+		"cpc", searchCPC,
+		"date_range", fmt.Sprintf("%v to %v", dateFrom, dateTo),
+		"max_results", searchMaxResults,
+		"sort", searchSort)
+
+	// Build search request
+	req := &patent_mining.PatentSearchRequest{
+		Query:      searchQuery,
+		IPC:        searchIPC,
+		CPC:        searchCPC,
+		DateFrom:   dateFrom,
+		DateTo:     dateTo,
+		Offices:    offices,
+		MaxResults: searchMaxResults,
+		Sort:       strings.ToLower(searchSort),
+		Context:    ctx,
+	}
+
+	// Execute search
+	results, err := service.SearchByText(ctx, req)
+	if err != nil {
+		logger.Error("Patent search failed", "error", err)
+		return errors.Wrap(err, "patent text search failed")
+	}
+
+	// Check empty results
+	if len(results) == 0 {
+		fmt.Println("\n💡 No matching patents found.")
+		fmt.Println("Try broadening your search query or adjusting filters.")
+		return nil
+	}
+
+	// Format output
+	output, err := formatPatentResults(results, searchOutput)
+	if err != nil {
+		return errors.Wrap(err, "failed to format results")
+	}
+
+	fmt.Print(output)
+
+	logger.Info("Patent search completed",
+		"results_count", len(results))
+
+	return nil
 }
 
-// isValidFingerprint validates fingerprint type.
-func isValidFingerprint(fp string) bool {
-	valid := map[string]bool{"morgan": true, "topological": true, "maccs": true, "gnn": true}
-	return valid[fp]
+func parseFingerprints(input string) ([]string, error) {
+	validFingerprints := map[string]bool{
+		"morgan":       true,
+		"topological":  true,
+		"maccs":        true,
+		"gnn":          true,
+	}
+
+	parts := strings.Split(input, ",")
+	result := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		trimmed := strings.ToLower(strings.TrimSpace(part))
+		if trimmed == "" {
+			continue
+		}
+		if !validFingerprints[trimmed] {
+			return nil, errors.Errorf("invalid fingerprint type: %s (must be morgan|topological|maccs|gnn)", trimmed)
+		}
+		result = append(result, trimmed)
+	}
+
+	if len(result) == 0 {
+		return nil, errors.New("at least one valid fingerprint type required")
+	}
+
+	return result, nil
 }
 
-// isValidSortOption validates sort option.
-func isValidSortOption(s string) bool {
-	valid := map[string]bool{"relevance": true, "date": true, "citations": true}
-	return valid[s]
+func parseOffices(input string) []string {
+	if input == "" {
+		return nil
+	}
+
+	parts := strings.Split(input, ",")
+	result := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		trimmed := strings.ToUpper(strings.TrimSpace(part))
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+
+	return result
 }
 
-// colorizeRiskLevel returns ANSI-colored risk level.
-// HIGH=red, MEDIUM=yellow, LOW=green
+func formatMoleculeResults(results []*patent_mining.MoleculeSearchResult, format string) (string, error) {
+	if format == "json" {
+		data, err := json.MarshalIndent(results, "", "  ")
+		if err != nil {
+			return "", err
+		}
+		return string(data) + "\n", nil
+	}
+
+	// Table format
+	var buf strings.Builder
+	buf.WriteString("\n=== Molecule Similarity Search Results ===\n\n")
+
+	table := tablewriter.NewWriter(&buf)
+	headers := []string{"Rank", "Similarity", "Patent", "Molecule Name", "SMILES"}
+	if searchIncludeRisk {
+		headers = append(headers, "Risk Level")
+	}
+	table.SetHeader(headers)
+	table.SetBorder(true)
+	table.SetAutoWrapText(false)
+
+	for i, result := range results {
+		row := []string{
+			fmt.Sprintf("%d", i+1),
+			fmt.Sprintf("%.2f%%", result.Similarity*100),
+			result.PatentNumber,
+			truncateString(result.MoleculeName, 30),
+			truncateString(result.SMILES, 40),
+		}
+		if searchIncludeRisk {
+			row = append(row, colorizeRiskLevel(result.RiskLevel))
+		}
+		table.Append(row)
+	}
+
+	table.Render()
+
+	buf.WriteString(fmt.Sprintf("\nTotal results: %d\n", len(results)))
+	buf.WriteString(fmt.Sprintf("Threshold: %.2f\n", searchThreshold))
+
+	return buf.String(), nil
+}
+
+func formatPatentResults(results []*patent_mining.PatentSearchResult, format string) (string, error) {
+	if format == "json" {
+		data, err := json.MarshalIndent(results, "", "  ")
+		if err != nil {
+			return "", err
+		}
+		return string(data) + "\n", nil
+	}
+
+	// Table format
+	var buf strings.Builder
+	buf.WriteString("\n=== Patent Text Search Results ===\n\n")
+
+	table := tablewriter.NewWriter(&buf)
+	table.SetHeader([]string{"Rank", "Relevance", "Patent", "Title", "Filing Date", "IPC"})
+	table.SetBorder(true)
+	table.SetAutoWrapText(false)
+
+	for i, result := range results {
+		relevanceStr := fmt.Sprintf("%.2f%%", result.Relevance*100)
+		if result.Relevance >= 0.8 {
+			relevanceStr = color.GreenString(relevanceStr)
+		} else if result.Relevance >= 0.5 {
+			relevanceStr = color.YellowString(relevanceStr)
+		}
+
+		table.Append([]string{
+			fmt.Sprintf("%d", i+1),
+			relevanceStr,
+			result.PatentNumber,
+			truncateString(result.Title, 50),
+			result.FilingDate.Format("2006-01-02"),
+			truncateString(result.IPC, 20),
+		})
+	}
+
+	table.Render()
+
+	buf.WriteString(fmt.Sprintf("\nTotal results: %d\n", len(results)))
+
+	return buf.String(), nil
+}
+
 func colorizeRiskLevel(level string) string {
-	switch level {
+	switch strings.ToUpper(level) {
 	case "HIGH":
-		return "\033[31m" + level + "\033[0m"
+		return color.RedString("HIGH")
 	case "MEDIUM":
-		return "\033[33m" + level + "\033[0m"
+		return color.YellowString("MEDIUM")
 	case "LOW":
-		return "\033[32m" + level + "\033[0m"
+		return color.GreenString("LOW")
 	default:
 		return level
 	}
 }
-
-// formatMoleculeResults formats molecule search results.
-func formatMoleculeResults(results []MoleculeSearchResult, format string, includeRisk bool) (string, error) {
-	if format == "json" {
-		data, err := json.MarshalIndent(results, "", "  ")
-		if err != nil {
-			return "", fmt.Errorf("JSON marshal error: %w", err)
-		}
-		return string(data) + "\n", nil
-	}
-
-	// Table format (stdout)
-	var sb strings.Builder
-	sb.WriteString("Molecule Similarity Search Results\n")
-	sb.WriteString("══════════════════════════════════════════════════════════════════════════════\n\n")
-
-	if len(results) == 0 {
-		sb.WriteString("  No molecules found matching the specified criteria.\n")
-		return sb.String(), nil
-	}
-
-	if includeRisk {
-		sb.WriteString(fmt.Sprintf("%-5s %-10s %-18s %-25s %-30s %s\n", "Rank", "Similarity", "Patent", "Molecule", "SMILES", "Risk"))
-		sb.WriteString("──────────────────────────────────────────────────────────────────────────────\n")
-		for _, r := range results {
-			fmt.Fprintf(&sb, "%-5d %-10.4f %-18s %-25s %-30s %s\n",
-				r.Rank, r.Similarity, r.PatentNumber, r.MoleculeName, truncateString(r.SMILES, 30), colorizeRiskLevel(r.RiskLevel))
-		}
-	} else {
-		sb.WriteString(fmt.Sprintf("%-5s %-10s %-18s %-25s %s\n", "Rank", "Similarity", "Patent", "Molecule", "SMILES"))
-		sb.WriteString("──────────────────────────────────────────────────────────────────────────────\n")
-		for _, r := range results {
-			fmt.Fprintf(&sb, "%-5d %-10.4f %-18s %-25s %s\n",
-				r.Rank, r.Similarity, r.PatentNumber, r.MoleculeName, truncateString(r.SMILES, 40))
-		}
-	}
-
-	sb.WriteString("\n══════════════════════════════════════════════════════════════════════════════\n")
-	fmt.Fprintf(&sb, "Total: %d result(s)\n", len(results))
-
-	return sb.String(), nil
-}
-
-// formatPatentResults formats patent search results.
-func formatPatentResults(results []PatentSearchResult, format string) (string, error) {
-	if format == "json" {
-		data, err := json.MarshalIndent(results, "", "  ")
-		if err != nil {
-			return "", fmt.Errorf("JSON marshal error: %w", err)
-		}
-		return string(data) + "\n", nil
-	}
-
-	// Table format (stdout)
-	var sb strings.Builder
-	sb.WriteString("Patent Search Results\n")
-	sb.WriteString("══════════════════════════════════════════════════════════════════════════════════════\n\n")
-
-	if len(results) == 0 {
-		sb.WriteString("  No patents found matching the specified criteria.\n")
-		return sb.String(), nil
-	}
-
-	sb.WriteString(fmt.Sprintf("%-5s %-10s %-18s %-40s %-12s %s\n", "Rank", "Relevance", "Patent", "Title", "Date", "IPC"))
-	sb.WriteString("────────────────────────────────────────────────────────────────────────────────────────\n")
-
-	for _, r := range results {
-		fmt.Fprintf(&sb, "%-5d %-10.4f %-18s %-40s %-12s %s\n",
-			r.Rank, r.Relevance, r.PatentNumber, truncateString(r.Title, 40), r.ApplicationDate, r.IPC)
-	}
-
-	sb.WriteString("\n══════════════════════════════════════════════════════════════════════════════════════\n")
-	fmt.Fprintf(&sb, "Total: %d result(s)\n", len(results))
-
-	return sb.String(), nil
-}
-
-// truncateString truncates a string to maxLen characters.
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
-}
-
-// SearchCmd is exported for backward compatibility.
-var SearchCmd = NewSearchCmd()
 
 //Personal.AI order the ending

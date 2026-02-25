@@ -1,22 +1,487 @@
+// Phase 11 - File 258: internal/interfaces/http/handlers/collaboration_handler.go
+// 实现协作空间 HTTP Handler。
+//
+// 实现要求:
+// * 功能定位：处理协作空间相关的 HTTP 请求，包括工作空间 CRUD、文件共享、权限管理、合作伙伴邀请
+// * 核心实现：
+//   - 定义 CollaborationHandler 结构体，注入 collaboration 应用服务与 logger
+//   - 实现 CreateWorkspace：创建协作工作空间
+//   - 实现 GetWorkspace：获取工作空间详情
+//   - 实现 ListWorkspaces：列出用户可访问的工作空间
+//   - 实现 UpdateWorkspace：更新工作空间配置
+//   - 实现 DeleteWorkspace：删除工作空间（软删除）
+//   - 实现 ShareDocument：在工作空间内共享文档（带水印选项）
+//   - 实现 ListSharedDocuments：列出工作空间内的共享文档
+//   - 实现 InviteMember：邀请成员加入工作空间
+//   - 实现 RemoveMember：移除工作空间成员
+//   - 实现 UpdateMemberRole：更新成员角色
+//   - 实现 RegisterRoutes：注册所有协作相关路由到 router group
+// * 业务逻辑：
+//   - 工作空间名称唯一性校验
+//   - 文件共享时可选数字水印嵌入
+//   - 成员角色分为 owner/admin/editor/viewer 四级
+//   - 删除工作空间需 owner 权限
+// * 依赖关系：
+//   - 依赖：internal/application/collaboration/workspace.go、internal/application/collaboration/sharing.go、pkg/errors、pkg/types/common
+//   - 被依赖：internal/interfaces/http/router.go
+// * 测试要求：全部 Handler 方法正常与异常路径、权限校验、参数验证
+// * 强制约束：文件最后一行必须为 //Personal.AI order the ending
+
 package handlers
 
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/collaboration"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	pkgtypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-type CollaborationHandler struct{}
-
-func NewCollaborationHandler() *CollaborationHandler {
-	return &CollaborationHandler{}
+// CollaborationHandler handles HTTP requests for collaboration workspace operations.
+type CollaborationHandler struct {
+	workspaceSvc collaboration.WorkspaceService
+	sharingSvc   collaboration.SharingService
+	logger       logging.Logger
 }
 
+// NewCollaborationHandler creates a new CollaborationHandler.
+func NewCollaborationHandler(
+	workspaceSvc collaboration.WorkspaceService,
+	sharingSvc collaboration.SharingService,
+	logger logging.Logger,
+) *CollaborationHandler {
+	return &CollaborationHandler{
+		workspaceSvc: workspaceSvc,
+		sharingSvc:   sharingSvc,
+		logger:       logger,
+	}
+}
+
+// CreateWorkspaceRequest is the request body for creating a workspace.
+type CreateWorkspaceRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Visibility  string `json:"visibility"` // private, internal, partner
+}
+
+// ShareDocumentRequest is the request body for sharing a document.
+type ShareDocumentRequest struct {
+	DocumentID     string `json:"document_id"`
+	WorkspaceID    string `json:"workspace_id"`
+	EnableWatermark bool  `json:"enable_watermark"`
+	MaxDownloads   int    `json:"max_downloads"`
+	ExpiresInHours int    `json:"expires_in_hours"`
+}
+
+// InviteMemberRequest is the request body for inviting a member.
+type InviteMemberRequest struct {
+	UserID string `json:"user_id"`
+	Email  string `json:"email"`
+	Role   string `json:"role"` // owner, admin, editor, viewer
+}
+
+// UpdateMemberRoleRequest is the request body for updating a member role.
+type UpdateMemberRoleRequest struct {
+	Role string `json:"role"`
+}
+
+// UpdateWorkspaceRequest is the request body for updating a workspace.
+type UpdateWorkspaceRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Visibility  *string `json:"visibility,omitempty"`
+}
+
+// RegisterRoutes registers all collaboration routes on the given router group.
+// Expected to be called with a group prefixed at /api/v1/collaboration.
+func (h *CollaborationHandler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/v1/workspaces", h.CreateWorkspace)
+	mux.HandleFunc("GET /api/v1/workspaces", h.ListWorkspaces)
+	mux.HandleFunc("GET /api/v1/workspaces/{id}", h.GetWorkspace)
+	mux.HandleFunc("PUT /api/v1/workspaces/{id}", h.UpdateWorkspace)
+	mux.HandleFunc("DELETE /api/v1/workspaces/{id}", h.DeleteWorkspace)
+	mux.HandleFunc("POST /api/v1/workspaces/{id}/documents", h.ShareDocument)
+	mux.HandleFunc("GET /api/v1/workspaces/{id}/documents", h.ListSharedDocuments)
+	mux.HandleFunc("POST /api/v1/workspaces/{id}/members", h.InviteMember)
+	mux.HandleFunc("DELETE /api/v1/workspaces/{id}/members/{memberId}", h.RemoveMember)
+	mux.HandleFunc("PUT /api/v1/workspaces/{id}/members/{memberId}/role", h.UpdateMemberRole)
+}
+
+// CreateWorkspace handles POST /api/v1/workspaces
 func (h *CollaborationHandler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(map[string]string{"workspace_id": "ws-123", "status": "created"})
+	var req CreateWorkspaceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		return
+	}
+
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("name is required"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+
+	input := &collaboration.CreateWorkspaceInput{
+		Name:        req.Name,
+		Description: req.Description,
+		Visibility:  req.Visibility,
+		OwnerID:     userID,
+	}
+
+	ws, err := h.workspaceSvc.Create(r.Context(), input)
+	if err != nil {
+		h.logger.Error("failed to create workspace", "error", err)
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, ws)
 }
 
-func (h *CollaborationHandler) SharePatent(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(map[string]string{"share_id": "sh-456", "status": "shared"})
+// GetWorkspace handles GET /api/v1/workspaces/{id}
+func (h *CollaborationHandler) GetWorkspace(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+
+	ws, err := h.workspaceSvc.GetByID(r.Context(), id, userID)
+	if err != nil {
+		h.logger.Error("failed to get workspace", "error", err, "workspace_id", id)
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, ws)
+}
+
+// ListWorkspaces handles GET /api/v1/workspaces
+func (h *CollaborationHandler) ListWorkspaces(w http.ResponseWriter, r *http.Request) {
+	userID := getUserIDFromContext(r)
+	page, pageSize := parsePagination(r)
+
+	input := &collaboration.ListWorkspacesInput{
+		UserID:   userID,
+		Page:     page,
+		PageSize: pageSize,
+	}
+
+	result, err := h.workspaceSvc.List(r.Context(), input)
+	if err != nil {
+		h.logger.Error("failed to list workspaces", "error", err)
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// UpdateWorkspace handles PUT /api/v1/workspaces/{id}
+func (h *CollaborationHandler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		return
+	}
+
+	var req UpdateWorkspaceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+
+	input := &collaboration.UpdateWorkspaceInput{
+		WorkspaceID: id,
+		UserID:      userID,
+		Name:        req.Name,
+		Description: req.Description,
+		Visibility:  req.Visibility,
+	}
+
+	ws, err := h.workspaceSvc.Update(r.Context(), input)
+	if err != nil {
+		h.logger.Error("failed to update workspace", "error", err, "workspace_id", id)
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, ws)
+}
+
+// DeleteWorkspace handles DELETE /api/v1/workspaces/{id}
+func (h *CollaborationHandler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+
+	err := h.workspaceSvc.Delete(r.Context(), id, userID)
+	if err != nil {
+		h.logger.Error("failed to delete workspace", "error", err, "workspace_id", id)
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+// ShareDocument handles POST /api/v1/workspaces/{id}/documents
+func (h *CollaborationHandler) ShareDocument(w http.ResponseWriter, r *http.Request) {
+	workspaceID := r.PathValue("id")
+	if workspaceID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		return
+	}
+
+	var req ShareDocumentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		return
+	}
+
+	if req.DocumentID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("document_id is required"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+
+	input := &collaboration.ShareDocumentInput{
+		WorkspaceID:     workspaceID,
+		DocumentID:      req.DocumentID,
+		SharedByUserID:  userID,
+		EnableWatermark: req.EnableWatermark,
+		MaxDownloads:    req.MaxDownloads,
+		ExpiresInHours:  req.ExpiresInHours,
+	}
+
+	shared, err := h.sharingSvc.ShareDocument(r.Context(), input)
+	if err != nil {
+		h.logger.Error("failed to share document", "error", err, "workspace_id", workspaceID)
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, shared)
+}
+
+// ListSharedDocuments handles GET /api/v1/workspaces/{id}/documents
+func (h *CollaborationHandler) ListSharedDocuments(w http.ResponseWriter, r *http.Request) {
+	workspaceID := r.PathValue("id")
+	if workspaceID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+	page, pageSize := parsePagination(r)
+
+	input := &collaboration.ListSharedDocumentsInput{
+		WorkspaceID: workspaceID,
+		UserID:      userID,
+		Page:        page,
+		PageSize:    pageSize,
+	}
+
+	result, err := h.sharingSvc.ListDocuments(r.Context(), input)
+	if err != nil {
+		h.logger.Error("failed to list shared documents", "error", err, "workspace_id", workspaceID)
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// InviteMember handles POST /api/v1/workspaces/{id}/members
+func (h *CollaborationHandler) InviteMember(w http.ResponseWriter, r *http.Request) {
+	workspaceID := r.PathValue("id")
+	if workspaceID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		return
+	}
+
+	var req InviteMemberRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		return
+	}
+
+	if req.UserID == "" && req.Email == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("user_id or email is required"))
+		return
+	}
+
+	if !isValidRole(req.Role) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("role must be one of: owner, admin, editor, viewer"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+
+	input := &collaboration.InviteMemberInput{
+		WorkspaceID: workspaceID,
+		InviterID:   userID,
+		InviteeID:   req.UserID,
+		InviteeEmail: req.Email,
+		Role:        req.Role,
+	}
+
+	member, err := h.workspaceSvc.InviteMember(r.Context(), input)
+	if err != nil {
+		h.logger.Error("failed to invite member", "error", err, "workspace_id", workspaceID)
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, member)
+}
+
+// RemoveMember handles DELETE /api/v1/workspaces/{id}/members/{memberId}
+func (h *CollaborationHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	workspaceID := r.PathValue("id")
+	memberID := r.PathValue("memberId")
+
+	if workspaceID == "" || memberID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id and member id are required"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+
+	err := h.workspaceSvc.RemoveMember(r.Context(), workspaceID, memberID, userID)
+	if err != nil {
+		h.logger.Error("failed to remove member", "error", err, "workspace_id", workspaceID, "member_id", memberID)
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+// UpdateMemberRole handles PUT /api/v1/workspaces/{id}/members/{memberId}/role
+func (h *CollaborationHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
+	workspaceID := r.PathValue("id")
+	memberID := r.PathValue("memberId")
+
+	if workspaceID == "" || memberID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id and member id are required"))
+		return
+	}
+
+	var req UpdateMemberRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		return
+	}
+
+	if !isValidRole(req.Role) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("role must be one of: owner, admin, editor, viewer"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+
+	err := h.workspaceSvc.UpdateMemberRole(r.Context(), workspaceID, memberID, req.Role, userID)
+	if err != nil {
+		h.logger.Error("failed to update member role", "error", err, "workspace_id", workspaceID, "member_id", memberID)
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+// isValidRole checks if the given role is one of the allowed workspace roles.
+func isValidRole(role string) bool {
+	switch role {
+	case "owner", "admin", "editor", "viewer":
+		return true
+	default:
+		return false
+	}
+}
+
+// getUserIDFromContext extracts user ID from request context (set by auth middleware).
+func getUserIDFromContext(r *http.Request) string {
+	if v := r.Context().Value(pkgtypes.ContextKeyUserID); v != nil {
+		if uid, ok := v.(string); ok {
+			return uid
+		}
+	}
+	return ""
+}
+
+// parsePagination extracts page and page_size from query parameters.
+func parsePagination(r *http.Request) (int, int) {
+	page := 1
+	pageSize := 20
+
+	if v := r.URL.Query().Get("page"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p > 0 {
+			page = p
+		}
+	}
+	if v := r.URL.Query().Get("page_size"); v != "" {
+		if ps, err := strconv.Atoi(v); err == nil && ps > 0 && ps <= 100 {
+			pageSize = ps
+		}
+	}
+	return page, pageSize
+}
+
+// writeJSON writes a JSON response with the given status code.
+func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	if data != nil {
+		_ = json.NewEncoder(w).Encode(data)
+	}
+}
+
+// ErrorResponse is the standard error response body.
+type ErrorResponse struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// writeError writes a structured error response.
+func writeError(w http.ResponseWriter, statusCode int, err error) {
+	resp := ErrorResponse{
+		Code:    http.StatusText(statusCode),
+		Message: err.Error(),
+	}
+	writeJSON(w, statusCode, resp)
+}
+
+// writeAppError maps application-level errors to HTTP status codes.
+func writeAppError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.IsNotFound(err):
+		writeError(w, http.StatusNotFound, err)
+	case errors.IsValidation(err):
+		writeError(w, http.StatusBadRequest, err)
+	case errors.IsConflict(err):
+		writeError(w, http.StatusConflict, err)
+	case errors.IsUnauthorized(err):
+		writeError(w, http.StatusUnauthorized, err)
+	case errors.IsForbidden(err):
+		writeError(w, http.StatusForbidden, err)
+	default:
+		writeError(w, http.StatusInternalServerError, errors.New("internal server error"))
+	}
 }
 
 //Personal.AI order the ending

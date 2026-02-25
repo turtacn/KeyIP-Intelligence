@@ -1,424 +1,552 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/lifecycle"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// NewLifecycleCmd returns the keyip lifecycle top-level subcommand.
-// It provides patent lifecycle management capabilities including deadlines,
-// annuities, legal status synchronization, and reminders.
-func NewLifecycleCmd() *cobra.Command {
-	cmd := &cobra.Command{
+var (
+	lifecyclePatentNumber    string
+	lifecycleJurisdiction    string
+	lifecycleDaysAhead       int
+	lifecycleStatus          string
+	lifecycleOutput          string
+	lifecycleYear            int
+	lifecycleCurrency        string
+	lifecycleIncludeForecast bool
+	lifecycleDryRun          bool
+	lifecycleAction          string
+	lifecycleChannels        string
+	lifecycleAdvanceDays     string
+)
+
+// NewLifecycleCmd creates the lifecycle command
+func NewLifecycleCmd(
+	deadlineService lifecycle.DeadlineService,
+	annuityService lifecycle.AnnuityService,
+	legalStatusService lifecycle.LegalStatusService,
+	calendarService lifecycle.CalendarService,
+	logger logging.Logger,
+) *cobra.Command {
+	lifecycleCmd := &cobra.Command{
 		Use:   "lifecycle",
-		Short: "Patent lifecycle management",
-		Long: `Manage patent lifecycle including deadlines, annuities, legal status synchronization and reminders.
-
-Provides tools for IP managers to:
-  - Query upcoming deadlines with urgency prioritization
-  - Calculate annuity/maintenance fees with multi-currency support
-  - Synchronize legal status from patent offices
-  - Configure deadline reminder notifications`,
+		Short: "Manage patent lifecycle operations",
+		Long:  `Query deadlines, calculate annuities, sync legal status, and configure reminders`,
 	}
 
-	cmd.AddCommand(newDeadlinesCmd())
-	cmd.AddCommand(newAnnuityCmd())
-	cmd.AddCommand(newSyncStatusCmd())
-	cmd.AddCommand(newRemindersCmd())
-
-	return cmd
-}
-
-func newDeadlinesCmd() *cobra.Command {
-	var (
-		patentNumber string
-		jurisdiction string
-		daysAhead    int
-		status       string
-		output       string
-	)
-
-	cmd := &cobra.Command{
+	// Subcommand: lifecycle deadlines
+	deadlinesCmd := &cobra.Command{
 		Use:   "deadlines",
-		Short: "Query upcoming deadlines",
-		Long:  "List upcoming patent deadlines within specified timeframe, sorted by urgency",
+		Short: "List upcoming patent deadlines",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate jurisdiction if provided
-			if jurisdiction != "" {
-				jurisdictions := strings.Split(jurisdiction, ",")
-				for _, j := range jurisdictions {
-					j = strings.TrimSpace(j)
-					if j != "" && !isValidJurisdiction(j) {
-						return fmt.Errorf("invalid jurisdiction: %s (must be CN/US/EP/JP/KR)", j)
-					}
-				}
-			}
-
-			// Validate days-ahead range: 1-365
-			if daysAhead < 1 || daysAhead > 365 {
-				return fmt.Errorf("days-ahead must be between 1 and 365, got %d", daysAhead)
-			}
-
-			// Validate status if provided
-			if status != "" && !isValidDeadlineStatus(status) {
-				return fmt.Errorf("invalid status: %s (must be pending/overdue/completed)", status)
-			}
-
-			// Build DeadlineQueryRequest and call DeadlineService.ListUpcoming()
-			// In production, this would integrate with application/lifecycle.DeadlineService
-			deadlines := []Deadline{
-				{PatentNumber: "CN202110123456", Type: "OA Response", DueDate: "2024-12-31", UrgencyLevel: "CRITICAL", DaysRemaining: 5},
-				{PatentNumber: "US11234567", Type: "Annuity Payment", DueDate: "2025-01-15", UrgencyLevel: "WARNING", DaysRemaining: 20},
-				{PatentNumber: "EP3456789", Type: "Validation", DueDate: "2025-02-01", UrgencyLevel: "NORMAL", DaysRemaining: 37},
-			}
-
-			// Filter by patent number if specified
-			if patentNumber != "" {
-				filtered := make([]Deadline, 0)
-				for _, d := range deadlines {
-					if strings.Contains(d.PatentNumber, patentNumber) {
-						filtered = append(filtered, d)
-					}
-				}
-				deadlines = filtered
-			}
-
-			// Sort by urgency (descending) then by due date (ascending)
-			sortDeadlinesByUrgency(deadlines)
-
-			// Format output
-			if output == "json" {
-				data, err := json.MarshalIndent(deadlines, "", "  ")
-				if err != nil {
-					return fmt.Errorf("failed to marshal JSON: %w", err)
-				}
-				fmt.Println(string(data))
-			} else {
-				fmt.Print(formatDeadlineTable(deadlines))
-			}
-
-			return nil
+			return runLifecycleDeadlines(cmd.Context(), deadlineService, logger)
 		},
 	}
 
-	cmd.Flags().StringVar(&patentNumber, "patent-number", "", "Filter by patent number")
-	cmd.Flags().StringVar(&jurisdiction, "jurisdiction", "", "Filter by jurisdiction (CN/US/EP/JP/KR, comma-separated)")
-	cmd.Flags().IntVar(&daysAhead, "days-ahead", 90, "Query deadlines within N days (1-365)")
-	cmd.Flags().StringVar(&status, "status", "", "Filter by status (pending/overdue/completed)")
-	cmd.Flags().StringVar(&output, "output", "stdout", "Output format (stdout/json)")
+	deadlinesCmd.Flags().StringVar(&lifecyclePatentNumber, "patent-number", "", "Filter by patent number")
+	deadlinesCmd.Flags().StringVar(&lifecycleJurisdiction, "jurisdiction", "", "Filter by jurisdiction (CN/US/EP/JP/KR)")
+	deadlinesCmd.Flags().IntVar(&lifecycleDaysAhead, "days-ahead", 90, "Query deadlines within N days (1-365)")
+	deadlinesCmd.Flags().StringVar(&lifecycleStatus, "status", "", "Filter by status: pending|overdue|completed")
+	deadlinesCmd.Flags().StringVar(&lifecycleOutput, "output", "stdout", "Output format: stdout|json")
 
-	return cmd
-}
-
-func newAnnuityCmd() *cobra.Command {
-	var (
-		patentNumber    string
-		year            int
-		currency        string
-		includeForecast bool
-	)
-
-	cmd := &cobra.Command{
+	// Subcommand: lifecycle annuity
+	annuityCmd := &cobra.Command{
 		Use:   "annuity",
-		Short: "Calculate annuity fees",
-		Long:  "Calculate patent annuity/maintenance fees for specified year with optional 5-year forecast",
+		Short: "Calculate patent annuity fees",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate currency
-			if !isValidCurrency(currency) {
-				return fmt.Errorf("invalid currency: %s (must be CNY/USD/EUR/JPY/KRW)", currency)
-			}
-
-			// Default year to current if not specified
-			if year == 0 {
-				year = time.Now().Year()
-			}
-
-			// Build AnnuityQueryRequest and call AnnuityService.Calculate()
-			// In production, this would integrate with application/lifecycle.AnnuityService
-			annuities := []AnnuityDetail{
-				{Year: year, Amount: getAnnuityAmount(currency, year), Currency: currency, DueDate: fmt.Sprintf("%d-01-31", year)},
-			}
-
-			if includeForecast {
-				for i := 1; i <= 5; i++ {
-					forecastYear := year + i
-					annuities = append(annuities, AnnuityDetail{
-						Year:     forecastYear,
-						Amount:   getAnnuityAmount(currency, forecastYear),
-						Currency: currency,
-						DueDate:  fmt.Sprintf("%d-01-31", forecastYear),
-					})
-				}
-			}
-
-			fmt.Print(formatAnnuityTable(annuities, currency))
-			return nil
+			return runLifecycleAnnuity(cmd.Context(), annuityService, logger)
 		},
 	}
 
-	cmd.Flags().StringVar(&patentNumber, "patent-number", "", "Patent number [REQUIRED]")
-	cmd.Flags().IntVar(&year, "year", 0, "Annuity year (default: current year)")
-	cmd.Flags().StringVar(&currency, "currency", "CNY", "Currency (CNY/USD/EUR/JPY/KRW)")
-	cmd.Flags().BoolVar(&includeForecast, "include-forecast", false, "Include 5-year forecast")
-	_ = cmd.MarkFlagRequired("patent-number")
+	annuityCmd.Flags().StringVar(&lifecyclePatentNumber, "patent-number", "", "Patent number (required)")
+	annuityCmd.Flags().IntVar(&lifecycleYear, "year", time.Now().Year(), "Target year for calculation")
+	annuityCmd.Flags().StringVar(&lifecycleCurrency, "currency", "CNY", "Currency: CNY|USD|EUR|JPY|KRW")
+	annuityCmd.Flags().BoolVar(&lifecycleIncludeForecast, "include-forecast", false, "Include 5-year forecast")
+	annuityCmd.MarkFlagRequired("patent-number")
 
-	return cmd
-}
-
-func newSyncStatusCmd() *cobra.Command {
-	var (
-		patentNumber string
-		jurisdiction string
-		dryRun       bool
-	)
-
-	cmd := &cobra.Command{
+	// Subcommand: lifecycle sync-status
+	syncStatusCmd := &cobra.Command{
 		Use:   "sync-status",
-		Short: "Synchronize legal status",
-		Long:  "Synchronize patent legal status from patent offices (CNIPA, USPTO, EPO, JPO, KIPO)",
+		Short: "Sync legal status from patent offices",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate jurisdiction if provided
-			if jurisdiction != "" && !isValidJurisdiction(jurisdiction) {
-				return fmt.Errorf("invalid jurisdiction: %s (must be CN/US/EP/JP/KR)", jurisdiction)
-			}
-
-			if dryRun {
-				fmt.Println("\033[33mDRY-RUN MODE: No changes will be made\033[0m")
-				fmt.Println("\nWould sync:")
-				if patentNumber != "" {
-					fmt.Printf("  • Patent: %s\n", patentNumber)
-				} else {
-					fmt.Println("  • All patents in portfolio")
-				}
-				if jurisdiction != "" {
-					fmt.Printf("  • Jurisdiction: %s\n", jurisdiction)
-				}
-				return nil
-			}
-
-			// Call LegalStatusService.SyncFromOffice()
-			// In production, this would integrate with application/lifecycle.LegalStatusService
-			fmt.Printf("Syncing legal status from patent offices...\n")
-			fmt.Printf("\n\033[32m✅ New: 5\033[0m  \033[33m⚡ Updated: 12\033[0m  \033[31m❌ Failed: 0\033[0m\n")
-
-			return nil
+			return runLifecycleSyncStatus(cmd.Context(), legalStatusService, logger)
 		},
 	}
 
-	cmd.Flags().StringVar(&patentNumber, "patent-number", "", "Patent number (leave empty to sync all)")
-	cmd.Flags().StringVar(&jurisdiction, "jurisdiction", "", "Jurisdiction filter (CN/US/EP/JP/KR)")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Dry run mode - show what would be synced without making changes")
+	syncStatusCmd.Flags().StringVar(&lifecyclePatentNumber, "patent-number", "", "Sync specific patent (optional)")
+	syncStatusCmd.Flags().StringVar(&lifecycleJurisdiction, "jurisdiction", "", "Sync specific jurisdiction (optional)")
+	syncStatusCmd.Flags().BoolVar(&lifecycleDryRun, "dry-run", false, "Preview changes without applying")
 
-	return cmd
-}
-
-func newRemindersCmd() *cobra.Command {
-	var (
-		action       string
-		patentNumber string
-		channels     string
-		advanceDays  string
-	)
-
-	cmd := &cobra.Command{
+	// Subcommand: lifecycle reminders
+	remindersCmd := &cobra.Command{
 		Use:   "reminders",
 		Short: "Manage deadline reminders",
-		Long:  "Configure deadline reminder notifications via email, wechat, or sms",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate action
-			if !isValidReminderAction(action) {
-				return fmt.Errorf("invalid action: %s (must be list/add/remove)", action)
-			}
-
-			// Validate required fields for add/remove
-			if (action == "add" || action == "remove") && patentNumber == "" {
-				return fmt.Errorf("--patent-number required for %s action", action)
-			}
-
-			// Validate channels for add action
-			if action == "add" {
-				if channels == "" {
-					return fmt.Errorf("--channels required for add action")
-				}
-				// Validate channel types
-				for _, ch := range strings.Split(channels, ",") {
-					ch = strings.TrimSpace(ch)
-					if ch != "" && !isValidChannel(ch) {
-						return fmt.Errorf("invalid channel: %s (must be email/wechat/sms)", ch)
-					}
-				}
-			}
-
-			// Execute action via CalendarService
-			// In production, this would integrate with application/lifecycle.CalendarService
-			switch action {
-			case "list":
-				fmt.Println("Active Reminders:")
-				fmt.Println("─────────────────────────────────────────────────")
-				fmt.Println("  • CN202110123456 → email, wechat (30, 60, 90 days)")
-				fmt.Println("  • US11234567 → email (60 days)")
-				fmt.Println("  • EP3456789 → sms (30 days)")
-				fmt.Println("─────────────────────────────────────────────────")
-				fmt.Println("Total: 3 reminder(s)")
-
-			case "add":
-				fmt.Printf("\033[32m✅ Reminder added for %s\033[0m\n", patentNumber)
-				fmt.Printf("   Channels: %s\n", channels)
-				fmt.Printf("   Advance days: %s\n", advanceDays)
-
-			case "remove":
-				fmt.Printf("\033[32m✅ Reminder removed for %s\033[0m\n", patentNumber)
-			}
-
-			return nil
+			return runLifecycleReminders(cmd.Context(), calendarService, logger)
 		},
 	}
 
-	cmd.Flags().StringVar(&action, "action", "", "Action: list/add/remove [REQUIRED]")
-	cmd.Flags().StringVar(&patentNumber, "patent-number", "", "Patent number (required for add/remove)")
-	cmd.Flags().StringVar(&channels, "channels", "", "Notification channels (email/wechat/sms, comma-separated)")
-	cmd.Flags().StringVar(&advanceDays, "advance-days", "30,60,90", "Advance notice days (comma-separated)")
-	_ = cmd.MarkFlagRequired("action")
+	remindersCmd.Flags().StringVar(&lifecycleAction, "action", "", "Action: list|add|remove (required)")
+	remindersCmd.Flags().StringVar(&lifecyclePatentNumber, "patent-number", "", "Patent number (required for add/remove)")
+	remindersCmd.Flags().StringVar(&lifecycleChannels, "channels", "email", "Notification channels: email,wechat,sms")
+	remindersCmd.Flags().StringVar(&lifecycleAdvanceDays, "advance-days", "30,60,90", "Reminder advance days (comma-separated)")
+	remindersCmd.MarkFlagRequired("action")
 
-	return cmd
+	lifecycleCmd.AddCommand(deadlinesCmd, annuityCmd, syncStatusCmd, remindersCmd)
+	return lifecycleCmd
 }
 
-// Deadline represents an upcoming patent deadline.
-type Deadline struct {
-	PatentNumber  string `json:"patent_number"`
-	Type          string `json:"type"`
-	DueDate       string `json:"due_date"`
-	UrgencyLevel  string `json:"urgency_level"`
-	DaysRemaining int    `json:"days_remaining"`
-}
-
-// AnnuityDetail represents annuity fee details.
-type AnnuityDetail struct {
-	Year     int     `json:"year"`
-	Amount   float64 `json:"amount"`
-	Currency string  `json:"currency"`
-	DueDate  string  `json:"due_date"`
-}
-
-// isValidJurisdiction validates jurisdiction code.
-func isValidJurisdiction(j string) bool {
-	valid := map[string]bool{"CN": true, "US": true, "EP": true, "JP": true, "KR": true}
-	return valid[j]
-}
-
-// isValidCurrency validates currency code.
-func isValidCurrency(c string) bool {
-	valid := map[string]bool{"CNY": true, "USD": true, "EUR": true, "JPY": true, "KRW": true}
-	return valid[c]
-}
-
-// isValidDeadlineStatus validates deadline status.
-func isValidDeadlineStatus(s string) bool {
-	valid := map[string]bool{"pending": true, "overdue": true, "completed": true}
-	return valid[s]
-}
-
-// isValidReminderAction validates reminder action.
-func isValidReminderAction(a string) bool {
-	valid := map[string]bool{"list": true, "add": true, "remove": true}
-	return valid[a]
-}
-
-// isValidChannel validates notification channel.
-func isValidChannel(ch string) bool {
-	valid := map[string]bool{"email": true, "wechat": true, "sms": true}
-	return valid[ch]
-}
-
-// getAnnuityAmount returns simulated annuity amount based on currency and year.
-func getAnnuityAmount(currency string, year int) float64 {
-	baseAmounts := map[string]float64{
-		"CNY": 12000.0,
-		"USD": 1800.0,
-		"EUR": 1600.0,
-		"JPY": 200000.0,
-		"KRW": 2000000.0,
+func runLifecycleDeadlines(ctx context.Context, deadlineService lifecycle.DeadlineService, logger logging.Logger) error {
+	// Validate days-ahead range
+	if lifecycleDaysAhead < 1 || lifecycleDaysAhead > 365 {
+		return errors.New("days-ahead must be between 1 and 365")
 	}
-	base := baseAmounts[currency]
-	// Increase by 5% per year after 2024
-	yearDiff := year - 2024
-	if yearDiff > 0 {
-		base *= (1 + 0.05*float64(yearDiff))
-	}
-	return base
-}
 
-// sortDeadlinesByUrgency sorts deadlines by urgency (descending) then by due date (ascending).
-func sortDeadlinesByUrgency(deadlines []Deadline) {
-	urgencyOrder := map[string]int{"CRITICAL": 0, "WARNING": 1, "NORMAL": 2}
-	sort.Slice(deadlines, func(i, j int) bool {
-		if urgencyOrder[deadlines[i].UrgencyLevel] != urgencyOrder[deadlines[j].UrgencyLevel] {
-			return urgencyOrder[deadlines[i].UrgencyLevel] < urgencyOrder[deadlines[j].UrgencyLevel]
+	// Validate jurisdiction if provided
+	if lifecycleJurisdiction != "" {
+		if err := validateJurisdictions(lifecycleJurisdiction); err != nil {
+			return err
 		}
-		return deadlines[i].DueDate < deadlines[j].DueDate
+	}
+
+	// Validate status if provided
+	if lifecycleStatus != "" {
+		validStatuses := []string{"pending", "overdue", "completed"}
+		if !contains(validStatuses, strings.ToLower(lifecycleStatus)) {
+			return errors.Errorf("invalid status: %s (must be pending|overdue|completed)", lifecycleStatus)
+		}
+	}
+
+	logger.Info("Querying upcoming deadlines",
+		"patent_number", lifecyclePatentNumber,
+		"jurisdiction", lifecycleJurisdiction,
+		"days_ahead", lifecycleDaysAhead,
+		"status", lifecycleStatus)
+
+	// Build query request
+	req := &lifecycle.DeadlineQueryRequest{
+		PatentNumber:  lifecyclePatentNumber,
+		Jurisdictions: parseJurisdictions(lifecycleJurisdiction),
+		DaysAhead:     lifecycleDaysAhead,
+		Status:        lifecycleStatus,
+		Context:       ctx,
+	}
+
+	// Query deadlines
+	deadlines, err := deadlineService.ListUpcoming(ctx, req)
+	if err != nil {
+		logger.Error("Failed to query deadlines", "error", err)
+		return errors.Wrap(err, "failed to query deadlines")
+	}
+
+	// Sort by urgency (critical > warning > normal) then by due date
+	sortDeadlinesByUrgency(deadlines)
+
+	// Format output
+	if lifecycleOutput == "json" {
+		data, err := json.MarshalIndent(deadlines, "", "  ")
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal JSON")
+		}
+		fmt.Println(string(data))
+	} else {
+		output := formatDeadlineTable(deadlines)
+		fmt.Print(output)
+	}
+
+	logger.Info("Deadlines query completed",
+		"count", len(deadlines))
+
+	return nil
+}
+
+func runLifecycleAnnuity(ctx context.Context, annuityService lifecycle.AnnuityService, logger logging.Logger) error {
+	// Validate currency
+	validCurrencies := []string{"CNY", "USD", "EUR", "JPY", "KRW"}
+	if !contains(validCurrencies, strings.ToUpper(lifecycleCurrency)) {
+		return errors.Errorf("invalid currency: %s (must be CNY|USD|EUR|JPY|KRW)", lifecycleCurrency)
+	}
+
+	logger.Info("Calculating annuity fees",
+		"patent_number", lifecyclePatentNumber,
+		"year", lifecycleYear,
+		"currency", lifecycleCurrency,
+		"include_forecast", lifecycleIncludeForecast)
+
+	// Build calculation request
+	req := &lifecycle.AnnuityQueryRequest{
+		PatentNumber:     lifecyclePatentNumber,
+		Year:             lifecycleYear,
+		Currency:         strings.ToUpper(lifecycleCurrency),
+		IncludeForecast:  lifecycleIncludeForecast,
+		Context:          ctx,
+	}
+
+	// Calculate annuities
+	result, err := annuityService.Calculate(ctx, req)
+	if err != nil {
+		logger.Error("Failed to calculate annuities", "error", err)
+		return errors.Wrap(err, "failed to calculate annuities")
+	}
+
+	// Format output
+	output := formatAnnuityTable(result.Details, result.Currency)
+	fmt.Print(output)
+
+	// Summary
+	fmt.Printf("\nTotal for %d: %s %.2f\n", lifecycleYear, result.Currency, result.TotalAmount)
+	if lifecycleIncludeForecast {
+		fmt.Printf("5-year forecast: %s %.2f\n", result.Currency, result.ForecastTotal)
+	}
+
+	logger.Info("Annuity calculation completed",
+		"patent_number", lifecyclePatentNumber,
+		"total_amount", result.TotalAmount)
+
+	return nil
+}
+
+func runLifecycleSyncStatus(ctx context.Context, legalStatusService lifecycle.LegalStatusService, logger logging.Logger) error {
+	// Validate jurisdiction if provided
+	if lifecycleJurisdiction != "" {
+		if err := validateJurisdictions(lifecycleJurisdiction); err != nil {
+			return err
+		}
+	}
+
+	logger.Info("Starting legal status sync",
+		"patent_number", lifecyclePatentNumber,
+		"jurisdiction", lifecycleJurisdiction,
+		"dry_run", lifecycleDryRun)
+
+	// Build sync request
+	req := &lifecycle.SyncStatusRequest{
+		PatentNumber:  lifecyclePatentNumber,
+		Jurisdictions: parseJurisdictions(lifecycleJurisdiction),
+		DryRun:        lifecycleDryRun,
+		Context:       ctx,
+	}
+
+	// Execute sync
+	result, err := legalStatusService.SyncFromOffice(ctx, req)
+	if err != nil {
+		logger.Error("Sync failed", "error", err)
+		return errors.Wrap(err, "sync operation failed")
+	}
+
+	// Output summary
+	fmt.Printf("\n=== Legal Status Sync Summary ===\n\n")
+	if lifecycleDryRun {
+		fmt.Println("🔍 DRY RUN MODE - No changes applied")
+	}
+	fmt.Printf("Total processed: %d\n", result.TotalProcessed)
+	fmt.Printf("✓ New records: %d\n", result.NewRecords)
+	fmt.Printf("↻ Updated records: %d\n", result.UpdatedRecords)
+	fmt.Printf("✗ Failed: %d\n", result.FailedCount)
+
+	if len(result.Errors) > 0 {
+		fmt.Println("\nErrors:")
+		for _, errItem := range result.Errors {
+			fmt.Printf("  - %s: %s\n", errItem.PatentNumber, errItem.ErrorMessage)
+		}
+	}
+
+	logger.Info("Sync completed",
+		"total_processed", result.TotalProcessed,
+		"new_records", result.NewRecords,
+		"updated_records", result.UpdatedRecords,
+		"failed", result.FailedCount)
+
+	return nil
+}
+
+func runLifecycleReminders(ctx context.Context, calendarService lifecycle.CalendarService, logger logging.Logger) error {
+	action := strings.ToLower(lifecycleAction)
+
+	// Validate action
+	validActions := []string{"list", "add", "remove"}
+	if !contains(validActions, action) {
+		return errors.Errorf("invalid action: %s (must be list|add|remove)", action)
+	}
+
+	// Require patent number for add/remove
+	if (action == "add" || action == "remove") && lifecyclePatentNumber == "" {
+		return errors.New("--patent-number required for add/remove actions")
+	}
+
+	logger.Info("Managing reminders",
+		"action", action,
+		"patent_number", lifecyclePatentNumber)
+
+	switch action {
+	case "list":
+		return listReminders(ctx, calendarService, logger)
+	case "add":
+		return addReminder(ctx, calendarService, logger)
+	case "remove":
+		return removeReminder(ctx, calendarService, logger)
+	default:
+		return errors.Errorf("unhandled action: %s", action)
+	}
+}
+
+func listReminders(ctx context.Context, calendarService lifecycle.CalendarService, logger logging.Logger) error {
+	reminders, err := calendarService.ListReminders(ctx, lifecyclePatentNumber)
+	if err != nil {
+		return errors.Wrap(err, "failed to list reminders")
+	}
+
+	if len(reminders) == 0 {
+		fmt.Println("No reminders configured.")
+		return nil
+	}
+
+	fmt.Printf("\n=== Configured Reminders ===\n\n")
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Patent", "Deadline Type", "Channels", "Advance Days"})
+
+	for _, r := range reminders {
+		table.Append([]string{
+			r.PatentNumber,
+			r.DeadlineType,
+			strings.Join(r.Channels, ", "),
+			fmt.Sprintf("%v", r.AdvanceDays),
+		})
+	}
+
+	table.Render()
+	return nil
+}
+
+func addReminder(ctx context.Context, calendarService lifecycle.CalendarService, logger logging.Logger) error {
+	channels := parseChannels(lifecycleChannels)
+	advanceDays := parseAdvanceDays(lifecycleAdvanceDays)
+
+	req := &lifecycle.AddReminderRequest{
+		PatentNumber: lifecyclePatentNumber,
+		Channels:     channels,
+		AdvanceDays:  advanceDays,
+		Context:      ctx,
+	}
+
+	if err := calendarService.AddReminder(ctx, req); err != nil {
+		return errors.Wrap(err, "failed to add reminder")
+	}
+
+	fmt.Printf("✓ Reminder added for patent %s\n", lifecyclePatentNumber)
+	fmt.Printf("  Channels: %s\n", strings.Join(channels, ", "))
+	fmt.Printf("  Advance days: %v\n", advanceDays)
+
+	logger.Info("Reminder added",
+		"patent_number", lifecyclePatentNumber,
+		"channels", channels,
+		"advance_days", advanceDays)
+
+	return nil
+}
+
+func removeReminder(ctx context.Context, calendarService lifecycle.CalendarService, logger logging.Logger) error {
+	if err := calendarService.RemoveReminder(ctx, lifecyclePatentNumber); err != nil {
+		return errors.Wrap(err, "failed to remove reminder")
+	}
+
+	fmt.Printf("✓ Reminder removed for patent %s\n", lifecyclePatentNumber)
+
+	logger.Info("Reminder removed",
+		"patent_number", lifecyclePatentNumber)
+
+	return nil
+}
+
+func validateJurisdictions(input string) error {
+	validJurisdictions := []string{"CN", "US", "EP", "JP", "KR"}
+	parts := strings.Split(input, ",")
+
+	for _, part := range parts {
+		jurisdiction := strings.ToUpper(strings.TrimSpace(part))
+		if !contains(validJurisdictions, jurisdiction) {
+			return errors.Errorf("invalid jurisdiction: %s (must be CN|US|EP|JP|KR)", jurisdiction)
+		}
+	}
+
+	return nil
+}
+
+func parseJurisdictions(input string) []string {
+	if input == "" {
+		return nil
+	}
+
+	parts := strings.Split(input, ",")
+	result := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		trimmed := strings.ToUpper(strings.TrimSpace(part))
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+
+	return result
+}
+
+func parseChannels(input string) []string {
+	parts := strings.Split(input, ",")
+	result := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		trimmed := strings.ToLower(strings.TrimSpace(part))
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+
+	return result
+}
+
+func parseAdvanceDays(input string) []int {
+	parts := strings.Split(input, ",")
+	result := make([]int, 0, len(parts))
+
+	for _, part := range parts {
+		var days int
+		if _, err := fmt.Sscanf(strings.TrimSpace(part), "%d", &days); err == nil {
+			result = append(result, days)
+		}
+	}
+
+	return result
+}
+
+func sortDeadlinesByUrgency(deadlines []*lifecycle.Deadline) {
+	sort.Slice(deadlines, func(i, j int) bool {
+		// Sort by urgency first (CRITICAL > WARNING > NORMAL)
+		if deadlines[i].Urgency != deadlines[j].Urgency {
+			urgencyOrder := map[string]int{
+				"CRITICAL": 0,
+				"WARNING":  1,
+				"NORMAL":   2,
+			}
+			return urgencyOrder[deadlines[i].Urgency] < urgencyOrder[deadlines[j].Urgency]
+		}
+		// Then by due date (earliest first)
+		return deadlines[i].DueDate.Before(deadlines[j].DueDate)
 	})
 }
 
-// formatDeadlineTable formats deadlines as a colored table.
-// CRITICAL=red, WARNING=yellow, NORMAL=green using ANSI escape codes.
-func formatDeadlineTable(deadlines []Deadline) string {
-	var sb strings.Builder
-	sb.WriteString("Upcoming Deadlines\n")
-	sb.WriteString("══════════════════════════════════════════════════════════════════\n\n")
-
+func formatDeadlineTable(deadlines []*lifecycle.Deadline) string {
 	if len(deadlines) == 0 {
-		sb.WriteString("  No deadlines found within the specified timeframe.\n")
-		return sb.String()
+		return "\nNo upcoming deadlines found.\n"
 	}
 
-	sb.WriteString(fmt.Sprintf("%-16s %-20s %-12s %-10s %s\n", "Patent", "Type", "Due Date", "Days", "Urgency"))
-	sb.WriteString("────────────────────────────────────────────────────────────────\n")
+	var buf strings.Builder
+	buf.WriteString("\n=== Upcoming Patent Deadlines ===\n\n")
+
+	// Define color functions
+	red := color.New(color.FgRed, color.Bold).SprintFunc()
+	yellow := color.New(color.FgYellow).SprintFunc()
+	green := color.New(color.FgGreen).SprintFunc()
+
+	table := tablewriter.NewWriter(&buf)
+	table.SetHeader([]string{"Urgency", "Patent", "Type", "Due Date", "Days Left", "Status"})
+	table.SetBorder(true)
 
 	for _, d := range deadlines {
-		var color, reset string = "", ""
-		switch d.UrgencyLevel {
+		urgencyStr := d.Urgency
+		switch d.Urgency {
 		case "CRITICAL":
-			color = "\033[31m" // Red
+			urgencyStr = red(d.Urgency)
 		case "WARNING":
-			color = "\033[33m" // Yellow
-		default:
-			color = "\033[32m" // Green
+			urgencyStr = yellow(d.Urgency)
+		case "NORMAL":
+			urgencyStr = green(d.Urgency)
 		}
-		reset = "\033[0m"
-		fmt.Fprintf(&sb, "%s%-16s %-20s %-12s %-10d [%s]%s\n",
-			color, d.PatentNumber, d.Type, d.DueDate, d.DaysRemaining, d.UrgencyLevel, reset)
+
+		daysLeft := int(time.Until(d.DueDate).Hours() / 24)
+		daysLeftStr := fmt.Sprintf("%d", daysLeft)
+		if daysLeft < 0 {
+			daysLeftStr = red(fmt.Sprintf("%d (overdue)", daysLeft))
+		}
+
+		table.Append([]string{
+			urgencyStr,
+			d.PatentNumber,
+			d.DeadlineType,
+			d.DueDate.Format("2006-01-02"),
+			daysLeftStr,
+			d.Status,
+		})
 	}
 
-	sb.WriteString("\n══════════════════════════════════════════════════════════════════\n")
-	fmt.Fprintf(&sb, "Total: %d deadline(s)\n", len(deadlines))
+	table.Render()
 
-	return sb.String()
+	// Summary
+	buf.WriteString(fmt.Sprintf("\nTotal deadlines: %d\n", len(deadlines)))
+
+	criticalCount := countByUrgency(deadlines, "CRITICAL")
+	if criticalCount > 0 {
+		buf.WriteString(red(fmt.Sprintf("⚠ CRITICAL: %d deadlines require immediate attention\n", criticalCount)))
+	}
+
+	return buf.String()
 }
 
-// formatAnnuityTable formats annuity details as a table.
-func formatAnnuityTable(annuities []AnnuityDetail, currency string) string {
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Annuity Fees (%s)\n", currency))
-	sb.WriteString("══════════════════════════════════════\n\n")
-	sb.WriteString(fmt.Sprintf("%-6s %-15s %s\n", "Year", "Amount", "Due Date"))
-	sb.WriteString("──────────────────────────────────────\n")
+func formatAnnuityTable(details []*lifecycle.AnnuityDetail, currency string) string {
+	var buf strings.Builder
 
-	var total float64
-	for _, a := range annuities {
-		fmt.Fprintf(&sb, "%-6d %15.2f   %s\n", a.Year, a.Amount, a.DueDate)
-		total += a.Amount
+	buf.WriteString("\n=== Patent Annuity Fees ===\n\n")
+
+	table := tablewriter.NewWriter(&buf)
+	table.SetHeader([]string{"Year", "Due Date", "Fee Amount", "Late Fee", "Total", "Status"})
+	table.SetBorder(true)
+
+	for _, d := range details {
+		table.Append([]string{
+			fmt.Sprintf("%d", d.Year),
+			d.DueDate.Format("2006-01-02"),
+			fmt.Sprintf("%s %.2f", currency, d.BaseFee),
+			fmt.Sprintf("%s %.2f", currency, d.LateFee),
+			fmt.Sprintf("%s %.2f", currency, d.TotalFee),
+			d.Status,
+		})
 	}
 
-	sb.WriteString("──────────────────────────────────────\n")
-	fmt.Fprintf(&sb, "%-6s %15.2f\n", "Total", total)
-	sb.WriteString("══════════════════════════════════════\n")
+	table.Render()
 
-	return sb.String()
+	return buf.String()
+}
+
+func countByUrgency(deadlines []*lifecycle.Deadline, urgency string) int {
+	count := 0
+	for _, d := range deadlines {
+		if d.Urgency == urgency {
+			count++
+		}
+	}
+	return count
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 //Personal.AI order the ending
