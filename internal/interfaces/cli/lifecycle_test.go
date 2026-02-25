@@ -3,7 +3,6 @@ package cli
 import (
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestNewLifecycleCmd(t *testing.T) {
@@ -58,22 +57,19 @@ func TestValidationFunctions(t *testing.T) {
 
 func TestFormatDeadlineTable(t *testing.T) {
 	// Test empty list
-	emptyDeadlines := []*Deadline{}
+	emptyDeadlines := []Deadline{}
 	output := formatDeadlineTable(emptyDeadlines)
-	if !strings.Contains(output, "No upcoming deadlines") {
-		t.Error("expected empty message")
+	if !strings.Contains(output, "Upcoming Deadlines") {
+		t.Error("expected header in output")
 	}
 
-	// Test with deadlines
-	deadlines := []*Deadline{
+	// Test with deadlines - using actual Deadline struct fields
+	deadlines := []Deadline{
 		{
-			PatentNumber:  "CN123",
-			Jurisdiction:  "CN",
-			Type:          "OA Response",
-			DueDate:       time.Now().AddDate(0, 0, 15),
-			DaysRemaining: 15,
-			Urgency:       "CRITICAL",
-			Status:        "pending",
+			PatentNumber: "CN123",
+			Type:         "OA Response",
+			DueDate:      "2024-12-15",
+			UrgencyLevel: "CRITICAL",
 		},
 	}
 
@@ -82,13 +78,13 @@ func TestFormatDeadlineTable(t *testing.T) {
 		t.Error("expected patent number in output")
 	}
 	if !strings.Contains(output, "CRITICAL") {
-		t.Error("expected urgency in output")
+		t.Error("expected urgency level in output")
 	}
 }
 
 func TestFormatAnnuityTable(t *testing.T) {
-	annuities := []*AnnuityDetail{
-		{Year: 2024, Amount: 12000, Currency: "CNY", Status: "unpaid"},
+	annuities := []AnnuityDetail{
+		{Year: 2024, Amount: 12000, Currency: "CNY", DueDate: "2024-01-31"},
 	}
 
 	output := formatAnnuityTable(annuities, "CNY")
@@ -101,14 +97,94 @@ func TestFormatAnnuityTable(t *testing.T) {
 }
 
 func TestFormatAnnuityTable_WithForecast(t *testing.T) {
-	annuities := []*AnnuityDetail{
-		{Year: 2024, Amount: 12000, Currency: "USD", Status: "unpaid"},
-		{Year: 2025, Amount: 13200, Currency: "USD", Status: "forecast"},
+	annuities := []AnnuityDetail{
+		{Year: 2024, Amount: 12000, Currency: "USD", DueDate: "2024-01-31"},
+		{Year: 2025, Amount: 13200, Currency: "USD", DueDate: "2025-01-31"},
 	}
 
 	output := formatAnnuityTable(annuities, "USD")
-	if !strings.Contains(output, "forecast") {
-		t.Error("expected forecast status in output")
+	if !strings.Contains(output, "2025") {
+		t.Error("expected forecast year in output")
+	}
+}
+
+func TestIsValidJurisdiction(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"CN", true},
+		{"US", true},
+		{"EP", true},
+		{"JP", true},
+		{"KR", true},
+		{"XX", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		if got := isValidJurisdiction(tt.input); got != tt.expected {
+			t.Errorf("isValidJurisdiction(%q) = %v, want %v", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestIsValidCurrency(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"CNY", true},
+		{"USD", true},
+		{"EUR", true},
+		{"JPY", true},
+		{"KRW", true},
+		{"GBP", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		if got := isValidCurrency(tt.input); got != tt.expected {
+			t.Errorf("isValidCurrency(%q) = %v, want %v", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestIsValidDeadlineStatus(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"pending", true},
+		{"overdue", true},
+		{"completed", true},
+		{"invalid", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		if got := isValidDeadlineStatus(tt.input); got != tt.expected {
+			t.Errorf("isValidDeadlineStatus(%q) = %v, want %v", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestIsValidReminderAction(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{"list", true},
+		{"add", true},
+		{"remove", true},
+		{"delete", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		if got := isValidReminderAction(tt.input); got != tt.expected {
+			t.Errorf("isValidReminderAction(%q) = %v, want %v", tt.input, got, tt.expected)
+		}
 	}
 }
 

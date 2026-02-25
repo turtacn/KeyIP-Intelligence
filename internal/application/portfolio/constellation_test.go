@@ -508,6 +508,12 @@ func (m *mockPatent) toPatent() *domainpatent.Patent {
 	
 	filingDate := m.filingDate
 	
+	// Set metadata with value_score for GetValueScore() method
+	metadata := make(map[string]interface{})
+	if m.valueScore > 0 {
+		metadata["value_score"] = m.valueScore
+	}
+	
 	return &domainpatent.Patent{
 		ID:               patentID,
 		PatentNumber:     m.number,
@@ -518,6 +524,7 @@ func (m *mockPatent) toPatent() *domainpatent.Patent {
 		FilingDate:       &filingDate,
 		IPCCodes:         []string{m.techDomain},
 		MoleculeIDs:      m.moleculeIDs,
+		Metadata:         metadata,
 	}
 }
 

@@ -226,6 +226,16 @@ valid := map[string]bool{"CNY": true, "USD": true, "EUR": true, "JPY": true, "KR
 return valid[c]
 }
 
+func isValidDeadlineStatus(s string) bool {
+valid := map[string]bool{"pending": true, "overdue": true, "completed": true}
+return valid[s]
+}
+
+func isValidReminderAction(a string) bool {
+valid := map[string]bool{"list": true, "add": true, "remove": true}
+return valid[a]
+}
+
 func formatDeadlineTable(deadlines []Deadline) string {
 var sb strings.Builder
 sb.WriteString("Upcoming Deadlines\n")

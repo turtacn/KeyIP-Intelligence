@@ -165,7 +165,7 @@ func loadE2EConfig() (*config.Config, error) {
 	}
 
 	if configPath != "" {
-		return config.Load(configPath)
+		return config.Load(config.WithConfigPath(configPath))
 	}
 
 	// Use default config

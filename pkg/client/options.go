@@ -32,13 +32,15 @@ func WithRetryMax(retryMax int) Option {
 }
 
 // WithRetryWait sets the minimum and maximum retry wait durations
+// Both min and max must be positive, and max must be >= min for values to be set
 func WithRetryWait(min, max time.Duration) Option {
 	return func(c *Client) {
 		if min > 0 {
 			c.retryWaitMin = min
-		}
-		if max > 0 && max >= min {
-			c.retryWaitMax = max
+			// Only set max if min is valid and max >= min
+			if max >= min {
+				c.retryWaitMax = max
+			}
 		}
 	}
 }
