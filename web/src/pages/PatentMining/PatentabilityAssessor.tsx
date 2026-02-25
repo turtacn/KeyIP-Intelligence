@@ -3,8 +3,10 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Search, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import MoleculeViewer from '../../components/ui/MoleculeViewer';
+import { useTranslation } from 'react-i18next';
 
 const PatentabilityAssessor: React.FC = () => {
+  const { t } = useTranslation();
   const [smiles, setSmiles] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,10 +39,10 @@ const PatentabilityAssessor: React.FC = () => {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
       {/* Input Section */}
       <Card className="flex flex-col h-full">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">New Invention Details</h3>
+        <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('mining.assessment.title')}</h3>
         <div className="space-y-4 flex-1">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Target Molecule Structure (SMILES)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('mining.assessment.smiles_label')}</label>
             <textarea
               value={smiles}
               onChange={(e) => setSmiles(e.target.value)}
@@ -55,11 +57,11 @@ const PatentabilityAssessor: React.FC = () => {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Technical Description</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('mining.assessment.desc_label')}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe the technical problem, solution, and advantages..."
+              placeholder={t('mining.assessment.desc_placeholder')}
               className="w-full h-40 p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -72,14 +74,14 @@ const PatentabilityAssessor: React.FC = () => {
             leftIcon={<Search className="w-4 h-4" />}
             className="w-full"
           >
-            Assess Patentability
+            {t('mining.assessment.btn_assess')}
           </Button>
         </div>
       </Card>
 
       {/* Result Section */}
       <Card className="flex flex-col h-full bg-slate-50/50">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Assessment Report</h3>
+        <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('mining.assessment.report_title')}</h3>
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
             <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-4" />
@@ -91,14 +93,14 @@ const PatentabilityAssessor: React.FC = () => {
             {/* Scores */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white p-4 rounded-lg border border-slate-200 text-center">
-                <div className="text-sm text-slate-500 mb-1">Novelty Score</div>
+                <div className="text-sm text-slate-500 mb-1">{t('mining.assessment.novelty')}</div>
                 <div className="text-3xl font-bold text-green-600">{result.novelty}</div>
                 <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2">
                   <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${result.novelty}%` }}></div>
                 </div>
               </div>
               <div className="bg-white p-4 rounded-lg border border-slate-200 text-center">
-                <div className="text-sm text-slate-500 mb-1">Inventive Step</div>
+                <div className="text-sm text-slate-500 mb-1">{t('mining.assessment.inventive')}</div>
                 <div className="text-3xl font-bold text-blue-600">{result.inventiveStep}</div>
                 <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2">
                   <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${result.inventiveStep}%` }}></div>
@@ -108,13 +110,13 @@ const PatentabilityAssessor: React.FC = () => {
 
             {/* Utility */}
             <div className="bg-white p-4 rounded-lg border border-slate-200">
-              <h4 className="font-semibold text-slate-700 mb-2 text-sm">Utility Assessment</h4>
+              <h4 className="font-semibold text-slate-700 mb-2 text-sm">{t('mining.assessment.utility')}</h4>
               <p className="text-sm text-slate-600 leading-relaxed">{result.utility}</p>
             </div>
 
             {/* Similar Patents */}
             <div>
-              <h4 className="font-semibold text-slate-700 mb-2 text-sm">Top Similar Prior Art</h4>
+              <h4 className="font-semibold text-slate-700 mb-2 text-sm">{t('mining.assessment.similar')}</h4>
               <div className="space-y-2">
                 {result.similarPatents.map((pat: any) => (
                   <div key={pat.id} className="flex justify-between items-center bg-white p-3 rounded border border-slate-200 text-sm">
@@ -139,7 +141,7 @@ const PatentabilityAssessor: React.FC = () => {
             }`}>
               {result.novelty > 80 ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
               <div>
-                <div className="font-bold">Recommendation: {result.recommendation}</div>
+                <div className="font-bold">{t('mining.assessment.recommendation')}: {result.recommendation}</div>
                 <div className="text-xs opacity-80 mt-1">Based on initial screening. Always consult a patent attorney.</div>
               </div>
             </div>
@@ -147,7 +149,7 @@ const PatentabilityAssessor: React.FC = () => {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-sm">
             <Search className="w-12 h-12 mb-4 opacity-20" />
-            <p>Enter molecule structure to begin assessment.</p>
+            <p>{t('mining.assessment.enter_molecule_hint')}</p>
           </div>
         )}
       </Card>

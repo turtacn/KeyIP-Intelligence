@@ -1,6 +1,7 @@
 import React from 'react';
 import { Filter, Calendar, AlertCircle } from 'lucide-react';
 import { Jurisdiction } from '../../types/domain';
+import { useTranslation } from 'react-i18next';
 
 interface FilterPanelProps {
   filters: {
@@ -15,9 +16,21 @@ interface FilterPanelProps {
 }
 
 const FilterPanel: React.FC<FilterPanelProps> = ({ filters, onFilterChange, onReset }) => {
+  const { t } = useTranslation();
   const jurisdictions: (Jurisdiction | 'All')[] = ['All', 'CN', 'US', 'EP', 'JP', 'KR', 'Other'];
   const eventTypes = ['All', 'annuity_due', 'response_deadline', 'examination', 'grant_expected', 'expiry_warning'];
   const riskLevels = ['All', 'Overdue', 'Due 7d', 'Due 30d', 'Due 90d'];
+
+  const getRiskLabel = (level: string) => {
+    switch (level) {
+      case 'All': return t('lifecycle.filters.all');
+      case 'Overdue': return t('lifecycle.filters.overdue');
+      case 'Due 7d': return t('lifecycle.filters.due_7d');
+      case 'Due 30d': return t('lifecycle.filters.due_30d');
+      case 'Due 90d': return t('lifecycle.filters.due_90d');
+      default: return level;
+    }
+  };
 
   const handleChange = (key: string, value: string) => {
     onFilterChange({ ...filters, [key]: value });
@@ -28,20 +41,20 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, onFilterChange, onRe
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-slate-900 flex items-center">
           <Filter className="w-4 h-4 mr-2" />
-          Filters
+          {t('lifecycle.filters.title')}
         </h3>
         <button
           onClick={onReset}
           className="text-xs text-blue-600 hover:text-blue-800 font-medium"
         >
-          Reset
+          {t('lifecycle.filters.reset')}
         </button>
       </div>
 
       <div className="space-y-4">
         {/* Jurisdiction Filter */}
         <div>
-          <label className="block text-xs font-medium text-slate-500 mb-2">Jurisdiction</label>
+          <label className="block text-xs font-medium text-slate-500 mb-2">{t('lifecycle.filters.jurisdiction')}</label>
           <div className="flex flex-wrap gap-2">
             {jurisdictions.map((j) => (
               <button
@@ -61,7 +74,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, onFilterChange, onRe
 
         {/* Event Type Filter */}
         <div>
-          <label className="block text-xs font-medium text-slate-500 mb-2">Event Type</label>
+          <label className="block text-xs font-medium text-slate-500 mb-2">{t('lifecycle.filters.type')}</label>
           <select
             value={filters.eventType}
             onChange={(e) => handleChange('eventType', e.target.value)}
@@ -80,7 +93,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, onFilterChange, onRe
           <label className="block text-xs font-medium text-slate-500 mb-2">
             <div className="flex items-center">
               <Calendar className="w-3 h-3 mr-1" />
-              Due Date Range
+              {t('lifecycle.filters.date_range')}
             </div>
           </label>
           <div className="grid grid-cols-2 gap-2">
@@ -104,7 +117,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, onFilterChange, onRe
           <label className="block text-xs font-medium text-slate-500 mb-2">
             <div className="flex items-center">
               <AlertCircle className="w-3 h-3 mr-1" />
-              Urgency
+              {t('lifecycle.filters.urgency')}
             </div>
           </label>
           <div className="space-y-2">
@@ -118,7 +131,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, onFilterChange, onRe
                   onChange={(e) => handleChange('riskLevel', e.target.value)}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300"
                 />
-                <span className="ml-2 text-sm text-slate-600">{level}</span>
+                <span className="ml-2 text-sm text-slate-600">{getRiskLabel(level)}</span>
               </label>
             ))}
           </div>
@@ -130,7 +143,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, onFilterChange, onRe
           className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
           onClick={() => {}} // Could trigger a specific "Apply" action if not instant
         >
-          Apply Filters
+          {t('lifecycle.filters.apply')}
         </button>
       </div>
     </div>

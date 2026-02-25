@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Play, TrendingUp, TrendingDown, RefreshCcw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const WhatIfSimulator: React.FC = () => {
+  const { t } = useTranslation();
   const [scenarioName, setScenarioName] = useState('');
   const [actionType, setActionType] = useState('add_patent');
   const [loading, setLoading] = useState(false);
@@ -25,10 +27,10 @@ const WhatIfSimulator: React.FC = () => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
       <Card className="lg:col-span-1 h-full flex flex-col">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Scenario Builder</h3>
+        <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('portfolio.simulator.builder_title')}</h3>
         <div className="space-y-4 flex-1">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Scenario Name</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('portfolio.simulator.name_label')}</label>
             <input
               type="text"
               value={scenarioName}
@@ -38,7 +40,7 @@ const WhatIfSimulator: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Simulate Action</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('portfolio.simulator.action_label')}</label>
             <select
               value={actionType}
               onChange={(e) => setActionType(e.target.value)}
@@ -59,13 +61,13 @@ const WhatIfSimulator: React.FC = () => {
             className="w-full"
             leftIcon={<Play className="w-4 h-4" />}
           >
-            Run Simulation
+            {t('portfolio.simulator.run_btn')}
           </Button>
         </div>
       </Card>
 
       <Card className="lg:col-span-2 h-full flex flex-col bg-slate-50/50">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Simulation Results</h3>
+        <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('portfolio.simulator.results_title')}</h3>
         {result ? (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="grid grid-cols-3 gap-4 text-center">
@@ -107,7 +109,7 @@ const WhatIfSimulator: React.FC = () => {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-sm">
             <RefreshCcw className="w-12 h-12 mb-4 opacity-20" />
-            <p>Configure scenario and run simulation to see impact.</p>
+            <p>{t('portfolio.simulator.hint')}</p>
           </div>
         )}
       </Card>

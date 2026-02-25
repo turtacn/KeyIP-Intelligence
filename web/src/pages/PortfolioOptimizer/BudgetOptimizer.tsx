@@ -4,8 +4,10 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { AlertOctagon, TrendingDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const BudgetOptimizer: React.FC = () => {
+  const { t } = useTranslation();
   const [showConfirm, setShowConfirm] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
 
@@ -39,7 +41,7 @@ const BudgetOptimizer: React.FC = () => {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px]">
       {/* Use padding="none" and custom bodyClassName to ensure full height for chart */}
       <Card
-        header="Annual Maintenance Cost by Jurisdiction"
+        header={t('portfolio.budget.chart_title')}
         className="h-full"
         padding="none"
         bodyClassName="flex flex-col h-full"
@@ -61,10 +63,10 @@ const BudgetOptimizer: React.FC = () => {
         </div>
       </Card>
 
-      <Card header="Optimization Recommendations" className="h-full" bodyClassName="flex flex-col h-full overflow-hidden">
+      <Card header={t('portfolio.budget.rec_title')} className="h-full" bodyClassName="flex flex-col h-full overflow-hidden">
         <div className="bg-green-50 p-4 rounded-lg border border-green-100 mb-4 flex items-center justify-between flex-shrink-0">
           <div>
-            <h4 className="font-semibold text-green-800">Potential Annual Savings</h4>
+            <h4 className="font-semibold text-green-800">{t('portfolio.budget.savings')}</h4>
             <p className="text-sm text-green-600">Based on value-to-cost analysis</p>
           </div>
           <div className="text-2xl font-bold text-green-700">
@@ -99,7 +101,7 @@ const BudgetOptimizer: React.FC = () => {
             variant="primary"
             leftIcon={<TrendingDown className="w-4 h-4" />}
           >
-            Apply Optimization Plan
+            {t('portfolio.budget.apply_btn')}
           </Button>
         </div>
       </Card>

@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Search, Loader2, FileText, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const PriorArtAnalysis: React.FC = () => {
+  const { t } = useTranslation();
   const [claimText, setClaimText] = useState('');
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<any | null>(null);
@@ -33,7 +35,7 @@ const PriorArtAnalysis: React.FC = () => {
           <textarea
             value={claimText}
             onChange={(e) => setClaimText(e.target.value)}
-            placeholder="Paste your claim text here for prior art analysis..."
+            placeholder={t('mining.prior_art.claim_placeholder')}
             className="w-full h-full min-h-[300px] p-4 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
           />
         </div>

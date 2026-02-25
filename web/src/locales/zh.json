@@ -3,6 +3,12 @@
     "title": "KeyIP 智能平台",
     "role": "知识产权经理"
   },
+  "search": {
+    "global_placeholder": "全平台搜索..."
+  },
+  "knowledge_graph": {
+    "search_placeholder": "搜索图谱..."
+  },
   "nav": {
     "home": "主页",
     "dashboard": "管理驾驶舱",
@@ -16,13 +22,20 @@
     "title": "管理驾驶舱",
     "subtitle": "您的专利组合和战略 KPI 的实时概览。",
     "search_placeholder": "搜索专利、分子式、公司...",
+    "nl_query_placeholder": "询问您的专利组合，例如，“去年申请了多少美国专利？”",
     "export": "导出报告",
     "add_patent": "新增专利",
     "kpi": {
       "total_patents": "专利总数",
       "active_patents": "有效专利",
       "high_risk": "高风险预警",
-      "due_month": "本月到期"
+      "due_month": "本月到期",
+      "vs_last_month": "较上月",
+      "portfolio_size": "组合规模",
+      "citation_index": "引用指数",
+      "tech_coverage": "技术覆盖率",
+      "grant_rate": "授权率",
+      "filing_rate": "申请率"
     },
     "trend": {
       "title": "月度申请趋势",
@@ -66,6 +79,7 @@
     "assessment": {
       "title": "新发明详情",
       "smiles_label": "目标分子结构 (SMILES)",
+      "smiles_placeholder": "例如：c1ccc2c(c1)c3ccccc3n2-c4ccc(cc4)N(c5ccccc5)c6ccccc6",
       "desc_label": "技术描述",
       "desc_placeholder": "描述技术问题、解决方案和优势...",
       "btn_assess": "评估可专利性",
@@ -74,7 +88,18 @@
       "inventive": "创造性",
       "utility": "实用性评估",
       "similar": "相似现有技术",
-      "recommendation": "建议"
+      "recommendation": "建议",
+      "enter_molecule_hint": "输入分子结构以开始评估。"
+    },
+    "draft": {
+      "desc_placeholder": "详细描述发明...",
+      "keywords_placeholder": "例如：氘代核心，高T1能量，热稳定性"
+    },
+    "prior_art": {
+      "claim_placeholder": "在此粘贴权利要求文本以进行现有技术分析..."
+    },
+    "whitespace": {
+      "search_placeholder": "例如：蒽"
     },
     "search": {
       "mode_text": "文本检索",
@@ -88,6 +113,8 @@
   "infringement": {
     "title": "侵权监测中心",
     "list_title": "监测预警",
+    "alerts_label": "预警",
+    "search_placeholder": "搜索专利或分子...",
     "refresh": "刷新",
     "filter_risk": "风险等级",
     "detail": {
@@ -106,6 +133,7 @@
     },
     "claims": {
       "title": "权利要求分析",
+      "claim_label": "权利要求",
       "match": "要素匹配"
     },
     "actions": {
@@ -113,11 +141,16 @@
       "report": "生成 FTO 报告",
       "design": "规避设计",
       "assign": "指派法务",
-      "reviewed": "标记已阅"
+      "reviewed": "标记已阅",
+      "reviewed_done": "已阅"
     },
     "feed": {
       "title": "全球专利实时流",
-      "new": "新增"
+      "new": "新增",
+      "high_risk_detected": "检测到高风险",
+      "waiting": "等待新的专利公布...",
+      "pause": "暂停流",
+      "resume": "恢复流"
     }
   },
   "portfolio": {
@@ -145,6 +178,7 @@
     },
     "scoring": {
       "title": "专利价值评估",
+      "desc": "基于技术、法律和商业因素的单项专利资产AI估值。",
       "rank": "排名",
       "composite": "综合分",
       "recommendation": "建议",
@@ -166,8 +200,10 @@
       "desc": "模拟战略举措及其对组合指标的影响。",
       "builder_title": "情景构建",
       "name_label": "情景名称",
+      "name_placeholder": "例如：收购初创公司 X",
       "action_label": "模拟动作",
       "run_btn": "运行模拟",
+      "hint": "配置情景并运行模拟以查看影响。",
       "results_title": "模拟结果",
       "coverage": "组合覆盖率",
       "value": "总价值",
@@ -189,12 +225,32 @@
       "date_range": "到期日期范围",
       "urgency": "紧急程度",
       "reset": "重置",
+      "overdue": "已逾期",
+      "all": "全部",
+      "due_7d": "7天内到期",
+      "due_30d": "30天内到期",
+      "due_90d": "90天内到期",
       "apply": "应用筛选"
     },
     "calendar": {
       "title": "期限日历",
+      "upcoming": "即将发生的事件",
+      "select_all": "全选",
+      "deselect_all": "取消全选",
       "mark_handled": "标记已处理",
       "export": "导出 CSV"
+    },
+    "table": {
+      "select": "选择",
+      "patent_id": "专利号",
+      "event_type": "事件类型",
+      "jurisdiction": "管辖区",
+      "due_date": "截止日期",
+      "fee": "费用",
+      "status": "状态"
+    },
+    "pagination": {
+      "showing": "显示页面"
     },
     "annuity": {
       "total_due": "本年应付总额",
@@ -220,7 +276,7 @@
       "title": "合作伙伴管理",
       "add_btn": "新增合作伙伴",
       "table": {
-        "name": "名称",
+        "name": "合作伙伴名称",
         "type": "类型",
         "country": "国家",
         "projects": "活跃项目",
@@ -233,20 +289,55 @@
       "tasks_title": "待办任务",
       "files_title": "文件交换",
       "comm_title": "沟通记录",
+      "chat_placeholder": "输入消息...",
       "upload_hint": "拖拽文件到此处或点击上传",
-      "recent_files": "最近文件"
+      "upload_subhint": "支持 PDF, DOCX, ZIP (最大 50MB)",
+      "recent_files": "最近文件",
+      "table": {
+        "task_id": "任务ID",
+        "patent_no": "专利号",
+        "type": "类型",
+        "deadline": "截止日期",
+        "priority": "优先级",
+        "status": "状态"
+      }
     },
     "counsel": {
       "title": "外部法律顾问审查",
       "submit_btn": "提交审查意见",
       "opinion_label": "法律意见",
-      "rating_label": "最终风险评级"
+      "opinion_placeholder": "输入您的法律评估、建议和风险缓解策略...",
+      "rating_label": "最终风险评级",
+      "table": {
+        "review_id": "审查ID",
+        "report_title": "报告标题",
+        "created": "创建时间",
+        "deadline": "截止日期",
+        "status": "状态",
+        "action": "操作"
+      },
+      "actions": {
+        "review": "审查",
+        "view": "查看"
+      }
     },
     "api": {
+      "doc_title": "API 文档",
       "intro_title": "简介",
+      "intro_desc": "欢迎使用 KeyIP 智能 API。将专利数据、分子分析和风险预警直接集成到您的内部系统中。",
       "endpoints_title": "端点",
       "auth_title": "认证",
-      "limits_title": "速率限制"
+      "key_label": "API 密钥",
+      "key_warning": "请妥善保管此密钥。不要在客户端代码中共享它。",
+      "gen_key_btn": "生成新密钥",
+      "limits_title": "速率限制",
+      "limit_rpm": "请求/分钟",
+      "limit_quota": "每日配额"
+    },
+    "common": {
+      "download": "下载",
+      "copy": "复制",
+      "copied": "已复制"
     }
   }
 }

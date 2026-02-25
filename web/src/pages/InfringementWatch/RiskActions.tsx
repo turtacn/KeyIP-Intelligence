@@ -4,6 +4,7 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import { InfringementAlert } from '../../types/domain';
 import { FileText, Edit, UserPlus, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface RiskActionsProps {
   alert: InfringementAlert;
@@ -11,6 +12,7 @@ interface RiskActionsProps {
 }
 
 const RiskActions: React.FC<RiskActionsProps> = ({ alert, onMarkReviewed }) => {
+  const { t } = useTranslation();
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [showDesignModal, setShowDesignModal] = useState(false);
 
@@ -51,7 +53,7 @@ const RiskActions: React.FC<RiskActionsProps> = ({ alert, onMarkReviewed }) => {
   return (
     <>
       <Card className="mt-6 border-t-4 border-t-slate-200">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Risk Mitigation Actions</h3>
+        <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('infringement.actions.title')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Button
             variant="outline"
@@ -59,7 +61,7 @@ const RiskActions: React.FC<RiskActionsProps> = ({ alert, onMarkReviewed }) => {
             isLoading={loadingAction === 'report'}
             leftIcon={<FileText className="w-4 h-4" />}
           >
-            Generate FTO Report
+            {t('infringement.actions.report')}
           </Button>
 
           <Button
@@ -67,7 +69,7 @@ const RiskActions: React.FC<RiskActionsProps> = ({ alert, onMarkReviewed }) => {
             onClick={handleDesignAround}
             leftIcon={<Edit className="w-4 h-4" />}
           >
-            Design Around
+            {t('infringement.actions.design')}
           </Button>
 
           <Button
@@ -76,7 +78,7 @@ const RiskActions: React.FC<RiskActionsProps> = ({ alert, onMarkReviewed }) => {
             isLoading={loadingAction === 'assign'}
             leftIcon={<UserPlus className="w-4 h-4" />}
           >
-            Assign to Legal
+            {t('infringement.actions.assign')}
           </Button>
 
           <Button
@@ -86,7 +88,7 @@ const RiskActions: React.FC<RiskActionsProps> = ({ alert, onMarkReviewed }) => {
             leftIcon={<CheckCircle className="w-4 h-4" />}
             disabled={alert.status === 'reviewed'}
           >
-            {alert.status === 'reviewed' ? 'Reviewed' : 'Mark as Reviewed'}
+            {alert.status === 'reviewed' ? t('infringement.actions.reviewed_done') : t('infringement.actions.reviewed')}
           </Button>
         </div>
       </Card>

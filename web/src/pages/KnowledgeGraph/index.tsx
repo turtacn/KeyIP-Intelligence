@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
 import Card from '../../components/ui/Card';
 import { Search, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const KnowledgeGraph: React.FC = () => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [cy, setCy] = useState<cytoscape.Core | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -113,7 +115,7 @@ const KnowledgeGraph: React.FC = () => {
           <form onSubmit={handleSearch} className="relative">
             <input
               type="text"
-              placeholder="Search graph..."
+              placeholder={t('knowledge_graph.search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"

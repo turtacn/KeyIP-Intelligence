@@ -3,12 +3,14 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Company } from '../../types/domain';
 import { Filter } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface GapAnalysisProps {
   companies: Company[];
 }
 
 const GapAnalysis: React.FC<GapAnalysisProps> = ({ companies }) => {
+  const { t } = useTranslation();
   const [selectedCompetitors, setSelectedCompetitors] = useState<string[]>(['Samsung SDI', 'LG Chem']);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -36,14 +38,14 @@ const GapAnalysis: React.FC<GapAnalysisProps> = ({ companies }) => {
   return (
     <Card className="flex flex-col h-full">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-slate-800">Competitive Gap Matrix</h3>
+        <h3 className="text-lg font-semibold text-slate-800">{t('portfolio.gap.title')}</h3>
         <Button
           size="sm"
           variant="outline"
           onClick={() => setShowFilters(!showFilters)}
           leftIcon={<Filter className="w-4 h-4" />}
         >
-          Select Competitors
+          {t('portfolio.gap.select_comp')}
         </Button>
       </div>
 
@@ -74,10 +76,10 @@ const GapAnalysis: React.FC<GapAnalysisProps> = ({ companies }) => {
           <thead className="bg-slate-50">
             <tr>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-10">
-                Technology Domain
+                {t('portfolio.gap.domain')}
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-900 uppercase tracking-wider font-bold bg-blue-50/50">
-                My Org
+                {t('portfolio.gap.my_org')}
               </th>
               {selectedCompetitors.map(comp => (
                 <th key={comp} scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">

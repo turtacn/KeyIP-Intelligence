@@ -5,12 +5,14 @@ import { InfringementAlert, Patent } from '../../types/domain';
 import { patentService } from '../../services/patent.service';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { ExternalLink, Calendar, User } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface AlertDetailProps {
   alert: InfringementAlert;
 }
 
 const AlertDetail: React.FC<AlertDetailProps> = ({ alert }) => {
+  const { t } = useTranslation();
   const [patent, setPatent] = useState<Patent | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -64,17 +66,17 @@ const AlertDetail: React.FC<AlertDetailProps> = ({ alert }) => {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-slate-400" />
-            <span className="font-medium text-slate-900">Assignee:</span> {patent.assignee}
+            <span className="font-medium text-slate-900">{t('infringement.detail.assignee')}:</span> {patent.assignee}
           </div>
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-slate-400" />
-            <span className="font-medium text-slate-900">Filing Date:</span> {patent.filingDate}
+            <span className="font-medium text-slate-900">{t('infringement.detail.filing_date')}:</span> {patent.filingDate}
           </div>
         </div>
         <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-          <h4 className="font-semibold text-slate-800 mb-2">Risk Assessment</h4>
+          <h4 className="font-semibold text-slate-800 mb-2">{t('infringement.detail.risk_assess')}</h4>
           <div className="flex justify-between items-center mb-1">
-            <span>Literal Infringement:</span>
+            <span>{t('infringement.detail.literal')}:</span>
             <span className="font-mono font-medium text-red-600">{(alert.literalScore * 100).toFixed(1)}%</span>
           </div>
           <div className="w-full bg-slate-200 rounded-full h-1.5 mb-3">
@@ -82,7 +84,7 @@ const AlertDetail: React.FC<AlertDetailProps> = ({ alert }) => {
           </div>
 
           <div className="flex justify-between items-center mb-1">
-            <span>Doctrine of Equivalents:</span>
+            <span>{t('infringement.detail.doctrine')}:</span>
             <span className="font-mono font-medium text-amber-600">{(alert.docScore! * 100).toFixed(1)}%</span>
           </div>
           <div className="w-full bg-slate-200 rounded-full h-1.5">
@@ -92,7 +94,7 @@ const AlertDetail: React.FC<AlertDetailProps> = ({ alert }) => {
       </div>
 
       <div>
-        <h4 className="font-semibold text-slate-800 mb-2">Abstract</h4>
+        <h4 className="font-semibold text-slate-800 mb-2">{t('infringement.detail.abstract')}</h4>
         <p className="text-slate-600 text-sm leading-relaxed bg-slate-50 p-4 rounded-lg border border-slate-100">
           {patent.abstract}
         </p>

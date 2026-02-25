@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import { Company } from '../../types/domain';
 import { UserPlus, Edit, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface AdminViewProps {
   partners: Company[];
@@ -13,18 +14,19 @@ interface AdminViewProps {
 }
 
 const AdminView: React.FC<AdminViewProps> = ({ partners, loading }) => {
+  const { t } = useTranslation();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newPartner, setNewPartner] = useState<Partial<Company>>({ name: '', country: 'US', type: 'Agency' });
 
   const columns: Column<Company>[] = [
-    { header: 'Partner Name', accessor: 'name' },
-    { header: 'Type', accessor: 'type' },
-    { header: 'Country', accessor: 'country' },
-    { header: 'Active Projects', accessor: () => Math.floor(Math.random() * 10) }, // Mock
-    { header: 'Performance', accessor: () => <span className="text-green-600 font-bold">{(85 + Math.random() * 15).toFixed(0)}%</span> },
-    { header: 'Status', accessor: () => <StatusBadge status="active" /> },
+    { header: t('partners.admin.table.name'), accessor: 'name' },
+    { header: t('partners.admin.table.type'), accessor: 'type' },
+    { header: t('partners.admin.table.country'), accessor: 'country' },
+    { header: t('partners.admin.table.projects'), accessor: () => Math.floor(Math.random() * 10) }, // Mock
+    { header: t('partners.admin.table.performance'), accessor: () => <span className="text-green-600 font-bold">{(85 + Math.random() * 15).toFixed(0)}%</span> },
+    { header: t('partners.admin.table.status'), accessor: () => <StatusBadge status="active" /> },
     {
-      header: 'Actions',
+      header: t('partners.admin.table.actions'),
       accessor: () => (
         <div className="flex space-x-2">
           <Button size="sm" variant="ghost"><Edit className="w-4 h-4" /></Button>
@@ -43,9 +45,9 @@ const AdminView: React.FC<AdminViewProps> = ({ partners, loading }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold text-slate-800">Partner Management</h2>
+        <h2 className="text-lg font-semibold text-slate-800">{t('partners.admin.title')}</h2>
         <Button onClick={() => setShowAddModal(true)} leftIcon={<UserPlus className="w-4 h-4" />}>
-          Add New Partner
+          {t('partners.admin.add_btn')}
         </Button>
       </div>
 

@@ -3,6 +3,7 @@ import Card from '../../components/ui/Card';
 import RiskLevelBadge from '../../components/ui/RiskLevelBadge';
 import { InfringementAlert, RiskLevel } from '../../types/domain';
 import { Search, RotateCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface AlertListProps {
   alerts: InfringementAlert[];
@@ -23,6 +24,7 @@ const AlertList: React.FC<AlertListProps> = ({
   onFilterRisk,
   currentRiskFilter
 }) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredAlerts = alerts.filter(alert =>
@@ -35,7 +37,7 @@ const AlertList: React.FC<AlertListProps> = ({
       <div className="p-4 border-b border-slate-100 bg-slate-50 space-y-3">
         <div className="flex justify-between items-center">
           <h2 className="font-semibold text-slate-800 flex items-center">
-            Alerts
+            {t('infringement.alerts_label')}
             <span className="ml-2 bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-xs">
               {alerts.length}
             </span>
@@ -112,9 +114,9 @@ const AlertList: React.FC<AlertListProps> = ({
                   {alert.targetPatentId}
                 </h4>
                 <div className="flex justify-between items-center text-xs text-slate-500">
-                  <span>Trigger: {alert.triggerMoleculeId}</span>
+                  <span>{t('infringement.comparison.trigger')}: {alert.triggerMoleculeId}</span>
                   <div className="flex items-center gap-1">
-                     <span className="font-medium">{(alert.literalScore * 100).toFixed(0)}%</span> match
+                     <span className="font-medium">{(alert.literalScore * 100).toFixed(0)}%</span> {t('infringement.claims.match')}
                   </div>
                 </div>
                 {/* Score Bar */}

@@ -3,8 +3,10 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea } from 'recharts';
 import { Search } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const WhiteSpaceDiscovery: React.FC = () => {
+  const { t } = useTranslation();
   const [domain, setDomain] = useState('Blue Emitter');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any[]>([]);
@@ -47,7 +49,7 @@ const WhiteSpaceDiscovery: React.FC = () => {
             <label className="block text-sm font-medium text-slate-700 mb-1">Core Scaffold (Optional)</label>
             <input
               type="text"
-              placeholder="e.g., Anthracene"
+              placeholder={t('mining.whitespace.search_placeholder')}
               className="w-full border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
             />
           </div>

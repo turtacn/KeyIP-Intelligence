@@ -5,6 +5,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { LifecycleEvent } from '../../types/domain';
 import { Calendar, Download, CheckSquare, Check } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import { useTranslation } from 'react-i18next';
 
 interface DeadlineTableProps {
   events: LifecycleEvent[];
@@ -14,6 +15,7 @@ interface DeadlineTableProps {
 }
 
 const DeadlineTable: React.FC<DeadlineTableProps> = ({ events, loading, onMarkHandled, onExport }) => {
+  const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleSelect = (id: string) => {
@@ -36,7 +38,7 @@ const DeadlineTable: React.FC<DeadlineTableProps> = ({ events, loading, onMarkHa
 
   const columns: Column<LifecycleEvent>[] = [
     {
-      header: 'Select',
+      header: t('lifecycle.table.select'),
       accessor: (row) => (
         <input
           type="checkbox"
@@ -47,11 +49,11 @@ const DeadlineTable: React.FC<DeadlineTableProps> = ({ events, loading, onMarkHa
       ),
       className: 'w-10 text-center',
     },
-    { header: 'Patent ID', accessor: 'patentId' },
-    { header: 'Event Type', accessor: (row) => row.eventType.replace(/_/g, ' ') },
-    { header: 'Jurisdiction', accessor: 'jurisdiction' },
+    { header: t('lifecycle.table.patent_id'), accessor: 'patentId' },
+    { header: t('lifecycle.table.event_type'), accessor: (row) => row.eventType.replace(/_/g, ' ') },
+    { header: t('lifecycle.table.jurisdiction'), accessor: 'jurisdiction' },
     {
-      header: 'Due Date',
+      header: t('lifecycle.table.due_date'),
       accessor: (row) => {
         const due = new Date(row.dueDate);
         const today = new Date();
@@ -72,12 +74,12 @@ const DeadlineTable: React.FC<DeadlineTableProps> = ({ events, loading, onMarkHa
       },
     },
     {
-      header: 'Fee',
+      header: t('lifecycle.table.fee'),
       accessor: (row) =>
         row.feeAmount ? `${row.currency} ${row.feeAmount.toLocaleString()}` : '-',
     },
     {
-      header: 'Status',
+      header: t('lifecycle.table.status'),
       accessor: (row) => (
         <StatusBadge
           status={
@@ -102,8 +104,8 @@ const DeadlineTable: React.FC<DeadlineTableProps> = ({ events, loading, onMarkHa
             <Calendar className="w-5 h-5 text-blue-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-800">Deadline Calendar</h3>
-            <p className="text-xs text-slate-500">{events.length} upcoming events</p>
+            <h3 className="font-semibold text-slate-800">{t('lifecycle.calendar.title')}</h3>
+            <p className="text-xs text-slate-500">{events.length} {t('lifecycle.calendar.upcoming')}</p>
           </div>
         </div>
         <div className="flex space-x-2">
@@ -113,7 +115,7 @@ const DeadlineTable: React.FC<DeadlineTableProps> = ({ events, loading, onMarkHa
             leftIcon={<Check className="w-4 h-4" />}
             onClick={handleSelectAll}
           >
-            {selectedIds.size === events.length ? 'Deselect All' : 'Select All'}
+            {selectedIds.size === events.length ? t('lifecycle.calendar.deselect_all') : t('lifecycle.calendar.select_all')}
           </Button>
 
           {selectedIds.size > 0 && (
@@ -126,7 +128,7 @@ const DeadlineTable: React.FC<DeadlineTableProps> = ({ events, loading, onMarkHa
                 setSelectedIds(new Set());
               }}
             >
-              Mark {selectedIds.size} Handled
+              {t('lifecycle.calendar.mark_handled')} ({selectedIds.size})
             </Button>
           )}
 
@@ -136,7 +138,7 @@ const DeadlineTable: React.FC<DeadlineTableProps> = ({ events, loading, onMarkHa
             leftIcon={<Download className="w-4 h-4" />}
             onClick={onExport}
           >
-            Export CSV
+            {t('lifecycle.calendar.export')}
           </Button>
         </div>
       </div>

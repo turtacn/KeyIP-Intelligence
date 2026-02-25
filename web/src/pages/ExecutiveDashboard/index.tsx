@@ -44,11 +44,11 @@ const ExecutiveDashboard: React.FC = () => {
 
   // Transform data for charts
   const radarData = [
-    { subject: 'Portfolio Size', A: 85, B: 90, fullMark: 100 },
-    { subject: 'Filing Rate', A: 78, B: 65, fullMark: 100 },
-    { subject: 'Grant Rate', A: 92, B: 88, fullMark: 100 },
-    { subject: 'Tech Coverage', A: 65, B: 85, fullMark: 100 },
-    { subject: 'Citation Index', A: 72, B: 80, fullMark: 100 },
+    { subject: t('dashboard.kpi.portfolio_size'), A: 85, B: 90, fullMark: 100 },
+    { subject: t('dashboard.kpi.filing_rate'), A: 78, B: 65, fullMark: 100 },
+    { subject: t('dashboard.kpi.grant_rate'), A: 92, B: 88, fullMark: 100 },
+    { subject: t('dashboard.kpi.tech_coverage'), A: 65, B: 85, fullMark: 100 },
+    { subject: t('dashboard.kpi.citation_index'), A: 72, B: 80, fullMark: 100 },
   ];
 
   return (

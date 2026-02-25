@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import { Search, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const NLQueryWidget: React.FC = () => {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<string | null>(null);
@@ -43,7 +45,7 @@ const NLQueryWidget: React.FC = () => {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask about your patent portfolio, e.g., 'How many US patents were filed last year?'"
+              placeholder={t('dashboard.nl_query_placeholder')}
               className="w-full bg-slate-800/50 border border-slate-600 rounded-lg pl-4 pr-12 py-3 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button

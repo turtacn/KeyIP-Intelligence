@@ -80,7 +80,7 @@ const KPICards: React.FC<KPICardsProps> = ({ metrics, loading }) => {
               {kpi.trendUp ? <ArrowUp className="w-4 h-4 mr-1" /> : <ArrowDown className="w-4 h-4 mr-1" />}
               {kpi.trend}
             </span>
-            <span className="text-slate-400 ml-2">vs last month</span>
+            <span className="text-slate-400 ml-2">{t('dashboard.kpi.vs_last_month')}</span>
           </div>
         </Card>
       ))}

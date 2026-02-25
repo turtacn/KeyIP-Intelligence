@@ -5,8 +5,10 @@ import DataTable, { Column } from '../../components/ui/DataTable';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { Gavel, CheckCircle, Clock } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
+import { useTranslation } from 'react-i18next';
 
 const CounselView: React.FC = () => {
+  const { t } = useTranslation();
   const [reviews, setReviews] = useState([
     { id: 'R001', reportTitle: 'FTO Analysis - Blue Emitter Gen 3', date: '2024-06-25', deadline: '2024-07-02', status: 'Pending Review' },
     { id: 'R002', reportTitle: 'Infringement Risk - Patent US11234567', date: '2024-06-22', deadline: '2024-06-30', status: 'Completed' },
@@ -18,20 +20,20 @@ const CounselView: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const columns: Column<any>[] = [
-    { header: 'Review ID', accessor: 'id' },
-    { header: 'Report Title', accessor: (row) => <span className="font-medium text-slate-800">{row.reportTitle}</span> },
-    { header: 'Created', accessor: 'date' },
+    { header: t('partners.counsel.table.review_id'), accessor: 'id' },
+    { header: t('partners.counsel.table.report_title'), accessor: (row) => <span className="font-medium text-slate-800">{row.reportTitle}</span> },
+    { header: t('partners.counsel.table.created'), accessor: 'date' },
     {
-      header: 'Deadline',
+      header: t('partners.counsel.table.deadline'),
       accessor: (row) => (
         <div className="flex items-center text-amber-600 font-medium text-xs gap-1">
           <Clock className="w-3 h-3" /> {row.deadline}
         </div>
       )
     },
-    { header: 'Status', accessor: (row) => <StatusBadge status={row.status === 'Completed' ? 'completed' : 'pending'} label={row.status} /> },
+    { header: t('partners.counsel.table.status'), accessor: (row) => <StatusBadge status={row.status === 'Completed' ? 'completed' : 'pending'} label={row.status} /> },
     {
-      header: 'Action',
+      header: t('partners.counsel.table.action'),
       accessor: (row) => (
         <Button
           size="sm"
@@ -39,7 +41,7 @@ const CounselView: React.FC = () => {
           onClick={() => setSelectedReview(row)}
           disabled={row.status === 'Completed'}
         >
-          {row.status === 'Completed' ? 'View' : 'Review'}
+          {row.status === 'Completed' ? t('partners.counsel.actions.view') : t('partners.counsel.actions.review')}
         </Button>
       )
     }
@@ -58,7 +60,7 @@ const CounselView: React.FC = () => {
   };
 
   return (
-    <Card header="External Legal Counsel Reviews" padding="none">
+    <Card header={t('partners.counsel.title')} padding="none">
       <DataTable columns={columns} data={reviews} />
 
       <Modal
@@ -70,7 +72,7 @@ const CounselView: React.FC = () => {
           <>
             <Button variant="secondary" onClick={() => setSelectedReview(null)}>Cancel</Button>
             <Button variant="primary" onClick={handleSubmitReview} isLoading={loading} leftIcon={<CheckCircle className="w-4 h-4" />}>
-              Submit Review
+              {t('partners.counsel.submit_btn')}
             </Button>
           </>
         }
@@ -92,7 +94,7 @@ const CounselView: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Legal Opinion</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">{t('partners.counsel.opinion_label')}</label>
             <textarea
               value={reviewNote}
               onChange={(e) => setReviewNote(e.target.value)}
@@ -102,7 +104,7 @@ const CounselView: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Final Risk Rating</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">{t('partners.counsel.rating_label')}</label>
             <div className="flex gap-4">
               {['Acceptable', 'Caution', 'High Risk', 'Reject'].map((rating) => (
                 <label key={rating} className={`

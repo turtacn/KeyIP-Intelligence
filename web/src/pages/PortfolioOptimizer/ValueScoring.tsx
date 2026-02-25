@@ -3,12 +3,14 @@ import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import { ChevronDown, ChevronUp, TrendingUp, Gavel, DollarSign } from 'lucide-react';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from 'recharts';
+import { useTranslation } from 'react-i18next';
 
 interface ValueScoringProps {
   patents: any[]; // Using any for simplicity as scoring fields aren't in base Patent type
 }
 
 const ValueScoring: React.FC<ValueScoringProps> = ({ patents }) => {
+  const { t } = useTranslation();
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // Mock scoring data generation
@@ -39,19 +41,20 @@ const ValueScoring: React.FC<ValueScoringProps> = ({ patents }) => {
   return (
     <Card className="flex flex-col h-full" padding="none">
       <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 rounded-t-lg">
-        <h3 className="font-semibold text-slate-800">Patent Value Assessment</h3>
+        <h3 className="font-semibold text-slate-800">{t('portfolio.scoring.title')}</h3>
+        <p className="text-sm text-slate-500 mt-1">{t('portfolio.scoring.desc')}</p>
       </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Rank</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{t('portfolio.scoring.rank')}</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Patent No.</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Title</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Composite</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Recommendation</th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Details</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{t('portfolio.scoring.composite')}</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{t('portfolio.scoring.recommendation')}</th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('portfolio.scoring.details')}</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-200">
@@ -117,7 +120,7 @@ const ValueScoring: React.FC<ValueScoringProps> = ({ patents }) => {
                             <div className="flex justify-center mb-2 bg-blue-100 w-8 h-8 rounded-full items-center mx-auto text-blue-600">
                               <TrendingUp className="w-4 h-4" />
                             </div>
-                            <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Technical Value</div>
+                            <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">{t('portfolio.scoring.tech_val')}</div>
                             <div className="text-2xl font-bold text-slate-800">{patent.scores.tech.toFixed(0)}</div>
                             <div className="text-xs text-slate-400 mt-1">Novelty & Utility</div>
                           </div>
@@ -126,7 +129,7 @@ const ValueScoring: React.FC<ValueScoringProps> = ({ patents }) => {
                             <div className="flex justify-center mb-2 bg-purple-100 w-8 h-8 rounded-full items-center mx-auto text-purple-600">
                               <Gavel className="w-4 h-4" />
                             </div>
-                            <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Legal Value</div>
+                            <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">{t('portfolio.scoring.legal_val')}</div>
                             <div className="text-2xl font-bold text-slate-800">{patent.scores.legal.toFixed(0)}</div>
                             <div className="text-xs text-slate-400 mt-1">Claim Strength</div>
                           </div>
@@ -135,7 +138,7 @@ const ValueScoring: React.FC<ValueScoringProps> = ({ patents }) => {
                             <div className="flex justify-center mb-2 bg-green-100 w-8 h-8 rounded-full items-center mx-auto text-green-600">
                               <DollarSign className="w-4 h-4" />
                             </div>
-                            <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Commercial Value</div>
+                            <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">{t('portfolio.scoring.comm_val')}</div>
                             <div className="text-2xl font-bold text-slate-800">{patent.scores.commercial.toFixed(0)}</div>
                             <div className="text-xs text-slate-400 mt-1">Market Size</div>
                           </div>

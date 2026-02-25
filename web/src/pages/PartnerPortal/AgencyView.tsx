@@ -4,8 +4,10 @@ import Button from '../../components/ui/Button';
 import DataTable, { Column } from '../../components/ui/DataTable';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { Upload, Download, Send, MessageSquare } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const AgencyView: React.FC = () => {
+  const { t } = useTranslation();
   const [tasks] = useState([
     { id: 'T001', patentNo: 'CN115321456A', type: 'Draft Response', deadline: '2024-07-15', priority: 'High', status: 'In Progress' },
     { id: 'T002', patentNo: 'US20230123456A1', type: 'File Application', deadline: '2024-08-01', priority: 'Medium', status: 'Pending' },
@@ -18,12 +20,12 @@ const AgencyView: React.FC = () => {
   ]);
 
   const taskColumns: Column<any>[] = [
-    { header: 'Task ID', accessor: 'id' },
-    { header: 'Patent No.', accessor: 'patentNo' },
-    { header: 'Type', accessor: 'type' },
-    { header: 'Deadline', accessor: 'deadline' },
+    { header: t('partners.agency.table.task_id'), accessor: 'id' },
+    { header: t('partners.agency.table.patent_no'), accessor: 'patentNo' },
+    { header: t('partners.agency.table.type'), accessor: 'type' },
+    { header: t('partners.agency.table.deadline'), accessor: 'deadline' },
     {
-      header: 'Priority',
+      header: t('partners.agency.table.priority'),
       accessor: (row) => (
         <span className={`px-2 py-0.5 rounded text-xs font-bold ${
           row.priority === 'High' ? 'bg-red-100 text-red-700' :
@@ -34,24 +36,24 @@ const AgencyView: React.FC = () => {
         </span>
       )
     },
-    { header: 'Status', accessor: (row) => <StatusBadge status={row.status === 'Completed' ? 'completed' : row.status === 'In Progress' ? 'active' : 'pending'} label={row.status} /> },
+    { header: t('partners.agency.table.status'), accessor: (row) => <StatusBadge status={row.status === 'Completed' ? 'completed' : row.status === 'In Progress' ? 'active' : 'pending'} label={row.status} /> },
   ];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
       <div className="lg:col-span-2 space-y-6">
-        <Card header="Active Tasks" padding="none">
+        <Card header={t('partners.agency.tasks_title')} padding="none">
           <DataTable columns={taskColumns} data={tasks} />
         </Card>
 
-        <Card header="File Exchange" className="flex-1">
+        <Card header={t('partners.agency.files_title')} className="flex-1">
           <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center mb-6 hover:bg-slate-50 transition-colors cursor-pointer">
             <Upload className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm text-slate-600 font-medium">Drag & Drop files here or click to upload</p>
-            <p className="text-xs text-slate-400 mt-1">PDF, DOCX, ZIP up to 50MB</p>
+            <p className="text-sm text-slate-600 font-medium">{t('partners.agency.upload_hint')}</p>
+            <p className="text-xs text-slate-400 mt-1">{t('partners.agency.upload_subhint')}</p>
           </div>
 
-          <h4 className="font-semibold text-slate-800 mb-2 text-sm">Recent Files</h4>
+          <h4 className="font-semibold text-slate-800 mb-2 text-sm">{t('partners.agency.recent_files')}</h4>
           <ul className="space-y-2">
             {files.map((file, i) => (
               <li key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded border border-slate-100">
@@ -65,7 +67,7 @@ const AgencyView: React.FC = () => {
                   </div>
                 </div>
                 <Button size="sm" variant="ghost" leftIcon={<Download className="w-4 h-4" />}>
-                  Download
+                  {t('partners.common.download')}
                 </Button>
               </li>
             ))}
@@ -78,7 +80,7 @@ const AgencyView: React.FC = () => {
           <div className="border-b border-slate-200 pb-4 mb-4">
             <h3 className="font-semibold text-slate-800 flex items-center gap-2">
               <MessageSquare className="w-4 h-4" />
-              Communication
+              {t('partners.agency.comm_title')}
             </h3>
           </div>
 

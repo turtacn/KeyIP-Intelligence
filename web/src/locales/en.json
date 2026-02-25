@@ -3,6 +3,12 @@
     "title": "KeyIP Intelligence",
     "role": "IP Manager"
   },
+  "search": {
+    "global_placeholder": "Search across platform..."
+  },
+  "knowledge_graph": {
+    "search_placeholder": "Search graph..."
+  },
   "nav": {
     "home": "Home",
     "dashboard": "Dashboard",
@@ -16,13 +22,20 @@
     "title": "Executive Dashboard",
     "subtitle": "Real-time overview of your patent portfolio and strategic KPIs.",
     "search_placeholder": "Search patents, molecules, companies...",
+    "nl_query_placeholder": "Ask about your patent portfolio, e.g., 'How many US patents were filed last year?'",
     "export": "Export Report",
     "add_patent": "Add New Patent",
     "kpi": {
       "total_patents": "Total Patents",
       "active_patents": "Active Patents",
       "high_risk": "High Risk Alerts",
-      "due_month": "Due This Month"
+      "due_month": "Due This Month",
+      "vs_last_month": "vs last month",
+      "portfolio_size": "Portfolio Size",
+      "citation_index": "Citation Index",
+      "tech_coverage": "Tech Coverage",
+      "grant_rate": "Grant Rate",
+      "filing_rate": "Filing Rate"
     },
     "trend": {
       "title": "Monthly Application Trend",
@@ -66,6 +79,7 @@
     "assessment": {
       "title": "New Invention Details",
       "smiles_label": "Target Molecule Structure (SMILES)",
+      "smiles_placeholder": "e.g., c1ccc2c(c1)c3ccccc3n2-c4ccc(cc4)N(c5ccccc5)c6ccccc6",
       "desc_label": "Technical Description",
       "desc_placeholder": "Describe technical problem, solution and advantages...",
       "btn_assess": "Assess Patentability",
@@ -74,7 +88,18 @@
       "inventive": "Inventive Step",
       "utility": "Utility Assessment",
       "similar": "Similar Prior Art",
-      "recommendation": "Recommendation"
+      "recommendation": "Recommendation",
+      "enter_molecule_hint": "Enter molecule structure to begin assessment."
+    },
+    "draft": {
+      "desc_placeholder": "Describe the invention in detail...",
+      "keywords_placeholder": "e.g., deuterated core, high T1 energy, thermally stable"
+    },
+    "prior_art": {
+      "claim_placeholder": "Paste your claim text here for prior art analysis..."
+    },
+    "whitespace": {
+      "search_placeholder": "e.g., Anthracene"
     },
     "search": {
       "mode_text": "Text Search",
@@ -88,6 +113,8 @@
   "infringement": {
     "title": "Infringement Watch Center",
     "list_title": "Monitoring Alerts",
+    "alerts_label": "Alerts",
+    "search_placeholder": "Search patent or molecule...",
     "refresh": "Refresh",
     "filter_risk": "Risk Level",
     "detail": {
@@ -106,18 +133,24 @@
     },
     "claims": {
       "title": "Claim Analysis",
+      "claim_label": "Claim",
       "match": "Element Match"
     },
     "actions": {
       "title": "Risk Mitigation Actions",
       "report": "Generate FTO Report",
-      "design": "Design Around Suggestions",
-      "assign": "Assign to Legal Team",
-      "reviewed": "Mark as Reviewed"
+      "design": "Design Around",
+      "assign": "Assign to Legal",
+      "reviewed": "Mark as Reviewed",
+      "reviewed_done": "Reviewed"
     },
     "feed": {
       "title": "Global Patent Live Feed",
-      "new": "NEW"
+      "new": "New",
+      "high_risk_detected": "HIGH RISK DETECTED",
+      "waiting": "Waiting for new patent publications...",
+      "pause": "Pause Feed",
+      "resume": "Resume Feed"
     }
   },
   "portfolio": {
@@ -140,11 +173,12 @@
     "gap": {
       "title": "Competitive Gap Matrix",
       "select_comp": "Select Competitors",
-      "domain": "Technology Domain",
-      "my_org": "My Org"
+      "domain": "TECHNOLOGY DOMAIN",
+      "my_org": "MY ORG"
     },
     "scoring": {
       "title": "Patent Value Scoring",
+      "desc": "AI-driven valuation of individual patent assets based on technical, legal, and commercial factors.",
       "rank": "Rank",
       "composite": "Composite Score",
       "recommendation": "Recommendation",
@@ -166,8 +200,10 @@
       "desc": "Simulate strategic moves and their impact on portfolio metrics.",
       "builder_title": "Scenario Builder",
       "name_label": "Scenario Name",
-      "action_label": "Simulation Action",
+      "name_placeholder": "e.g., Acquisition of Startup X",
+      "action_label": "Simulate Action",
       "run_btn": "Run Simulation",
+      "hint": "Configure scenario and run simulation to see impact.",
       "results_title": "Simulation Results",
       "coverage": "Portfolio Coverage",
       "value": "Total Value",
@@ -189,12 +225,32 @@
       "date_range": "Due Date Range",
       "urgency": "Urgency",
       "reset": "Reset",
+      "overdue": "Overdue",
+      "all": "All",
+      "due_7d": "Due 7d",
+      "due_30d": "Due 30d",
+      "due_90d": "Due 90d",
       "apply": "Apply Filters"
     },
     "calendar": {
       "title": "Deadline Calendar",
+      "upcoming": "upcoming events",
+      "select_all": "Select All",
+      "deselect_all": "Deselect All",
       "mark_handled": "Mark as Handled",
       "export": "Export CSV"
+    },
+    "table": {
+      "select": "SELECT",
+      "patent_id": "PATENT ID",
+      "event_type": "EVENT TYPE",
+      "jurisdiction": "JURISDICTION",
+      "due_date": "DUE DATE",
+      "fee": "FEE",
+      "status": "STATUS"
+    },
+    "pagination": {
+      "showing": "Showing page"
     },
     "annuity": {
       "total_due": "Total Due This Year",
@@ -220,33 +276,68 @@
       "title": "Partner Management",
       "add_btn": "Add Partner",
       "table": {
-        "name": "Name",
-        "type": "Type",
-        "country": "Country",
-        "projects": "Active Projects",
-        "performance": "Performance",
-        "status": "Status",
-        "actions": "Actions"
+        "name": "PARTNER NAME",
+        "type": "TYPE",
+        "country": "COUNTRY",
+        "projects": "ACTIVE PROJECTS",
+        "performance": "PERFORMANCE",
+        "status": "STATUS",
+        "actions": "ACTIONS"
       }
     },
     "agency": {
-      "tasks_title": "Pending Tasks",
+      "tasks_title": "Active Tasks",
       "files_title": "File Exchange",
-      "comm_title": "Communication Log",
-      "upload_hint": "Drag and drop files here or click to upload",
-      "recent_files": "Recent Files"
+      "comm_title": "Communication",
+      "chat_placeholder": "Type a message...",
+      "upload_hint": "Drag & Drop files here or click to upload",
+      "upload_subhint": "PDF, DOCX, ZIP up to 50MB",
+      "recent_files": "Recent Files",
+      "table": {
+        "task_id": "TASK ID",
+        "patent_no": "PATENT NO.",
+        "type": "TYPE",
+        "deadline": "DEADLINE",
+        "priority": "PRIORITY",
+        "status": "STATUS"
+      }
     },
     "counsel": {
-      "title": "External Legal Counsel Review",
+      "title": "External Legal Counsel Reviews",
       "submit_btn": "Submit Review Opinion",
       "opinion_label": "Legal Opinion",
-      "rating_label": "Final Risk Rating"
+      "opinion_placeholder": "Enter your legal assessment, recommendations, and risk mitigation strategies...",
+      "rating_label": "Final Risk Rating",
+      "table": {
+        "review_id": "REVIEW ID",
+        "report_title": "REPORT TITLE",
+        "created": "CREATED",
+        "deadline": "DEADLINE",
+        "status": "STATUS",
+        "action": "ACTION"
+      },
+      "actions": {
+        "review": "Review",
+        "view": "View"
+      }
     },
     "api": {
+      "doc_title": "API Documentation",
       "intro_title": "Introduction",
+      "intro_desc": "Welcome to the KeyIP Intelligence API. Integrate patent data, molecular analysis, and risk alerts directly into your internal systems.",
       "endpoints_title": "Endpoints",
       "auth_title": "Authentication",
-      "limits_title": "Rate Limits"
+      "key_label": "API Key",
+      "key_warning": "Keep this key secret. Do not share it in client-side code.",
+      "gen_key_btn": "Generate New Key",
+      "limits_title": "Rate Limits",
+      "limit_rpm": "Requests / Minute",
+      "limit_quota": "Daily Quota"
+    },
+    "common": {
+      "download": "Download",
+      "copy": "Copy",
+      "copied": "Copied"
     }
   }
 }

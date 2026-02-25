@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import DataTable, { Column } from '../../components/ui/DataTable';
 import { Search as SearchIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const Search: React.FC = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('all');
   const [results] = useState([]); // Mock results empty for now
 
@@ -16,7 +18,7 @@ const Search: React.FC = () => {
         <div className="relative">
           <input
             type="text"
-            placeholder="Search across platform..."
+            placeholder={t('search.global_placeholder')}
             className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
           />
           <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />

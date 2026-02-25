@@ -2,6 +2,7 @@ import React from 'react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import { Claim, InfringementAlert } from '../../types/domain';
+import { useTranslation } from 'react-i18next';
 
 interface ClaimAnalysisProps {
   claims?: Claim[];
@@ -9,6 +10,8 @@ interface ClaimAnalysisProps {
 }
 
 const ClaimAnalysis: React.FC<ClaimAnalysisProps> = ({ claims = [], alert }) => {
+  const { t } = useTranslation();
+
   // Mock analysis logic for display
   const relevantClaims = claims.length > 0 ? claims : [
     {
@@ -29,7 +32,7 @@ const ClaimAnalysis: React.FC<ClaimAnalysisProps> = ({ claims = [], alert }) => 
 
   return (
     <Card className="mb-6">
-      <h3 className="text-lg font-semibold text-slate-800 mb-4">Claim Analysis</h3>
+      <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('infringement.claims.title')}</h3>
 
       <div className="space-y-4">
         {relevantClaims.map((claim, index) => {
@@ -40,13 +43,13 @@ const ClaimAnalysis: React.FC<ClaimAnalysisProps> = ({ claims = [], alert }) => 
             <div key={claim.id} className="border border-slate-200 rounded-lg overflow-hidden">
               <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <span className="font-bold text-slate-700">Claim {index + 1}</span>
+                  <span className="font-bold text-slate-700">{t('infringement.claims.claim_label')} {index + 1}</span>
                   <Badge variant={claim.type === 'independent' ? 'info' : 'default'} size="sm">
                     {claim.type}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="text-slate-500">Element Match:</span>
+                  <span className="text-slate-500">{t('infringement.claims.match')}:</span>
                   <span className={`font-bold ${Number(matchPercent) > 80 ? 'text-red-600' : 'text-amber-600'}`}>
                     {matchPercent}%
                   </span>

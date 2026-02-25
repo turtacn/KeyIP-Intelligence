@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { PenTool, Copy, Download, Loader2, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const ClaimDraftAssistant: React.FC = () => {
+  const { t } = useTranslation();
   const [description, setDescription] = useState('');
   const [features, setFeatures] = useState('');
   const [loading, setLoading] = useState(false);
@@ -56,7 +58,7 @@ const ClaimDraftAssistant: React.FC = () => {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe the invention in detail..."
+              placeholder={t('mining.draft.desc_placeholder')}
               className="w-full h-48 p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
           </div>
@@ -66,7 +68,7 @@ const ClaimDraftAssistant: React.FC = () => {
               type="text"
               value={features}
               onChange={(e) => setFeatures(e.target.value)}
-              placeholder="e.g., deuterated core, high T1 energy, thermally stable"
+              placeholder={t('mining.draft.keywords_placeholder')}
               className="w-full p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
