@@ -14,13 +14,40 @@ const WhiteSpaceDiscovery: React.FC = () => {
   const handleAnalyze = () => {
     setLoading(true);
     setTimeout(() => {
-      // Mock data generation
-      const mockData = Array.from({ length: 50 }).map((_, i) => ({
-        id: `mol_${i}`,
-        homo: -5.0 - Math.random() * 1.5,
-        eqe: 5 + Math.random() * 20,
-        patented: Math.random() > 0.3,
-      }));
+      // Mock data generation with clear white space
+      const mockData = [];
+
+      // Cluster 1: Low HOMO, varying EQE (Patented)
+      for (let i = 0; i < 20; i++) {
+        mockData.push({
+          id: `pat_a_${i}`,
+          homo: -6.4 + Math.random() * 0.4, // -6.4 to -6.0
+          eqe: 5 + Math.random() * 15,      // 5 to 20
+          patented: true,
+        });
+      }
+
+      // Cluster 2: High HOMO, varying EQE (Patented)
+      for (let i = 0; i < 20; i++) {
+        mockData.push({
+          id: `pat_b_${i}`,
+          homo: -5.5 + Math.random() * 0.4, // -5.5 to -5.1
+          eqe: 5 + Math.random() * 20,      // 5 to 25
+          patented: true,
+        });
+      }
+
+      // Cluster 3: Candidates in White Space (High EQE, specific HOMO gap)
+      // White Space defined as: HOMO [-6.0, -5.5], EQE [20, 30]
+      for (let i = 0; i < 15; i++) {
+        mockData.push({
+          id: `cand_${i}`,
+          homo: -5.9 + Math.random() * 0.3, // -5.9 to -5.6 (inside gap)
+          eqe: 22 + Math.random() * 6,      // 22 to 28 (high performance)
+          patented: false,
+        });
+      }
+
       setData(mockData);
       setLoading(false);
     }, 1500);
@@ -56,8 +83,7 @@ const WhiteSpaceDiscovery: React.FC = () => {
           <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-800 border border-blue-100 mt-4">
             <h4 className="font-semibold mb-2">{t('mining.whitespace.properties_title')}</h4>
             <ul className="list-disc list-inside space-y-1 opacity-80">
-              <li>HOMO: -5.0 to -6.5 eV</li>
-              <li>LUMO: -2.0 to -3.0 eV</li>
+              <li>HOMO: -6.0 to -5.5 eV (Target Gap)</li>
               <li>EQE: &gt; 20%</li>
             </ul>
           </div>
@@ -74,7 +100,7 @@ const WhiteSpaceDiscovery: React.FC = () => {
         <p className="text-sm text-slate-500 mb-4">{t('mining.whitespace.map_desc')}</p>
 
         {data.length > 0 ? (
-          <div className="flex-1 w-full relative">
+          <div className="flex-1 w-full relative min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -96,15 +122,15 @@ const WhiteSpaceDiscovery: React.FC = () => {
                 />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} />
 
-                {/* Highlight White Space */}
-                <ReferenceArea x1={-6.0} x2={-5.5} y1={20} y2={28} stroke="none" fill="#10b981" fillOpacity={0.1} />
+                {/* Highlight White Space: HOMO -6.0 to -5.5, EQE > 20 */}
+                <ReferenceArea x1={-6.0} x2={-5.5} y1={20} y2={30} stroke="none" fill="#10b981" fillOpacity={0.1} />
 
                 <Scatter name={t('mining.whitespace.legend_patented')} data={data.filter(d => d.patented)} fill="#94a3b8" shape="circle" />
                 <Scatter name={t('mining.whitespace.legend_candidate')} data={data.filter(d => !d.patented)} fill="#3b82f6" shape="star" />
               </ScatterChart>
             </ResponsiveContainer>
 
-            <div className="absolute top-4 right-4 bg-white/90 p-2 rounded border border-slate-200 text-xs shadow-sm">
+            <div className="absolute top-4 right-4 bg-white/90 p-2 rounded border border-slate-200 text-xs shadow-sm z-10">
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-3 h-3 rounded-full bg-slate-400"></span> {t('mining.whitespace.legend_patented')}
               </div>

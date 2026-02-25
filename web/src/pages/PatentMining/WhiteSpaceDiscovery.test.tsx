@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import WhiteSpaceDiscovery from './WhiteSpaceDiscovery';
+import React from 'react';
 
 // Mock Recharts ResponsiveContainer because it relies on ResizeObserver and DOM dimensions
 vi.mock('recharts', async (importOriginal) => {
@@ -26,9 +27,9 @@ describe('WhiteSpaceDiscovery', () => {
 
   it('renders correctly initially', () => {
     render(<WhiteSpaceDiscovery />);
-    expect(screen.getByText('Discovery Parameters')).toBeInTheDocument();
-    expect(screen.getByText('Molecular Space Map')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Identify White Spaces/i })).toBeInTheDocument();
+    expect(screen.getByText('mining.whitespace.params_title')).toBeInTheDocument();
+    expect(screen.getByText('mining.whitespace.map_title')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /mining.whitespace.btn_identify/i })).toBeInTheDocument();
     // Chart should not be visible initially
     expect(screen.queryByTestId('responsive-container')).not.toBeInTheDocument();
   });
@@ -36,7 +37,7 @@ describe('WhiteSpaceDiscovery', () => {
   it('shows chart after analysis', async () => {
     render(<WhiteSpaceDiscovery />);
 
-    const analyzeButton = screen.getByRole('button', { name: /Identify White Spaces/i });
+    const analyzeButton = screen.getByRole('button', { name: /mining.whitespace.btn_identify/i });
     fireEvent.click(analyzeButton);
 
     // Fast-forward timers inside act to flush updates
@@ -49,8 +50,8 @@ describe('WhiteSpaceDiscovery', () => {
     expect(screen.getByTestId('responsive-container')).toBeInTheDocument();
 
     // Check if legend items are present (custom HTML legend)
-    expect(screen.getByText('Patented')).toBeInTheDocument();
-    expect(screen.getByText('Candidate')).toBeInTheDocument();
-    expect(screen.getByText('White Space')).toBeInTheDocument();
+    expect(screen.getByText('mining.whitespace.legend_patented')).toBeInTheDocument();
+    expect(screen.getByText('mining.whitespace.legend_candidate')).toBeInTheDocument();
+    expect(screen.getByText('mining.whitespace.legend_whitespace')).toBeInTheDocument();
   });
 });
