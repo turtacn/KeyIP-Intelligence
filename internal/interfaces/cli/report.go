@@ -442,8 +442,4 @@ func progressBar(progress int) string {
 	return bar
 }
 
-func init() {
-	RootCmd.AddCommand(NewReportCmd())
-}
-
 //Personal.AI order the ending
