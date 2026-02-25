@@ -41,6 +41,9 @@ type PatentRepository interface {
 	GetInventors(ctx context.Context, patentID uuid.UUID) ([]*Inventor, error)
 	SearchByInventor(ctx context.Context, inventorName string, limit, offset int) ([]*Patent, int64, error)
 
+	// Assignee
+	SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*Patent, int64, error)
+
 	// Priority
 	SetPriorityClaims(ctx context.Context, patentID uuid.UUID, claims []*PriorityClaim) error
 	GetPriorityClaims(ctx context.Context, patentID uuid.UUID) ([]*PriorityClaim, error)

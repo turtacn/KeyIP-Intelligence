@@ -669,6 +669,11 @@ func (s *valuationServiceImpl) AssessPatent(ctx context.Context, req *SinglePate
 		s.metrics.ObserveHistogram("valuation_assess_patent_duration_seconds", time.Since(start).Seconds(), nil)
 	}()
 
+	// Check context cancellation
+	if err := ctx.Err(); err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeTimeout, "context cancelled")
+	}
+
 	// 1. Validate
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -768,6 +773,11 @@ func (s *valuationServiceImpl) AssessPortfolio(ctx context.Context, req *Portfol
 	defer func() {
 		s.metrics.ObserveHistogram("valuation_assess_portfolio_duration_seconds", time.Since(start).Seconds(), nil)
 	}()
+
+	// Check context cancellation
+	if err := ctx.Err(); err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeTimeout, "context cancelled")
+	}
 
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -1039,8 +1049,8 @@ func (s *valuationServiceImpl) exportCSV(record *AssessmentRecord) ([]byte, erro
 	var buf strings.Builder
 	w := csv.NewWriter(&buf)
 
-	// Header
-	header := []string{"ID", "PatentID", "PortfolioID", "OverallScore", "Tier", "AssessedAt", "AssessorType"}
+	// Header: use lowercase snake_case for CSV compatibility
+	header := []string{"id", "patent_id", "portfolio_id", "overall_score", "tier", "assessed_at", "assessor_type"}
 	dims := AllDimensions()
 	for _, d := range dims {
 		header = append(header, string(d))

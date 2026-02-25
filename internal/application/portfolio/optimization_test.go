@@ -10,6 +10,12 @@ import (
 	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 )
 
+// Standard test UUIDs for optimization tests
+const (
+	testPortfolioOptID      = "40000000-0000-0000-0000-000000000003"
+	testPortfolioOptEmptyID = "40000000-0000-0000-0000-000000000004"
+)
+
 // -----------------------------------------------------------------------
 // Tests: OptimizationService Construction
 // -----------------------------------------------------------------------
@@ -76,16 +82,17 @@ func buildOptTestRepo() *mockPatentRepo {
 
 func TestOptimize_Success(t *testing.T) {
 	repo := buildOptTestRepo()
+	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: repo,
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    repo,
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "40000000-0000-0000-0000-000000000003",
+		PortfolioID: testPortfolioOptID,
 		Objective:   GoalBalanced,
 	})
 	if err != nil {
@@ -94,8 +101,8 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 	if resp == nil {
 		t.Fatal("expected non-nil response")
 	}
-	if resp.PortfolioID != "40000000-0000-0000-0000-000000000003" {
-		t.Errorf("expected opt-port, got %s", resp.PortfolioID)
+	if resp.PortfolioID != testPortfolioOptID {
+		t.Errorf("expected %s, got %s", testPortfolioOptID, resp.PortfolioID)
 	}
 	if resp.Summary.TotalPatents != 5 {
 		t.Errorf("expected 5 total patents, got %d", resp.Summary.TotalPatents)
@@ -109,11 +116,12 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 }
 
 func TestOptimize_NilRequest(t *testing.T) {
+	testPortfolio := createTestPortfolio("p1")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: newMockPatentRepo(),
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    newMockPatentRepo(),
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 	_, err := svc.Optimize(context.Background(), nil)
@@ -123,11 +131,12 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 }
 
 func TestOptimize_EmptyPortfolioID(t *testing.T) {
+	testPortfolio := createTestPortfolio("p1")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: newMockPatentRepo(),
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    newMockPatentRepo(),
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 	_, err := svc.Optimize(context.Background(), &OptimizationRequest{})
@@ -138,16 +147,17 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestOptimize_DefaultObjective(t *testing.T) {
 	repo := buildOptTestRepo()
+	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: repo,
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    repo,
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "40000000-0000-0000-0000-000000000003",
+		PortfolioID: testPortfolioOptID,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -159,16 +169,17 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestOptimize_MinCostObjective(t *testing.T) {
 	repo := buildOptTestRepo()
+	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: repo,
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    repo,
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "40000000-0000-0000-0000-000000000003",
+		PortfolioID: testPortfolioOptID,
 		Objective:   GoalMinCost,
 		Constraints: OptConstraints{
 			MinPatentCount:  4,
@@ -199,16 +210,17 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestOptimize_MaxROIObjective(t *testing.T) {
 	repo := buildOptTestRepo()
+	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: repo,
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    repo,
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "40000000-0000-0000-0000-000000000003",
+		PortfolioID: testPortfolioOptID,
 		Objective:   GoalMaxROI,
 	})
 	if err != nil {
@@ -221,16 +233,17 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestOptimize_WithPreferences(t *testing.T) {
 	repo := buildOptTestRepo()
+	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: repo,
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    repo,
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "40000000-0000-0000-0000-000000000003",
+		PortfolioID: testPortfolioOptID,
 		Objective:   GoalBalanced,
 		Preferences: OptPreferences{
 			PreferRecent:    true,
@@ -250,10 +263,10 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestOptimize_PortfolioNotFound(t *testing.T) {
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: nil},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: newMockPatentRepo(),
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: nil},
+		PortfolioRepository: newMockPortfolioRepoConstellation(),
+		PatentRepository:    newMockPatentRepo(),
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
@@ -267,17 +280,18 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestOptimize_EmptyPortfolio(t *testing.T) {
 	repo := newMockPatentRepo()
-	repo.byPortfolio["40000000-0000-0000-0000-000000000001"] = []*domainpatent.Patent{}
+	repo.byPortfolio[testPortfolioOptEmptyID] = []*domainpatent.Patent{}
+	testPortfolio := createTestPortfolioWithID(testPortfolioOptEmptyID, "Empty Portfolio")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000001")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
 		PatentRepository: repo,
 		Logger:           &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
 	resp, err := svc.Optimize(context.Background(), &OptimizationRequest{
-		PortfolioID: "40000000-0000-0000-0000-000000000001",
+		PortfolioID: testPortfolioOptEmptyID,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -296,15 +310,16 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestGetPruneCandidates_Success(t *testing.T) {
 	repo := buildOptTestRepo()
+	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: repo,
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    repo,
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
-	candidates, err := svc.GetPruneCandidates(context.Background(), "40000000-0000-0000-0000-000000000003", 3)
+	candidates, err := svc.GetPruneCandidates(context.Background(), testPortfolioOptID, 3)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -314,11 +329,12 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 }
 
 func TestGetPruneCandidates_EmptyPortfolioID(t *testing.T) {
+	testPortfolio := createTestPortfolio("p1")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: newMockPatentRepo(),
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    newMockPatentRepo(),
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
@@ -330,15 +346,16 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestGetPruneCandidates_DefaultLimit(t *testing.T) {
 	repo := buildOptTestRepo()
+	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: repo,
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    repo,
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
-	candidates, err := svc.GetPruneCandidates(context.Background(), "40000000-0000-0000-0000-000000000003", 0)
+	candidates, err := svc.GetPruneCandidates(context.Background(), testPortfolioOptID, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -353,11 +370,12 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestEstimateCost_Success(t *testing.T) {
 	repo := buildOptTestRepo()
+	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("40000000-0000-0000-0000-000000000003")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: repo,
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    repo,
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
@@ -397,11 +415,12 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 }
 
 func TestEstimateCost_EmptyPortfolioID(t *testing.T) {
+	testPortfolio := createTestPortfolio("p1")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: newMockPatentRepo(),
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    newMockPatentRepo(),
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
@@ -413,10 +432,10 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestEstimateCost_PortfolioNotFound(t *testing.T) {
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: nil},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: newMockPatentRepo(),
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: nil},
+		PortfolioRepository: newMockPortfolioRepoConstellation(),
+		PatentRepository:    newMockPatentRepo(),
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
@@ -428,16 +447,17 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 
 func TestEstimateCost_EmptyPortfolio(t *testing.T) {
 	repo := newMockPatentRepo()
-	repo.byPortfolio["empty"] = []*domainpatent.Patent{}
+	repo.byPortfolio[testPortfolioOptEmptyID] = []*domainpatent.Patent{}
+	testPortfolio := createTestPortfolioWithID(testPortfolioOptEmptyID, "Empty Portfolio")
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("empty")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: repo,
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
+		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PatentRepository:    repo,
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
-	estimate, err := svc.EstimateCost(context.Background(), "empty")
+	estimate, err := svc.EstimateCost(context.Background(), testPortfolioOptEmptyID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

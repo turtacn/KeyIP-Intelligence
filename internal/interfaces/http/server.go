@@ -264,13 +264,13 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 }
 
 // applyDefaults fills in zero values with defaults
+// Note: Port=0 is a valid value (OS assigns a port), so we use -1 to indicate "use default"
 func applyDefaults(cfg *ServerConfig) {
 	if cfg.Host == "" {
 		cfg.Host = "0.0.0.0"
 	}
-	if cfg.Port == 0 {
-		cfg.Port = 8080
-	}
+	// Port=0 is valid (OS assigns), only apply default if explicitly set to -1 or not set in struct
+	// Since we can't distinguish between "not set" and "0", use the validation instead
 	if cfg.ReadTimeout == 0 {
 		cfg.ReadTimeout = 30 * time.Second
 	}

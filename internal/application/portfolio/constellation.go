@@ -611,17 +611,30 @@ func (s *constellationServiceImpl) CompareWithCompetitor(ctx context.Context, re
 	}
 
 	// Load competitor patents.
-	// TODO: Implement competitor patent loading when batch retrieval methods are available
 	var compPatents []*domainpatent.Patent
-	// Placeholder: competitor patent loading will require repository method implementation
 	if len(req.CompetitorIDs) > 0 {
-		// Need: FindByIDs or BatchGetByID method
-		// For now, return empty to avoid compilation error
-		compPatents = []*domainpatent.Patent{}
+		// Load by specific patent IDs
+		for _, idStr := range req.CompetitorIDs {
+			id, parseErr := uuid.Parse(idStr)
+			if parseErr != nil {
+				s.logger.Warn("invalid competitor patent ID", logging.String("id", idStr), logging.Err(parseErr))
+				continue
+			}
+			p, fetchErr := s.patentRepo.GetByID(ctx, id)
+			if fetchErr != nil {
+				s.logger.Warn("failed to fetch competitor patent", logging.String("id", idStr), logging.Err(fetchErr))
+				continue
+			}
+			compPatents = append(compPatents, p)
+		}
 	} else {
-		// Need: FindByAssigneeName or SearchByAssignee method
-		// For now, return empty to avoid compilation error  
-		compPatents = []*domainpatent.Patent{}
+		// Search by assignee name
+		results, _, searchErr := s.patentRepo.SearchByAssigneeName(ctx, req.CompetitorName, 1000, 0)
+		if searchErr != nil {
+			s.logger.Warn("failed to search competitor patents by assignee name", logging.Err(searchErr))
+		} else {
+			compPatents = results
+		}
 	}
 
 	// Filter by tech domains if specified.

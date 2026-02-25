@@ -270,6 +270,37 @@ func (r *postgresPatentRepo) SearchByInventor(ctx context.Context, inventorName 
 func (r *postgresPatentRepo) SetPriorityClaims(ctx context.Context, patentID uuid.UUID, claims []*patent.PriorityClaim) error { return nil }
 func (r *postgresPatentRepo) GetPriorityClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.PriorityClaim, error) { return nil, nil }
 
+// Assignee
+func (r *postgresPatentRepo) SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*patent.Patent, int64, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	// Search patents by assignee name (case-insensitive partial match)
+	query := `SELECT id, patent_number, title, abstract, status, jurisdiction, filing_date, assignee_name, family_id
+		FROM patents WHERE assignee_name ILIKE $1 ORDER BY filing_date DESC LIMIT $2 OFFSET $3`
+	rows, err := r.conn.DB().QueryContext(ctx, query, "%"+assigneeName+"%", limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var results []*patent.Patent
+	for rows.Next() {
+		p := &patent.Patent{}
+		if err := rows.Scan(&p.ID, &p.PatentNumber, &p.Title, &p.Abstract, &p.Status, &p.Jurisdiction, &p.FilingDate, &p.AssigneeName, &p.FamilyID); err != nil {
+			return nil, 0, err
+		}
+		results = append(results, p)
+	}
+
+	// Count total
+	var total int64
+	countQuery := `SELECT COUNT(*) FROM patents WHERE assignee_name ILIKE $1`
+	r.conn.DB().QueryRowContext(ctx, countQuery, "%"+assigneeName+"%").Scan(&total)
+
+	return results, total, nil
+}
+
 // Batch
 func (r *postgresPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Patent) (int, error) { return 0, nil }
 func (r *postgresPatentRepo) BatchUpdateStatus(ctx context.Context, ids []uuid.UUID, status patent.PatentStatus) (int64, error) { return 0, nil }

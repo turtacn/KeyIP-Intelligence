@@ -379,6 +379,14 @@ func (m *mockPatentRepoConstellation) GetByAssignee(ctx context.Context, assigne
 	return nil, 0, nil
 }
 
+func (m *mockPatentRepoConstellation) SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*domainpatent.Patent, int64, error) {
+	if m.findErr != nil {
+		return nil, 0, m.findErr
+	}
+	patents := m.byAssignee[assigneeName]
+	return patents, int64(len(patents)), nil
+}
+
 func (m *mockPatentRepoConstellation) GetByJurisdiction(ctx context.Context, jurisdiction string, limit, offset int) ([]*domainpatent.Patent, int64, error) {
 	return nil, 0, nil
 }

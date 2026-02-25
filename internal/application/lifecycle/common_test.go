@@ -271,6 +271,7 @@ func (m *mockPatentRepo) GetIndependentClaims(ctx context.Context, patentID impo
 func (m *mockPatentRepo) SetInventors(ctx context.Context, patentID importUUID.UUID, inventors []*domainPatent.Inventor) error { return nil }
 func (m *mockPatentRepo) GetInventors(ctx context.Context, patentID importUUID.UUID) ([]*domainPatent.Inventor, error) { return nil, nil }
 func (m *mockPatentRepo) SearchByInventor(ctx context.Context, inventorName string, limit, offset int) ([]*domainPatent.Patent, int64, error) { return nil, 0, nil }
+func (m *mockPatentRepo) SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*domainPatent.Patent, int64, error) { return nil, 0, nil }
 func (m *mockPatentRepo) SetPriorityClaims(ctx context.Context, patentID importUUID.UUID, claims []*domainPatent.PriorityClaim) error { return nil }
 func (m *mockPatentRepo) GetPriorityClaims(ctx context.Context, patentID importUUID.UUID) ([]*domainPatent.PriorityClaim, error) { return nil, nil }
 func (m *mockPatentRepo) BatchCreate(ctx context.Context, patents []*domainPatent.Patent) (int, error) { return 0, nil }
