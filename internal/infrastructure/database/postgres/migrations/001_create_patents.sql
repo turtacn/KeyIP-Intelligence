@@ -1,9 +1,24 @@
 -- +migrate Up
-CREATE EXTENSION IF NOT EXISTS vector;
 
+-- Enable extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "vector";
+
+-- Create trigger function for updated_at
+CREATE OR REPLACE FUNCTION trigger_set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create ENUM types
 CREATE TYPE patent_status AS ENUM ('draft', 'filed', 'published', 'under_examination', 'granted', 'rejected', 'withdrawn', 'expired', 'lapsed', 'invalidated');
 CREATE TYPE patent_type AS ENUM ('invention', 'utility_model', 'design', 'plant', 'provisional');
 
+-- Create patents table
 CREATE TABLE patents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patent_number VARCHAR(64) NOT NULL UNIQUE,
@@ -35,6 +50,7 @@ CREATE TABLE patents (
     deleted_at TIMESTAMPTZ
 );
 
+-- Create patent_claims table
 CREATE TABLE patent_claims (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patent_id UUID NOT NULL REFERENCES patents(id) ON DELETE CASCADE,
@@ -51,6 +67,7 @@ CREATE TABLE patent_claims (
     UNIQUE(patent_id, claim_number)
 );
 
+-- Create patent_inventors table
 CREATE TABLE patent_inventors (
     patent_id UUID NOT NULL REFERENCES patents(id) ON DELETE CASCADE,
     inventor_name VARCHAR(256) NOT NULL,
@@ -60,6 +77,7 @@ CREATE TABLE patent_inventors (
     PRIMARY KEY (patent_id, inventor_name, sequence)
 );
 
+-- Create patent_priority_claims table
 CREATE TABLE patent_priority_claims (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patent_id UUID NOT NULL REFERENCES patents(id) ON DELETE CASCADE,
@@ -68,6 +86,7 @@ CREATE TABLE patent_priority_claims (
     priority_country VARCHAR(8) NOT NULL
 );
 
+-- Create indexes
 CREATE INDEX idx_patents_patent_number ON patents(patent_number);
 CREATE INDEX idx_patents_status ON patents(status);
 CREATE INDEX idx_patents_jurisdiction ON patents(jurisdiction);
@@ -78,18 +97,13 @@ CREATE INDEX idx_patents_ipc_codes ON patents USING GIN(ipc_codes);
 CREATE INDEX idx_patents_keyip_tech_codes ON patents USING GIN(keyip_tech_codes);
 CREATE INDEX idx_patents_metadata ON patents USING GIN(metadata jsonb_path_ops);
 CREATE INDEX idx_patents_deleted_at ON patents(deleted_at) WHERE deleted_at IS NULL;
+
 CREATE INDEX idx_patent_claims_patent_id ON patent_claims(patent_id);
 CREATE INDEX idx_patent_claims_type ON patent_claims(claim_type);
+
 CREATE INDEX idx_patent_priority_claims_patent_id ON patent_priority_claims(patent_id);
 
-CREATE OR REPLACE FUNCTION trigger_set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
+-- Create triggers
 CREATE TRIGGER set_updated_at
 BEFORE UPDATE ON patents
 FOR EACH ROW
@@ -101,11 +115,17 @@ FOR EACH ROW
 EXECUTE FUNCTION trigger_set_updated_at();
 
 -- +migrate Down
-DROP TABLE patent_priority_claims;
-DROP TABLE patent_inventors;
-DROP TABLE patent_claims;
-DROP TABLE patents;
-DROP TYPE patent_type;
-DROP TYPE patent_status;
 
+DROP TRIGGER IF EXISTS set_updated_at ON patent_claims;
+DROP TRIGGER IF EXISTS set_updated_at ON patents;
+
+DROP TABLE IF EXISTS patent_priority_claims;
+DROP TABLE IF EXISTS patent_inventors;
+DROP TABLE IF EXISTS patent_claims;
+DROP TABLE IF EXISTS patents;
+
+DROP TYPE IF EXISTS patent_type;
+DROP TYPE IF EXISTS patent_status;
+DROP FUNCTION IF EXISTS trigger_set_updated_at;
+DROP EXTENSION IF EXISTS "vector";
 --Personal.AI order the ending

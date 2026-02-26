@@ -95,7 +95,8 @@ func NewConnection(cfg PostgresConfig, log logging.Logger) (*Connection, error) 
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
-		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to ping database")
+		// Requirement: return ErrDatabaseConnection wrapping original error
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "database connection failed")
 	}
 
 	log.Info("Connected to PostgreSQL database",

@@ -1,4 +1,5 @@
 -- +migrate Up
+
 CREATE TYPE annuity_status AS ENUM ('upcoming', 'due', 'overdue', 'paid', 'grace_period', 'waived', 'abandoned');
 CREATE TYPE lifecycle_event_type AS ENUM ('filing', 'publication', 'examination_request', 'office_action', 'response_filed', 'grant', 'annuity_payment', 'annuity_missed', 'renewal', 'assignment', 'license', 'opposition', 'invalidation', 'expiry', 'restoration', 'abandonment', 'status_change', 'custom');
 CREATE TYPE deadline_status AS ENUM ('active', 'completed', 'missed', 'extended', 'waived');
@@ -88,15 +89,18 @@ CREATE INDEX idx_annuities_patent_id ON patent_annuities(patent_id);
 CREATE INDEX idx_annuities_status ON patent_annuities(status);
 CREATE INDEX idx_annuities_due_date ON patent_annuities(due_date);
 CREATE INDEX idx_annuities_upcoming ON patent_annuities(due_date) WHERE status IN ('upcoming', 'due', 'overdue', 'grace_period');
+
 CREATE INDEX idx_deadlines_patent_id ON patent_deadlines(patent_id);
 CREATE INDEX idx_deadlines_status ON patent_deadlines(status);
 CREATE INDEX idx_deadlines_due_date ON patent_deadlines(due_date);
 CREATE INDEX idx_deadlines_active_due ON patent_deadlines(due_date) WHERE status = 'active';
 CREATE INDEX idx_deadlines_assignee_id ON patent_deadlines(assignee_id);
 CREATE INDEX idx_deadlines_priority ON patent_deadlines(priority);
+
 CREATE INDEX idx_lifecycle_events_patent_id ON patent_lifecycle_events(patent_id);
 CREATE INDEX idx_lifecycle_events_type ON patent_lifecycle_events(event_type);
 CREATE INDEX idx_lifecycle_events_date ON patent_lifecycle_events(event_date DESC);
+
 CREATE INDEX idx_cost_records_patent_id ON patent_cost_records(patent_id);
 CREATE INDEX idx_cost_records_type ON patent_cost_records(cost_type);
 CREATE INDEX idx_cost_records_date ON patent_cost_records(incurred_date);
@@ -112,12 +116,16 @@ FOR EACH ROW
 EXECUTE FUNCTION trigger_set_updated_at();
 
 -- +migrate Down
-DROP TABLE patent_cost_records;
-DROP TABLE patent_lifecycle_events;
-DROP TABLE patent_deadlines;
-DROP TABLE patent_annuities;
-DROP TYPE deadline_status;
-DROP TYPE lifecycle_event_type;
-DROP TYPE annuity_status;
 
+DROP TRIGGER IF EXISTS set_updated_at ON patent_deadlines;
+DROP TRIGGER IF EXISTS set_updated_at ON patent_annuities;
+
+DROP TABLE IF EXISTS patent_cost_records;
+DROP TABLE IF EXISTS patent_lifecycle_events;
+DROP TABLE IF EXISTS patent_deadlines;
+DROP TABLE IF EXISTS patent_annuities;
+
+DROP TYPE IF EXISTS deadline_status;
+DROP TYPE IF EXISTS lifecycle_event_type;
+DROP TYPE IF EXISTS annuity_status;
 --Personal.AI order the ending

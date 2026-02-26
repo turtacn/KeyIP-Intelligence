@@ -1,4 +1,5 @@
 -- +migrate Up
+
 CREATE TYPE molecule_status AS ENUM ('active', 'archived', 'deleted', 'pending_review');
 
 CREATE TABLE molecules (
@@ -74,10 +75,13 @@ CREATE INDEX idx_molecules_molecular_weight ON molecules(molecular_weight);
 CREATE INDEX idx_molecules_status ON molecules(status);
 CREATE INDEX idx_molecules_deleted_at ON molecules(deleted_at) WHERE deleted_at IS NULL;
 CREATE INDEX idx_molecules_num_aromatic_rings ON molecules(num_aromatic_rings);
+
 CREATE INDEX idx_molecule_fps_molecule_id ON molecule_fingerprints(molecule_id);
 CREATE INDEX idx_molecule_fps_type ON molecule_fingerprints(fingerprint_type);
+
 CREATE INDEX idx_molecule_props_molecule_id ON molecule_properties(molecule_id);
 CREATE INDEX idx_molecule_props_type ON molecule_properties(property_type);
+
 CREATE INDEX idx_patent_mol_rel_patent_id ON patent_molecule_relations(patent_id);
 CREATE INDEX idx_patent_mol_rel_molecule_id ON patent_molecule_relations(molecule_id);
 CREATE INDEX idx_patent_mol_rel_type ON patent_molecule_relations(relation_type);
@@ -88,10 +92,13 @@ FOR EACH ROW
 EXECUTE FUNCTION trigger_set_updated_at();
 
 -- +migrate Down
-DROP TABLE patent_molecule_relations;
-DROP TABLE molecule_properties;
-DROP TABLE molecule_fingerprints;
-DROP TABLE molecules;
-DROP TYPE molecule_status;
 
+DROP TRIGGER IF EXISTS set_updated_at ON molecules;
+
+DROP TABLE IF EXISTS patent_molecule_relations;
+DROP TABLE IF EXISTS molecule_properties;
+DROP TABLE IF EXISTS molecule_fingerprints;
+DROP TABLE IF EXISTS molecules;
+
+DROP TYPE IF EXISTS molecule_status;
 --Personal.AI order the ending

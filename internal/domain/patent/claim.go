@@ -3,7 +3,9 @@ package patent
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -101,16 +103,23 @@ type ClaimElement struct {
 
 // Claim is a value object representing a single patent claim.
 type Claim struct {
+	ID                   uuid.UUID      `json:"id"`
+	PatentID             uuid.UUID      `json:"patent_id"`
 	Number               int            `json:"number"`
 	Text                 string         `json:"text"`
+	TextEn               string         `json:"text_en,omitempty"`
 	Type                 ClaimType      `json:"type"`
 	Category             ClaimCategory  `json:"category"`
 	DependsOn            []int          `json:"depends_on,omitempty"`
+	ParentClaimID        *uuid.UUID     `json:"parent_claim_id,omitempty"`
 	Preamble             string         `json:"preamble,omitempty"`
 	CharacterizingPortion string         `json:"characterizing_portion,omitempty"`
 	Elements             []ClaimElement `json:"elements,omitempty"`
 	MarkushStructures    []string       `json:"markush_structures,omitempty"`
+	ScopeEmbedding       []float32      `json:"scope_embedding,omitempty"`
 	Language             string         `json:"language"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
 }
 
 // NewClaim constructs and validates a new Claim.
@@ -130,11 +139,14 @@ func NewClaim(number int, text string, claimType ClaimType, category ClaimCatego
 	}
 
 	return &Claim{
+		ID:       uuid.New(),
 		Number:   number,
 		Text:     trimmedText,
 		Type:     claimType,
 		Category: category,
 		Language: "en", // Default language
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	}, nil
 }
 
@@ -167,10 +179,6 @@ func (c *Claim) Validate() error {
 			return errors.InvalidParam("claim must have at least one essential element")
 		}
 	}
-
-	// If preamble and characterizing portion are set, they shouldn't both be empty
-	// (Note: this check only applies if they have been populated by structural analysis)
-	// For now we don't enforce this during basic validation unless they were specifically meant to be set.
 
 	return nil
 }
@@ -339,12 +347,9 @@ func (cs ClaimSet) Validate() error {
 		for _, dep := range c.DependsOn {
 			if !numbers[dep] {
 				// Dependency must refer to a previous claim.
-				// This assumes ClaimSet is ordered, but even if not,
-				// the rule is usually that a claim can only depend on a lower-numbered claim.
 				if dep >= c.Number {
 					return errors.InvalidParam(fmt.Sprintf("claim %d depends on forward claim %d", c.Number, dep))
 				}
-				// We also need to check if the referenced claim exists at all in the set.
 				exists := false
 				for _, other := range cs {
 					if other.Number == dep {

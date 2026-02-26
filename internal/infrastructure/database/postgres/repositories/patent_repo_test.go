@@ -3,12 +3,15 @@ package repositories
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
+	"github.com/pgvector/pgvector-go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres"
@@ -17,20 +20,20 @@ import (
 
 type PatentRepoTestSuite struct {
 	suite.Suite
-	mock   sqlmock.Sqlmock
-	db     *sql.DB
-	repo   patent.PatentRepository
-	logger logging.Logger
+	db   *sql.DB
+	mock sqlmock.Sqlmock
+	repo patent.PatentRepository
+	log  logging.Logger
 }
 
 func (s *PatentRepoTestSuite) SetupTest() {
 	var err error
 	s.db, s.mock, err = sqlmock.New()
-	s.NoError(err)
+	require.NoError(s.T(), err)
 
-	s.logger = logging.NewNopLogger()
-	conn := postgres.NewConnectionWithDB(s.db, s.logger)
-	s.repo = NewPostgresPatentRepo(conn, s.logger)
+	s.log = logging.NewNopLogger()
+	conn := postgres.NewConnectionWithDB(s.db, s.log)
+	s.repo = NewPostgresPatentRepo(conn, s.log)
 }
 
 func (s *PatentRepoTestSuite) TearDownTest() {
@@ -38,82 +41,129 @@ func (s *PatentRepoTestSuite) TearDownTest() {
 }
 
 func (s *PatentRepoTestSuite) TestCreate_Success() {
-	id := uuid.New()
 	p := &patent.Patent{
+		ID:           uuid.New(),
 		PatentNumber: "US123456",
-		Title:        "OLED",
-		Status:       patent.PatentStatusFiled,
-		RawData:      map[string]any{"raw": "data"},
-		Metadata:     map[string]any{"meta": "data"},
+		Title:        "Test Patent",
+		IPCCodes:     []string{"A01B"},
 	}
-	raw, _ := json.Marshal(p.RawData)
-	meta, _ := json.Marshal(p.Metadata)
 
 	s.mock.ExpectQuery("INSERT INTO patents").
-		WithArgs(p.PatentNumber, p.Title, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), p.Status.String(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), raw, meta).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(id, time.Now(), time.Now()))
+		WithArgs(
+			p.ID, p.PatentNumber, p.Title, p.TitleEn, p.Abstract, p.AbstractEn,
+			p.Type, p.Status, p.FilingDate, p.PublicationDate, p.GrantDate,
+			p.ExpiryDate, p.PriorityDate, p.AssigneeID, p.AssigneeName, p.Jurisdiction,
+			pq.Array(p.IPCCodes), pq.Array(p.CPCCodes), pq.Array(p.KeyIPTechCodes),
+			p.FamilyID, p.ApplicationNumber, p.FullTextHash, p.Source, sqlmock.AnyArg(), sqlmock.AnyArg(),
+		).
+		WillReturnRows(sqlmock.NewRows([]string{"created_at", "updated_at"}).
+			AddRow(time.Now(), time.Now()))
 
 	err := s.repo.Create(context.Background(), p)
-	s.NoError(err)
-	s.Equal(id, p.ID)
+	assert.NoError(s.T(), err)
 }
 
-func (s *PatentRepoTestSuite) TestGetByID_Found() {
+func (s *PatentRepoTestSuite) TestGetByID_Success() {
 	id := uuid.New()
 
-	// Columns: id, patent_number, title, title_en, abstract, abstract_en, patent_type, status,
-	// filing_date, publication_date, grant_date, expiry_date, priority_date,
-	// assignee_id, assignee_name, jurisdiction, ipc_codes, cpc_codes, keyip_tech_codes,
-	// family_id, application_number, full_text_hash, source, raw_data, metadata,
-	// created_at, updated_at, deleted_at
-
-	cols := []string{
-		"id", "patent_number", "title", "title_en", "abstract", "abstract_en", "patent_type", "status",
-		"filing_date", "publication_date", "grant_date", "expiry_date", "priority_date",
-		"assignee_id", "assignee_name", "jurisdiction", "ipc_codes", "cpc_codes", "keyip_tech_codes",
-		"family_id", "application_number", "full_text_hash", "source", "raw_data", "metadata",
-		"created_at", "updated_at", "deleted_at",
-	}
-
-	row := sqlmock.NewRows(cols).AddRow(
-		id, "US123", "Title", "", "Abstract", "", "invention", "filed",
-		nil, nil, nil, nil, nil,
-		nil, "", "US", []uint8("{}"), []uint8("{}"), []uint8("{}"),
-		"", "", "", "manual", []byte("{}"), []byte("{}"),
-		time.Now(), time.Now(), nil,
-	)
-
-	s.mock.ExpectQuery("SELECT \\* FROM patents WHERE id = \\$1").
+	// Expect main query
+	s.mock.ExpectQuery("SELECT .* FROM patents WHERE id =").
 		WithArgs(id).
-		WillReturnRows(row)
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "patent_number", "title", "title_en", "abstract", "abstract_en",
+			"patent_type", "status", "filing_date", "publication_date", "grant_date",
+			"expiry_date", "priority_date", "assignee_id", "assignee_name", "jurisdiction",
+			"ipc_codes", "cpc_codes", "keyip_tech_codes", "family_id", "application_number",
+			"full_text_hash", "source", "raw_data", "metadata",
+			"created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			id, "US123", "Title", "", "", "",
+			"invention", patent.PatentStatusGranted, nil, nil, nil,
+			nil, nil, nil, "", "US",
+			pq.Array([]string{}), pq.Array([]string{}), pq.Array([]string{}), "", "",
+			"", "manual", nil, nil,
+			time.Now(), time.Now(), nil,
+		))
 
-	// Preload calls (Claims, Inventors, PriorityClaims) - assuming GetByID impl calls them
-	// The repo implementation calls GetClaimsByPatent, GetInventors, GetPriorityClaims.
-	// We expect empty results for them.
-	s.mock.ExpectQuery("SELECT \\* FROM patent_claims WHERE patent_id = \\$1").
+	// Expect preloads
+	// Claims
+	s.mock.ExpectQuery("SELECT .* FROM patent_claims WHERE patent_id =").
 		WithArgs(id).
 		WillReturnRows(sqlmock.NewRows([]string{}))
-
-	s.mock.ExpectQuery("SELECT \\* FROM patent_inventors WHERE patent_id = \\$1").
+	// Inventors
+	s.mock.ExpectQuery("SELECT .* FROM patent_inventors WHERE patent_id =").
 		WithArgs(id).
 		WillReturnRows(sqlmock.NewRows([]string{}))
-
-	s.mock.ExpectQuery("SELECT \\* FROM patent_priority_claims WHERE patent_id = \\$1").
+	// Priority
+	s.mock.ExpectQuery("SELECT .* FROM patent_priority_claims WHERE patent_id =").
 		WithArgs(id).
 		WillReturnRows(sqlmock.NewRows([]string{}))
 
 	p, err := s.repo.GetByID(context.Background(), id)
-	s.NoError(err)
-	s.NotNil(p)
-	s.Equal(id, p.ID)
-	s.Equal("US123", p.PatentNumber)
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), id, p.ID)
 }
 
-func TestPatentRepoTestSuite(t *testing.T) {
+func (s *PatentRepoTestSuite) TestCreateClaim_Success() {
+	claim := &patent.Claim{
+		ID:             uuid.New(),
+		PatentID:       uuid.New(),
+		Number:         1,
+		Type:           patent.ClaimTypeIndependent,
+		Text:           "Claim text",
+		ScopeEmbedding: []float32{0.1, 0.2},
+	}
+
+	embedding := pgvector.NewVector(claim.ScopeEmbedding)
+
+	s.mock.ExpectQuery("INSERT INTO patent_claims").
+		WithArgs(
+			claim.ID, claim.PatentID, claim.Number, "independent", claim.ParentClaimID,
+			claim.Text, claim.TextEn, sqlmock.AnyArg(), sqlmock.AnyArg(), embedding,
+		).
+		WillReturnRows(sqlmock.NewRows([]string{"created_at", "updated_at"}).
+			AddRow(time.Now(), time.Now()))
+
+	err := s.repo.CreateClaim(context.Background(), claim)
+	assert.NoError(s.T(), err)
+}
+
+func (s *PatentRepoTestSuite) TestSearch_Keyword() {
+	query := patent.SearchQuery{
+		Keyword: "OLED",
+		Limit:   10,
+	}
+
+	// Count
+	s.mock.ExpectQuery("SELECT COUNT").
+		WithArgs("OLED").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	// Select
+	s.mock.ExpectQuery("SELECT .* FROM patents").
+		WithArgs("OLED", 10, 0).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "patent_number", "title", "title_en", "abstract", "abstract_en",
+			"patent_type", "status", "filing_date", "publication_date", "grant_date",
+			"expiry_date", "priority_date", "assignee_id", "assignee_name", "jurisdiction",
+			"ipc_codes", "cpc_codes", "keyip_tech_codes", "family_id", "application_number",
+			"full_text_hash", "source", "raw_data", "metadata",
+			"created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			uuid.New(), "US123", "OLED Display", "", "", "",
+			"invention", patent.PatentStatusGranted, nil, nil, nil,
+			nil, nil, nil, "", "US",
+			pq.Array([]string{}), pq.Array([]string{}), pq.Array([]string{}), "", "",
+			"", "manual", nil, nil,
+			time.Now(), time.Now(), nil,
+		))
+
+	res, err := s.repo.Search(context.Background(), query)
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), int64(1), res.TotalCount)
+}
+
+func TestPatentRepo(t *testing.T) {
 	suite.Run(t, new(PatentRepoTestSuite))
 }
-
 //Personal.AI order the ending

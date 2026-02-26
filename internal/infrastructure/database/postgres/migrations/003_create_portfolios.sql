@@ -1,4 +1,5 @@
 -- +migrate Up
+
 CREATE TYPE portfolio_status AS ENUM ('active', 'archived', 'draft');
 CREATE TYPE valuation_tier AS ENUM ('S', 'A', 'B', 'C', 'D');
 
@@ -6,7 +7,7 @@ CREATE TABLE portfolios (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(256) NOT NULL,
     description TEXT,
-    owner_id UUID NOT NULL,
+    owner_id UUID NOT NULL, -- FK added in 005
     status portfolio_status NOT NULL DEFAULT 'active',
     tech_domains TEXT[],
     target_jurisdictions TEXT[],
@@ -98,14 +99,18 @@ CREATE INDEX idx_portfolios_owner_id ON portfolios(owner_id);
 CREATE INDEX idx_portfolios_status ON portfolios(status);
 CREATE INDEX idx_portfolios_deleted_at ON portfolios(deleted_at) WHERE deleted_at IS NULL;
 CREATE INDEX idx_portfolios_tech_domains ON portfolios USING GIN(tech_domains);
+
 CREATE INDEX idx_portfolio_patents_patent_id ON portfolio_patents(patent_id);
+
 CREATE INDEX idx_patent_valuations_patent_id ON patent_valuations(patent_id);
 CREATE INDEX idx_patent_valuations_portfolio_id ON patent_valuations(portfolio_id);
 CREATE INDEX idx_patent_valuations_tier ON patent_valuations(tier);
 CREATE INDEX idx_patent_valuations_composite_score ON patent_valuations(composite_score DESC);
 CREATE INDEX idx_patent_valuations_valid_period ON patent_valuations(valid_from, valid_until);
+
 CREATE INDEX idx_portfolio_health_portfolio_id ON portfolio_health_scores(portfolio_id);
 CREATE INDEX idx_portfolio_health_evaluated_at ON portfolio_health_scores(evaluated_at DESC);
+
 CREATE INDEX idx_portfolio_opt_portfolio_id ON portfolio_optimization_suggestions(portfolio_id);
 CREATE INDEX idx_portfolio_opt_status ON portfolio_optimization_suggestions(status);
 CREATE INDEX idx_portfolio_opt_priority ON portfolio_optimization_suggestions(priority);
@@ -121,12 +126,16 @@ FOR EACH ROW
 EXECUTE FUNCTION trigger_set_updated_at();
 
 -- +migrate Down
-DROP TABLE portfolio_optimization_suggestions;
-DROP TABLE portfolio_health_scores;
-DROP TABLE patent_valuations;
-DROP TABLE portfolio_patents;
-DROP TABLE portfolios;
-DROP TYPE valuation_tier;
-DROP TYPE portfolio_status;
 
+DROP TRIGGER IF EXISTS set_updated_at ON portfolio_optimization_suggestions;
+DROP TRIGGER IF EXISTS set_updated_at ON portfolios;
+
+DROP TABLE IF EXISTS portfolio_optimization_suggestions;
+DROP TABLE IF EXISTS portfolio_health_scores;
+DROP TABLE IF EXISTS patent_valuations;
+DROP TABLE IF EXISTS portfolio_patents;
+DROP TABLE IF EXISTS portfolios;
+
+DROP TYPE IF EXISTS valuation_tier;
+DROP TYPE IF EXISTS portfolio_status;
 --Personal.AI order the ending

@@ -290,7 +290,7 @@ func (w *workerInfrastructure) Close() {
 		w.redis.Close()
 	}
 	if w.neo4j != nil {
-		w.neo4j.Close()
+		w.neo4j.Close(context.Background())
 	}
 	if w.pg != nil {
 		w.pg.Close()

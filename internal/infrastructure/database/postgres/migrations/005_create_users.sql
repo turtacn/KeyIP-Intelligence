@@ -1,4 +1,5 @@
 -- +migrate Up
+
 CREATE TYPE user_status AS ENUM ('active', 'inactive', 'suspended', 'pending_verification');
 
 CREATE TABLE users (
@@ -62,16 +63,13 @@ CREATE TABLE roles (
 );
 
 CREATE TABLE user_roles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
     granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    granted_by UUID REFERENCES users(id) ON DELETE SET NULL
+    granted_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    PRIMARY KEY (user_id, role_id, organization_id)
 );
-
-CREATE UNIQUE INDEX idx_user_roles_global ON user_roles (user_id, role_id) WHERE organization_id IS NULL;
-CREATE UNIQUE INDEX idx_user_roles_org ON user_roles (user_id, role_id, organization_id) WHERE organization_id IS NOT NULL;
 
 CREATE TABLE api_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -106,6 +104,7 @@ CREATE TABLE audit_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Add foreign keys for tables created in previous migrations
 ALTER TABLE patents ADD CONSTRAINT fk_patents_assignee FOREIGN KEY (assignee_id) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE portfolios ADD CONSTRAINT fk_portfolios_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE RESTRICT;
 
@@ -113,20 +112,26 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_status ON users(status);
 CREATE INDEX idx_users_deleted_at ON users(deleted_at) WHERE deleted_at IS NULL;
+
 CREATE INDEX idx_orgs_slug ON organizations(slug);
 CREATE INDEX idx_orgs_deleted_at ON organizations(deleted_at) WHERE deleted_at IS NULL;
+
 CREATE INDEX idx_org_members_user_id ON organization_members(user_id);
+
 CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
 CREATE INDEX idx_user_roles_org_id ON user_roles(organization_id);
+
 CREATE INDEX idx_api_keys_user_id ON api_keys(user_id);
 CREATE INDEX idx_api_keys_key_hash ON api_keys(key_hash);
 CREATE INDEX idx_api_keys_active ON api_keys(is_active) WHERE is_active = TRUE;
+
 CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_org_id ON audit_logs(organization_id);
 CREATE INDEX idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
 
+-- Seed roles
 INSERT INTO roles (name, display_name, description, is_system, permissions) VALUES
 ('super_admin', '超级管理员', '系统最高权限', TRUE, '["*"]'),
 ('org_admin', '组织管理员', '组织级管理权限', TRUE, '["org:*", "patent:*", "portfolio:*", "molecule:*", "user:read", "user:invite"]'),
@@ -150,15 +155,21 @@ FOR EACH ROW
 EXECUTE FUNCTION trigger_set_updated_at();
 
 -- +migrate Down
-ALTER TABLE patents DROP CONSTRAINT IF EXISTS fk_patents_assignee;
-ALTER TABLE portfolios DROP CONSTRAINT IF EXISTS fk_portfolios_owner;
-DROP TABLE audit_logs;
-DROP TABLE api_keys;
-DROP TABLE user_roles;
-DROP TABLE roles;
-DROP TABLE organization_members;
-DROP TABLE organizations;
-DROP TABLE users;
-DROP TYPE user_status;
 
+DROP TRIGGER IF EXISTS set_updated_at ON api_keys;
+DROP TRIGGER IF EXISTS set_updated_at ON organizations;
+DROP TRIGGER IF EXISTS set_updated_at ON users;
+
+ALTER TABLE portfolios DROP CONSTRAINT IF EXISTS fk_portfolios_owner;
+ALTER TABLE patents DROP CONSTRAINT IF EXISTS fk_patents_assignee;
+
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS user_roles;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS organization_members;
+DROP TABLE IF EXISTS organizations;
+DROP TABLE IF EXISTS users;
+
+DROP TYPE IF EXISTS user_status;
 --Personal.AI order the ending
