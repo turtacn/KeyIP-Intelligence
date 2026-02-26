@@ -225,6 +225,11 @@ func NewValidationError(field, message string) *AppError {
 	return New(ErrCodeValidation, message).WithDetail(field)
 }
 
+// NewValidationMsg creates a validation error with only a message (no field).
+func NewValidationMsg(message string) *AppError {
+	return New(ErrCodeValidation, message)
+}
+
 func NewInternal(format string, args ...interface{}) *AppError {
 	return Newf(ErrCodeInternal, format, args...)
 }
@@ -406,6 +411,24 @@ func IsConflict(err error) bool {
 
 func IsValidation(err error) bool {
 	return IsCode(err, ErrCodeValidation)
+}
+
+func IsUnauthorized(err error) bool {
+	return IsCode(err, ErrCodeUnauthorized)
+}
+
+func IsForbidden(err error) bool {
+	return IsCode(err, ErrCodeForbidden)
+}
+
+// Errorf creates a new AppError with formatted message using ErrCodeInternal.
+func Errorf(format string, args ...interface{}) *AppError {
+	return New(ErrCodeInternal, fmt.Sprintf(format, args...))
+}
+
+// ValidationErrorf creates a new validation error with formatted message.
+func ValidationErrorf(format string, args ...interface{}) *AppError {
+	return New(ErrCodeValidation, fmt.Sprintf(format, args...))
 }
 
 func IsClientErr(err error) bool {

@@ -138,28 +138,28 @@ func RequestLogging(logger logging.Logger, config LoggingConfig) func(http.Handl
 			duration := time.Since(start)
 			durationMs := float64(duration.Nanoseconds()) / 1e6
 
-			// Build log fields
-			fields := []interface{}{
-				"method", r.Method,
-				"path", path,
-				"status", wrapped.statusCode,
-				"duration_ms", fmt.Sprintf("%.2f", durationMs),
-				"bytes", wrapped.bytesWritten,
-				"remote_addr", r.RemoteAddr,
-				"request_id", requestID,
+			// Build log fields using logging.Field
+			fields := []logging.Field{
+				logging.String("method", r.Method),
+				logging.String("path", path),
+				logging.Int("status", wrapped.statusCode),
+				logging.String("duration_ms", fmt.Sprintf("%.2f", durationMs)),
+				logging.Int64("bytes", wrapped.bytesWritten),
+				logging.String("remote_addr", r.RemoteAddr),
+				logging.String("request_id", requestID),
 			}
 
 			// Add user agent for non-API clients
 			if ua := r.UserAgent(); ua != "" {
-				fields = append(fields, "user_agent", ua)
+				fields = append(fields, logging.String("user_agent", ua))
 			}
 
 			// Add tenant/user context if available
 			if tenantID := ContextGetTenantID(r.Context()); tenantID != "" {
-				fields = append(fields, "tenant_id", tenantID)
+				fields = append(fields, logging.String("tenant_id", tenantID))
 			}
 			if userID := ContextGetUserID(r.Context()); userID != "" {
-				fields = append(fields, "user_id", userID)
+				fields = append(fields, logging.String("user_id", userID))
 			}
 
 			// Log at appropriate level based on status code and duration

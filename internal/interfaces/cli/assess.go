@@ -73,7 +73,7 @@ func runAssessPatent(ctx context.Context, valuationService portfolio.ValuationSe
 	// Parse and validate patent numbers
 	patentNumbers := parsePatentNumbers(assessPatentNumber)
 	if len(patentNumbers) == 0 {
-		return errors.New("at least one valid patent number required")
+		return errors.New(errors.ErrCodeValidation, "at least one valid patent number required")
 	}
 
 	for _, pn := range patentNumbers {

@@ -38,9 +38,11 @@ type HTTPConfig struct {
 }
 
 type GRPCConfig struct {
-	Port           int `mapstructure:"port" validate:"required,min=1,max=65535"`
-	MaxRecvMsgSize int `mapstructure:"max_recv_msg_size"`
-	MaxSendMsgSize int `mapstructure:"max_send_msg_size"`
+	Host           string `mapstructure:"host"`
+	Port           int    `mapstructure:"port" validate:"required,min=1,max=65535"`
+	MaxRecvMsgSize int    `mapstructure:"max_recv_msg_size"`
+	MaxSendMsgSize int    `mapstructure:"max_send_msg_size"`
+	Debug          bool   `mapstructure:"debug"`
 }
 
 // DatabaseConfig holds database connection parameters.

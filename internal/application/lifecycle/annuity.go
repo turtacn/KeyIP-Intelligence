@@ -1233,4 +1233,7 @@ func buildAbandonmentRationale(valueScore, threshold, annualCost float64, remain
 // Ensure interface compliance at compile time.
 var _ AnnuityService = (*annuityServiceImpl)(nil)
 
+// AnnuityDetail is an alias for AnnuityResult for backward compatibility.
+type AnnuityDetail = AnnuityResult
+
 //Personal.AI order the ending

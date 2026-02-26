@@ -114,27 +114,26 @@ func (h *CollaborationHandler) RegisterRoutes(mux *http.ServeMux) {
 func (h *CollaborationHandler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	var req CreateWorkspaceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
 		return
 	}
 
 	if req.Name == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("name is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("name", "name is required"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 
-	input := &collaboration.CreateWorkspaceInput{
+	input := &collaboration.CreateWorkspaceRequest{
 		Name:        req.Name,
 		Description: req.Description,
-		Visibility:  req.Visibility,
 		OwnerID:     userID,
 	}
 
 	ws, err := h.workspaceSvc.Create(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to create workspace", "error", err)
+		h.logger.Error("failed to create workspace", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -146,15 +145,13 @@ func (h *CollaborationHandler) CreateWorkspace(w http.ResponseWriter, r *http.Re
 func (h *CollaborationHandler) GetWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id is required"))
 		return
 	}
 
-	userID := getUserIDFromContext(r)
-
-	ws, err := h.workspaceSvc.GetByID(r.Context(), id, userID)
+	ws, err := h.workspaceSvc.GetByID(r.Context(), id)
 	if err != nil {
-		h.logger.Error("failed to get workspace", "error", err, "workspace_id", id)
+		h.logger.Error("failed to get workspace", logging.Err(err), logging.String("workspace_id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -175,7 +172,7 @@ func (h *CollaborationHandler) ListWorkspaces(w http.ResponseWriter, r *http.Req
 
 	result, err := h.workspaceSvc.List(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to list workspaces", "error", err)
+		h.logger.Error("failed to list workspaces", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -187,29 +184,28 @@ func (h *CollaborationHandler) ListWorkspaces(w http.ResponseWriter, r *http.Req
 func (h *CollaborationHandler) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id is required"))
 		return
 	}
 
 	var req UpdateWorkspaceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 
-	input := &collaboration.UpdateWorkspaceInput{
+	input := &collaboration.UpdateWorkspaceRequest{
 		WorkspaceID: id,
-		UserID:      userID,
 		Name:        req.Name,
 		Description: req.Description,
-		Visibility:  req.Visibility,
+		UpdatedBy:   userID,
 	}
 
 	ws, err := h.workspaceSvc.Update(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to update workspace", "error", err, "workspace_id", id)
+		h.logger.Error("failed to update workspace", logging.Err(err), logging.String("workspace_id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -221,7 +217,7 @@ func (h *CollaborationHandler) UpdateWorkspace(w http.ResponseWriter, r *http.Re
 func (h *CollaborationHandler) DeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id is required"))
 		return
 	}
 
@@ -229,7 +225,7 @@ func (h *CollaborationHandler) DeleteWorkspace(w http.ResponseWriter, r *http.Re
 
 	err := h.workspaceSvc.Delete(r.Context(), id, userID)
 	if err != nil {
-		h.logger.Error("failed to delete workspace", "error", err, "workspace_id", id)
+		h.logger.Error("failed to delete workspace", logging.Err(err), logging.String("workspace_id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -241,18 +237,18 @@ func (h *CollaborationHandler) DeleteWorkspace(w http.ResponseWriter, r *http.Re
 func (h *CollaborationHandler) ShareDocument(w http.ResponseWriter, r *http.Request) {
 	workspaceID := r.PathValue("id")
 	if workspaceID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id is required"))
 		return
 	}
 
 	var req ShareDocumentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
 		return
 	}
 
 	if req.DocumentID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("document_id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("document_id", "document_id is required"))
 		return
 	}
 
@@ -269,7 +265,7 @@ func (h *CollaborationHandler) ShareDocument(w http.ResponseWriter, r *http.Requ
 
 	shared, err := h.sharingSvc.ShareDocument(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to share document", "error", err, "workspace_id", workspaceID)
+		h.logger.Error("failed to share document", logging.Err(err), logging.String("workspace_id", workspaceID))
 		writeAppError(w, err)
 		return
 	}
@@ -281,7 +277,7 @@ func (h *CollaborationHandler) ShareDocument(w http.ResponseWriter, r *http.Requ
 func (h *CollaborationHandler) ListSharedDocuments(w http.ResponseWriter, r *http.Request) {
 	workspaceID := r.PathValue("id")
 	if workspaceID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id is required"))
 		return
 	}
 
@@ -297,7 +293,7 @@ func (h *CollaborationHandler) ListSharedDocuments(w http.ResponseWriter, r *htt
 
 	result, err := h.sharingSvc.ListDocuments(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to list shared documents", "error", err, "workspace_id", workspaceID)
+		h.logger.Error("failed to list shared documents", logging.Err(err), logging.String("workspace_id", workspaceID))
 		writeAppError(w, err)
 		return
 	}
@@ -309,39 +305,39 @@ func (h *CollaborationHandler) ListSharedDocuments(w http.ResponseWriter, r *htt
 func (h *CollaborationHandler) InviteMember(w http.ResponseWriter, r *http.Request) {
 	workspaceID := r.PathValue("id")
 	if workspaceID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id is required"))
 		return
 	}
 
 	var req InviteMemberRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
 		return
 	}
 
 	if req.UserID == "" && req.Email == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("user_id or email is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("user_id", "user_id or email is required"))
 		return
 	}
 
 	if !isValidRole(req.Role) {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("role must be one of: owner, admin, editor, viewer"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("role", "role must be one of: owner, admin, editor, viewer"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 
 	input := &collaboration.InviteMemberInput{
-		WorkspaceID: workspaceID,
-		InviterID:   userID,
-		InviteeID:   req.UserID,
+		WorkspaceID:  workspaceID,
+		InviterID:    userID,
+		InviteeID:    req.UserID,
 		InviteeEmail: req.Email,
-		Role:        req.Role,
+		Role:         req.Role,
 	}
 
 	member, err := h.workspaceSvc.InviteMember(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to invite member", "error", err, "workspace_id", workspaceID)
+		h.logger.Error("failed to invite member", logging.Err(err), logging.String("workspace_id", workspaceID))
 		writeAppError(w, err)
 		return
 	}
@@ -355,7 +351,7 @@ func (h *CollaborationHandler) RemoveMember(w http.ResponseWriter, r *http.Reque
 	memberID := r.PathValue("memberId")
 
 	if workspaceID == "" || memberID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id and member id are required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id and member id are required"))
 		return
 	}
 
@@ -363,7 +359,7 @@ func (h *CollaborationHandler) RemoveMember(w http.ResponseWriter, r *http.Reque
 
 	err := h.workspaceSvc.RemoveMember(r.Context(), workspaceID, memberID, userID)
 	if err != nil {
-		h.logger.Error("failed to remove member", "error", err, "workspace_id", workspaceID, "member_id", memberID)
+		h.logger.Error("failed to remove member", logging.Err(err), logging.String("workspace_id", workspaceID), logging.String("member_id", memberID))
 		writeAppError(w, err)
 		return
 	}
@@ -377,18 +373,18 @@ func (h *CollaborationHandler) UpdateMemberRole(w http.ResponseWriter, r *http.R
 	memberID := r.PathValue("memberId")
 
 	if workspaceID == "" || memberID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("workspace id and member id are required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id and member id are required"))
 		return
 	}
 
 	var req UpdateMemberRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
 		return
 	}
 
 	if !isValidRole(req.Role) {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("role must be one of: owner, admin, editor, viewer"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("role", "role must be one of: owner, admin, editor, viewer"))
 		return
 	}
 
@@ -396,7 +392,7 @@ func (h *CollaborationHandler) UpdateMemberRole(w http.ResponseWriter, r *http.R
 
 	err := h.workspaceSvc.UpdateMemberRole(r.Context(), workspaceID, memberID, req.Role, userID)
 	if err != nil {
-		h.logger.Error("failed to update member role", "error", err, "workspace_id", workspaceID, "member_id", memberID)
+		h.logger.Error("failed to update member role", logging.Err(err), logging.String("workspace_id", workspaceID), logging.String("member_id", memberID))
 		writeAppError(w, err)
 		return
 	}
@@ -480,7 +476,7 @@ func writeAppError(w http.ResponseWriter, err error) {
 	case errors.IsForbidden(err):
 		writeError(w, http.StatusForbidden, err)
 	default:
-		writeError(w, http.StatusInternalServerError, errors.New("internal server error"))
+		writeError(w, http.StatusInternalServerError, errors.New(errors.ErrCodeInternal, "internal server error"))
 	}
 }
 

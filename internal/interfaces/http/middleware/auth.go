@@ -119,7 +119,9 @@ func (m *AuthMiddleware) Authenticate() func(http.Handler) http.Handler {
 			if token := extractBearerToken(r); token != "" {
 				claims, err := m.tokenValidator.ValidateToken(token)
 				if err != nil {
-					m.logger.Error("token validation failed", "error", err, "path", r.URL.Path)
+					m.logger.Error("token validation failed",
+						logging.Err(err),
+						logging.String("path", r.URL.Path))
 					writeUnauthorized(w, "invalid or expired token")
 					return
 				}
@@ -139,7 +141,9 @@ func (m *AuthMiddleware) Authenticate() func(http.Handler) http.Handler {
 			if apiKey := extractAPIKey(r); apiKey != "" {
 				info, err := m.apiKeyValidator.ValidateAPIKey(apiKey)
 				if err != nil {
-					m.logger.Error("API key validation failed", "error", err, "path", r.URL.Path)
+					m.logger.Error("API key validation failed",
+						logging.Err(err),
+						logging.String("path", r.URL.Path))
 					writeUnauthorized(w, "invalid API key")
 					return
 				}

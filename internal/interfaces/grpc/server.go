@@ -247,7 +247,7 @@ func NewServer(cfg *config.GRPCConfig, opts ...Option) (*Server, error) {
 func (s *Server) RegisterService(desc *grpc.ServiceDesc, impl interface{}) {
 	s.grpcServer.RegisterService(desc, impl)
 	s.healthServer.SetServingStatus(desc.ServiceName, healthpb.HealthCheckResponse_SERVING)
-	s.opts.logger.Info("grpc service registered", "service", desc.ServiceName)
+	s.opts.logger.Info("grpc service registered", logging.String("service", desc.ServiceName))
 }
 
 // Start begins serving gRPC requests. It blocks until the server is stopped.
@@ -260,7 +260,7 @@ func (s *Server) Start() error {
 	s.started = true
 	s.mu.Unlock()
 
-	s.opts.logger.Info("grpc server starting", "address", s.listener.Addr().String())
+	s.opts.logger.Info("grpc server starting", logging.String("address", s.listener.Addr().String()))
 	return s.grpcServer.Serve(s.listener)
 }
 
@@ -330,9 +330,9 @@ func recoveryUnaryInterceptor(logger logging.Logger) grpc.UnaryServerInterceptor
 			if r := recover(); r != nil {
 				stack := string(debug.Stack())
 				logger.Error("grpc panic recovered",
-					"method", info.FullMethod,
-					"panic", fmt.Sprintf("%v", r),
-					"stack", stack,
+					logging.String("method", info.FullMethod),
+					logging.String("panic", fmt.Sprintf("%v", r)),
+					logging.String("stack", stack),
 				)
 				err = status.Errorf(codes.Internal, "internal server error")
 			}
@@ -353,9 +353,9 @@ func recoveryStreamInterceptor(logger logging.Logger) grpc.StreamServerIntercept
 			if r := recover(); r != nil {
 				stack := string(debug.Stack())
 				logger.Error("grpc stream panic recovered",
-					"method", info.FullMethod,
-					"panic", fmt.Sprintf("%v", r),
-					"stack", stack,
+					logging.String("method", info.FullMethod),
+					logging.String("panic", fmt.Sprintf("%v", r)),
+					logging.String("stack", stack),
 				)
 				err = status.Errorf(codes.Internal, "internal server error")
 			}
@@ -387,9 +387,9 @@ func loggingUnaryInterceptor(logger logging.Logger) grpc.UnaryServerInterceptor 
 
 		code := status.Code(err)
 		logger.Info("grpc request",
-			"method", info.FullMethod,
-			"duration_ms", duration.Milliseconds(),
-			"code", code.String(),
+			logging.String("method", info.FullMethod),
+			logging.Int64("duration_ms", duration.Milliseconds()),
+			logging.String("code", code.String()),
 		)
 		return resp, err
 	}
@@ -413,9 +413,9 @@ func loggingStreamInterceptor(logger logging.Logger) grpc.StreamServerIntercepto
 
 		code := status.Code(err)
 		logger.Info("grpc stream",
-			"method", info.FullMethod,
-			"duration_ms", duration.Milliseconds(),
-			"code", code.String(),
+			logging.String("method", info.FullMethod),
+			logging.Int64("duration_ms", duration.Milliseconds()),
+			logging.String("code", code.String()),
 		)
 		return err
 	}

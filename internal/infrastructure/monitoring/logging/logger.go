@@ -372,6 +372,11 @@ func NewNopLogger() Logger {
 	return &nopLogger{}
 }
 
+// NewNoop is an alias for NewNopLogger for convenience.
+func NewNoop() Logger {
+	return &nopLogger{}
+}
+
 var (
 	globalLogger   Logger
 	globalLoggerMu sync.RWMutex

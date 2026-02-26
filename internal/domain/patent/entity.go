@@ -429,4 +429,46 @@ func (p *Patent) GetPatentNumber() string {
 	return p.PatentNumber
 }
 
+// AnalyzeClaims builds a ClaimTree structure from the patent's claims.
+func (p *Patent) AnalyzeClaims() *ClaimTree {
+	if len(p.Claims) == 0 {
+		return &ClaimTree{
+			Roots:    []*ClaimNode{},
+			AllNodes: []*ClaimNode{},
+		}
+	}
+
+	// Build a map of claim number to node
+	nodeMap := make(map[int]*ClaimNode)
+	allNodes := make([]*ClaimNode, 0, len(p.Claims))
+
+	for _, claim := range p.Claims {
+		node := &ClaimNode{
+			Claim:    claim,
+			Children: []*ClaimNode{},
+		}
+		nodeMap[claim.Number] = node
+		allNodes = append(allNodes, node)
+	}
+
+	// Build parent-child relationships
+	roots := make([]*ClaimNode, 0)
+	for _, node := range allNodes {
+		if node.Claim.Type == ClaimTypeIndependent || len(node.Claim.DependsOn) == 0 {
+			roots = append(roots, node)
+		} else {
+			for _, depNum := range node.Claim.DependsOn {
+				if parent, ok := nodeMap[depNum]; ok {
+					parent.Children = append(parent.Children, node)
+				}
+			}
+		}
+	}
+
+	return &ClaimTree{
+		Roots:    roots,
+		AllNodes: allNodes,
+	}
+}
+
 //Personal.AI order the ending

@@ -383,4 +383,57 @@ func (cs ClaimSet) FindByNumber(number int) (*Claim, bool) {
 	return nil, false
 }
 
+// ClaimTreeStruct represents the hierarchical structure of patent claims for analysis.
+type ClaimTreeStruct struct {
+	Roots    []*ClaimNode `json:"roots"`
+	AllNodes []*ClaimNode `json:"all_nodes"`
+}
+
+// ClaimTree is an alias for ClaimTreeStruct for external use.
+type ClaimTree = ClaimTreeStruct
+
+// ClaimNode represents a node in the claim tree.
+type ClaimNode struct {
+	Claim    *Claim       `json:"claim"`
+	Children []*ClaimNode `json:"children,omitempty"`
+}
+
+// IndependentCount returns the number of independent claims.
+func (ct *ClaimTreeStruct) IndependentCount() int {
+	return len(ct.Roots)
+}
+
+// DependentCount returns the number of dependent claims.
+func (ct *ClaimTreeStruct) DependentCount() int {
+	return len(ct.AllNodes) - len(ct.Roots)
+}
+
+// TotalCount returns the total number of claims.
+func (ct *ClaimTreeStruct) TotalCount() int {
+	return len(ct.AllNodes)
+}
+
+// MaxDepth returns the maximum dependency depth in the claim tree.
+func (ct *ClaimTreeStruct) MaxDepth() int {
+	maxDepth := 0
+	for _, root := range ct.Roots {
+		depth := ct.nodeDepth(root, 1)
+		if depth > maxDepth {
+			maxDepth = depth
+		}
+	}
+	return maxDepth
+}
+
+func (ct *ClaimTreeStruct) nodeDepth(node *ClaimNode, currentDepth int) int {
+	maxChildDepth := currentDepth
+	for _, child := range node.Children {
+		childDepth := ct.nodeDepth(child, currentDepth+1)
+		if childDepth > maxChildDepth {
+			maxChildDepth = childDepth
+		}
+	}
+	return maxChildDepth
+}
+
 //Personal.AI order the ending

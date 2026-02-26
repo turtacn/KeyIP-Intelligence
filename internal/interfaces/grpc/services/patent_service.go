@@ -62,9 +62,11 @@ func (s *PatentServiceServer) GetPatent(
 		return nil, status.Error(codes.InvalidArgument, "invalid patent number format")
 	}
 
-	pat, err := s.patentRepo.FindByNumber(ctx, req.PatentNumber)
+	pat, err := s.patentRepo.GetByPatentNumber(ctx, req.PatentNumber)
 	if err != nil {
-		s.logger.Error("failed to get patent", "error", err, "patent_number", req.PatentNumber)
+		s.logger.Error("failed to get patent",
+			logging.Err(err),
+			logging.String("patent_number", req.PatentNumber))
 		return nil, mapPatentError(err)
 	}
 
@@ -97,46 +99,44 @@ func (s *PatentServiceServer) SearchPatents(
 		offset, _ = strconv.ParseInt(string(decoded), 10, 64)
 	}
 
-	// Build search filter
-	filter := &patent.SearchFilter{
-		Query:          req.Query,
-		IpcClasses:     req.IpcClasses,
-		CpcClasses:     req.CpcClasses,
-		PatentOffices:  req.PatentOffices,
-		ApplicationDateFrom: parseDate(req.ApplicationDateFrom),
-		ApplicationDateTo:   parseDate(req.ApplicationDateTo),
-		PublicationDateFrom: parseDate(req.PublicationDateFrom),
-		PublicationDateTo:   parseDate(req.PublicationDateTo),
-		Offset:         offset,
-		Limit:          int64(pageSize),
+	// Build search query
+	query := patent.SearchQuery{
+		Keyword:        req.Query,
+		IPCCode:        strings.Join(req.IpcClasses, ","),
+		Jurisdiction:   strings.Join(req.PatentOffices, ","),
+		FilingDateFrom: parseDate(req.ApplicationDateFrom),
+		FilingDateTo:   parseDate(req.ApplicationDateTo),
+		Offset:         int(offset),
+		Limit:          int(pageSize),
 		SortBy:         req.SortBy,
-		SortOrder:      req.SortOrder,
 	}
 
 	// Execute search
-	patents, total, err := s.patentRepo.Search(ctx, filter)
+	result, err := s.patentRepo.Search(ctx, query)
 	if err != nil {
-		s.logger.Error("failed to search patents", "error", err, "query", req.Query)
+		s.logger.Error("failed to search patents",
+			logging.Err(err),
+			logging.String("query", req.Query))
 		return nil, mapPatentError(err)
 	}
 
 	// Convert patents to proto
-	pbPatents := make([]*pb.Patent, len(patents))
-	for i, pat := range patents {
+	pbPatents := make([]*pb.Patent, len(result.Items))
+	for i, pat := range result.Items {
 		pbPatents[i] = patentDomainToProto(pat)
 	}
 
 	// Generate next page token
 	var nextPageToken string
-	if int64(len(patents)) == int64(pageSize) {
-		nextOffset := offset + int64(len(patents))
+	if int64(len(result.Items)) == int64(pageSize) {
+		nextOffset := offset + int64(len(result.Items))
 		nextPageToken = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d", nextOffset)))
 	}
 
 	return &pb.SearchPatentsResponse{
 		Patents:       pbPatents,
 		NextPageToken: nextPageToken,
-		TotalCount:    total,
+		TotalCount:    result.TotalCount,
 	}, nil
 }
 
@@ -155,9 +155,11 @@ func (s *PatentServiceServer) AnalyzeClaims(
 	}
 
 	// Fetch patent
-	pat, err := s.patentRepo.FindByNumber(ctx, req.PatentNumber)
+	pat, err := s.patentRepo.GetByPatentNumber(ctx, req.PatentNumber)
 	if err != nil {
-		s.logger.Error("failed to get patent for claims analysis", "error", err, "patent_number", req.PatentNumber)
+		s.logger.Error("failed to get patent for claims analysis",
+			logging.Err(err),
+			logging.String("patent_number", req.PatentNumber))
 		return nil, mapPatentError(err)
 	}
 
@@ -187,46 +189,21 @@ func (s *PatentServiceServer) CheckFTO(
 	}
 
 	// Set timeout for FTO check
-	checkCtx, cancel := context.WithTimeout(ctx, ftoCheckTimeout)
+	_, cancel := context.WithTimeout(ctx, ftoCheckTimeout)
 	defer cancel()
 
-	// Build FTO request
-	ftoReq := &reporting.FTOQuickCheckRequest{
-		TargetMolecule: req.TargetSmiles,
-		Jurisdiction:   req.Jurisdiction,
-		IncludeExpired: req.IncludeExpired,
-	}
-
-	// Perform FTO check
-	result, err := s.ftoService.QuickCheck(checkCtx, ftoReq)
-	if err != nil {
-		s.logger.Error("failed to perform FTO check", "error", err, "smiles", req.TargetSmiles)
-		if checkCtx.Err() == context.DeadlineExceeded {
-			return nil, status.Error(codes.DeadlineExceeded, "FTO check timeout")
-		}
-		return nil, mapPatentError(err)
-	}
-
-	// Convert blocking patents
-	blockingPatents := make([]*pb.BlockingPatent, len(result.BlockingPatents))
-	for i, bp := range result.BlockingPatents {
-		blockingPatents[i] = &pb.BlockingPatent{
-			PatentNumber:    bp.PatentNumber,
-			Title:           bp.Title,
-			RiskLevel:       bp.RiskLevel,
-			Similarity:      bp.Similarity,
-			ExpiryDate:      bp.ExpiryDate.Unix(),
-			LegalStatus:     bp.LegalStatus,
-			MatchedClaims:   bp.MatchedClaims,
-		}
-	}
+	// Note: FTO QuickCheck is not yet implemented in FTOReportService
+	// This is a placeholder implementation returning a safe default response
+	s.logger.Info("FTO check requested (placeholder implementation)",
+		logging.String("smiles", req.TargetSmiles),
+		logging.String("jurisdiction", req.Jurisdiction))
 
 	return &pb.CheckFTOResponse{
-		CanOperate:      result.CanOperate,
-		RiskLevel:       result.RiskLevel,
-		Confidence:      result.Confidence,
-		BlockingPatents: blockingPatents,
-		Recommendation:  result.Recommendation,
+		CanOperate:      false, // Conservative: assume cannot operate until analyzed
+		RiskLevel:       "UNKNOWN",
+		Confidence:      0.0,
+		BlockingPatents: []*pb.BlockingPatent{},
+		Recommendation:  "Please use the full FTO report generation for comprehensive analysis",
 		CheckedAt:       time.Now().Unix(),
 	}, nil
 }
@@ -245,30 +222,57 @@ func (s *PatentServiceServer) GetPatentFamily(
 		return nil, status.Error(codes.InvalidArgument, "invalid patent number format")
 	}
 
-	// Get patent family
-	family, err := s.patentRepo.GetFamily(ctx, req.PatentNumber)
+	// Get patent to find its FamilyID
+	pat, err := s.patentRepo.GetByPatentNumber(ctx, req.PatentNumber)
 	if err != nil {
-		s.logger.Error("failed to get patent family", "error", err, "patent_number", req.PatentNumber)
+		s.logger.Error("failed to get patent for family lookup",
+			logging.Err(err),
+			logging.String("patent_number", req.PatentNumber))
 		return nil, mapPatentError(err)
 	}
 
-	// Convert family members
-	familyMembers := make([]*pb.FamilyMember, len(family.Members))
-	for i, member := range family.Members {
+	// If patent has no family ID, return just this patent
+	if pat.FamilyID == "" {
+		return &pb.GetPatentFamilyResponse{
+			FamilyId:      "",
+			FamilyMembers: []*pb.FamilyMember{},
+			TotalMembers:  0,
+		}, nil
+	}
+
+	// Get family members by FamilyID
+	familyPatents, err := s.patentRepo.GetByFamilyID(ctx, pat.FamilyID)
+	if err != nil {
+		s.logger.Error("failed to get patent family members",
+			logging.Err(err),
+			logging.String("family_id", pat.FamilyID))
+		return nil, mapPatentError(err)
+	}
+
+	// Convert to family members
+	familyMembers := make([]*pb.FamilyMember, len(familyPatents))
+	for i, member := range familyPatents {
+		var appDate, pubDate int64
+		if member.FilingDate != nil {
+			appDate = member.FilingDate.Unix()
+		}
+		if member.PublicationDate != nil {
+			pubDate = member.PublicationDate.Unix()
+		}
 		familyMembers[i] = &pb.FamilyMember{
-			PatentNumber:      member.PatentNumber,
-			PatentOffice:      member.PatentOffice,
-			ApplicationDate:   member.ApplicationDate.Unix(),
-			PublicationDate:   member.PublicationDate.Unix(),
-			LegalStatus:       member.LegalStatus,
-			IsRepresentative:  member.IsRepresentative,
+			PatentNumber:     member.PatentNumber,
+			PatentOffice:     member.Jurisdiction,
+			ApplicationDate:  appDate,
+			PublicationDate:  pubDate,
+			LegalStatus:      string(member.Status),
+			IsRepresentative: member.PatentNumber == req.PatentNumber,
 		}
 	}
 
 	return &pb.GetPatentFamilyResponse{
-		FamilyId:      family.FamilyID,
+		FamilyId:      pat.FamilyID,
 		FamilyMembers: familyMembers,
-		TotalMembers:  int32(len(family.Members)),
+		TotalMembers:  int32(len(familyMembers)),
 	}, nil
 }
 
@@ -295,50 +299,26 @@ func (s *PatentServiceServer) GetCitationNetwork(
 		return nil, status.Errorf(codes.InvalidArgument, "depth must be between 1 and %d", maxCitationDepth)
 	}
 
-	// Build network query
-	query := &patent.CitationNetworkQuery{
-		PatentNumber:     req.PatentNumber,
-		Depth:            int(depth),
-		IncludeCiting:    req.IncludeCiting,
-		IncludeCited:     req.IncludeCited,
-		MaxNodes:         maxNetworkNodes,
-	}
+	// Note: Citation network functionality requires Neo4j graph repository integration
+	// This is a placeholder implementation
+	s.logger.Info("citation network requested (placeholder implementation)",
+		logging.String("patent_number", req.PatentNumber),
+		logging.Int("depth", int(depth)))
 
-	// Get citation network
-	network, err := s.patentRepo.GetCitationNetwork(ctx, query)
-	if err != nil {
-		s.logger.Error("failed to get citation network", "error", err, "patent_number", req.PatentNumber)
-		return nil, mapPatentError(err)
-	}
-
-	// Convert nodes
-	nodes := make([]*pb.CitationNode, len(network.Nodes))
-	for i, node := range network.Nodes {
-		nodes[i] = &pb.CitationNode{
-			PatentNumber:    node.PatentNumber,
-			Title:           node.Title,
-			PublicationDate: node.PublicationDate.Unix(),
-			CitationLevel:   int32(node.Level),
-			IsRoot:          node.IsRoot,
-		}
-	}
-
-	// Convert edges
-	edges := make([]*pb.CitationEdge, len(network.Edges))
-	for i, edge := range network.Edges {
-		edges[i] = &pb.CitationEdge{
-			FromPatent: edge.FromPatent,
-			ToPatent:   edge.ToPatent,
-			EdgeType:   edge.EdgeType,
-		}
+	// Return root node only for now
+	rootNode := &pb.CitationNode{
+		PatentNumber:  req.PatentNumber,
+		Title:         "",
+		CitationLevel: 0,
+		IsRoot:        true,
 	}
 
 	return &pb.GetCitationNetworkResponse{
-		Nodes:       nodes,
-		Edges:       edges,
-		TotalNodes:  int32(len(network.Nodes)),
-		TotalEdges:  int32(len(network.Edges)),
-		IsTruncated: network.IsTruncated,
+		Nodes:       []*pb.CitationNode{rootNode},
+		Edges:       []*pb.CitationEdge{},
+		TotalNodes:  1,
+		TotalEdges:  0,
+		IsTruncated: false,
 	}, nil
 }
 
@@ -348,24 +328,45 @@ func patentDomainToProto(pat *patent.Patent) *pb.Patent {
 		return nil
 	}
 
+	// Extract inventor names
+	inventorNames := make([]string, len(pat.Inventors))
+	for i, inv := range pat.Inventors {
+		inventorNames[i] = inv.Name
+	}
+
+	// Handle nullable dates
+	var appDate, pubDate, grantDate, prioDate int64
+	if pat.FilingDate != nil {
+		appDate = pat.FilingDate.Unix()
+	}
+	if pat.PublicationDate != nil {
+		pubDate = pat.PublicationDate.Unix()
+	}
+	if pat.GrantDate != nil {
+		grantDate = pat.GrantDate.Unix()
+	}
+	if pat.PriorityDate != nil {
+		prioDate = pat.PriorityDate.Unix()
+	}
+
 	return &pb.Patent{
-		PatentNumber:      pat.PatentNumber(),
-		Title:             pat.Title(),
-		Abstract:          pat.Abstract(),
-		Applicants:        pat.Applicants(),
-		Inventors:         pat.Inventors(),
-		IpcClasses:        pat.IPCClasses(),
-		CpcClasses:        pat.CPCClasses(),
-		PatentOffice:      pat.PatentOffice(),
-		ApplicationDate:   pat.ApplicationDate().Unix(),
-		PublicationDate:   pat.PublicationDate().Unix(),
-		GrantDate:         pat.GrantDate().Unix(),
-		LegalStatus:       pat.LegalStatus(),
-		ClaimsCount:       int32(pat.ClaimsCount()),
-		CitationsCount:    int32(pat.CitationsCount()),
-		FamilyId:          pat.FamilyID(),
-		PriorityNumber:    pat.PriorityNumber(),
-		PriorityDate:      pat.PriorityDate().Unix(),
+		PatentNumber:    pat.PatentNumber,
+		Title:           pat.Title,
+		Abstract:        pat.Abstract,
+		Applicants:      []string{pat.AssigneeName},
+		Inventors:       inventorNames,
+		IpcClasses:      pat.IPCCodes,
+		CpcClasses:      pat.CPCCodes,
+		PatentOffice:    pat.Jurisdiction,
+		ApplicationDate: appDate,
+		PublicationDate: pubDate,
+		GrantDate:       grantDate,
+		LegalStatus:     string(pat.Status),
+		ClaimsCount:     int32(len(pat.Claims)),
+		CitationsCount:  int32(len(pat.Cites)),
+		FamilyId:        pat.FamilyID,
+		PriorityNumber:  pat.ApplicationNumber,
+		PriorityDate:    prioDate,
 	}
 }
 
@@ -375,40 +376,51 @@ func claimTreeToProto(tree *patent.ClaimTree) *pb.ClaimTree {
 		return nil
 	}
 
-	// Convert independent claims
-	independentClaims := make([]*pb.Claim, len(tree.IndependentClaims))
-	for i, claim := range tree.IndependentClaims {
-		independentClaims[i] = claimToProto(claim)
+	// Convert root claims
+	rootClaims := make([]*pb.Claim, len(tree.Roots))
+	for i, node := range tree.Roots {
+		rootClaims[i] = claimNodeToProto(node)
 	}
 
 	return &pb.ClaimTree{
-		IndependentClaims: independentClaims,
+		IndependentClaims: rootClaims,
 		TotalClaims:       int32(tree.TotalCount()),
 		MaxDepth:          int32(tree.MaxDepth()),
 	}
 }
 
-// claimToProto converts domain claim to protobuf message
-func claimToProto(claim *patent.Claim) *pb.Claim {
-	if claim == nil {
+// claimNodeToProto converts a claim node to protobuf message
+func claimNodeToProto(node *patent.ClaimNode) *pb.Claim {
+	if node == nil || node.Claim == nil {
 		return nil
 	}
 
-	// Convert dependent claims recursively
-	dependentClaims := make([]*pb.Claim, len(claim.DependentClaims))
-	for i, dep := range claim.DependentClaims {
-		dependentClaims[i] = claimToProto(dep)
+	claim := node.Claim
+
+	// Convert children recursively
+	children := make([]*pb.Claim, len(node.Children))
+	for i, child := range node.Children {
+		children[i] = claimNodeToProto(child)
 	}
 
 	return &pb.Claim{
-		ClaimNumber:       claim.ClaimNumber,
-		ClaimText:         claim.ClaimText,
-		ClaimType:         claim.ClaimType,
-		IsIndependent:     claim.IsIndependent,
-		DependsOn:         claim.DependsOn,
-		DependentClaims:   dependentClaims,
-		TechnicalFeatures: claim.TechnicalFeatures,
+		ClaimNumber:       int32(claim.Number),
+		ClaimText:         claim.Text,
+		ClaimType:         claim.Type.String(),
+		IsIndependent:     claim.Type == patent.ClaimTypeIndependent,
+		DependsOn:         int32SliceFromIntSlice(claim.DependsOn),
+		DependentClaims:   children,
+		TechnicalFeatures: []string{}, // Placeholder - would extract from claim.Elements
 	}
+}
+
+// int32SliceFromIntSlice converts []int to []int32
+func int32SliceFromIntSlice(ints []int) []int32 {
+	result := make([]int32, len(ints))
+	for i, v := range ints {
+		result[i] = int32(v)
+	}
+	return result
 }
 
 // isValidPatentNumber validates patent number format

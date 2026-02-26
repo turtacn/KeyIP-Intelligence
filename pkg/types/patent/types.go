@@ -674,4 +674,18 @@ func NewWatchlistConfig(name string, watchType string) WatchlistConfig {
 	}
 }
 
+// ValuationItem represents a single patent valuation item in assessment.
+type ValuationItem struct {
+	PatentID        string             `json:"patent_id"`
+	PatentNumber    string             `json:"patent_number"`
+	Title           string             `json:"title"`
+	OverallScore    float64            `json:"overall_score"`
+	TechnicalScore  float64            `json:"technical_score"`
+	LegalScore      float64            `json:"legal_score"`
+	CommercialScore float64            `json:"commercial_score"`
+	StrategicScore  float64            `json:"strategic_score"`
+	RiskLevel       string             `json:"risk_level"`
+	Factors         map[string]float64 `json:"factors,omitempty"`
+}
+
 //Personal.AI order the ending

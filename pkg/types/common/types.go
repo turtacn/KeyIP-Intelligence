@@ -333,4 +333,16 @@ func NewPageResponse[T any](items []T, total int64, req PageRequest) PageRespons
 	}
 }
 
+// Context keys for request context
+type ContextKey string
+
+const (
+	// ContextKeyUserID is the context key for user ID.
+	ContextKeyUserID ContextKey = "user_id"
+	// ContextKeyTenantID is the context key for tenant ID.
+	ContextKeyTenantID ContextKey = "tenant_id"
+	// ContextKeyRequestID is the context key for request ID.
+	ContextKeyRequestID ContextKey = "request_id"
+)
+
 //Personal.AI order the ending

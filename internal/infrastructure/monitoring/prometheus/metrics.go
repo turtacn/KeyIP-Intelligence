@@ -5,6 +5,40 @@ import (
 	"time"
 )
 
+// GRPCMetrics holds gRPC-specific metrics for service/method/code dimensions.
+type GRPCMetrics struct {
+	collector            MetricsCollector
+	UnaryRequestsTotal   CounterVec
+	UnaryRequestDuration HistogramVec
+	StreamRequestsTotal  CounterVec
+	StreamRequestDuration HistogramVec
+}
+
+// DefaultGRPCDurationBuckets are default latency buckets for gRPC requests.
+var DefaultGRPCDurationBuckets = []float64{.001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10}
+
+// NewGRPCMetrics creates and registers gRPC metrics.
+func NewGRPCMetrics(collector MetricsCollector) *GRPCMetrics {
+	m := &GRPCMetrics{collector: collector}
+	m.UnaryRequestsTotal = collector.RegisterCounter("grpc_unary_requests_total", "Total gRPC unary requests", "service", "method", "code")
+	m.UnaryRequestDuration = collector.RegisterHistogram("grpc_unary_request_duration_seconds", "gRPC unary request duration", DefaultGRPCDurationBuckets, "service", "method")
+	m.StreamRequestsTotal = collector.RegisterCounter("grpc_stream_requests_total", "Total gRPC stream requests", "service", "method", "code")
+	m.StreamRequestDuration = collector.RegisterHistogram("grpc_stream_request_duration_seconds", "gRPC stream request duration", DefaultGRPCDurationBuckets, "service", "method")
+	return m
+}
+
+// RecordUnaryRequest records a gRPC unary request.
+func (m *GRPCMetrics) RecordUnaryRequest(service, method, code string, duration time.Duration) {
+	m.UnaryRequestsTotal.WithLabelValues(service, method, code).Inc()
+	m.UnaryRequestDuration.WithLabelValues(service, method).Observe(duration.Seconds())
+}
+
+// RecordStreamRequest records a gRPC stream request.
+func (m *GRPCMetrics) RecordStreamRequest(service, method, code string, duration time.Duration) {
+	m.StreamRequestsTotal.WithLabelValues(service, method, code).Inc()
+	m.StreamRequestDuration.WithLabelValues(service, method).Observe(duration.Seconds())
+}
+
 // AppMetrics holds all application metrics.
 type AppMetrics struct {
 	// HTTP Layer

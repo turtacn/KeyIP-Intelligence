@@ -170,6 +170,8 @@ type SimilaritySearchService interface {
 	SearchBySemantic(ctx context.Context, req *SearchBySemanticRequest) (*SimilaritySearchResult, error)
 	SearchByPatent(ctx context.Context, req *SearchByPatentRequest) (*SimilaritySearchResult, error)
 	GetSearchHistory(ctx context.Context, userID string, limit int) ([]SearchHistoryEntry, error)
+	// Search provides a simplified similarity search for gRPC services
+	Search(ctx context.Context, query *SimilarityQuery) ([]SimilarityResult, error)
 }
 
 // ---------------------------------------------------------------------------
@@ -543,6 +545,139 @@ var searchQueryIDCounter int64
 func generateSearchQueryID() string {
 	searchQueryIDCounter++
 	return fmt.Sprintf("sq-%d-%d", time.Now().UnixMilli(), searchQueryIDCounter)
+}
+
+// ---------------------------------------------------------------------------
+// Additional types for gRPC service compatibility
+// ---------------------------------------------------------------------------
+
+// SimilarityQuery is a unified query type for similarity searches.
+// Used by gRPC services for molecular similarity searches.
+type SimilarityQuery struct {
+	SMILES          string  `json:"smiles"`
+	InChI           string  `json:"inchi"`
+	Threshold       float64 `json:"threshold"`
+	FingerprintType string  `json:"fingerprint_type"`
+	MaxResults      int     `json:"max_results"`
+}
+
+// SimilarityResult represents a single similarity search result with molecule info.
+type SimilarityResult struct {
+	Molecule   *MoleculeInfo `json:"molecule"`
+	Similarity float64       `json:"similarity"`
+	Method     string        `json:"method"`
+}
+
+// MoleculeInfo holds basic molecule information for search results.
+type MoleculeInfo struct {
+	ID        string `json:"id"`
+	SMILES    string `json:"smiles"`
+	InChI     string `json:"inchi"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	OLEDLayer string `json:"oled_layer"`
+}
+
+// Search performs a generic similarity search based on SimilarityQuery.
+// This method provides a simplified interface for gRPC services.
+func (s *similaritySearchServiceImpl) Search(ctx context.Context, query *SimilarityQuery) ([]SimilarityResult, error) {
+	if query == nil {
+		return nil, apperrors.NewValidationError("query", "query cannot be nil")
+	}
+
+	smiles := query.SMILES
+	if smiles == "" && query.InChI != "" {
+		return nil, apperrors.NewValidationError("smiles", "SMILES is required for similarity search")
+	}
+
+	if smiles == "" {
+		return nil, apperrors.NewValidationError("smiles", "SMILES is required")
+	}
+
+	threshold := query.Threshold
+	if threshold <= 0 || threshold > 1.0 {
+		threshold = 0.7
+	}
+
+	maxResults := query.MaxResults
+	if maxResults <= 0 {
+		maxResults = 100
+	}
+
+	fpType := query.FingerprintType
+	if fpType == "" {
+		fpType = "morgan"
+	}
+
+	req := &SearchByFingerprintRequest{
+		SMILES:          smiles,
+		FingerprintType: fpType,
+		Metric:          MetricTanimoto,
+		Threshold:       threshold,
+		MaxResults:      maxResults,
+	}
+
+	result, err := s.SearchByFingerprint(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]SimilarityResult, 0, len(result.Hits))
+	for _, hit := range result.Hits {
+		results = append(results, SimilarityResult{
+			Molecule: &MoleculeInfo{
+				ID:     hit.ID,
+				SMILES: hit.SMILES,
+				Name:   hit.Name,
+			},
+			Similarity: hit.Score,
+			Method:     string(hit.Metric),
+		})
+	}
+
+	return results, nil
+}
+
+// MoleculeSearchResult represents the result of a molecule search.
+type MoleculeSearchResult struct {
+	Molecules     []MoleculeInfo `json:"molecules"`
+	TotalCount    int            `json:"total_count"`
+	Page          int            `json:"page"`
+	PageSize      int            `json:"page_size"`
+	SearchTimeMs  int64          `json:"search_time_ms"`
+}
+
+// PatentSearchResult represents the result of a patent search.
+type PatentSearchResult struct {
+	Patents      []PatentInfo  `json:"patents"`
+	TotalCount   int           `json:"total_count"`
+	Page         int           `json:"page"`
+	PageSize     int           `json:"page_size"`
+	SearchTimeMs int64         `json:"search_time_ms"`
+	Facets       []SearchFacet `json:"facets,omitempty"`
+}
+
+// PatentInfo holds brief patent information for search results.
+type PatentInfo struct {
+	PatentID     string    `json:"patent_id"`
+	PatentNumber string    `json:"patent_number"`
+	Title        string    `json:"title"`
+	Abstract     string    `json:"abstract,omitempty"`
+	Applicant    string    `json:"applicant"`
+	FilingDate   time.Time `json:"filing_date"`
+	Score        float64   `json:"score,omitempty"`
+}
+
+// SearchFacet represents a facet category in search results.
+type SearchFacet struct {
+	Name   string       `json:"name"`
+	Values []FacetValue `json:"values"`
+}
+
+// FacetValue represents a single facet value.
+type FacetValue struct {
+	Value string `json:"value"`
+	Count int    `json:"count"`
 }
 
 //Personal.AI order the ending

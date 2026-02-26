@@ -680,4 +680,22 @@ func (s *templateEngineImpl) extractPlaceholders(content string) []Placeholder {
 	return phs
 }
 
+// TemplateService provides template management operations.
+// This is an alias for TemplateEngine for handler compatibility.
+type TemplateService = TemplateEngine
+
+// ReportResult represents a generated report output.
+type ReportResult struct {
+	ReportID    string    `json:"report_id"`
+	ReportType  string    `json:"report_type"`
+	Title       string    `json:"title"`
+	Format      string    `json:"format"`
+	Content     []byte    `json:"content,omitempty"`
+	URL         string    `json:"url,omitempty"`
+	GeneratedAt time.Time `json:"generated_at"`
+	ExpiresAt   time.Time `json:"expires_at,omitempty"`
+	Size        int64     `json:"size"`
+	Status      string    `json:"status"`
+}
+
 //Personal.AI order the ending

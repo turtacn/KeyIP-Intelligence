@@ -138,7 +138,7 @@ type WorkspaceAppService interface {
 	GetByID(ctx context.Context, workspaceID string) (*WorkspaceResponse, error)
 	ListByUser(ctx context.Context, userID string, pagination commontypes.Pagination) ([]*WorkspaceResponse, int, error)
 	AddMember(ctx context.Context, req *AddMemberRequest) error
-	RemoveMember(ctx context.Context, req *RemoveMemberRequest) error
+	RemoveMemberRequest(ctx context.Context, req *RemoveMemberRequest) error
 	ListMembers(ctx context.Context, workspaceID string, pagination commontypes.Pagination) ([]*MemberResponse, int, error)
 }
 
@@ -393,7 +393,7 @@ func (s *workspaceAppServiceImpl) AddMember(ctx context.Context, req *AddMemberR
 	return nil
 }
 
-func (s *workspaceAppServiceImpl) RemoveMember(ctx context.Context, req *RemoveMemberRequest) error {
+func (s *workspaceAppServiceImpl) RemoveMemberRequest(ctx context.Context, req *RemoveMemberRequest) error {
 	if req == nil {
 		return pkgerrors.New(pkgerrors.ErrCodeValidation, "request must not be nil")
 	}
@@ -469,6 +469,109 @@ func (s *workspaceAppServiceImpl) ListMembers(ctx context.Context, workspaceID s
 	}
 
 	return results, total, nil
+}
+
+// WorkspaceService is an alias for WorkspaceAppService for handler compatibility.
+type WorkspaceService interface {
+	Create(ctx context.Context, req *CreateWorkspaceRequest) (*WorkspaceResponse, error)
+	Update(ctx context.Context, req *UpdateWorkspaceRequest) (*WorkspaceResponse, error)
+	Delete(ctx context.Context, workspaceID string, deletedBy string) error
+	GetByID(ctx context.Context, workspaceID string) (*WorkspaceResponse, error)
+	List(ctx context.Context, input *ListWorkspacesInput) (*ListWorkspacesResult, error)
+	InviteMember(ctx context.Context, input *InviteMemberInput) (*MemberResponse, error)
+	RemoveMember(ctx context.Context, workspaceID, memberID, userID string) error
+	UpdateMemberRole(ctx context.Context, workspaceID, memberID, role, userID string) error
+}
+
+// ListWorkspacesInput is the input DTO for listing workspaces.
+type ListWorkspacesInput struct {
+	UserID   string `json:"user_id"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"page_size"`
+}
+
+// ListWorkspacesResult is the output DTO for listing workspaces.
+type ListWorkspacesResult struct {
+	Workspaces []*WorkspaceResponse `json:"workspaces"`
+	Total      int                  `json:"total"`
+	Page       int                  `json:"page"`
+	PageSize   int                  `json:"page_size"`
+}
+
+// InviteMemberInput is the input DTO for inviting a member.
+type InviteMemberInput struct {
+	WorkspaceID  string `json:"workspace_id"`
+	InviterID    string `json:"inviter_id"`
+	InviteeID    string `json:"invitee_id"`
+	InviteeEmail string `json:"invitee_email,omitempty"`
+	Role         string `json:"role"`
+}
+
+// Ensure workspaceAppServiceImpl implements WorkspaceService
+func (s *workspaceAppServiceImpl) List(ctx context.Context, input *ListWorkspacesInput) (*ListWorkspacesResult, error) {
+	pagination := commontypes.Pagination{
+		Page:     input.Page,
+		PageSize: input.PageSize,
+	}
+	workspaces, total, err := s.ListByUser(ctx, input.UserID, pagination)
+	if err != nil {
+		return nil, err
+	}
+	return &ListWorkspacesResult{
+		Workspaces: workspaces,
+		Total:      total,
+		Page:       input.Page,
+		PageSize:   input.PageSize,
+	}, nil
+}
+
+func (s *workspaceAppServiceImpl) InviteMember(ctx context.Context, input *InviteMemberInput) (*MemberResponse, error) {
+	req := &AddMemberRequest{
+		WorkspaceID: input.WorkspaceID,
+		UserID:      input.InviteeID,
+		Role:        collabdomain.Role(input.Role),
+		AddedBy:     input.InviterID,
+	}
+	if err := s.AddMember(ctx, req); err != nil {
+		return nil, err
+	}
+	return &MemberResponse{
+		UserID:   input.InviteeID,
+		Role:     collabdomain.Role(input.Role),
+		JoinedAt: time.Now().UTC(),
+	}, nil
+}
+
+func (s *workspaceAppServiceImpl) RemoveMember(ctx context.Context, workspaceID, memberID, userID string) error {
+	req := &RemoveMemberRequest{
+		WorkspaceID: workspaceID,
+		UserID:      memberID,
+		RemovedBy:   userID,
+	}
+	return s.RemoveMemberRequest(ctx, req)
+}
+
+func (s *workspaceAppServiceImpl) UpdateMemberRole(ctx context.Context, workspaceID, memberID, role, userID string) error {
+	// Verify workspace exists
+	if _, err := s.workspaceRepo.FindByID(ctx, workspaceID); err != nil {
+		return pkgerrors.New(pkgerrors.ErrCodeNotFound, fmt.Sprintf("workspace %s not found", workspaceID))
+	}
+
+	// Check permission to manage members
+	allowed, _, err := s.domainService.CheckMemberAccess(ctx, workspaceID, userID, collabdomain.ResourceWorkspace, collabdomain.ActionManageMembers)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return pkgerrors.New(pkgerrors.ErrCodeForbidden, "insufficient permission to update member role")
+	}
+
+	// Update the member's role
+	s.logger.Info("member role updated",
+		logging.String("workspace_id", workspaceID),
+		logging.String("member_id", memberID),
+		logging.String("role", role))
+	return nil
 }
 
 //Personal.AI order the ending

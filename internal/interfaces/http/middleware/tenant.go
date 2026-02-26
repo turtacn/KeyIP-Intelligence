@@ -127,9 +127,9 @@ func NewTenantMiddleware(cfg TenantConfig, logger logging.Logger) func(http.Hand
 			if tenantID == "" {
 				if cfg.Required {
 					logger.Warn("tenant ID missing in required mode",
-						"method", r.Method,
-						"path", r.URL.Path,
-						"remote", r.RemoteAddr,
+						logging.String("method", r.Method),
+						logging.String("path", r.URL.Path),
+						logging.String("remote", r.RemoteAddr),
 					)
 					writeTenantError(w, http.StatusBadRequest,
 						errors.ErrCodeValidation,
@@ -144,9 +144,9 @@ func NewTenantMiddleware(cfg TenantConfig, logger logging.Logger) func(http.Hand
 			// Format validation.
 			if !validateTenantID(tenantID) {
 				logger.Warn("invalid tenant ID format",
-					"tenant_id", tenantID,
-					"method", r.Method,
-					"path", r.URL.Path,
+					logging.String("tenant_id", tenantID),
+					logging.String("method", r.Method),
+					logging.String("path", r.URL.Path),
 				)
 				writeTenantError(w, http.StatusBadRequest,
 					errors.ErrCodeValidation,
@@ -158,9 +158,9 @@ func NewTenantMiddleware(cfg TenantConfig, logger logging.Logger) func(http.Hand
 			if allowedSet != nil {
 				if _, ok := allowedSet[tenantID]; !ok {
 					logger.Warn("tenant ID not in allowed list",
-						"tenant_id", tenantID,
-						"method", r.Method,
-						"path", r.URL.Path,
+						logging.String("tenant_id", tenantID),
+						logging.String("method", r.Method),
+						logging.String("path", r.URL.Path),
 					)
 					writeTenantError(w, http.StatusForbidden,
 						errors.ErrCodeUnauthorized,
@@ -174,8 +174,8 @@ func NewTenantMiddleware(cfg TenantConfig, logger logging.Logger) func(http.Hand
 				valid, err := cfg.TenantValidator(tenantID)
 				if err != nil {
 					logger.Error("tenant validation failed",
-						"tenant_id", tenantID,
-						"error", err,
+						logging.String("tenant_id", tenantID),
+						logging.Err(err),
 					)
 					writeTenantError(w, http.StatusInternalServerError,
 						errors.ErrCodeInternal,
@@ -184,9 +184,9 @@ func NewTenantMiddleware(cfg TenantConfig, logger logging.Logger) func(http.Hand
 				}
 				if !valid {
 					logger.Warn("tenant rejected by validator",
-						"tenant_id", tenantID,
-						"method", r.Method,
-						"path", r.URL.Path,
+						logging.String("tenant_id", tenantID),
+						logging.String("method", r.Method),
+						logging.String("path", r.URL.Path),
 					)
 					writeTenantError(w, http.StatusForbidden,
 						errors.ErrCodeUnauthorized,
@@ -208,9 +208,9 @@ func NewTenantMiddleware(cfg TenantConfig, logger logging.Logger) func(http.Hand
 			w.Header().Set("X-Tenant-ID", tenantID)
 
 			logger.Debug("tenant resolved",
-				"tenant_id", tenantID,
-				"method", r.Method,
-				"path", r.URL.Path,
+				logging.String("tenant_id", tenantID),
+				logging.String("method", r.Method),
+				logging.String("path", r.URL.Path),
 			)
 
 			next.ServeHTTP(w, r)
