@@ -80,11 +80,11 @@ func (h *MoleculeHandler) RegisterRoutes(mux *http.ServeMux) {
 func (h *MoleculeHandler) CreateMolecule(w http.ResponseWriter, r *http.Request) {
 	var req CreateMoleculeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 	if req.SMILES == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("smiles is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "smiles is required"))
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *MoleculeHandler) CreateMolecule(w http.ResponseWriter, r *http.Request)
 
 	mol, err := h.moleculeSvc.Create(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to create molecule", "error", err)
+		h.logger.Error("failed to create molecule", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -112,13 +112,13 @@ func (h *MoleculeHandler) CreateMolecule(w http.ResponseWriter, r *http.Request)
 func (h *MoleculeHandler) GetMolecule(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("molecule id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "molecule id is required"))
 		return
 	}
 
 	mol, err := h.moleculeSvc.GetByID(r.Context(), id)
 	if err != nil {
-		h.logger.Error("failed to get molecule", "error", err, "id", id)
+		h.logger.Error("failed to get molecule", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -140,7 +140,7 @@ func (h *MoleculeHandler) ListMolecules(w http.ResponseWriter, r *http.Request) 
 
 	result, err := h.moleculeSvc.List(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to list molecules", "error", err)
+		h.logger.Error("failed to list molecules", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -151,13 +151,13 @@ func (h *MoleculeHandler) ListMolecules(w http.ResponseWriter, r *http.Request) 
 func (h *MoleculeHandler) UpdateMolecule(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("molecule id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "molecule id is required"))
 		return
 	}
 
 	var req UpdateMoleculeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 
@@ -172,7 +172,7 @@ func (h *MoleculeHandler) UpdateMolecule(w http.ResponseWriter, r *http.Request)
 
 	mol, err := h.moleculeSvc.Update(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to update molecule", "error", err, "id", id)
+		h.logger.Error("failed to update molecule", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -183,13 +183,13 @@ func (h *MoleculeHandler) UpdateMolecule(w http.ResponseWriter, r *http.Request)
 func (h *MoleculeHandler) DeleteMolecule(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("molecule id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "molecule id is required"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 	if err := h.moleculeSvc.Delete(r.Context(), id, userID); err != nil {
-		h.logger.Error("failed to delete molecule", "error", err, "id", id)
+		h.logger.Error("failed to delete molecule", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -200,11 +200,11 @@ func (h *MoleculeHandler) DeleteMolecule(w http.ResponseWriter, r *http.Request)
 func (h *MoleculeHandler) SearchByStructure(w http.ResponseWriter, r *http.Request) {
 	var req StructureSearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 	if req.SMILES == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("smiles is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "smiles is required"))
 		return
 	}
 	if req.SearchType == "" {
@@ -222,7 +222,7 @@ func (h *MoleculeHandler) SearchByStructure(w http.ResponseWriter, r *http.Reque
 
 	result, err := h.moleculeSvc.SearchByStructure(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to search by structure", "error", err)
+		h.logger.Error("failed to search by structure", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -233,11 +233,11 @@ func (h *MoleculeHandler) SearchByStructure(w http.ResponseWriter, r *http.Reque
 func (h *MoleculeHandler) SearchBySimilarity(w http.ResponseWriter, r *http.Request) {
 	var req SimilaritySearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 	if req.SMILES == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("smiles is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "smiles is required"))
 		return
 	}
 	if req.Threshold <= 0 || req.Threshold > 1.0 {
@@ -255,7 +255,7 @@ func (h *MoleculeHandler) SearchBySimilarity(w http.ResponseWriter, r *http.Requ
 
 	result, err := h.moleculeSvc.SearchBySimilarity(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to search by similarity", "error", err)
+		h.logger.Error("failed to search by similarity", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -266,11 +266,11 @@ func (h *MoleculeHandler) SearchBySimilarity(w http.ResponseWriter, r *http.Requ
 func (h *MoleculeHandler) CalculateProperties(w http.ResponseWriter, r *http.Request) {
 	var req CalculatePropertiesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 	if req.SMILES == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("smiles is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "smiles is required"))
 		return
 	}
 
@@ -281,7 +281,7 @@ func (h *MoleculeHandler) CalculateProperties(w http.ResponseWriter, r *http.Req
 
 	result, err := h.moleculeSvc.CalculateProperties(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to calculate properties", "error", err)
+		h.logger.Error("failed to calculate properties", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}

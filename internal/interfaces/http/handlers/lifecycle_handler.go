@@ -264,7 +264,7 @@ func (h *LifecycleHandler) GetTimeline(w http.ResponseWriter, r *http.Request) {
 
 // GetUpcomingDeadlines handles GET /api/v1/deadlines/upcoming
 func (h *LifecycleHandler) GetUpcomingDeadlines(w http.ResponseWriter, r *http.Request) {
-	userID := getUserIDFromContext(r)
+	_ = getUserIDFromContext(r) // userID reserved for future RBAC filtering
 	daysAhead := 30
 	if v := r.URL.Query().Get("days"); v != "" {
 		if d, err := parseInt(v); err == nil && d > 0 && d <= 365 {

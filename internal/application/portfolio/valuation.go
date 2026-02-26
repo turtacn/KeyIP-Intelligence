@@ -556,6 +556,70 @@ const (
 )
 
 // ---------------------------------------------------------------------------
+// CLI-Compatible Types (adapters for CLI assess command)
+// ---------------------------------------------------------------------------
+
+// CLIValuationRequest is the CLI-compatible request for patent assessment.
+type CLIValuationRequest struct {
+	PatentNumbers []string        `json:"patent_numbers"`
+	Dimensions    []string        `json:"dimensions"`
+	Context       context.Context `json:"-"`
+}
+
+// CLIValuationResult is the CLI-compatible response for patent assessment.
+type CLIValuationResult struct {
+	Items           []*CLIValuationItem `json:"items"`
+	AverageScore    float64             `json:"average_score"`
+	HighRiskPatents []*HighRiskInfo     `json:"high_risk_patents"`
+}
+
+// CLIValuationItem represents a single patent's assessment result for CLI.
+type CLIValuationItem struct {
+	PatentNumber    string  `json:"patent_number"`
+	OverallScore    float64 `json:"overall_score"`
+	TechnicalScore  float64 `json:"technical_score"`
+	LegalScore      float64 `json:"legal_score"`
+	CommercialScore float64 `json:"commercial_score"`
+	StrategicScore  float64 `json:"strategic_score"`
+}
+
+// HighRiskInfo contains risk information for a patent.
+type HighRiskInfo struct {
+	PatentNumber string `json:"patent_number"`
+	RiskReason   string `json:"risk_reason"`
+}
+
+// CLIPortfolioAssessRequest is the CLI-compatible request for portfolio assessment.
+type CLIPortfolioAssessRequest struct {
+	PortfolioID            string          `json:"portfolio_id"`
+	IncludeRecommendations bool            `json:"include_recommendations"`
+	Context                context.Context `json:"-"`
+}
+
+// CLIPortfolioAssessResult is the CLI-compatible response for portfolio assessment.
+type CLIPortfolioAssessResult struct {
+	PortfolioID      string                `json:"portfolio_id"`
+	TotalPatents     int                   `json:"total_patents"`
+	OverallScore     float64               `json:"overall_score"`
+	TechnicalScore   float64               `json:"technical_score"`
+	LegalScore       float64               `json:"legal_score"`
+	CommercialScore  float64               `json:"commercial_score"`
+	StrategicScore   float64               `json:"strategic_score"`
+	TechnicalWeight  float64               `json:"technical_weight"`
+	LegalWeight      float64               `json:"legal_weight"`
+	CommercialWeight float64               `json:"commercial_weight"`
+	StrategicWeight  float64               `json:"strategic_weight"`
+	RiskLevel        string                `json:"risk_level"`
+	Recommendations  []*RecommendationInfo `json:"recommendations"`
+}
+
+// RecommendationInfo contains a recommendation for CLI display.
+type RecommendationInfo struct {
+	Priority    string `json:"priority"`
+	Description string `json:"description"`
+}
+
+// ---------------------------------------------------------------------------
 // ValuationService Interface
 // ---------------------------------------------------------------------------
 
@@ -564,8 +628,14 @@ type ValuationService interface {
 	// AssessPatent performs a multi-dimensional value assessment of a single patent.
 	AssessPatent(ctx context.Context, req *SinglePatentAssessmentRequest) (*SinglePatentAssessmentResponse, error)
 
-	// AssessPortfolio performs batch assessment of a patent portfolio with aggregation.
-	AssessPortfolio(ctx context.Context, req *PortfolioAssessmentRequest) (*PortfolioAssessmentResponse, error)
+	// Assess performs multi-patent assessment for CLI usage.
+	Assess(ctx context.Context, req *CLIValuationRequest) (*CLIValuationResult, error)
+
+	// AssessPortfolioCLI performs portfolio assessment for CLI usage.
+	AssessPortfolioCLI(ctx context.Context, req *CLIPortfolioAssessRequest) (*CLIPortfolioAssessResult, error)
+
+	// AssessPortfolioFull performs batch assessment of a patent portfolio with aggregation.
+	AssessPortfolioFull(ctx context.Context, req *PortfolioAssessmentRequest) (*PortfolioAssessmentResponse, error)
 
 	// GetAssessmentHistory returns historical assessment records for a patent.
 	GetAssessmentHistory(ctx context.Context, patentID string, opts ...QueryOption) ([]*AssessmentRecord, error)
@@ -765,10 +835,161 @@ func (s *valuationServiceImpl) AssessPatent(ctx context.Context, req *SinglePate
 }
 
 // ---------------------------------------------------------------------------
-// AssessPortfolio
+// Assess (CLI-compatible multi-patent assessment)
 // ---------------------------------------------------------------------------
 
-func (s *valuationServiceImpl) AssessPortfolio(ctx context.Context, req *PortfolioAssessmentRequest) (*PortfolioAssessmentResponse, error) {
+// Assess performs multi-patent assessment for CLI usage.
+func (s *valuationServiceImpl) Assess(ctx context.Context, req *CLIValuationRequest) (*CLIValuationResult, error) {
+	if len(req.PatentNumbers) == 0 {
+		return nil, errors.NewValidation("at least one patent number is required")
+	}
+
+	result := &CLIValuationResult{
+		Items:           make([]*CLIValuationItem, 0, len(req.PatentNumbers)),
+		HighRiskPatents: make([]*HighRiskInfo, 0),
+	}
+
+	var totalScore float64
+	for _, pn := range req.PatentNumbers {
+		// Build a single patent assessment request
+		singleReq := &SinglePatentAssessmentRequest{
+			PatentID:   pn,
+			Dimensions: AllDimensions(),
+			Context:    DefaultAssessmentContext(),
+		}
+
+		resp, err := s.AssessPatent(ctx, singleReq)
+		if err != nil {
+			s.logger.Warn("failed to assess patent", logging.String("patent_number", pn), logging.Err(err))
+			continue
+		}
+
+		item := &CLIValuationItem{
+			PatentNumber: pn,
+			OverallScore: resp.OverallScore.Score,
+		}
+
+		// Extract dimension scores
+		for dim, ds := range resp.Scores {
+			switch dim {
+			case DimensionTechnicalValue:
+				item.TechnicalScore = ds.Score
+			case DimensionLegalValue:
+				item.LegalScore = ds.Score
+			case DimensionCommercialValue:
+				item.CommercialScore = ds.Score
+			case DimensionStrategicValue:
+				item.StrategicScore = ds.Score
+			}
+		}
+
+		result.Items = append(result.Items, item)
+		totalScore += item.OverallScore
+
+		// Check for high risk
+		if item.OverallScore < 40.0 || item.LegalScore < 30.0 || item.CommercialScore < 25.0 {
+			result.HighRiskPatents = append(result.HighRiskPatents, &HighRiskInfo{
+				PatentNumber: pn,
+				RiskReason:   fmt.Sprintf("Low scores: overall=%.1f, legal=%.1f, commercial=%.1f", item.OverallScore, item.LegalScore, item.CommercialScore),
+			})
+		}
+	}
+
+	if len(result.Items) > 0 {
+		result.AverageScore = totalScore / float64(len(result.Items))
+	}
+
+	return result, nil
+}
+
+// ---------------------------------------------------------------------------
+// AssessPortfolioCLI (CLI-compatible portfolio assessment)
+// ---------------------------------------------------------------------------
+
+// AssessPortfolioCLI performs portfolio assessment for CLI usage.
+func (s *valuationServiceImpl) AssessPortfolioCLI(ctx context.Context, req *CLIPortfolioAssessRequest) (*CLIPortfolioAssessResult, error) {
+	if req.PortfolioID == "" {
+		return nil, errors.NewValidation("portfolio_id is required")
+	}
+
+	// Call the main AssessPortfolioFull with adapted request
+	portfolioReq := &PortfolioAssessmentRequest{
+		PortfolioID:             req.PortfolioID,
+		Dimensions:              AllDimensions(),
+		Context:                 DefaultAssessmentContext(),
+		IncludeCostOptimization: true,
+	}
+
+	resp, err := s.AssessPortfolioFull(ctx, portfolioReq)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to CLI-compatible result
+	result := &CLIPortfolioAssessResult{
+		PortfolioID:      resp.PortfolioID,
+		TotalPatents:     len(resp.Assessments),
+		OverallScore:     resp.Summary.AverageScore,
+		TechnicalWeight:  DimensionWeights[DimensionTechnicalValue],
+		LegalWeight:      DimensionWeights[DimensionLegalValue],
+		CommercialWeight: DimensionWeights[DimensionCommercialValue],
+		StrategicWeight:  DimensionWeights[DimensionStrategicValue],
+		RiskLevel:        "LOW",
+		Recommendations:  make([]*RecommendationInfo, 0),
+	}
+
+	// Aggregate dimension scores from assessments
+	if len(resp.Assessments) > 0 {
+		var techSum, legalSum, commSum, stratSum float64
+		for _, a := range resp.Assessments {
+			for dim, ds := range a.Scores {
+				switch dim {
+				case DimensionTechnicalValue:
+					techSum += ds.Score
+				case DimensionLegalValue:
+					legalSum += ds.Score
+				case DimensionCommercialValue:
+					commSum += ds.Score
+				case DimensionStrategicValue:
+					stratSum += ds.Score
+				}
+			}
+		}
+		n := float64(len(resp.Assessments))
+		result.TechnicalScore = techSum / n
+		result.LegalScore = legalSum / n
+		result.CommercialScore = commSum / n
+		result.StrategicScore = stratSum / n
+	}
+
+	// Determine risk level
+	tierC := resp.Summary.TierDistribution[TierC]
+	tierD := resp.Summary.TierDistribution[TierD]
+	lowValueCount := tierC + tierD
+	if lowValueCount > len(resp.Assessments)/2 {
+		result.RiskLevel = "HIGH"
+	} else if lowValueCount > len(resp.Assessments)/4 {
+		result.RiskLevel = "MEDIUM"
+	}
+
+	// Convert recommendations if requested
+	if req.IncludeRecommendations && resp.CostOptimization != nil {
+		for _, cr := range resp.CostOptimization.Recommendations {
+			result.Recommendations = append(result.Recommendations, &RecommendationInfo{
+				Priority:    string(cr.Action),
+				Description: cr.Reason,
+			})
+		}
+	}
+
+	return result, nil
+}
+
+// ---------------------------------------------------------------------------
+// AssessPortfolioFull
+// ---------------------------------------------------------------------------
+
+func (s *valuationServiceImpl) AssessPortfolioFull(ctx context.Context, req *PortfolioAssessmentRequest) (*PortfolioAssessmentResponse, error) {
 	start := time.Now()
 	defer func() {
 		s.metrics.ObserveHistogram("valuation_assess_portfolio_duration_seconds", time.Since(start).Seconds(), nil)

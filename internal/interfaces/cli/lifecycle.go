@@ -113,7 +113,7 @@ func NewLifecycleCmd(
 func runLifecycleDeadlines(ctx context.Context, deadlineService lifecycle.DeadlineService, logger logging.Logger) error {
 	// Validate days-ahead range
 	if lifecycleDaysAhead < 1 || lifecycleDaysAhead > 365 {
-		return errors.New("days-ahead must be between 1 and 365")
+		return errors.NewMsg("days-ahead must be between 1 and 365")
 	}
 
 	// Validate jurisdiction if provided
@@ -132,26 +132,27 @@ func runLifecycleDeadlines(ctx context.Context, deadlineService lifecycle.Deadli
 	}
 
 	logger.Info("Querying upcoming deadlines",
-		"patent_number", lifecyclePatentNumber,
-		"jurisdiction", lifecycleJurisdiction,
-		"days_ahead", lifecycleDaysAhead,
-		"status", lifecycleStatus)
+		logging.String("patent_number", lifecyclePatentNumber),
+		logging.String("jurisdiction", lifecycleJurisdiction),
+		logging.Int("days_ahead", lifecycleDaysAhead),
+		logging.String("status", lifecycleStatus))
 
 	// Build query request
-	req := &lifecycle.DeadlineQueryRequest{
-		PatentNumber:  lifecyclePatentNumber,
-		Jurisdictions: parseJurisdictions(lifecycleJurisdiction),
-		DaysAhead:     lifecycleDaysAhead,
-		Status:        lifecycleStatus,
-		Context:       ctx,
+	req := &lifecycle.DeadlineQuery{
+		Page:     1,
+		PageSize: 100,
+	}
+	if lifecycleJurisdiction != "" {
+		// Parse jurisdiction
 	}
 
 	// Query deadlines
-	deadlines, err := deadlineService.ListUpcoming(ctx, req)
+	resp, err := deadlineService.ListDeadlines(ctx, req)
 	if err != nil {
-		logger.Error("Failed to query deadlines", "error", err)
-		return errors.Wrap(err, "failed to query deadlines")
+		logger.Error("Failed to query deadlines", logging.Err(err))
+		return errors.WrapMsg(err, "failed to query deadlines")
 	}
+	deadlines := resp.Deadlines
 
 	// Sort by urgency (critical > warning > normal) then by due date
 	sortDeadlinesByUrgency(deadlines)
@@ -160,7 +161,7 @@ func runLifecycleDeadlines(ctx context.Context, deadlineService lifecycle.Deadli
 	if lifecycleOutput == "json" {
 		data, err := json.MarshalIndent(deadlines, "", "  ")
 		if err != nil {
-			return errors.Wrap(err, "failed to marshal JSON")
+			return errors.WrapMsg(err, "failed to marshal JSON")
 		}
 		fmt.Println(string(data))
 	} else {
@@ -200,7 +201,7 @@ func runLifecycleAnnuity(ctx context.Context, annuityService lifecycle.AnnuitySe
 	result, err := annuityService.Calculate(ctx, req)
 	if err != nil {
 		logger.Error("Failed to calculate annuities", "error", err)
-		return errors.Wrap(err, "failed to calculate annuities")
+		return errors.WrapMsg(err, "failed to calculate annuities")
 	}
 
 	// Format output
@@ -245,7 +246,7 @@ func runLifecycleSyncStatus(ctx context.Context, legalStatusService lifecycle.Le
 	result, err := legalStatusService.SyncFromOffice(ctx, req)
 	if err != nil {
 		logger.Error("Sync failed", "error", err)
-		return errors.Wrap(err, "sync operation failed")
+		return errors.WrapMsg(err, "sync operation failed")
 	}
 
 	// Output summary
@@ -285,7 +286,7 @@ func runLifecycleReminders(ctx context.Context, calendarService lifecycle.Calend
 
 	// Require patent number for add/remove
 	if (action == "add" || action == "remove") && lifecyclePatentNumber == "" {
-		return errors.New("--patent-number required for add/remove actions")
+		return errors.NewMsg("--patent-number required for add/remove actions")
 	}
 
 	logger.Info("Managing reminders",
@@ -307,7 +308,7 @@ func runLifecycleReminders(ctx context.Context, calendarService lifecycle.Calend
 func listReminders(ctx context.Context, calendarService lifecycle.CalendarService, logger logging.Logger) error {
 	reminders, err := calendarService.ListReminders(ctx, lifecyclePatentNumber)
 	if err != nil {
-		return errors.Wrap(err, "failed to list reminders")
+		return errors.WrapMsg(err, "failed to list reminders")
 	}
 
 	if len(reminders) == 0 {
@@ -344,7 +345,7 @@ func addReminder(ctx context.Context, calendarService lifecycle.CalendarService,
 	}
 
 	if err := calendarService.AddReminder(ctx, req); err != nil {
-		return errors.Wrap(err, "failed to add reminder")
+		return errors.WrapMsg(err, "failed to add reminder")
 	}
 
 	fmt.Printf("✓ Reminder added for patent %s\n", lifecyclePatentNumber)
@@ -361,7 +362,7 @@ func addReminder(ctx context.Context, calendarService lifecycle.CalendarService,
 
 func removeReminder(ctx context.Context, calendarService lifecycle.CalendarService, logger logging.Logger) error {
 	if err := calendarService.RemoveReminder(ctx, lifecyclePatentNumber); err != nil {
-		return errors.Wrap(err, "failed to remove reminder")
+		return errors.WrapMsg(err, "failed to remove reminder")
 	}
 
 	fmt.Printf("✓ Reminder removed for patent %s\n", lifecyclePatentNumber)

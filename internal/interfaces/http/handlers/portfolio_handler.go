@@ -61,11 +61,11 @@ func (h *PortfolioHandler) RegisterRoutes(mux *http.ServeMux) {
 func (h *PortfolioHandler) CreatePortfolio(w http.ResponseWriter, r *http.Request) {
 	var req CreatePortfolioRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 	if req.Name == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("name is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "name is required"))
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *PortfolioHandler) CreatePortfolio(w http.ResponseWriter, r *http.Reques
 
 	p, err := h.portfolioSvc.Create(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to create portfolio", "error", err)
+		h.logger.Error("failed to create portfolio", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -90,13 +90,13 @@ func (h *PortfolioHandler) CreatePortfolio(w http.ResponseWriter, r *http.Reques
 func (h *PortfolioHandler) GetPortfolio(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("portfolio id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
 		return
 	}
 
 	p, err := h.portfolioSvc.GetByID(r.Context(), id)
 	if err != nil {
-		h.logger.Error("failed to get portfolio", "error", err, "id", id)
+		h.logger.Error("failed to get portfolio", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -115,7 +115,7 @@ func (h *PortfolioHandler) ListPortfolios(w http.ResponseWriter, r *http.Request
 
 	result, err := h.portfolioSvc.List(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to list portfolios", "error", err)
+		h.logger.Error("failed to list portfolios", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -125,13 +125,13 @@ func (h *PortfolioHandler) ListPortfolios(w http.ResponseWriter, r *http.Request
 func (h *PortfolioHandler) UpdatePortfolio(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("portfolio id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
 		return
 	}
 
 	var req UpdatePortfolioRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 
@@ -146,7 +146,7 @@ func (h *PortfolioHandler) UpdatePortfolio(w http.ResponseWriter, r *http.Reques
 
 	p, err := h.portfolioSvc.Update(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to update portfolio", "error", err, "id", id)
+		h.logger.Error("failed to update portfolio", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -156,13 +156,13 @@ func (h *PortfolioHandler) UpdatePortfolio(w http.ResponseWriter, r *http.Reques
 func (h *PortfolioHandler) DeletePortfolio(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("portfolio id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 	if err := h.portfolioSvc.Delete(r.Context(), id, userID); err != nil {
-		h.logger.Error("failed to delete portfolio", "error", err, "id", id)
+		h.logger.Error("failed to delete portfolio", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -172,23 +172,23 @@ func (h *PortfolioHandler) DeletePortfolio(w http.ResponseWriter, r *http.Reques
 func (h *PortfolioHandler) AddPatents(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("portfolio id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
 		return
 	}
 
 	var req AddPatentsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 	if len(req.PatentIDs) == 0 {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent_ids is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "patent_ids is required"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 	if err := h.portfolioSvc.AddPatents(r.Context(), id, req.PatentIDs, userID); err != nil {
-		h.logger.Error("failed to add patents to portfolio", "error", err, "id", id)
+		h.logger.Error("failed to add patents to portfolio", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -198,23 +198,23 @@ func (h *PortfolioHandler) AddPatents(w http.ResponseWriter, r *http.Request) {
 func (h *PortfolioHandler) RemovePatents(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("portfolio id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
 		return
 	}
 
 	var req RemovePatentsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 	if len(req.PatentIDs) == 0 {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent_ids is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "patent_ids is required"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 	if err := h.portfolioSvc.RemovePatents(r.Context(), id, req.PatentIDs, userID); err != nil {
-		h.logger.Error("failed to remove patents from portfolio", "error", err, "id", id)
+		h.logger.Error("failed to remove patents from portfolio", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -224,13 +224,13 @@ func (h *PortfolioHandler) RemovePatents(w http.ResponseWriter, r *http.Request)
 func (h *PortfolioHandler) GetAnalysis(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("portfolio id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
 		return
 	}
 
 	analysis, err := h.portfolioSvc.GetAnalysis(r.Context(), id)
 	if err != nil {
-		h.logger.Error("failed to get portfolio analysis", "error", err, "id", id)
+		h.logger.Error("failed to get portfolio analysis", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}

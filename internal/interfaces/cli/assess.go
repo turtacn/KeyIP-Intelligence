@@ -15,7 +15,6 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
 var (
@@ -94,12 +93,12 @@ func runAssessPatent(ctx context.Context, valuationService portfolio.ValuationSe
 	}
 
 	logger.Info("Starting patent assessment",
-		"patents", patentNumbers,
-		"dimensions", dimensions,
-		"output", assessOutput)
+		logging.Any("patents", patentNumbers),
+		logging.Any("dimensions", dimensions),
+		logging.String("output", assessOutput))
 
 	// Build assessment request
-	req := &portfolio.ValuationRequest{
+	req := &portfolio.CLIValuationRequest{
 		PatentNumbers: patentNumbers,
 		Dimensions:    dimensions,
 		Context:       ctx,
@@ -108,8 +107,8 @@ func runAssessPatent(ctx context.Context, valuationService portfolio.ValuationSe
 	// Call valuation service
 	result, err := valuationService.Assess(ctx, req)
 	if err != nil {
-		logger.Error("Patent assessment failed", "error", err)
-		return errors.Wrap(err, "patent assessment failed")
+		logger.Error("Patent assessment failed", logging.Err(err))
+		return errors.WrapMsg(err, "patent assessment failed")
 	}
 
 	// Check for high-risk items and emit warning
@@ -120,17 +119,17 @@ func runAssessPatent(ctx context.Context, valuationService portfolio.ValuationSe
 	// Format output
 	output, err := formatAssessOutput(result, assessOutput)
 	if err != nil {
-		return errors.Wrap(err, "failed to format output")
+		return errors.WrapMsg(err, "failed to format output")
 	}
 
 	// Write output
 	if err := writeOutput(output, assessFile); err != nil {
-		return errors.Wrap(err, "failed to write output")
+		return errors.WrapMsg(err, "failed to write output")
 	}
 
 	logger.Info("Patent assessment completed successfully",
-		"patents_count", len(patentNumbers),
-		"output_format", assessOutput)
+		logging.Int("patents_count", len(patentNumbers)),
+		logging.String("output_format", assessOutput))
 
 	return nil
 }
@@ -142,22 +141,22 @@ func runAssessPortfolio(ctx context.Context, valuationService portfolio.Valuatio
 	}
 
 	logger.Info("Starting portfolio assessment",
-		"portfolio_id", assessPortfolioID,
-		"include_recommendations", assessIncludeRecommendations,
-		"output", assessOutput)
+		logging.String("portfolio_id", assessPortfolioID),
+		logging.Bool("include_recommendations", assessIncludeRecommendations),
+		logging.String("output", assessOutput))
 
 	// Build assessment request
-	req := &portfolio.PortfolioAssessRequest{
+	req := &portfolio.CLIPortfolioAssessRequest{
 		PortfolioID:           assessPortfolioID,
 		IncludeRecommendations: assessIncludeRecommendations,
 		Context:               ctx,
 	}
 
 	// Call valuation service
-	result, err := valuationService.AssessPortfolio(ctx, req)
+	result, err := valuationService.AssessPortfolioCLI(ctx, req)
 	if err != nil {
-		logger.Error("Portfolio assessment failed", "error", err)
-		return errors.Wrap(err, "portfolio assessment failed")
+		logger.Error("Portfolio assessment failed", logging.Err(err))
+		return errors.WrapMsg(err, "portfolio assessment failed")
 	}
 
 	// Check for high-risk items
@@ -168,17 +167,17 @@ func runAssessPortfolio(ctx context.Context, valuationService portfolio.Valuatio
 	// Format output
 	output, err := formatPortfolioOutput(result, assessOutput)
 	if err != nil {
-		return errors.Wrap(err, "failed to format output")
+		return errors.WrapMsg(err, "failed to format output")
 	}
 
 	// Write output
 	if err := writeOutput(output, assessFile); err != nil {
-		return errors.Wrap(err, "failed to write output")
+		return errors.WrapMsg(err, "failed to write output")
 	}
 
 	logger.Info("Portfolio assessment completed successfully",
-		"portfolio_id", assessPortfolioID,
-		"output_format", assessOutput)
+		logging.String("portfolio_id", assessPortfolioID),
+		logging.String("output_format", assessOutput))
 
 	return nil
 }
@@ -229,7 +228,7 @@ func parseDimensions(input string) ([]string, error) {
 	}
 
 	if len(result) == 0 {
-		return nil, errors.New("at least one valid dimension required")
+		return nil, errors.NewValidation("at least one valid dimension required")
 	}
 
 	return result, nil
@@ -246,7 +245,7 @@ func isValidOutputFormat(format string) bool {
 	return false
 }
 
-func formatAssessOutput(result *portfolio.ValuationResult, format string) (string, error) {
+func formatAssessOutput(result *portfolio.CLIValuationResult, format string) (string, error) {
 	switch strings.ToLower(format) {
 	case "json":
 		data, err := json.MarshalIndent(result, "", "  ")
@@ -266,25 +265,23 @@ func formatAssessOutput(result *portfolio.ValuationResult, format string) (strin
 	}
 }
 
-func formatTableOutput(result *portfolio.ValuationResult) string {
+func formatTableOutput(result *portfolio.CLIValuationResult) string {
 	var buf strings.Builder
 
 	buf.WriteString("\n=== Patent Value Assessment ===\n\n")
 
 	table := tablewriter.NewWriter(&buf)
-	table.SetHeader([]string{"Patent", "Overall Score", "Technical", "Legal", "Commercial", "Strategic"})
-	table.SetBorder(true)
+	table.Header("Patent", "Overall Score", "Technical", "Legal", "Commercial", "Strategic")
 
 	for _, item := range result.Items {
-		row := []string{
+		table.Append([]string{
 			item.PatentNumber,
 			fmt.Sprintf("%.2f", item.OverallScore),
 			fmt.Sprintf("%.2f", item.TechnicalScore),
 			fmt.Sprintf("%.2f", item.LegalScore),
 			fmt.Sprintf("%.2f", item.CommercialScore),
 			fmt.Sprintf("%.2f", item.StrategicScore),
-		}
-		table.Append(row)
+		})
 	}
 
 	table.Render()
@@ -303,7 +300,7 @@ func formatTableOutput(result *portfolio.ValuationResult) string {
 	return buf.String()
 }
 
-func formatCSVOutput(result *portfolio.ValuationResult) (string, error) {
+func formatCSVOutput(result *portfolio.CLIValuationResult) (string, error) {
 	var buf strings.Builder
 	writer := csv.NewWriter(&buf)
 
@@ -342,7 +339,7 @@ func formatCSVOutput(result *portfolio.ValuationResult) (string, error) {
 	return buf.String(), nil
 }
 
-func formatPortfolioOutput(result *portfolio.PortfolioAssessResult, format string) (string, error) {
+func formatPortfolioOutput(result *portfolio.CLIPortfolioAssessResult, format string) (string, error) {
 	switch strings.ToLower(format) {
 	case "json":
 		data, err := json.MarshalIndent(result, "", "  ")
@@ -362,7 +359,7 @@ func formatPortfolioOutput(result *portfolio.PortfolioAssessResult, format strin
 	}
 }
 
-func formatPortfolioTableOutput(result *portfolio.PortfolioAssessResult) string {
+func formatPortfolioTableOutput(result *portfolio.CLIPortfolioAssessResult) string {
 	var buf strings.Builder
 
 	buf.WriteString("\n=== Portfolio Value Assessment ===\n\n")
@@ -372,7 +369,7 @@ func formatPortfolioTableOutput(result *portfolio.PortfolioAssessResult) string 
 
 	// Dimension scores table
 	table := tablewriter.NewWriter(&buf)
-	table.SetHeader([]string{"Dimension", "Score", "Weight"})
+	table.Header("Dimension", "Score", "Weight")
 	table.Append([]string{"Technical", fmt.Sprintf("%.2f", result.TechnicalScore), fmt.Sprintf("%.0f%%", result.TechnicalWeight*100)})
 	table.Append([]string{"Legal", fmt.Sprintf("%.2f", result.LegalScore), fmt.Sprintf("%.0f%%", result.LegalWeight*100)})
 	table.Append([]string{"Commercial", fmt.Sprintf("%.2f", result.CommercialScore), fmt.Sprintf("%.0f%%", result.CommercialWeight*100)})
@@ -390,7 +387,7 @@ func formatPortfolioTableOutput(result *portfolio.PortfolioAssessResult) string 
 	return buf.String()
 }
 
-func formatPortfolioCSVOutput(result *portfolio.PortfolioAssessResult) (string, error) {
+func formatPortfolioCSVOutput(result *portfolio.CLIPortfolioAssessResult) (string, error) {
 	var buf strings.Builder
 	writer := csv.NewWriter(&buf)
 
@@ -437,15 +434,15 @@ func writeOutput(content string, filePath string) error {
 	return nil
 }
 
-func hasHighRiskItems(result *portfolio.ValuationResult) bool {
+func hasHighRiskItems(result *portfolio.CLIValuationResult) bool {
 	return len(result.HighRiskPatents) > 0
 }
 
-func hasHighRiskPortfolioItems(result *portfolio.PortfolioAssessResult) bool {
-	return result.RiskLevel == common.RiskHigh || result.RiskLevel == common.RiskCritical
+func hasHighRiskPortfolioItems(result *portfolio.CLIPortfolioAssessResult) bool {
+	return result.RiskLevel == string(common.RiskHigh) || result.RiskLevel == string(common.RiskCritical)
 }
 
-func isHighRiskItem(item *patent.ValuationItem) bool {
+func isHighRiskItem(item *portfolio.CLIValuationItem) bool {
 	// Define high risk thresholds
 	return item.OverallScore < 40.0 ||
 		item.LegalScore < 30.0 ||

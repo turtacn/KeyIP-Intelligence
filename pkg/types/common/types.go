@@ -345,4 +345,18 @@ const (
 	ContextKeyRequestID ContextKey = "request_id"
 )
 
+// RiskLevel represents the risk assessment level.
+type RiskLevel string
+
+const (
+	// RiskLow indicates low risk.
+	RiskLow RiskLevel = "LOW"
+	// RiskMedium indicates medium risk.
+	RiskMedium RiskLevel = "MEDIUM"
+	// RiskHigh indicates high risk.
+	RiskHigh RiskLevel = "HIGH"
+	// RiskCritical indicates critical risk.
+	RiskCritical RiskLevel = "CRITICAL"
+)
+
 //Personal.AI order the ending

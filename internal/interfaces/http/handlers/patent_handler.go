@@ -85,11 +85,11 @@ func (h *PatentHandler) RegisterRoutes(mux *http.ServeMux) {
 func (h *PatentHandler) CreatePatent(w http.ResponseWriter, r *http.Request) {
 	var req CreatePatentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 	if req.Title == "" || req.ApplicationNo == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("title and application_no are required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "title and application_no are required"))
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *PatentHandler) CreatePatent(w http.ResponseWriter, r *http.Request) {
 
 	p, err := h.patentSvc.Create(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to create patent", "error", err)
+		h.logger.Error("failed to create patent", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -122,13 +122,13 @@ func (h *PatentHandler) CreatePatent(w http.ResponseWriter, r *http.Request) {
 func (h *PatentHandler) GetPatent(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "patent id is required"))
 		return
 	}
 
 	p, err := h.patentSvc.GetByID(r.Context(), id)
 	if err != nil {
-		h.logger.Error("failed to get patent", "error", err, "id", id)
+		h.logger.Error("failed to get patent", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -149,7 +149,7 @@ func (h *PatentHandler) ListPatents(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.patentSvc.List(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to list patents", "error", err)
+		h.logger.Error("failed to list patents", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -159,13 +159,13 @@ func (h *PatentHandler) ListPatents(w http.ResponseWriter, r *http.Request) {
 func (h *PatentHandler) UpdatePatent(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "patent id is required"))
 		return
 	}
 
 	var req UpdatePatentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 
@@ -182,7 +182,7 @@ func (h *PatentHandler) UpdatePatent(w http.ResponseWriter, r *http.Request) {
 
 	p, err := h.patentSvc.Update(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to update patent", "error", err, "id", id)
+		h.logger.Error("failed to update patent", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -192,13 +192,13 @@ func (h *PatentHandler) UpdatePatent(w http.ResponseWriter, r *http.Request) {
 func (h *PatentHandler) DeletePatent(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "patent id is required"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 	if err := h.patentSvc.Delete(r.Context(), id, userID); err != nil {
-		h.logger.Error("failed to delete patent", "error", err, "id", id)
+		h.logger.Error("failed to delete patent", logging.Err(err), logging.String("id", id))
 		writeAppError(w, err)
 		return
 	}
@@ -208,11 +208,11 @@ func (h *PatentHandler) DeletePatent(w http.ResponseWriter, r *http.Request) {
 func (h *PatentHandler) SearchPatents(w http.ResponseWriter, r *http.Request) {
 	var req SearchPatentsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 	if req.Query == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("query is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "query is required"))
 		return
 	}
 	if req.Page <= 0 {
@@ -232,7 +232,7 @@ func (h *PatentHandler) SearchPatents(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.patentSvc.Search(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to search patents", "error", err)
+		h.logger.Error("failed to search patents", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -242,7 +242,7 @@ func (h *PatentHandler) SearchPatents(w http.ResponseWriter, r *http.Request) {
 func (h *PatentHandler) AdvancedSearch(w http.ResponseWriter, r *http.Request) {
 	var req AdvancedSearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 	if req.Page <= 0 {
@@ -268,7 +268,7 @@ func (h *PatentHandler) AdvancedSearch(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.patentSvc.AdvancedSearch(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to advanced search patents", "error", err)
+		h.logger.Error("failed to advanced search patents", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -286,7 +286,7 @@ func (h *PatentHandler) GetPatentStats(w http.ResponseWriter, r *http.Request) {
 
 	stats, err := h.patentSvc.GetStats(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to get patent stats", "error", err)
+		h.logger.Error("failed to get patent stats", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}

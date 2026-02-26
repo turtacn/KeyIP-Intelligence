@@ -189,6 +189,21 @@ func Wrapf(err error, code ErrorCode, format string, args ...interface{}) *AppEr
 	return ae
 }
 
+// WrapMsg wraps an error with a message using ErrCodeInternal as default code.
+func WrapMsg(err error, message string) *AppError {
+	return Wrap(err, ErrCodeInternal, message)
+}
+
+// WrapMsgf wraps an error with a formatted message using ErrCodeInternal as default code.
+func WrapMsgf(err error, format string, args ...interface{}) *AppError {
+	return Wrapf(err, ErrCodeInternal, format, args...)
+}
+
+// NewMsg creates a new error with the given message using ErrCodeInternal as default code.
+func NewMsg(message string) *AppError {
+	return New(ErrCodeInternal, message)
+}
+
 func FromCode(code ErrorCode) *AppError {
 	return newAppError(code, DefaultMessageForCode(code))
 }
