@@ -5,104 +5,7 @@ import (
 	"time"
 )
 
-// GRPCMetrics holds gRPC-specific metrics for service/method/code dimensions.
-type GRPCMetrics struct {
-	collector            MetricsCollector
-	UnaryRequestsTotal   CounterVec
-	UnaryRequestDuration HistogramVec
-	StreamRequestsTotal  CounterVec
-	StreamRequestDuration HistogramVec
-}
-
-// DefaultGRPCDurationBuckets are default latency buckets for gRPC requests.
-var DefaultGRPCDurationBuckets = []float64{.001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10}
-
-// NewGRPCMetrics creates and registers gRPC metrics.
-func NewGRPCMetrics(collector MetricsCollector) *GRPCMetrics {
-	m := &GRPCMetrics{collector: collector}
-	m.UnaryRequestsTotal = collector.RegisterCounter("grpc_unary_requests_total", "Total gRPC unary requests", "service", "method", "code")
-	m.UnaryRequestDuration = collector.RegisterHistogram("grpc_unary_request_duration_seconds", "gRPC unary request duration", DefaultGRPCDurationBuckets, "service", "method")
-	m.StreamRequestsTotal = collector.RegisterCounter("grpc_stream_requests_total", "Total gRPC stream requests", "service", "method", "code")
-	m.StreamRequestDuration = collector.RegisterHistogram("grpc_stream_request_duration_seconds", "gRPC stream request duration", DefaultGRPCDurationBuckets, "service", "method")
-	return m
-}
-
-// RecordUnaryRequest records a gRPC unary request.
-func (m *GRPCMetrics) RecordUnaryRequest(service, method, code string, duration time.Duration) {
-	m.UnaryRequestsTotal.WithLabelValues(service, method, code).Inc()
-	m.UnaryRequestDuration.WithLabelValues(service, method).Observe(duration.Seconds())
-}
-
-// RecordStreamRequest records a gRPC stream request.
-func (m *GRPCMetrics) RecordStreamRequest(service, method, code string, duration time.Duration) {
-	m.StreamRequestsTotal.WithLabelValues(service, method, code).Inc()
-	m.StreamRequestDuration.WithLabelValues(service, method).Observe(duration.Seconds())
-}
-
-// AppMetrics holds all application metrics.
-type AppMetrics struct {
-	// HTTP Layer
-	HTTPRequestsTotal     CounterVec
-	HTTPRequestDuration   HistogramVec
-	HTTPRequestSize       HistogramVec
-	HTTPResponseSize      HistogramVec
-	HTTPActiveRequests    GaugeVec
-
-	// Auth Layer
-	AuthAttemptsTotal     CounterVec
-	AuthTokenVerifyDuration HistogramVec
-	AuthActiveTokens      GaugeVec
-
-	// Patent Layer
-	PatentIngestTotal     CounterVec
-	PatentIngestDuration  HistogramVec
-	PatentStorageSize     GaugeVec
-	PatentSearchDuration  HistogramVec
-	PatentSearchResultCount HistogramVec
-	PatentTotalCount      GaugeVec
-
-	// Infringement/Risk Layer
-	RiskAssessmentRequestsTotal  CounterVec
-	RiskAssessmentDuration       HistogramVec
-	RiskAssessmentCacheHitsTotal CounterVec
-	FTOAnalysisDuration          HistogramVec
-
-	// Analysis Layer
-	AnalysisTasksTotal    CounterVec
-	AnalysisTaskDuration  HistogramVec
-	AnalysisTaskQueueDepth GaugeVec
-	AnalysisActiveWorkers GaugeVec
-	AnalysisTaskRetries   CounterVec
-
-	// Graph Layer
-	GraphNodesTotal       GaugeVec
-	GraphEdgesTotal       GaugeVec
-	GraphQueryDuration    HistogramVec
-	GraphBuildDuration    HistogramVec
-
-	// AI/LLM Layer
-	LLMRequestsTotal      CounterVec
-	LLMRequestDuration    HistogramVec
-	LLMTokensUsed         CounterVec
-	LLMCostTotal          CounterVec
-	LLMCacheHitRate       GaugeVec
-
-	// Infrastructure Layer
-	DBConnectionPoolSize  GaugeVec
-	DBConnectionPoolActive GaugeVec
-	DBQueryDuration       HistogramVec
-	CacheHitsTotal        CounterVec
-	CacheMissesTotal      CounterVec
-	MessageQueueDepth     GaugeVec
-	MessageProcessDuration HistogramVec
-
-	// System Health
-	ServiceUptime         GaugeVec
-	HealthCheckStatus     GaugeVec
-	ErrorsTotal           CounterVec
-}
-
-// Default Buckets
+// Default bucket definitions
 var (
 	DefaultHTTPDurationBuckets     = []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10}
 	DefaultAnalysisDurationBuckets = []float64{1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600}
@@ -111,7 +14,64 @@ var (
 	DefaultDBDurationBuckets       = []float64{.001, .005, .01, .025, .05, .1, .25, .5, 1, 5}
 )
 
-// NewAppMetrics registers all metrics and returns AppMetrics struct.
+// AppMetrics holds all application metrics.
+type AppMetrics struct {
+	// HTTP
+	HTTPRequestsTotal    CounterVec
+	HTTPRequestDuration  HistogramVec
+	HTTPRequestSize      HistogramVec
+	HTTPResponseSize     HistogramVec
+	HTTPActiveRequests   GaugeVec
+
+	// Auth
+	AuthAttemptsTotal       CounterVec
+	AuthTokenVerifyDuration HistogramVec
+	AuthActiveTokens        GaugeVec
+
+	// Patent
+	PatentIngestTotal       CounterVec
+	PatentIngestDuration    HistogramVec
+	PatentStorageSize       GaugeVec
+	PatentSearchDuration    HistogramVec
+	PatentSearchResultCount HistogramVec
+	PatentTotalCount        GaugeVec
+
+	// Analysis
+	AnalysisTasksTotal     CounterVec
+	AnalysisTaskDuration   HistogramVec
+	AnalysisTaskQueueDepth GaugeVec
+	AnalysisActiveWorkers  GaugeVec
+	AnalysisTaskRetries    CounterVec
+
+	// Graph
+	GraphNodesTotal    GaugeVec
+	GraphEdgesTotal    GaugeVec
+	GraphQueryDuration HistogramVec
+	GraphBuildDuration HistogramVec
+
+	// LLM
+	LLMRequestsTotal   CounterVec
+	LLMRequestDuration HistogramVec
+	LLMTokensUsed      CounterVec
+	LLMCostTotal       CounterVec
+	LLMCacheHitRate    GaugeVec
+
+	// Infra
+	DBConnectionPoolSize   GaugeVec
+	DBConnectionPoolActive GaugeVec
+	DBQueryDuration        HistogramVec
+	CacheHitsTotal         CounterVec
+	CacheMissesTotal       CounterVec
+	MessageQueueDepth      GaugeVec
+	MessageProcessDuration HistogramVec
+
+	// Health
+	ServiceUptime     GaugeVec
+	HealthCheckStatus GaugeVec
+	ErrorsTotal       CounterVec
+}
+
+// NewAppMetrics creates and registers all metrics.
 func NewAppMetrics(collector MetricsCollector) *AppMetrics {
 	m := &AppMetrics{}
 
@@ -123,57 +83,54 @@ func NewAppMetrics(collector MetricsCollector) *AppMetrics {
 	m.HTTPActiveRequests = collector.RegisterGauge("http_active_requests", "Active HTTP requests", "method", "path")
 
 	// Auth
-	m.AuthAttemptsTotal = collector.RegisterCounter("auth_attempts_total", "Authentication attempts", "result", "failure_reason")
-	m.AuthTokenVerifyDuration = collector.RegisterHistogram("auth_token_verify_duration_seconds", "Token verification duration", DefaultHTTPDurationBuckets, "method")
-	m.AuthActiveTokens = collector.RegisterGauge("auth_active_tokens", "Active tokens (introspected)", "token_type")
+	m.AuthAttemptsTotal = collector.RegisterCounter("auth_attempts_total", "Total authentication attempts", "result", "failure_reason")
+	m.AuthTokenVerifyDuration = collector.RegisterHistogram("auth_token_verify_duration_seconds", "Token verification duration", DefaultDBDurationBuckets, "method")
+	m.AuthActiveTokens = collector.RegisterGauge("auth_active_tokens", "Active tokens (introspection)", "token_type")
 
 	// Patent
-	m.PatentIngestTotal = collector.RegisterCounter("patent_ingest_total", "Patent ingestion count", "source", "status")
+	m.PatentIngestTotal = collector.RegisterCounter("patent_ingest_total", "Total patents ingested", "source", "status")
 	m.PatentIngestDuration = collector.RegisterHistogram("patent_ingest_duration_seconds", "Patent ingestion duration", DefaultAnalysisDurationBuckets, "source")
 	m.PatentStorageSize = collector.RegisterGauge("patent_storage_bytes", "Patent storage size", "storage_type")
 	m.PatentSearchDuration = collector.RegisterHistogram("patent_search_duration_seconds", "Patent search duration", DefaultHTTPDurationBuckets, "query_type")
-	m.PatentSearchResultCount = collector.RegisterHistogram("patent_search_result_count", "Patent search result count", []float64{0, 10, 50, 100, 500, 1000, 5000, 10000}, "query_type")
+	m.PatentSearchResultCount = collector.RegisterHistogram("patent_search_results", "Patent search results count", []float64{0, 10, 50, 100, 500, 1000}, "query_type")
 	m.PatentTotalCount = collector.RegisterGauge("patent_total_count", "Total patents", "status")
 
-	// Infringement/Risk
-	m.RiskAssessmentRequestsTotal = collector.RegisterCounter("risk_assessment_requests_total", "Risk assessment requests", "method", "depth")
-	m.RiskAssessmentDuration = collector.RegisterHistogram("risk_assessment_duration_seconds", "Risk assessment duration", DefaultAnalysisDurationBuckets, "depth")
-	m.RiskAssessmentCacheHitsTotal = collector.RegisterCounter("risk_assessment_cache_hits_total", "Risk assessment cache hits")
-	m.FTOAnalysisDuration = collector.RegisterHistogram("fto_analysis_duration_seconds", "FTO analysis duration", DefaultAnalysisDurationBuckets, "jurisdictions")
-
 	// Analysis
-	m.AnalysisTasksTotal = collector.RegisterCounter("analysis_tasks_total", "Analysis tasks total", "type", "status")
+	m.AnalysisTasksTotal = collector.RegisterCounter("analysis_tasks_total", "Total analysis tasks", "type", "status")
 	m.AnalysisTaskDuration = collector.RegisterHistogram("analysis_task_duration_seconds", "Analysis task duration", DefaultAnalysisDurationBuckets, "type")
-	m.AnalysisTaskQueueDepth = collector.RegisterGauge("analysis_task_queue_depth", "Analysis task queue depth", "priority")
+	m.AnalysisTaskQueueDepth = collector.RegisterGauge("analysis_queue_depth", "Analysis task queue depth", "priority")
 	m.AnalysisActiveWorkers = collector.RegisterGauge("analysis_active_workers", "Active analysis workers", "type")
 	m.AnalysisTaskRetries = collector.RegisterCounter("analysis_task_retries_total", "Analysis task retries", "type", "reason")
 
 	// Graph
-	m.GraphNodesTotal = collector.RegisterGauge("graph_nodes_total", "Graph nodes total", "node_type")
-	m.GraphEdgesTotal = collector.RegisterGauge("graph_edges_total", "Graph edges total", "edge_type")
+	m.GraphNodesTotal = collector.RegisterGauge("graph_nodes_total", "Total graph nodes", "node_type")
+	m.GraphEdgesTotal = collector.RegisterGauge("graph_edges_total", "Total graph edges", "edge_type")
 	m.GraphQueryDuration = collector.RegisterHistogram("graph_query_duration_seconds", "Graph query duration", DefaultDBDurationBuckets, "query_type")
 	m.GraphBuildDuration = collector.RegisterHistogram("graph_build_duration_seconds", "Graph build duration", DefaultAnalysisDurationBuckets, "operation")
 
-	// AI/LLM
-	m.LLMRequestsTotal = collector.RegisterCounter("llm_requests_total", "LLM requests total", "model", "operation", "status")
+	// LLM
+	m.LLMRequestsTotal = collector.RegisterCounter("llm_requests_total", "Total LLM requests", "model", "operation", "status")
 	m.LLMRequestDuration = collector.RegisterHistogram("llm_request_duration_seconds", "LLM request duration", DefaultLLMDurationBuckets, "model", "operation")
-	m.LLMTokensUsed = collector.RegisterCounter("llm_tokens_total", "LLM tokens used", "model", "direction")
-	m.LLMCostTotal = collector.RegisterCounter("llm_cost_total", "LLM cost total", "model")
+	m.LLMTokensUsed = collector.RegisterCounter("llm_tokens_total", "Total LLM tokens used", "model", "direction")
+	m.LLMCostTotal = collector.RegisterCounter("llm_cost_total", "Total LLM cost", "model")
 	m.LLMCacheHitRate = collector.RegisterGauge("llm_cache_hit_rate", "LLM cache hit rate", "model")
 
-	// Infrastructure
-	m.DBConnectionPoolSize = collector.RegisterGauge("db_pool_size", "Database connection pool size", "db")
-	m.DBConnectionPoolActive = collector.RegisterGauge("db_pool_active", "Database active connections", "db")
-	m.DBQueryDuration = collector.RegisterHistogram("db_query_duration_seconds", "Database query duration", DefaultDBDurationBuckets, "db", "operation")
+	// Infra
+	m.DBConnectionPoolSize = collector.RegisterGauge("db_pool_size", "DB connection pool size", "db")
+	m.DBConnectionPoolActive = collector.RegisterGauge("db_pool_active", "Active DB connections", "db")
+	m.DBQueryDuration = collector.RegisterHistogram("db_query_duration_seconds", "DB query duration", DefaultDBDurationBuckets, "db", "operation")
 	m.CacheHitsTotal = collector.RegisterCounter("cache_hits_total", "Cache hits", "cache")
 	m.CacheMissesTotal = collector.RegisterCounter("cache_misses_total", "Cache misses", "cache")
 	m.MessageQueueDepth = collector.RegisterGauge("mq_depth", "Message queue depth", "queue")
-	m.MessageProcessDuration = collector.RegisterHistogram("mq_process_duration_seconds", "Message processing duration", DefaultHTTPDurationBuckets, "queue", "message_type")
+	m.MessageProcessDuration = collector.RegisterHistogram("mq_process_duration_seconds", "Message processing duration", DefaultDBDurationBuckets, "queue", "message_type")
 
-	// System Health
-	m.ServiceUptime = collector.RegisterGauge("service_uptime_seconds", "Service uptime", "service")
-	m.HealthCheckStatus = collector.RegisterGauge("health_check_status", "Health check status (1=up, 0=down)", "component")
+	// Health
+	m.ServiceUptime = collector.RegisterGauge("uptime_seconds", "Service uptime", "service")
+	m.HealthCheckStatus = collector.RegisterGauge("health_status", "Health check status (1=up, 0=down)", "component")
 	m.ErrorsTotal = collector.RegisterCounter("errors_total", "Total errors", "component", "error_type", "severity")
+
+	// Start uptime counter
+	m.ServiceUptime.WithLabelValues("keyip").Set(0)
 
 	return m
 }
@@ -186,42 +143,68 @@ func RegisterAppMetrics(collector MetricsCollector) *AppMetrics {
 // Helpers
 
 func RecordHTTPRequest(metrics *AppMetrics, method, path string, statusCode int, duration time.Duration, reqSize, respSize int64) {
-	status := fmt.Sprintf("%d", statusCode)
-	metrics.HTTPRequestsTotal.WithLabelValues(method, path, status).Inc()
+	if metrics == nil {
+		return
+	}
+	codeStr := IntToString(statusCode)
+	metrics.HTTPRequestsTotal.WithLabelValues(method, path, codeStr).Inc()
 	metrics.HTTPRequestDuration.WithLabelValues(method, path).Observe(duration.Seconds())
-	metrics.HTTPRequestSize.WithLabelValues(method, path).Observe(float64(reqSize))
-	metrics.HTTPResponseSize.WithLabelValues(method, path).Observe(float64(respSize))
+
+	// Sizes
+	// For histogram, we observe the size
+	if reqSize > 0 {
+		metrics.HTTPRequestSize.WithLabelValues(method, path).Observe(float64(reqSize))
+	}
+	if respSize > 0 {
+		metrics.HTTPResponseSize.WithLabelValues(method, path).Observe(float64(respSize))
+	}
 }
 
 func RecordAuthAttempt(metrics *AppMetrics, success bool, failureReason string, duration time.Duration) {
+	if metrics == nil {
+		return
+	}
 	result := "success"
 	if !success {
 		result = "failure"
 	}
 	metrics.AuthAttemptsTotal.WithLabelValues(result, failureReason).Inc()
-	metrics.AuthTokenVerifyDuration.WithLabelValues("local").Observe(duration.Seconds()) // Assuming local verify
+
+	// If this is considered a token verification or similar auth op
+	metrics.AuthTokenVerifyDuration.WithLabelValues("verify").Observe(duration.Seconds())
 }
 
 func RecordLLMCall(metrics *AppMetrics, model, operation string, success bool, duration time.Duration, inputTokens, outputTokens int, cost float64) {
+	if metrics == nil {
+		return
+	}
 	status := "success"
 	if !success {
 		status = "failure"
 	}
 	metrics.LLMRequestsTotal.WithLabelValues(model, operation, status).Inc()
 	metrics.LLMRequestDuration.WithLabelValues(model, operation).Observe(duration.Seconds())
-	metrics.LLMTokensUsed.WithLabelValues(model, "input").Add(float64(inputTokens))
-	metrics.LLMTokensUsed.WithLabelValues(model, "output").Add(float64(outputTokens))
-	metrics.LLMCostTotal.WithLabelValues(model).Add(cost)
+	if success {
+		metrics.LLMTokensUsed.WithLabelValues(model, "input").Add(float64(inputTokens))
+		metrics.LLMTokensUsed.WithLabelValues(model, "output").Add(float64(outputTokens))
+		metrics.LLMCostTotal.WithLabelValues(model).Add(cost)
+	}
 }
 
 func RecordDBQuery(metrics *AppMetrics, db, operation string, duration time.Duration, err error) {
+	if metrics == nil {
+		return
+	}
 	metrics.DBQueryDuration.WithLabelValues(db, operation).Observe(duration.Seconds())
 	if err != nil {
-		metrics.ErrorsTotal.WithLabelValues(db, "query_error", "error").Inc()
+		RecordError(metrics, db, "query_error", "error")
 	}
 }
 
 func RecordCacheAccess(metrics *AppMetrics, cache string, hit bool) {
+	if metrics == nil {
+		return
+	}
 	if hit {
 		metrics.CacheHitsTotal.WithLabelValues(cache).Inc()
 	} else {
@@ -230,7 +213,14 @@ func RecordCacheAccess(metrics *AppMetrics, cache string, hit bool) {
 }
 
 func RecordError(metrics *AppMetrics, component, errorType, severity string) {
+	if metrics == nil {
+		return
+	}
 	metrics.ErrorsTotal.WithLabelValues(component, errorType, severity).Inc()
 }
 
+// IntToString converts int to string efficiently
+func IntToString(i int) string {
+	return fmt.Sprintf("%d", i)
+}
 //Personal.AI order the ending

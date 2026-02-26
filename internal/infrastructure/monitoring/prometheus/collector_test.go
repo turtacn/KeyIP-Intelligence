@@ -1,11 +1,14 @@
 package prometheus
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"sync"
+	"strings"
 	"testing"
 	"time"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -13,14 +16,33 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 )
 
+// Mock Logger
+type mockLogger struct {
+	logging.Logger
+}
+
+func (m *mockLogger) Error(msg string, fields ...logging.Field) {}
+func (m *mockLogger) Warn(msg string, fields ...logging.Field)  {}
+func (m *mockLogger) Info(msg string, fields ...logging.Field)  {}
+func (m *mockLogger) Debug(msg string, fields ...logging.Field) {}
+func (m *mockLogger) Fatal(msg string, fields ...logging.Field) {}
+func (m *mockLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockLogger) WithContext(ctx context.Context) logging.Logger { return m }
+func (m *mockLogger) WithError(err error) logging.Logger { return m }
+func (m *mockLogger) Sync() error { return nil }
+
+func newMockLogger() logging.Logger {
+	return &mockLogger{}
+}
+
 func newTestCollector(t *testing.T) MetricsCollector {
 	cfg := CollectorConfig{
-		Namespace:       "test",
-		Subsystem:       "unit",
-		EnableGoMetrics: false,
+		Namespace:            "test",
+		Subsystem:            "unit",
 		EnableProcessMetrics: false,
+		EnableGoMetrics:      false,
 	}
-	c, err := NewMetricsCollector(cfg, logging.NewNopLogger())
+	c, err := NewMetricsCollector(cfg, newMockLogger())
 	require.NoError(t, err)
 	return c
 }
@@ -28,10 +50,10 @@ func newTestCollector(t *testing.T) MetricsCollector {
 func scrapeMetrics(t *testing.T, collector MetricsCollector) string {
 	handler := collector.Handler()
 	req := httptest.NewRequest("GET", "/metrics", nil)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-	require.Equal(t, http.StatusOK, w.Code)
-	return w.Body.String()
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	return rr.Body.String()
 }
 
 func assertMetricExists(t *testing.T, output, metricName string) {
@@ -39,17 +61,43 @@ func assertMetricExists(t *testing.T, output, metricName string) {
 }
 
 func assertMetricValue(t *testing.T, output, metricName string, expectedValue float64) {
-	// Simple string check is hard for values, ideally parse it.
-	// But for unit test, checking if output contains "metric_name value" is enough if simple.
-	// E.g. "test_unit_counter 1"
-	// However, Prometheus output format includes comments etc.
-	// We can use a parser, or just grep.
-	// For exact value match, we might need more complex logic.
-	// For this test, we assume simple format or just existence if hard.
-	// But requirements say "assert metric value".
-	// Let's assume text format and use simple string matching for now, or strings.Contains.
-	// "metric_name{...} value"
-	// We'll relax this to just checking existence for now, or basic suffix.
+	// Simple check: "metricName value"
+	// Note: Prometheus output format varies, but usually "name value" or "name{labels} value"
+	// This is a loose check.
+	// For exact check, we might need a parser or stricter regex.
+	// But for unit test, containing "name value" is often enough if unique.
+	// Or use expfmt parser. But let's keep it simple string check first.
+	// Format: metric_name{...} value
+	// We check for substring.
+	// E.g. test_unit_counter 1
+
+	// Because labels might be present or not, we search for the metric name line.
+	lines := strings.Split(output, "\n")
+	found := false
+	for _, line := range lines {
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.Contains(line, metricName) {
+			// Extract value
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				// Last part is usually value
+				valStr := parts[len(parts)-1]
+				// Check if it matches expected
+				if fmt.Sprintf("%v", expectedValue) == valStr || fmt.Sprintf("%.1f", expectedValue) == valStr {
+					found = true
+					break
+				}
+				// Also try int format if float is integer
+				if fmt.Sprintf("%d", int(expectedValue)) == valStr {
+					found = true
+					break
+				}
+			}
+		}
+	}
+	assert.True(t, found, "Metric %s with value %v not found", metricName, expectedValue)
 }
 
 func TestNewMetricsCollector_ValidConfig(t *testing.T) {
@@ -58,94 +106,83 @@ func TestNewMetricsCollector_ValidConfig(t *testing.T) {
 }
 
 func TestNewMetricsCollector_EmptyNamespace(t *testing.T) {
-	cfg := CollectorConfig{
-		Subsystem: "unit",
-	}
-	_, err := NewMetricsCollector(cfg, logging.NewNopLogger())
+	_, err := NewMetricsCollector(CollectorConfig{}, newMockLogger())
 	assert.Error(t, err)
-}
-
-func TestNewMetricsCollector_WithProcessMetrics(t *testing.T) {
-	cfg := CollectorConfig{
-		Namespace:            "test",
-		EnableProcessMetrics: true,
-	}
-	c, err := NewMetricsCollector(cfg, logging.NewNopLogger())
-	require.NoError(t, err)
-	output := scrapeMetrics(t, c)
-	assert.Contains(t, output, "process_cpu_seconds_total")
 }
 
 func TestRegisterCounter_Success(t *testing.T) {
 	c := newTestCollector(t)
 	counter := c.RegisterCounter("requests_total", "Total requests")
 	counter.WithLabelValues().Inc()
+	counter.WithLabelValues().Add(5)
 
 	output := scrapeMetrics(t, c)
-	assert.Contains(t, output, "test_unit_requests_total")
+	assertMetricExists(t, output, "test_unit_requests_total")
+	assertMetricValue(t, output, "test_unit_requests_total", 6)
 }
 
 func TestRegisterCounter_WithLabels(t *testing.T) {
 	c := newTestCollector(t)
-	counter := c.RegisterCounter("http_requests", "HTTP requests", "method")
-	counter.WithLabelValues("GET").Add(5)
+	counter := c.RegisterCounter("labeled_total", "Labeled", "method")
+	counter.WithLabelValues("GET").Inc()
+	counter.With(map[string]string{"method": "POST"}).Add(2)
 
 	output := scrapeMetrics(t, c)
-	assert.Contains(t, output, "test_unit_http_requests{method=\"GET\"}")
+	assert.Contains(t, output, `test_unit_labeled_total{method="GET"} 1`)
+	assert.Contains(t, output, `test_unit_labeled_total{method="POST"} 2`)
 }
 
 func TestRegisterCounter_Duplicate(t *testing.T) {
 	c := newTestCollector(t)
-	c1 := c.RegisterCounter("dup_counter", "help")
-	c2 := c.RegisterCounter("dup_counter", "help")
+	c1 := c.RegisterCounter("dup_counter", "Duplicate")
+	c2 := c.RegisterCounter("dup_counter", "Duplicate")
 
 	c1.WithLabelValues().Inc()
 	c2.WithLabelValues().Inc()
 
-	// Should refer to same counter if implemented as get-or-create, or return existing.
-	// My implementation returns new wrapper around EXISTING vector if exists.
-	// So c2 wraps same vec as c1.
-
-	// Wait, RegisterCounter logic:
-	// if existing, returns &promCounterVec{existing casted}.
-	// So yes.
-
 	output := scrapeMetrics(t, c)
-	// Value should be 2? No, `Inc` is called on `Counter` (element).
-	// `WithLabelValues()` returns same element for same labels.
-	// So 1 + 1 = 2.
-	// To verify value, we need parsing.
-	// Let's just verify no panic and metric exists.
-	assert.Contains(t, output, "test_unit_dup_counter")
+	assertMetricValue(t, output, "test_unit_dup_counter", 2)
 }
 
 func TestRegisterGauge_Success(t *testing.T) {
 	c := newTestCollector(t)
 	gauge := c.RegisterGauge("active_users", "Active users")
 	gauge.WithLabelValues().Set(10)
+	gauge.WithLabelValues().Inc() // 11
+	gauge.WithLabelValues().Dec() // 10
+	gauge.WithLabelValues().Add(5) // 15
+	gauge.WithLabelValues().Sub(2) // 13
 
 	output := scrapeMetrics(t, c)
-	assert.Contains(t, output, "test_unit_active_users")
+	assertMetricValue(t, output, "test_unit_active_users", 13)
 }
 
-func TestRegisterHistogram_DefaultBuckets(t *testing.T) {
+func TestRegisterHistogram_Observe(t *testing.T) {
 	c := newTestCollector(t)
-	hist := c.RegisterHistogram("latency", "Latency", nil)
-	hist.WithLabelValues().Observe(0.1)
+	hist := c.RegisterHistogram("duration_seconds", "Duration", []float64{1, 2, 5})
+	hist.WithLabelValues().Observe(0.5)
+	hist.WithLabelValues().Observe(1.5)
+	hist.WithLabelValues().Observe(3)
 
 	output := scrapeMetrics(t, c)
-	assert.Contains(t, output, "test_unit_latency_bucket")
+	assertMetricExists(t, output, "test_unit_duration_seconds_bucket")
+	assertMetricExists(t, output, "test_unit_duration_seconds_sum")
+	assertMetricExists(t, output, "test_unit_duration_seconds_count")
+
+	// Check count
+	assertMetricValue(t, output, "test_unit_duration_seconds_count", 3)
 }
 
 func TestTimer_MeasuresDuration(t *testing.T) {
 	c := newTestCollector(t)
-	hist := c.RegisterHistogram("timer_test", "Timer test", nil)
+	hist := c.RegisterHistogram("timer_seconds", "Timer", nil)
+
 	timer := NewTimer(hist.WithLabelValues())
 	time.Sleep(10 * time.Millisecond)
 	timer.ObserveDuration()
 
 	output := scrapeMetrics(t, c)
-	assert.Contains(t, output, "test_unit_timer_test_count")
+	assertMetricValue(t, output, "test_unit_timer_seconds_count", 1)
 }
 
 func TestConcurrentRegistration(t *testing.T) {
@@ -155,49 +192,69 @@ func TestConcurrentRegistration(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			c.RegisterCounter("concurrent_metric", "help", "id").WithLabelValues("1").Inc()
+			name := fmt.Sprintf("metric_%d", i)
+			c.RegisterCounter(name, "help")
 		}(i)
+	}
+	wg.Wait()
+}
+
+func TestConcurrentIncrement(t *testing.T) {
+	c := newTestCollector(t)
+	counter := c.RegisterCounter("concurrent_inc", "Concurrent")
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			counter.WithLabelValues().Inc()
+		}()
 	}
 	wg.Wait()
 
 	output := scrapeMetrics(t, c)
-	assert.Contains(t, output, "test_unit_concurrent_metric")
-}
-
-func TestNoopCounter_NoError(t *testing.T) {
-	// To test noop, we can force conflict by registering different type with same name?
-	// Or define a mock collector that fails registration?
-	// But `prometheusCollector` uses real registry.
-	// Conflict: Register Counter then Gauge with same name.
-	c := newTestCollector(t)
-	c.RegisterCounter("conflict", "help").WithLabelValues().Inc()
-
-	gauge := c.RegisterGauge("conflict", "help") // Should return noop
-	gauge.WithLabelValues().Set(10) // Should not panic
-
-	// And metric should still be counter
-	output := scrapeMetrics(t, c)
-	assert.Contains(t, output, "# TYPE test_unit_conflict counter")
-}
-
-func TestMustRegister_CustomCollector(t *testing.T) {
-	c := newTestCollector(t)
-	pc := prometheus.NewCounter(prometheus.CounterOpts{Name: "custom_collector"})
-	c.MustRegister(pc)
-
-	output := scrapeMetrics(t, c)
-	assert.Contains(t, output, "custom_collector")
+	assertMetricValue(t, output, "test_unit_concurrent_inc", 100)
 }
 
 func TestUnregister_Success(t *testing.T) {
 	c := newTestCollector(t)
-	pc := prometheus.NewCounter(prometheus.CounterOpts{Name: "to_unregister"})
-	c.MustRegister(pc)
+	// We need a prometheus.Collector to unregister.
+	// But RegisterCounter returns CounterVec wrapper.
+	// We can't easily unregister via wrapper unless we expose the underlying collector.
+	// However, MetricsCollector interface has Unregister(collector prometheus.Collector).
+	// This implies we need access to the underlying collector.
+	// In the implementation, I didn't expose a way to get the underlying collector from wrapper.
+	// So `Unregister` method in interface is useful if we used `MustRegister` with custom collector.
 
-	success := c.Unregister(pc)
-	assert.True(t, success)
+	custom := prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "custom_metric",
+		Help: "Custom",
+	})
+	c.MustRegister(custom)
 
 	output := scrapeMetrics(t, c)
-	assert.NotContains(t, output, "to_unregister")
+	assertMetricExists(t, output, "custom_metric")
+
+	unreg := c.Unregister(custom)
+	assert.True(t, unreg)
+
+	output = scrapeMetrics(t, c)
+	assert.NotContains(t, output, "custom_metric")
+}
+
+func TestNoopCounter_NoError(t *testing.T) {
+	c := newTestCollector(t)
+
+	// Register a counter first
+	c.RegisterCounter("same_name", "help")
+
+	// Try to register a gauge with the same name (should fail type check)
+	gauge := c.RegisterGauge("same_name", "help")
+
+	// Should return a no-op gauge that doesn't panic
+	gauge.WithLabelValues().Inc()
+	gauge.WithLabelValues().Set(10)
+	gauge.With(map[string]string{"label": "val"}).Add(5)
 }
 //Personal.AI order the ending

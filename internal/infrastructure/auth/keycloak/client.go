@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	stdliberrors "errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -21,7 +20,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// AuthProvider is the interface for authentication providers.
+// AuthProvider defines the interface for authentication operations.
 type AuthProvider interface {
 	VerifyToken(ctx context.Context, rawToken string) (*TokenClaims, error)
 	GetUserInfo(ctx context.Context, accessToken string) (*UserInfo, error)
@@ -32,7 +31,7 @@ type AuthProvider interface {
 	Health(ctx context.Context) error
 }
 
-// TokenClaims represents the claims in a JWT token.
+// TokenClaims represents the claims parsed from a JWT access token.
 type TokenClaims struct {
 	Subject           string              `json:"sub"`
 	Email             string              `json:"email"`
@@ -48,7 +47,7 @@ type TokenClaims struct {
 	Scope             string              `json:"scope"`
 }
 
-// UserInfo represents the user information.
+// UserInfo represents user information returned by the UserInfo endpoint.
 type UserInfo struct {
 	ID                string              `json:"sub"`
 	Email             string              `json:"email"`
@@ -74,7 +73,7 @@ type IntrospectionResult struct {
 	Roles     []string  `json:"roles"`
 }
 
-// TokenPair represents an access token and refresh token pair.
+// TokenPair represents a pair of access and refresh tokens.
 type TokenPair struct {
 	AccessToken      string `json:"access_token"`
 	RefreshToken     string `json:"refresh_token"`
@@ -83,7 +82,7 @@ type TokenPair struct {
 	TokenType        string `json:"token_type"`
 }
 
-// KeycloakConfig configuration for Keycloak client.
+// KeycloakConfig holds configuration for the Keycloak client.
 type KeycloakConfig struct {
 	BaseURL                  string        `json:"base_url"`
 	Realm                    string        `json:"realm"`
@@ -96,6 +95,7 @@ type KeycloakConfig struct {
 	TLSInsecureSkipVerify    bool          `json:"tls_insecure_skip_verify"`
 }
 
+// keycloakClient implements the AuthProvider interface.
 type keycloakClient struct {
 	config            KeycloakConfig
 	httpClient        *http.Client
@@ -105,184 +105,31 @@ type keycloakClient struct {
 	metrics           MetricsCollector
 }
 
-type serviceTokenEntry struct {
-	token     string
-	expiresAt time.Time
-	mu        sync.RWMutex
-}
-
-func (s *serviceTokenEntry) isValid() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return time.Now().Add(30 * time.Second).Before(s.expiresAt)
-}
-
-func (s *serviceTokenEntry) getToken() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.token
-}
-
-func (s *serviceTokenEntry) setToken(token string, expiresAt time.Time) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.token = token
-	s.expiresAt = expiresAt
-}
-
-type jwksCache struct {
-	keys   map[string]*rsa.PublicKey
-	mu     sync.RWMutex
-	client *http.Client
-	url    string
-	logger logging.Logger
-}
-
-func (c *jwksCache) refresh() error {
-	c.logger.Debug("Refreshing JWKS cache", logging.String("url", c.url))
-	resp, err := c.client.Get(c.url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to fetch JWKS: %s", resp.Status)
-	}
-
-	var jwks struct {
-		Keys []struct {
-			Kid string   `json:"kid"`
-			Kty string   `json:"kty"`
-			Alg string   `json:"alg"`
-			Use string   `json:"use"`
-			N   string   `json:"n"`
-			E   string   `json:"e"`
-			X5c []string `json:"x5c"`
-		} `json:"keys"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
-		return err
-	}
-
-	newKeys := make(map[string]*rsa.PublicKey)
-	for _, key := range jwks.Keys {
-		if key.Kty != "RSA" || key.Use != "sig" {
-			continue
-		}
-
-		nBytes, err := base64.RawURLEncoding.DecodeString(key.N)
-		if err != nil {
-			c.logger.Warn("Failed to decode modulus", logging.String("kid", key.Kid), logging.Err(err))
-			continue
-		}
-		eBytes, err := base64.RawURLEncoding.DecodeString(key.E)
-		if err != nil {
-			c.logger.Warn("Failed to decode exponent", logging.String("kid", key.Kid), logging.Err(err))
-			continue
-		}
-
-		// Correct way to decode E (exponent) which is usually small (e.g. 65537)
-		// Standard E is often AQAB (65537). Base64 decode gives [1, 0, 1].
-		// We need to convert bytes to int.
-		eInt := 0
-		for _, b := range eBytes {
-			eInt = eInt<<8 + int(b)
-		}
-
-		pubKey := &rsa.PublicKey{
-			N: big.NewInt(0).SetBytes(nBytes),
-			E: eInt,
-		}
-		newKeys[key.Kid] = pubKey
-	}
-
-	c.mu.Lock()
-	c.keys = newKeys
-	c.mu.Unlock()
-	return nil
-}
-
-func (c *jwksCache) getKey(kid string) (*rsa.PublicKey, error) {
-	c.mu.RLock()
-	key, ok := c.keys[kid]
-	c.mu.RUnlock()
-	if ok {
-		return key, nil
-	}
-	// Try refresh
-	if err := c.refresh(); err != nil {
-		return nil, err
-	}
-	c.mu.RLock()
-	key, ok = c.keys[kid]
-	c.mu.RUnlock()
-	if ok {
-		return key, nil
-	}
-	return nil, fmt.Errorf("public key not found for kid: %s", kid)
-}
-
-// ClientOption is a function option for configuring KeycloakClient.
-type ClientOption func(*keycloakClient)
-
-// WithHTTPClient sets the HTTP client.
-func WithHTTPClient(client *http.Client) ClientOption {
-	return func(c *keycloakClient) {
-		c.httpClient = client
-	}
-}
-
-// WithMetrics sets the metrics collector.
-func WithMetrics(collector MetricsCollector) ClientOption {
-	return func(c *keycloakClient) {
-		c.metrics = collector
-	}
-}
-
-// WithJWKSRefreshInterval sets the JWKS refresh interval.
-func WithJWKSRefreshInterval(d time.Duration) ClientOption {
-	return func(c *keycloakClient) {
-		c.config.PublicKeyRefreshInterval = d
-	}
-}
-
-// MetricsCollector interface placeholder, will be implemented in prometheus package.
+// MetricsCollector is an interface for metrics collection.
 type MetricsCollector interface {
-	// Define methods if needed, or use any
+	// Add metric collection methods here if needed
 }
 
-// Errors
-var (
-	ErrTokenExpired             = errors.New(errors.ErrCodeUnauthorized, "token expired")
-	ErrTokenInvalidSignature    = errors.New(errors.ErrCodeUnauthorized, "invalid token signature")
-	ErrTokenInvalidIssuer       = errors.New(errors.ErrCodeUnauthorized, "invalid token issuer")
-	ErrTokenInvalidAudience     = errors.New(errors.ErrCodeUnauthorized, "invalid token audience")
-	ErrTokenMalformed           = errors.New(errors.ErrCodeUnauthorized, "malformed token")
-	ErrTokenIntrospectionFailed = errors.New(errors.ErrCodeInternal, "token introspection failed")
-	ErrKeycloakUnavailable      = errors.New(errors.ErrCodeServiceUnavailable, "keycloak unavailable")
-	ErrJWKSRefreshFailed        = errors.New(errors.ErrCodeInternal, "jwks refresh failed")
-	ErrInvalidConfig            = errors.New(errors.ErrCodeValidation, "invalid configuration")
-)
-
-// NewKeycloakClient creates a new KeycloakClient.
+// NewKeycloakClient creates a new instance of keycloakClient.
 func NewKeycloakClient(cfg KeycloakConfig, logger logging.Logger, opts ...ClientOption) (AuthProvider, error) {
 	if cfg.BaseURL == "" {
-		return nil, errors.Wrap(ErrInvalidConfig, errors.ErrCodeValidation, "base_url is required")
+		return nil, ErrInvalidConfig.WithInternalMessage("BaseURL is required")
 	}
 	if cfg.Realm == "" {
-		return nil, errors.Wrap(ErrInvalidConfig, errors.ErrCodeValidation, "realm is required")
+		return nil, ErrInvalidConfig.WithInternalMessage("Realm is required")
 	}
 	if cfg.ClientID == "" {
-		return nil, errors.Wrap(ErrInvalidConfig, errors.ErrCodeValidation, "client_id is required")
+		return nil, ErrInvalidConfig.WithInternalMessage("ClientID is required")
 	}
 
-	if cfg.RequestTimeout == 0 {
-		cfg.RequestTimeout = 10 * time.Second
-	}
+	// Normalize BaseURL
+	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
+
 	if cfg.PublicKeyRefreshInterval == 0 {
 		cfg.PublicKeyRefreshInterval = 5 * time.Minute
+	}
+	if cfg.RequestTimeout == 0 {
+		cfg.RequestTimeout = 10 * time.Second
 	}
 	if cfg.RetryAttempts == 0 {
 		cfg.RetryAttempts = 3
@@ -291,16 +138,19 @@ func NewKeycloakClient(cfg KeycloakConfig, logger logging.Logger, opts ...Client
 		cfg.RetryDelay = 500 * time.Millisecond
 	}
 
-	httpClient := &http.Client{
-		Timeout: cfg.RequestTimeout,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: cfg.TLSInsecureSkipVerify},
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: cfg.TLSInsecureSkipVerify,
 		},
 	}
 
 	client := &keycloakClient{
-		config:            cfg,
-		httpClient:        httpClient,
+		config: cfg,
+		httpClient: &http.Client{
+			Timeout:   cfg.RequestTimeout,
+			Transport: transport,
+		},
+		jwksCache:         newJWKSCache(),
 		serviceTokenCache: &serviceTokenEntry{},
 		logger:            logger,
 	}
@@ -309,202 +159,263 @@ func NewKeycloakClient(cfg KeycloakConfig, logger logging.Logger, opts ...Client
 		opt(client)
 	}
 
-	jwksURL := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/certs", strings.TrimRight(cfg.BaseURL, "/"), cfg.Realm)
-	client.jwksCache = &jwksCache{
-		client: client.httpClient,
-		url:    jwksURL,
-		logger: logger,
-	}
-
 	// Initial JWKS fetch
-	if err := client.jwksCache.refresh(); err != nil {
-		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to fetch JWKS")
+	if err := client.refreshJWKS(context.Background()); err != nil {
+		return nil, ErrJWKSRefreshFailed.WithCause(err)
 	}
 
 	// Start background refresh
-	go func() {
-		ticker := time.NewTicker(cfg.PublicKeyRefreshInterval)
-		defer ticker.Stop()
-		for range ticker.C {
-			if err := client.jwksCache.refresh(); err != nil {
-				logger.Error("Failed to refresh JWKS", logging.Err(err))
-			}
-		}
-	}()
+	go client.startJWKSRefresh()
 
 	return client, nil
 }
 
-func (c *keycloakClient) VerifyToken(ctx context.Context, rawToken string) (*TokenClaims, error) {
-	// Parse token without verification first to get header
-	parser := jwt.NewParser()
-	token, _, err := parser.ParseUnverified(rawToken, jwt.MapClaims{})
-	if err != nil {
-		return nil, ErrTokenMalformed
-	}
-
-	// Get kid from header
-	kid, ok := token.Header["kid"].(string)
-	if !ok {
-		return nil, ErrTokenMalformed
-	}
-
-	// Get key from cache
-	key, err := c.jwksCache.getKey(kid)
-	if err != nil {
-		// Try to refresh once
-		if refreshErr := c.jwksCache.refresh(); refreshErr != nil {
-			return nil, ErrJWKSRefreshFailed
+func (c *keycloakClient) startJWKSRefresh() {
+	ticker := time.NewTicker(c.config.PublicKeyRefreshInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		if err := c.refreshJWKS(context.Background()); err != nil {
+			c.logger.Error("failed to refresh JWKS", logging.Error(err))
 		}
-		key, err = c.jwksCache.getKey(kid)
+	}
+}
+
+func (c *keycloakClient) refreshJWKS(ctx context.Context) error {
+	url := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/certs", c.config.BaseURL, c.config.Realm)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.doRequest(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to fetch JWKS: status %d", resp.StatusCode)
+	}
+
+	var jwks struct {
+		Keys []json.RawMessage `json:"keys"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+		return err
+	}
+
+	keys := make(map[string]*rsa.PublicKey)
+	for _, raw := range jwks.Keys {
+		var keyData struct {
+			Kty string `json:"kty"`
+			Kid string `json:"kid"`
+			N   string `json:"n"`
+			E   string `json:"e"`
+		}
+		if err := json.Unmarshal(raw, &keyData); err != nil {
+			continue
+		}
+
+		if keyData.Kty != "RSA" {
+			continue
+		}
+
+		pubKey, err := parseRSAPublicKey(keyData.N, keyData.E)
 		if err != nil {
-			return nil, ErrTokenInvalidSignature
+			c.logger.Warn("failed to parse RSA key", logging.String("kid", keyData.Kid), logging.Error(err))
+			continue
 		}
+		keys[keyData.Kid] = pubKey
 	}
 
-	// Verify token with key
-	parsedToken, err := jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
+	c.jwksCache.update(keys)
+	return nil
+}
+
+// doRequest executes HTTP request with retry logic for 5xx errors.
+func (c *keycloakClient) doRequest(req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+
+	for i := 0; i <= c.config.RetryAttempts; i++ {
+		if i > 0 {
+			select {
+			case <-req.Context().Done():
+				return nil, req.Context().Err()
+			case <-time.After(c.config.RetryDelay * time.Duration(1<<uint(i-1))): // Exponential backoff
+			}
+		}
+
+		// Clone request body if needed? No, usually body is stream.
+		// If body is read once, we can't retry unless we buffer it.
+		// For GET requests, body is nil.
+		// For POST requests, we assume body reader supports seeking or is bytes buffer.
+		// Standard `http.NewRequest` wraps strings/bytes readers which support seek.
+		// If generic reader, we might have issues.
+		// However, in this client, we use `strings.NewReader` for POSTs.
+		if req.Body != nil {
+			if seeker, ok := req.Body.(io.Seeker); ok {
+				seeker.Seek(0, io.SeekStart)
+			} else if req.GetBody != nil {
+				// Use GetBody to refresh body
+				newBody, err := req.GetBody()
+				if err == nil {
+					req.Body = newBody
+				}
+			}
+		}
+
+		resp, err = c.httpClient.Do(req)
+		if err != nil {
+			// Network error, retry
+			c.logger.Warn("request failed, retrying", logging.Error(err), logging.Int("attempt", i+1))
+			continue
+		}
+
+		if resp.StatusCode >= 500 {
+			resp.Body.Close()
+			c.logger.Warn("server error, retrying", logging.Int("status", resp.StatusCode), logging.Int("attempt", i+1))
+			continue
+		}
+
+		// Success or 4xx error (no retry)
+		return resp, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return nil, ErrKeycloakUnavailable.WithInternalMessage("max retries exceeded")
+}
+
+// VerifyToken validates the token and returns the claims.
+func (c *keycloakClient) VerifyToken(ctx context.Context, rawToken string) (*TokenClaims, error) {
+	token, err := jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return key, nil
+
+		kid, ok := token.Header["kid"].(string)
+		if !ok {
+			return nil, fmt.Errorf("kid missing from header")
+		}
+
+		pubKey, ok := c.jwksCache.getKey(kid)
+		if !ok {
+			// Try refreshing JWKS once
+			if err := c.refreshJWKS(ctx); err != nil {
+				return nil, fmt.Errorf("key not found and refresh failed")
+			}
+			pubKey, ok = c.jwksCache.getKey(kid)
+			if !ok {
+				return nil, fmt.Errorf("key not found")
+			}
+		}
+		return pubKey, nil
 	})
 
 	if err != nil {
-		if stdliberrors.Is(err, jwt.ErrTokenExpired) {
+		if errors.Is(err, jwt.ErrTokenExpired) {
 			return nil, ErrTokenExpired
 		}
-		if stdliberrors.Is(err, jwt.ErrTokenSignatureInvalid) {
+		if errors.Is(err, jwt.ErrTokenSignatureInvalid) {
 			return nil, ErrTokenInvalidSignature
 		}
-		return nil, errors.Wrap(err, errors.ErrCodeUnauthorized, "token verification failed")
+		return nil, ErrTokenMalformed.WithCause(err)
 	}
 
-	if !parsedToken.Valid {
+	if !token.Valid {
 		return nil, ErrTokenInvalidSignature
 	}
 
-	claims, ok := parsedToken.Claims.(jwt.MapClaims)
+	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return nil, ErrTokenMalformed
+		return nil, ErrTokenMalformed.WithInternalMessage("invalid claims type")
 	}
 
-	// Check Issuer
-	expectedIssuer := fmt.Sprintf("%s/realms/%s", strings.TrimRight(c.config.BaseURL, "/"), c.config.Realm)
-	if iss, err := claims.GetIssuer(); err != nil || iss != expectedIssuer {
-		// Some Keycloak setups might differ slightly in issuer format, verify logic is correct for your setup
-		// Strict check:
-		return nil, ErrTokenInvalidIssuer
+	// Validate Issuer
+	expectedIssuer := fmt.Sprintf("%s/realms/%s", c.config.BaseURL, c.config.Realm)
+	iss, _ := claims.GetIssuer()
+	if iss != expectedIssuer {
+		return nil, ErrTokenInvalidIssuer.WithDetail(fmt.Sprintf("expected %s, got %s", expectedIssuer, iss))
 	}
 
-	// Check Audience
-	aud, err := claims.GetAudience()
-	if err != nil {
-		return nil, ErrTokenInvalidAudience
-	}
-	audienceFound := false
+	// Validate Audience
+	aud, _ := claims.GetAudience()
+	audFound := false
 	for _, a := range aud {
 		if a == c.config.ClientID {
-			audienceFound = true
+			audFound = true
 			break
 		}
 	}
-	if !audienceFound {
-		// Also check "azp" (Authorized Party) if available
-		if azp, ok := claims["azp"].(string); ok && azp == c.config.ClientID {
-			// Acceptable
-		} else {
-			return nil, ErrTokenInvalidAudience
-		}
+	if !audFound {
+		return nil, ErrTokenInvalidAudience.WithDetail(fmt.Sprintf("expected %s", c.config.ClientID))
 	}
 
-	tokenClaims := &TokenClaims{}
+	// Map claims to TokenClaims
+	tc := &TokenClaims{
+		Subject:           mustGetString(claims, "sub"),
+		Email:             getString(claims, "email"),
+		PreferredUsername: getString(claims, "preferred_username"),
+		Issuer:            iss,
+		Audience:          aud,
+		Scope:             getString(claims, "scope"),
+	}
 
-	// Map standard claims
-	if sub, err := claims.GetSubject(); err == nil {
-		tokenClaims.Subject = sub
+	if iat, err := claims.GetIssuedAt(); err == nil && iat != nil {
+		tc.IssuedAt = iat.Time
 	}
 	if exp, err := claims.GetExpirationTime(); err == nil && exp != nil {
-		tokenClaims.ExpiresAt = exp.Time
-	}
-	if iat, err := claims.GetIssuedAt(); err == nil && iat != nil {
-		tokenClaims.IssuedAt = iat.Time
-	}
-	if iss, err := claims.GetIssuer(); err == nil {
-		tokenClaims.Issuer = iss
-	}
-	if aud, err := claims.GetAudience(); err == nil {
-		tokenClaims.Audience = aud
-	}
-
-	// Map custom claims
-	if email, ok := claims["email"].(string); ok {
-		tokenClaims.Email = email
-	}
-	if preferredUsername, ok := claims["preferred_username"].(string); ok {
-		tokenClaims.PreferredUsername = preferredUsername
-	}
-	if scope, ok := claims["scope"].(string); ok {
-		tokenClaims.Scope = scope
-	}
-	if tenantID, ok := claims["tenant_id"].(string); ok {
-		tokenClaims.TenantID = tenantID
-	} else if tenantID, ok := claims["tenantId"].(string); ok {
-		tokenClaims.TenantID = tenantID
+		tc.ExpiresAt = exp.Time
 	}
 
 	// Extract Realm Roles
 	if realmAccess, ok := claims["realm_access"].(map[string]interface{}); ok {
 		if roles, ok := realmAccess["roles"].([]interface{}); ok {
 			for _, r := range roles {
-				if roleStr, ok := r.(string); ok {
-					tokenClaims.RealmRoles = append(tokenClaims.RealmRoles, roleStr)
+				if rStr, ok := r.(string); ok {
+					tc.RealmRoles = append(tc.RealmRoles, rStr)
 				}
 			}
 		}
 	}
 
 	// Extract Client Roles
-	tokenClaims.ClientRoles = make(map[string][]string)
 	if resourceAccess, ok := claims["resource_access"].(map[string]interface{}); ok {
+		tc.ClientRoles = make(map[string][]string)
 		for clientID, access := range resourceAccess {
 			if accessMap, ok := access.(map[string]interface{}); ok {
 				if roles, ok := accessMap["roles"].([]interface{}); ok {
 					var clientRoleList []string
 					for _, r := range roles {
-						if roleStr, ok := r.(string); ok {
-							clientRoleList = append(clientRoleList, roleStr)
+						if rStr, ok := r.(string); ok {
+							clientRoleList = append(clientRoleList, rStr)
 						}
 					}
-					tokenClaims.ClientRoles[clientID] = clientRoleList
+					tc.ClientRoles[clientID] = clientRoleList
 				}
 			}
 		}
 	}
 
-	// Groups
-	if groups, ok := claims["groups"].([]interface{}); ok {
-		for _, g := range groups {
-			if gStr, ok := g.(string); ok {
-				tokenClaims.Groups = append(tokenClaims.Groups, gStr)
-			}
-		}
-	}
+	// Extract TenantID
+	tc.TenantID = getString(claims, "tenant_id")
 
-	return tokenClaims, nil
+	return tc, nil
 }
 
 func (c *keycloakClient) GetUserInfo(ctx context.Context, accessToken string) (*UserInfo, error) {
-	url := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/userinfo", strings.TrimRight(c.config.BaseURL, "/"), c.config.Realm)
+	url := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/userinfo", c.config.BaseURL, c.config.Realm)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	resp, err := c.doWithRetry(req)
+	resp, err := c.doRequest(req)
 	if err != nil {
-		return nil, ErrKeycloakUnavailable
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -512,19 +423,18 @@ func (c *keycloakClient) GetUserInfo(ctx context.Context, accessToken string) (*
 		return nil, ErrTokenExpired
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("userinfo request failed with status: %d", resp.StatusCode)
+		return nil, ErrKeycloakUnavailable.WithInternalMessage(fmt.Sprintf("userinfo status: %d", resp.StatusCode))
 	}
 
-	userInfo := &UserInfo{}
-	if err := json.NewDecoder(resp.Body).Decode(userInfo); err != nil {
+	var userInfo UserInfo
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
 		return nil, err
 	}
-	return userInfo, nil
+	return &userInfo, nil
 }
 
 func (c *keycloakClient) IntrospectToken(ctx context.Context, token string) (*IntrospectionResult, error) {
-	endpoint := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token/introspect", strings.TrimRight(c.config.BaseURL, "/"), c.config.Realm)
-
+	endpoint := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token/introspect", c.config.BaseURL, c.config.Realm)
 	data := url.Values{}
 	data.Set("token", token)
 	data.Set("client_id", c.config.ClientID)
@@ -536,44 +446,26 @@ func (c *keycloakClient) IntrospectToken(ctx context.Context, token string) (*In
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := c.doWithRetry(req)
+	resp, err := c.doRequest(req)
 	if err != nil {
-		return nil, ErrTokenIntrospectionFailed
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("introspection request failed with status: %d", resp.StatusCode)
+		return nil, ErrTokenIntrospectionFailed.WithInternalMessage(fmt.Sprintf("status: %d", resp.StatusCode))
 	}
 
-	var rawResult struct {
-		Active    bool     `json:"active"`
-		Subject   string   `json:"sub"`
-		ClientID  string   `json:"client_id"`
-		TokenType string   `json:"token_type"`
-		ExpiresAt int64    `json:"exp"`
-		Scope     string   `json:"scope"`
-		Roles     []string `json:"roles"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&rawResult); err != nil {
+	var result IntrospectionResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	return &IntrospectionResult{
-		Active:    rawResult.Active,
-		Subject:   rawResult.Subject,
-		ClientID:  rawResult.ClientID,
-		TokenType: rawResult.TokenType,
-		ExpiresAt: time.Unix(rawResult.ExpiresAt, 0).UTC(),
-		Scope:     rawResult.Scope,
-		Roles:     rawResult.Roles,
-	}, nil
+	return &result, nil
 }
 
 func (c *keycloakClient) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
-	endpoint := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", strings.TrimRight(c.config.BaseURL, "/"), c.config.Realm)
-
+	endpoint := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", c.config.BaseURL, c.config.Realm)
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
 	data.Set("refresh_token", refreshToken)
@@ -586,29 +478,42 @@ func (c *keycloakClient) RefreshToken(ctx context.Context, refreshToken string) 
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := c.doWithRetry(req)
+	resp, err := c.doRequest(req)
 	if err != nil {
-		return nil, ErrKeycloakUnavailable
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("refresh token failed with status: %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, ErrTokenExpired.WithInternalMessage(fmt.Sprintf("refresh failed: %s", string(body)))
 	}
 
-	tokenPair := &TokenPair{}
-	if err := json.NewDecoder(resp.Body).Decode(tokenPair); err != nil {
+	var pair TokenPair
+	if err := json.NewDecoder(resp.Body).Decode(&pair); err != nil {
 		return nil, err
 	}
-	return tokenPair, nil
+	return &pair, nil
 }
 
 func (c *keycloakClient) GetServiceToken(ctx context.Context) (string, error) {
+	c.serviceTokenCache.mu.RLock()
 	if c.serviceTokenCache.isValid() {
-		return c.serviceTokenCache.getToken(), nil
+		token := c.serviceTokenCache.token
+		c.serviceTokenCache.mu.RUnlock()
+		return token, nil
+	}
+	c.serviceTokenCache.mu.RUnlock()
+
+	c.serviceTokenCache.mu.Lock()
+	defer c.serviceTokenCache.mu.Unlock()
+
+	// Double check
+	if c.serviceTokenCache.isValid() {
+		return c.serviceTokenCache.token, nil
 	}
 
-	endpoint := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", strings.TrimRight(c.config.BaseURL, "/"), c.config.Realm)
+	endpoint := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/token", c.config.BaseURL, c.config.Realm)
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
 	data.Set("client_id", c.config.ClientID)
@@ -620,14 +525,14 @@ func (c *keycloakClient) GetServiceToken(ctx context.Context) (string, error) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := c.doWithRetry(req)
+	resp, err := c.doRequest(req)
 	if err != nil {
-		return "", ErrKeycloakUnavailable
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("get service token failed with status: %d", resp.StatusCode)
+		return "", ErrKeycloakUnavailable.WithInternalMessage("failed to get service token")
 	}
 
 	var result struct {
@@ -638,13 +543,14 @@ func (c *keycloakClient) GetServiceToken(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	c.serviceTokenCache.setToken(result.AccessToken, time.Now().Add(time.Duration(result.ExpiresIn)*time.Second))
+	c.serviceTokenCache.token = result.AccessToken
+	c.serviceTokenCache.expiresAt = time.Now().Add(time.Duration(result.ExpiresIn) * time.Second)
+
 	return result.AccessToken, nil
 }
 
 func (c *keycloakClient) Logout(ctx context.Context, refreshToken string) error {
-	endpoint := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/logout", strings.TrimRight(c.config.BaseURL, "/"), c.config.Realm)
-
+	endpoint := fmt.Sprintf("%s/realms/%s/protocol/openid-connect/logout", c.config.BaseURL, c.config.Realm)
 	data := url.Values{}
 	data.Set("refresh_token", refreshToken)
 	data.Set("client_id", c.config.ClientID)
@@ -656,28 +562,28 @@ func (c *keycloakClient) Logout(ctx context.Context, refreshToken string) error 
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := c.doWithRetry(req)
+	resp, err := c.doRequest(req)
 	if err != nil {
-		return ErrKeycloakUnavailable
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("logout failed with status: %d", resp.StatusCode)
+		return fmt.Errorf("logout failed with status %d", resp.StatusCode)
 	}
 	return nil
 }
 
 func (c *keycloakClient) Health(ctx context.Context) error {
-	endpoint := fmt.Sprintf("%s/realms/%s/.well-known/openid-configuration", strings.TrimRight(c.config.BaseURL, "/"), c.config.Realm)
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	url := fmt.Sprintf("%s/realms/%s/.well-known/openid-configuration", c.config.BaseURL, c.config.Realm)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return err
 	}
 
-	resp, err := c.doWithRetry(req)
+	resp, err := c.doRequest(req)
 	if err != nil {
-		return ErrKeycloakUnavailable
+		return ErrKeycloakUnavailable.WithCause(err)
 	}
 	defer resp.Body.Close()
 
@@ -687,63 +593,116 @@ func (c *keycloakClient) Health(ctx context.Context) error {
 	return nil
 }
 
-func (c *keycloakClient) doWithRetry(req *http.Request) (*http.Response, error) {
-	var resp *http.Response
-	var err error
+// Internal structures
 
-	for i := 0; i <= c.config.RetryAttempts; i++ {
-		// Clone request for retries as Body might be closed
-		if i > 0 {
-			time.Sleep(c.config.RetryDelay * time.Duration(1<<i))
-			if req.Body != nil {
-				// This is a simplification; for full retry support, body needs to be seekable or buffered.
-				// For now assuming body is small and we can't easily rewind if it's an io.Reader.
-				// However, GetUserInfo has no body, Introspect/Token has form body which we can reconstruct if needed,
-				// but here we used NewReader so it is seekable? No, strings.NewReader is seekable but http.Request wraps it.
-				// In this implementation we just retry if error is transient.
-				// For production, strictly handling body rewind is better.
-				if seeker, ok := req.Body.(io.Seeker); ok {
-					seeker.Seek(0, io.SeekStart)
-				}
-			}
-		}
-
-		// Add X-Request-ID if context has it
-		if reqID := logging.RequestIDFromContext(req.Context()); reqID != "" {
-			req.Header.Set("X-Request-ID", reqID)
-		}
-
-		resp, err = c.httpClient.Do(req)
-		if err == nil && resp.StatusCode < 500 {
-			return resp, nil
-		}
-		if resp != nil {
-			resp.Body.Close()
-		}
-	}
-	return nil, err
+type jwksCache struct {
+	mu   sync.RWMutex
+	keys map[string]*rsa.PublicKey
 }
 
-// Type aliases for backward compatibility with apiserver/worker
-
-// Client is an alias for keycloakClient implementing AuthProvider interface.
-type Client struct {
-	*keycloakClient
+func newJWKSCache() *jwksCache {
+	return &jwksCache{
+		keys: make(map[string]*rsa.PublicKey),
+	}
 }
 
-// NewClient creates a new Keycloak client with the given configuration.
-// Uses a no-op logger by default for backward compatibility.
-func NewClient(cfg *KeycloakConfig) (*Client, error) {
-	if cfg == nil {
-		return nil, errors.Wrap(ErrInvalidConfig, errors.ErrCodeValidation, "config is nil")
+func (c *jwksCache) update(keys map[string]*rsa.PublicKey) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.keys = keys
+}
+
+func (c *jwksCache) getKey(kid string) (*rsa.PublicKey, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	k, ok := c.keys[kid]
+	return k, ok
+}
+
+type serviceTokenEntry struct {
+	mu        sync.RWMutex
+	token     string
+	expiresAt time.Time
+}
+
+func (e *serviceTokenEntry) isValid() bool {
+	return time.Now().Add(30 * time.Second).Before(e.expiresAt)
+}
+
+// ClientOption defines functional options for configuration.
+type ClientOption func(*keycloakClient)
+
+func WithHTTPClient(client *http.Client) ClientOption {
+	return func(c *keycloakClient) {
+		c.httpClient = client
 	}
-	// Use a no-op logger for backward compatibility
-	noopLogger := logging.NewNopLogger()
-	kc, err := NewKeycloakClient(*cfg, noopLogger)
+}
+
+func WithMetrics(collector MetricsCollector) ClientOption {
+	return func(c *keycloakClient) {
+		c.metrics = collector
+	}
+}
+
+func WithJWKSRefreshInterval(d time.Duration) ClientOption {
+	return func(c *keycloakClient) {
+		c.config.PublicKeyRefreshInterval = d
+	}
+}
+
+// Errors
+var (
+	ErrTokenExpired             = errors.ErrUnauthorized("token expired")
+	ErrTokenInvalidSignature    = errors.ErrUnauthorized("invalid token signature")
+	ErrTokenInvalidIssuer       = errors.ErrUnauthorized("invalid token issuer")
+	ErrTokenInvalidAudience     = errors.ErrUnauthorized("invalid token audience")
+	ErrTokenMalformed           = errors.ErrUnauthorized("malformed token")
+	ErrTokenIntrospectionFailed = errors.ErrInternal("token introspection failed")
+	ErrKeycloakUnavailable      = errors.ErrServiceUnavailable("Keycloak")
+	ErrJWKSRefreshFailed        = errors.ErrInternal("failed to refresh JWKS")
+	ErrInvalidConfig            = errors.ErrInternal("invalid configuration")
+)
+
+// Helpers
+func getString(claims jwt.MapClaims, key string) string {
+	if v, ok := claims[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func mustGetString(claims jwt.MapClaims, key string) string {
+	if v, ok := claims[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// parseRSAPublicKey parses n and e strings (base64url encoded) into an RSA Public Key.
+func parseRSAPublicKey(nStr, eStr string) (*rsa.PublicKey, error) {
+	// Base64 URL decode
+	nBytes, err := base64.RawURLEncoding.DecodeString(nStr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode n: %w", err)
 	}
-	return &Client{keycloakClient: kc.(*keycloakClient)}, nil
-}
+	eBytes, err := base64.RawURLEncoding.DecodeString(eStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode e: %w", err)
+	}
 
+	var eInt int
+	if len(eBytes) <= 8 { // Allow up to 64-bit e, typically 3 or 65537
+		for _, b := range eBytes {
+			eInt = (eInt << 8) | int(b)
+		}
+	} else {
+		return nil, fmt.Errorf("exponent too large")
+	}
+
+	pub := &rsa.PublicKey{
+		N: new(big.Int).SetBytes(nBytes),
+		E: eInt,
+	}
+	return pub, nil
+}
 //Personal.AI order the ending

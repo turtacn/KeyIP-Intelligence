@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
+// Context keys
 type contextKey string
 
 const (
@@ -18,239 +20,222 @@ const (
 	ContextKeyRoles    contextKey = "user_roles"
 )
 
-// AuthMiddlewareConfig configuration for AuthMiddleware.
+var (
+	ErrMissingAuthHeader = errors.ErrUnauthorized("missing authorization header")
+	ErrInvalidAuthFormat = errors.ErrUnauthorized("invalid authorization format")
+)
+
+// AuthMiddleware handles request authentication.
+type AuthMiddleware struct {
+	authProvider         AuthProvider
+	logger               logging.Logger
+	skipPaths            map[string]bool
+	skipPrefixes         []string
+	requireIntrospection bool
+	tenantExtractor      func(*TokenClaims) string
+	onAuthFailure        func(w http.ResponseWriter, r *http.Request, err error)
+}
+
+// AuthMiddlewareConfig holds configuration for the middleware.
 type AuthMiddlewareConfig struct {
-	SkipPaths          []string
-	SkipPrefixes       []string
+	SkipPaths            []string
+	SkipPrefixes         []string
 	RequireIntrospection bool
 	TenantClaimKey       string
 }
 
-// AuthMiddleware is the authentication middleware.
-type AuthMiddleware struct {
-	authProvider    AuthProvider
-	logger          logging.Logger
-	skipPaths       map[string]bool
-	skipPrefixes    []string
-	requireIntrospection bool
-	tenantExtractor func(*TokenClaims) string
-	onAuthFailure   func(w http.ResponseWriter, r *http.Request, err error)
-}
-
-// MiddlewareOption is a function option for configuring AuthMiddleware.
-type MiddlewareOption func(*AuthMiddleware)
-
-// WithSkipPaths sets the skip paths.
-func WithSkipPaths(paths ...string) MiddlewareOption {
-	return func(m *AuthMiddleware) {
-		for _, p := range paths {
-			m.skipPaths[p] = true
-		}
+// NewAuthMiddleware creates a new instance of AuthMiddleware.
+func NewAuthMiddleware(provider AuthProvider, logger logging.Logger, cfg AuthMiddlewareConfig) *AuthMiddleware {
+	skipPaths := make(map[string]bool)
+	for _, p := range cfg.SkipPaths {
+		skipPaths[p] = true
 	}
-}
 
-// WithSkipPrefixes sets the skip prefixes.
-func WithSkipPrefixes(prefixes ...string) MiddlewareOption {
-	return func(m *AuthMiddleware) {
-		m.skipPrefixes = append(m.skipPrefixes, prefixes...)
-	}
-}
-
-// WithIntrospection enables token introspection.
-func WithIntrospection(enabled bool) MiddlewareOption {
-	return func(m *AuthMiddleware) {
-		m.requireIntrospection = enabled
-	}
-}
-
-// WithAuthFailureHandler sets the authentication failure handler.
-func WithAuthFailureHandler(handler func(http.ResponseWriter, *http.Request, error)) MiddlewareOption {
-	return func(m *AuthMiddleware) {
-		m.onAuthFailure = handler
-	}
-}
-
-// NewAuthMiddleware creates a new AuthMiddleware.
-func NewAuthMiddleware(provider AuthProvider, logger logging.Logger, cfg AuthMiddlewareConfig, opts ...MiddlewareOption) *AuthMiddleware {
-	m := &AuthMiddleware{
-		authProvider:    provider,
-		logger:          logger,
-		skipPaths:       make(map[string]bool),
-		skipPrefixes:    cfg.SkipPrefixes,
+	mw := &AuthMiddleware{
+		authProvider:         provider,
+		logger:               logger,
+		skipPaths:            skipPaths,
+		skipPrefixes:         cfg.SkipPrefixes,
 		requireIntrospection: cfg.RequireIntrospection,
-		tenantExtractor: func(claims *TokenClaims) string {
-			return claims.TenantID
+		tenantExtractor: func(c *TokenClaims) string {
+			if c.TenantID != "" {
+				return c.TenantID
+			}
+			return "default"
 		},
 		onAuthFailure: defaultAuthFailureHandler,
 	}
 
-	for _, p := range cfg.SkipPaths {
-		m.skipPaths[p] = true
-	}
-
-	for _, opt := range opts {
-		opt(m)
-	}
-
-	return m
+	return mw
 }
 
-func (m *AuthMiddleware) Handler(next http.Handler) http.Handler {
+// MiddlewareOption defines functional options for the middleware.
+type MiddlewareOption func(*AuthMiddleware)
+
+func WithSkipPaths(paths ...string) MiddlewareOption {
+	return func(mw *AuthMiddleware) {
+		for _, p := range paths {
+			mw.skipPaths[p] = true
+		}
+	}
+}
+
+func WithSkipPrefixes(prefixes ...string) MiddlewareOption {
+	return func(mw *AuthMiddleware) {
+		mw.skipPrefixes = append(mw.skipPrefixes, prefixes...)
+	}
+}
+
+func WithIntrospection(enabled bool) MiddlewareOption {
+	return func(mw *AuthMiddleware) {
+		mw.requireIntrospection = enabled
+	}
+}
+
+func WithAuthFailureHandler(handler func(http.ResponseWriter, *http.Request, error)) MiddlewareOption {
+	return func(mw *AuthMiddleware) {
+		mw.onAuthFailure = handler
+	}
+}
+
+// Handler returns the HTTP handler for the middleware.
+func (mw *AuthMiddleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check skip paths
-		if m.skipPaths[r.URL.Path] {
+		// 1. Check skip paths
+		if mw.skipPaths[r.URL.Path] {
 			next.ServeHTTP(w, r)
 			return
 		}
-		for _, prefix := range m.skipPrefixes {
+		for _, prefix := range mw.skipPrefixes {
 			if strings.HasPrefix(r.URL.Path, prefix) {
 				next.ServeHTTP(w, r)
 				return
 			}
 		}
 
-		// Extract token
+		// 2. Extract Token
 		token, err := extractBearerToken(r)
 		if err != nil {
-			m.handleError(w, r, err)
+			mw.handleError(w, r, err)
 			return
 		}
 
-		// Verify token
+		// 3. Verify Token
 		ctx := r.Context()
-		claims, err := m.authProvider.VerifyToken(ctx, token)
+		claims, err := mw.authProvider.VerifyToken(ctx, token)
 		if err != nil {
-			m.handleError(w, r, err)
+			mw.handleError(w, r, err)
 			return
 		}
 
-		// Introspection
-		if m.requireIntrospection {
-			result, err := m.authProvider.IntrospectToken(ctx, token)
+		// 4. Introspection (Optional)
+		if mw.requireIntrospection {
+			res, err := mw.authProvider.IntrospectToken(ctx, token)
 			if err != nil {
-				// Introspection failure usually means internal error or unavailable
-				// But we treat it as auth failure for safety
-				m.logger.Error("Token introspection failed", logging.Err(err))
-				m.handleError(w, r, err)
+				mw.handleError(w, r, ErrTokenIntrospectionFailed.WithCause(err))
 				return
 			}
-			if !result.Active {
-				m.handleError(w, r, ErrTokenExpired) // Treat as expired/invalid
+			if !res.Active {
+				mw.handleError(w, r, ErrTokenExpired)
 				return
 			}
 		}
 
-		// Inject into context
+		// 5. Inject Context
 		ctx = context.WithValue(ctx, ContextKeyClaims, claims)
 		ctx = context.WithValue(ctx, ContextKeyUserID, claims.Subject)
+		ctx = context.WithValue(ctx, ContextKeyTenantID, mw.tenantExtractor(claims))
+		ctx = context.WithValue(ctx, ContextKeyRoles, claims.RealmRoles)
 
-		tenantID := m.tenantExtractor(claims)
-		if tenantID != "" {
-			ctx = context.WithValue(ctx, ContextKeyTenantID, tenantID)
-		}
-
-		// Roles: combine realm roles and client roles?
-		// Usually we care about realm roles or specific client roles.
-		// Let's flatten all roles for convenience.
-		var allRoles []string
-		allRoles = append(allRoles, claims.RealmRoles...)
-		for _, roles := range claims.ClientRoles {
-			allRoles = append(allRoles, roles...)
-		}
-		ctx = context.WithValue(ctx, ContextKeyRoles, allRoles)
-
+		// 6. Next
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func (m *AuthMiddleware) HandlerFunc(next http.HandlerFunc) http.HandlerFunc {
-	return m.Handler(next).ServeHTTP
+// HandlerFunc is a convenience wrapper for http.HandlerFunc.
+func (mw *AuthMiddleware) HandlerFunc(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		mw.Handler(next).ServeHTTP(w, r)
+	}
 }
 
-func (m *AuthMiddleware) handleError(w http.ResponseWriter, r *http.Request, err error) {
-	// Log error without token
-	m.logger.Warn("Authentication failed",
+func (mw *AuthMiddleware) handleError(w http.ResponseWriter, r *http.Request, err error) {
+	mw.logger.Warn("authentication failed",
 		logging.String("path", r.URL.Path),
 		logging.String("ip", r.RemoteAddr),
-		logging.Err(err),
+		logging.Error(err),
 	)
-	m.onAuthFailure(w, r, err)
+	mw.onAuthFailure(w, r, err)
 }
 
 func extractBearerToken(r *http.Request) (string, error) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
 		return "", ErrMissingAuthHeader
 	}
-	if !strings.HasPrefix(authHeader, "Bearer ") {
+	if !strings.HasPrefix(auth, "Bearer ") {
 		return "", ErrInvalidAuthFormat
 	}
-	return strings.TrimPrefix(authHeader, "Bearer "), nil
+	return strings.TrimPrefix(auth, "Bearer "), nil
 }
 
 func defaultAuthFailureHandler(w http.ResponseWriter, r *http.Request, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("WWW-Authenticate", "Bearer")
-	w.WriteHeader(http.StatusUnauthorized)
 
-	resp := map[string]string{
-		"code":    "UNAUTHORIZED",
-		"message": "Authentication required",
+	code := "UNAUTHORIZED"
+	msg := "Authentication required"
+	status := http.StatusUnauthorized
+
+	if errors.Is(err, ErrTokenExpired) {
+		code = "TOKEN_EXPIRED"
+		msg = "Access token has expired"
+	} else if errors.Is(err, ErrTokenInvalidSignature) {
+		code = "TOKEN_INVALID"
+		msg = "Invalid token signature"
+	} else if errors.Is(err, ErrTokenMalformed) {
+		code = "TOKEN_MALFORMED"
+		msg = "Malformed authorization token"
+	} else if errors.Is(err, ErrMissingAuthHeader) {
+		code = "MISSING_AUTH_HEADER"
+		msg = "Missing authorization header"
+	} else if errors.Is(err, ErrTokenIntrospectionFailed) {
+		code = "INTROSPECTION_FAILED"
+		msg = "Token introspection failed"
+		status = http.StatusInternalServerError
+	} else if errors.IsForbidden(err) {
+		code = "ACCESS_DENIED"
+		msg = "Access denied"
+		status = http.StatusForbidden
 	}
 
-	if err == ErrTokenExpired {
-		resp["code"] = "TOKEN_EXPIRED"
-		resp["message"] = "Access token has expired"
-	} else if err == ErrTokenInvalidSignature {
-		resp["code"] = "TOKEN_INVALID"
-		resp["message"] = "Invalid token signature"
-	} else if err == ErrTokenMalformed || err == ErrInvalidAuthFormat {
-		resp["code"] = "TOKEN_MALFORMED"
-		resp["message"] = "Malformed authorization token"
-	}
-
-	json.NewEncoder(w).Encode(resp)
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{
+		"code":    code,
+		"message": msg,
+	})
 }
 
-// Errors
-// Note: Some errors are defined in client.go, we reuse them.
-// We define middleware specific errors here if not exported from client.go?
-// ErrMissingAuthHeader is new.
-// ErrTokenExpired etc are exported from client.go (Wait, variables in client.go are exported).
-
-var (
-	ErrMissingAuthHeader = &authError{"missing authorization header"}
-	ErrInvalidAuthFormat = &authError{"invalid authorization format"}
-)
-
-type authError struct {
-	msg string
-}
-
-func (e *authError) Error() string {
-	return e.msg
-}
-
-// Context helpers
+// Context Helpers
 
 func ClaimsFromContext(ctx context.Context) (*TokenClaims, bool) {
-	claims, ok := ctx.Value(ContextKeyClaims).(*TokenClaims)
-	return claims, ok
+	c, ok := ctx.Value(ContextKeyClaims).(*TokenClaims)
+	return c, ok
 }
 
 func UserIDFromContext(ctx context.Context) (string, bool) {
-	uid, ok := ctx.Value(ContextKeyUserID).(string)
-	return uid, ok
+	v, ok := ctx.Value(ContextKeyUserID).(string)
+	return v, ok
 }
 
 func TenantIDFromContext(ctx context.Context) (string, bool) {
-	tid, ok := ctx.Value(ContextKeyTenantID).(string)
-	return tid, ok
+	v, ok := ctx.Value(ContextKeyTenantID).(string)
+	return v, ok
 }
 
 func RolesFromContext(ctx context.Context) ([]string, bool) {
-	roles, ok := ctx.Value(ContextKeyRoles).([]string)
-	return roles, ok
+	v, ok := ctx.Value(ContextKeyRoles).([]string)
+	return v, ok
 }
 
 func HasRole(ctx context.Context, role string) bool {
@@ -280,5 +265,4 @@ func HasAnyRole(ctx context.Context, roles ...string) bool {
 	}
 	return false
 }
-
 //Personal.AI order the ending

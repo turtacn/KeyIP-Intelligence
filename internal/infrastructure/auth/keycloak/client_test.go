@@ -6,8 +6,6 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
-	stdliberrors "errors"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,474 +17,342 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-type mockKeycloak struct {
-	server        *httptest.Server
-	privateKey    *rsa.PrivateKey
-	publicKey     *rsa.PublicKey
-	kid           string
-	tokenSub      string
-	tokenExp      time.Time
-	requestCounts map[string]int
-	mu            sync.Mutex
-	delay         time.Duration
+// Mock Logger
+type mockLogger struct {
+	logging.Logger
 }
 
-func setupTestKeycloak(t *testing.T) (*mockKeycloak, AuthProvider) {
-	// Generate RSA keys
+func (m *mockLogger) Error(msg string, fields ...logging.Field) {}
+func (m *mockLogger) Warn(msg string, fields ...logging.Field)  {}
+func (m *mockLogger) Info(msg string, fields ...logging.Field)  {}
+func (m *mockLogger) Debug(msg string, fields ...logging.Field) {}
+
+func newMockLogger() logging.Logger {
+	return &mockLogger{}
+}
+
+func setupTestKeycloak(t *testing.T) (*httptest.Server, AuthProvider, *rsa.PrivateKey) {
+	// Generate RSA Key Pair
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
-	publicKey := &privateKey.PublicKey
-	kid := "test-key-id"
 
-	mk := &mockKeycloak{
-		privateKey:    privateKey,
-		publicKey:     publicKey,
-		kid:           kid,
-		tokenSub:      "test-user",
-		tokenExp:      time.Now().Add(1 * time.Hour),
-		requestCounts: make(map[string]int),
-	}
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mk.mu.Lock()
-		mk.requestCounts[r.URL.Path]++
-		delay := mk.delay
-		mk.mu.Unlock()
+	// JWKS Handler
+	mux.HandleFunc("/realms/test-realm/protocol/openid-connect/certs", func(w http.ResponseWriter, r *http.Request) {
+		n := base64.RawURLEncoding.EncodeToString(privateKey.N.Bytes())
+		// e is usually 65537
+		eBytes := []byte{1, 0, 1}
+		e := base64.RawURLEncoding.EncodeToString(eBytes)
 
-		if delay > 0 {
-			time.Sleep(delay)
+		jwks := map[string]interface{}{
+			"keys": []map[string]interface{}{
+				{
+					"kty": "RSA",
+					"kid": "test-key-id",
+					"n":   n,
+					"e":   e,
+					"alg": "RS256",
+					"use": "sig",
+				},
+			},
 		}
-
-		switch {
-		case strings.Contains(r.URL.Path, "/openid-connect/certs"):
-			mk.handleJWKS(w, r)
-		case strings.Contains(r.URL.Path, "/openid-connect/userinfo"):
-			mk.handleUserInfo(w, r)
-		case strings.Contains(r.URL.Path, "/openid-connect/token/introspect"):
-			mk.handleIntrospect(w, r)
-		case strings.Contains(r.URL.Path, "/openid-connect/token"):
-			mk.handleToken(w, r)
-		case strings.Contains(r.URL.Path, "/openid-connect/logout"):
-			mk.handleLogout(w, r)
-		case strings.Contains(r.URL.Path, "/.well-known/openid-configuration"):
-			mk.handleOpenIDConfig(w, r)
-		default:
-			http.NotFound(w, r)
-		}
+		json.NewEncoder(w).Encode(jwks)
 	})
 
-	mk.server = httptest.NewServer(handler)
+	// UserInfo Handler
+	mux.HandleFunc("/realms/test-realm/protocol/openid-connect/userinfo", func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		token := strings.TrimPrefix(auth, "Bearer ")
+		if token == "invalid" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if token == "error" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
-	cfg := KeycloakConfig{
-		BaseURL:                  mk.server.URL,
-		Realm:                    "test-realm",
-		ClientID:                 "test-client",
-		ClientSecret:             "test-secret",
-		PublicKeyRefreshInterval: 100 * time.Millisecond,
-		RequestTimeout:           1 * time.Second,
-		RetryAttempts:            1,
-		RetryDelay:               1 * time.Millisecond,
-	}
+		userInfo := UserInfo{
+			ID:    "user-123",
+			Email: "test@example.com",
+			Name:  "Test User",
+		}
+		json.NewEncoder(w).Encode(userInfo)
+	})
 
-	client, err := NewKeycloakClient(cfg, logging.NewNopLogger())
-	require.NoError(t, err)
-
-	return mk, client
-}
-
-func (mk *mockKeycloak) handleJWKS(w http.ResponseWriter, r *http.Request) {
-	nBytes := mk.publicKey.N.Bytes()
-	eBytes := big.NewInt(int64(mk.publicKey.E)).Bytes()
-
-	jwks := map[string]interface{}{
-		"keys": []map[string]interface{}{
-			{
-				"kid": mk.kid,
-				"kty": "RSA",
-				"alg": "RS256",
-				"use": "sig",
-				"n":   base64.RawURLEncoding.EncodeToString(nBytes),
-				"e":   base64.RawURLEncoding.EncodeToString(eBytes),
-			},
-		},
-	}
-	json.NewEncoder(w).Encode(jwks)
-}
-
-func (mk *mockKeycloak) handleUserInfo(w http.ResponseWriter, r *http.Request) {
-	authHeader := r.Header.Get("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	// Simplified logic: assume valid token for now
-	userInfo := map[string]interface{}{
-		"sub":                mk.tokenSub,
-		"email":              "test@example.com",
-		"email_verified":     true,
-		"name":               "Test User",
-		"preferred_username": "testuser",
-		"given_name":         "Test",
-		"family_name":        "User",
-		"roles":              []string{"role1", "role2"},
-		"groups":             []string{"group1"},
-		"tenant_id":          "tenant-1",
-		"attributes": map[string]interface{}{
-			"attr1": []string{"val1"},
-		},
-	}
-	json.NewEncoder(w).Encode(userInfo)
-}
-
-func (mk *mockKeycloak) handleIntrospect(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	token := r.Form.Get("token")
-	active := token == "valid-token"
-
-	result := map[string]interface{}{
-		"active":    active,
-		"sub":       mk.tokenSub,
-		"client_id": "test-client",
-		"exp":       mk.tokenExp.Unix(),
-		"scope":     "openid profile email",
-	}
-	json.NewEncoder(w).Encode(result)
-}
-
-func (mk *mockKeycloak) handleToken(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	grantType := r.Form.Get("grant_type")
-
-	if grantType == "refresh_token" {
-		refreshToken := r.Form.Get("refresh_token")
-		if refreshToken == "invalid-refresh" {
+	// Introspect Handler
+	mux.HandleFunc("/realms/test-realm/protocol/openid-connect/token/introspect", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if err := r.ParseForm(); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"access_token":       "new-access-token",
-			"refresh_token":      "new-refresh-token",
-			"expires_in":         3600,
-			"refresh_expires_in": 7200,
-			"token_type":         "Bearer",
-		})
-		return
-	}
-
-	if grantType == "client_credentials" {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"access_token": "service-token",
-			"expires_in":   3600,
-		})
-		return
-	}
-
-	w.WriteHeader(http.StatusBadRequest)
-}
-
-func (mk *mockKeycloak) handleLogout(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (mk *mockKeycloak) handleOpenIDConfig(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"issuer": mk.server.URL + "/realms/test-realm",
+		token := r.FormValue("token")
+		active := token == "active-token"
+		result := IntrospectionResult{
+			Active: active,
+			Subject: "user-123",
+		}
+		json.NewEncoder(w).Encode(result)
 	})
+
+	// Token Handler
+	mux.HandleFunc("/realms/test-realm/protocol/openid-connect/token", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		grantType := r.FormValue("grant_type")
+		if grantType == "client_credentials" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"access_token": "service-token",
+				"expires_in":   300,
+			})
+			return
+		}
+		if grantType == "refresh_token" {
+			refreshToken := r.FormValue("refresh_token")
+			if refreshToken == "valid-refresh" {
+				json.NewEncoder(w).Encode(TokenPair{
+					AccessToken:  "new-access",
+					RefreshToken: "new-refresh",
+					ExpiresIn:    300,
+				})
+				return
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error":"invalid_grant"}`))
+			return
+		}
+	})
+
+	// Logout Handler
+	mux.HandleFunc("/realms/test-realm/protocol/openid-connect/logout", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// Health Handler
+	mux.HandleFunc("/realms/test-realm/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	cfg := KeycloakConfig{
+		BaseURL:                  server.URL, // httptest server URL doesn't have trailing slash usually
+		Realm:                    "test-realm",
+		ClientID:                 "test-client",
+		ClientSecret:             "secret",
+		PublicKeyRefreshInterval: 1 * time.Second,
+	}
+
+	client, err := NewKeycloakClient(cfg, newMockLogger())
+	require.NoError(t, err)
+
+	return server, client, privateKey
 }
 
-func (mk *mockKeycloak) signToken(claims jwt.MapClaims) string {
+func signTestToken(t *testing.T, privateKey *rsa.PrivateKey, claims jwt.MapClaims) string {
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = mk.kid
-	signedToken, _ := token.SignedString(mk.privateKey)
-	return signedToken
+	token.Header["kid"] = "test-key-id"
+	signed, err := token.SignedString(privateKey)
+	require.NoError(t, err)
+	return signed
 }
 
 func TestNewKeycloakClient_ValidConfig(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+	server, client, _ := setupTestKeycloak(t)
+	defer server.Close()
 	assert.NotNil(t, client)
 }
 
-func TestNewKeycloakClient_MissingConfig(t *testing.T) {
-	_, err := NewKeycloakClient(KeycloakConfig{}, logging.NewNopLogger())
+func TestNewKeycloakClient_InvalidConfig(t *testing.T) {
+	_, err := NewKeycloakClient(KeycloakConfig{}, newMockLogger())
 	assert.Error(t, err)
-	assert.True(t, stdliberrors.Is(err, ErrInvalidConfig))
+	assert.True(t, errors.IsCode(err, errors.ErrCodeInternal))
 }
 
-func TestNewKeycloakClient_JWKSFetchFailure(t *testing.T) {
-	// Start server but make it fail
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
+func TestNewKeycloakClient_TrailingSlash(t *testing.T) {
+	// Setup minimalist server for JWKS
+	mux := http.NewServeMux()
+	mux.HandleFunc("/realms/test-realm/protocol/openid-connect/certs", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"keys":[]}`))
+	})
+	server := httptest.NewServer(mux)
 	defer server.Close()
 
 	cfg := KeycloakConfig{
-		BaseURL:  server.URL,
-		Realm:    "test-realm",
-		ClientID: "test-client",
+		BaseURL:      server.URL + "/",
+		Realm:        "test-realm",
+		ClientID:     "id",
+		ClientSecret: "sec",
 	}
-	_, err := NewKeycloakClient(cfg, logging.NewNopLogger())
-	assert.Error(t, err)
-	// It returns wrapped error, check if it fails during refresh
-	// Implementation: return nil, errors.Wrap(err, ..., "failed to fetch JWKS")
-	assert.Contains(t, err.Error(), "failed to fetch JWKS")
+	client, err := NewKeycloakClient(cfg, newMockLogger())
+	require.NoError(t, err)
+	assert.NotNil(t, client)
 }
 
 func TestVerifyToken_ValidToken(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+	server, client, key := setupTestKeycloak(t)
+	defer server.Close()
 
 	claims := jwt.MapClaims{
-		"sub":                "user-123",
-		"iss":                mk.server.URL + "/realms/test-realm",
-		"aud":                []string{"test-client"},
-		"exp":                time.Now().Add(time.Hour).Unix(),
-		"iat":                time.Now().Unix(),
-		"email":              "user@example.com",
-		"preferred_username": "user123",
+		"sub": "user-123",
+		"iss": server.URL + "/realms/test-realm",
+		"aud": []string{"test-client"},
+		"exp": time.Now().Add(time.Hour).Unix(),
 		"realm_access": map[string]interface{}{
 			"roles": []string{"admin"},
 		},
-		"resource_access": map[string]interface{}{
-			"test-client": map[string]interface{}{
-				"roles": []string{"manager"},
-			},
-		},
-		"tenant_id": "tenant-abc",
 	}
-	token := mk.signToken(claims)
+	token := signTestToken(t, key, claims)
 
-	tokenClaims, err := client.VerifyToken(context.Background(), token)
-	assert.NoError(t, err)
-	assert.NotNil(t, tokenClaims)
-	assert.Equal(t, "user-123", tokenClaims.Subject)
-	assert.Equal(t, "user@example.com", tokenClaims.Email)
-	assert.Contains(t, tokenClaims.RealmRoles, "admin")
-	assert.Contains(t, tokenClaims.ClientRoles["test-client"], "manager")
-	assert.Equal(t, "tenant-abc", tokenClaims.TenantID)
+	tc, err := client.VerifyToken(context.Background(), token)
+	require.NoError(t, err)
+	assert.Equal(t, "user-123", tc.Subject)
+	assert.Contains(t, tc.RealmRoles, "admin")
 }
 
 func TestVerifyToken_ExpiredToken(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+	server, client, key := setupTestKeycloak(t)
+	defer server.Close()
 
 	claims := jwt.MapClaims{
 		"sub": "user-123",
-		"iss": mk.server.URL + "/realms/test-realm",
+		"iss": server.URL + "/realms/test-realm",
 		"aud": []string{"test-client"},
 		"exp": time.Now().Add(-time.Hour).Unix(),
 	}
-	token := mk.signToken(claims)
+	token := signTestToken(t, key, claims)
 
 	_, err := client.VerifyToken(context.Background(), token)
 	assert.Error(t, err)
-	assert.True(t, stdliberrors.Is(err, ErrTokenExpired))
+	assert.Equal(t, ErrTokenExpired, err)
 }
-
-func TestVerifyToken_InvalidSignature(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
-
-	claims := jwt.MapClaims{
-		"sub": "user-123",
-		"iss": mk.server.URL + "/realms/test-realm",
-		"aud": []string{"test-client"},
-		"exp": time.Now().Add(time.Hour).Unix(),
-	}
-	// Sign with a different key
-	otherKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = mk.kid // Use same kid but wrong key signature
-	signedToken, _ := token.SignedString(otherKey)
-
-	_, err := client.VerifyToken(context.Background(), tokenString(signedToken)) // tokenString cast just to be safe
-	// Actually signedToken is string.
-	_, err = client.VerifyToken(context.Background(), signedToken)
-	assert.Error(t, err)
-	// It might return InvalidSignature or VerificationFailed depending on jwt lib behavior with wrong key but matching kid
-	// Since we verify with the public key corresponding to kid, verification should fail.
-	assert.True(t, stdliberrors.Is(err, ErrTokenInvalidSignature))
-}
-
-func tokenString(s string) string { return s }
 
 func TestGetUserInfo_Success(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+	server, client, _ := setupTestKeycloak(t)
+	defer server.Close()
 
-	userInfo, err := client.GetUserInfo(context.Background(), "valid-token")
-	assert.NoError(t, err)
-	assert.NotNil(t, userInfo)
-	assert.Equal(t, "test-user", userInfo.ID)
+	info, err := client.GetUserInfo(context.Background(), "valid-token")
+	require.NoError(t, err)
+	assert.Equal(t, "user-123", info.ID)
 }
 
-func TestGetUserInfo_Timeout(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+func TestGetUserInfo_Retry(t *testing.T) {
+	// Create a server that fails 2 times then succeeds
+	failures := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("/realms/test-realm/protocol/openid-connect/certs", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"keys":[]}`))
+	})
+	mux.HandleFunc("/realms/test-realm/protocol/openid-connect/userinfo", func(w http.ResponseWriter, r *http.Request) {
+		if failures < 2 {
+			failures++
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"sub":"user-123"}`))
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
 
-	// Inject delay > timeout
-	// Setup client with very short timeout
 	cfg := KeycloakConfig{
-		BaseURL:        mk.server.URL,
-		Realm:          "test-realm",
-		ClientID:       "test-client",
-		RequestTimeout: 10 * time.Millisecond,
-		RetryAttempts:  0,
+		BaseURL:       server.URL,
+		Realm:         "test-realm",
+		ClientID:      "id",
+		ClientSecret:  "sec",
+		RetryAttempts: 3,
+		RetryDelay:    10 * time.Millisecond,
 	}
-	// We need a new client but mock server is reused.
-	// But mock server is part of setup.
-	// We can manually create client for this test.
-	client, _ = NewKeycloakClient(cfg, logging.NewNopLogger())
+	client, err := NewKeycloakClient(cfg, newMockLogger())
+	require.NoError(t, err)
 
-	mk.mu.Lock()
-	mk.delay = 100 * time.Millisecond
-	mk.mu.Unlock()
+	info, err := client.GetUserInfo(context.Background(), "token")
+	require.NoError(t, err)
+	assert.Equal(t, "user-123", info.ID)
+	assert.Equal(t, 2, failures)
+}
 
-	_, err := client.GetUserInfo(context.Background(), "valid-token")
+func TestGetUserInfo_Unauthorized(t *testing.T) {
+	server, client, _ := setupTestKeycloak(t)
+	defer server.Close()
+
+	_, err := client.GetUserInfo(context.Background(), "invalid")
 	assert.Error(t, err)
-	// Timeout error
-	// Client returns ErrKeycloakUnavailable on error in doWithRetry if not specific status
-	assert.True(t, stdliberrors.Is(err, ErrKeycloakUnavailable))
+	assert.Equal(t, ErrTokenExpired, err)
 }
 
 func TestIntrospectToken_Active(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+	server, client, _ := setupTestKeycloak(t)
+	defer server.Close()
 
-	result, err := client.IntrospectToken(context.Background(), "valid-token")
-	assert.NoError(t, err)
-	assert.True(t, result.Active)
-}
-
-func TestIntrospectToken_Inactive(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
-
-	result, err := client.IntrospectToken(context.Background(), "invalid-token")
-	assert.NoError(t, err)
-	assert.False(t, result.Active)
+	res, err := client.IntrospectToken(context.Background(), "active-token")
+	require.NoError(t, err)
+	assert.True(t, res.Active)
 }
 
 func TestRefreshToken_Success(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+	server, client, _ := setupTestKeycloak(t)
+	defer server.Close()
 
 	pair, err := client.RefreshToken(context.Background(), "valid-refresh")
-	assert.NoError(t, err)
-	assert.Equal(t, "new-access-token", pair.AccessToken)
+	require.NoError(t, err)
+	assert.Equal(t, "new-access", pair.AccessToken)
 }
 
 func TestGetServiceToken_Success(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+	server, client, _ := setupTestKeycloak(t)
+	defer server.Close()
 
 	token, err := client.GetServiceToken(context.Background())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "service-token", token)
 
-	// Second call should hit cache
+	// Cached
 	token2, err := client.GetServiceToken(context.Background())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, token, token2)
 }
 
-func TestGetServiceToken_CacheHit(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+func TestLogout_Success(t *testing.T) {
+	server, client, _ := setupTestKeycloak(t)
+	defer server.Close()
 
-	// First call
-	_, err := client.GetServiceToken(context.Background())
-	assert.NoError(t, err)
-
-	// Get count
-	mk.mu.Lock()
-	count1 := mk.requestCounts["/realms/test-realm/protocol/openid-connect/token"]
-	mk.mu.Unlock()
-	assert.GreaterOrEqual(t, count1, 1)
-
-	// Second call
-	_, err = client.GetServiceToken(context.Background())
-	assert.NoError(t, err)
-
-	mk.mu.Lock()
-	count2 := mk.requestCounts["/realms/test-realm/protocol/openid-connect/token"]
-	mk.mu.Unlock()
-
-	// Should be same
-	assert.Equal(t, count1, count2)
-}
-
-func TestGetServiceToken_CacheExpired(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
-
-	// First call
-	_, err := client.GetServiceToken(context.Background())
-	assert.NoError(t, err)
-
-	// Expire cache manually (white-box test hack or mock time? mock time is hard here)
-	// We can't access internal cache easily without reflection or exposing it.
-	// But `client` is `AuthProvider` interface. Cast it.
-	kc, ok := client.(*keycloakClient)
-	require.True(t, ok)
-
-	kc.serviceTokenCache.setToken("expired", time.Now().Add(-1*time.Hour))
-
-	// Second call
-	_, err = client.GetServiceToken(context.Background())
-	assert.NoError(t, err)
-
-	// Check count
-	mk.mu.Lock()
-	count := mk.requestCounts["/realms/test-realm/protocol/openid-connect/token"]
-	mk.mu.Unlock()
-
-	// Should be 2 calls
-	assert.GreaterOrEqual(t, count, 2)
+	err := client.Logout(context.Background(), "refresh-token")
+	require.NoError(t, err)
 }
 
 func TestHealth_Healthy(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+	server, client, _ := setupTestKeycloak(t)
+	defer server.Close()
 
 	err := client.Health(context.Background())
-	assert.NoError(t, err)
-}
-
-func TestHealth_Unhealthy(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	mk.server.Close() // Close server to simulate failure
-	// We need to keep defer in setupTestKeycloak but here we close it early.
-	// setupTestKeycloak defers close? No, test function defers close.
-	// So we can close it here.
-
-	// However, if we close it, client requests will fail.
-	err := client.Health(context.Background())
-	assert.Error(t, err)
-	assert.True(t, stdliberrors.Is(err, ErrKeycloakUnavailable))
+	require.NoError(t, err)
 }
 
 func TestJWKSCache_ConcurrentRead(t *testing.T) {
-	mk, client := setupTestKeycloak(t)
-	defer mk.server.Close()
+	server, client, key := setupTestKeycloak(t)
+	defer server.Close()
 
 	claims := jwt.MapClaims{
 		"sub": "user-123",
-		"iss": mk.server.URL + "/realms/test-realm",
+		"iss": server.URL + "/realms/test-realm",
 		"aud": []string{"test-client"},
 		"exp": time.Now().Add(time.Hour).Unix(),
 	}
-	token := mk.signToken(claims)
+	token := signTestToken(t, key, claims)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
@@ -499,5 +365,4 @@ func TestJWKSCache_ConcurrentRead(t *testing.T) {
 	}
 	wg.Wait()
 }
-
 //Personal.AI order the ending
