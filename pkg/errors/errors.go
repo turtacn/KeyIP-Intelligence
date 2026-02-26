@@ -487,6 +487,7 @@ var (
 	ErrParsingFailed     = New(ErrCodeValidation, "parsing failed")
 	ErrInvalidMolecule   = New(ErrCodeMoleculeInvalidFormat, "invalid molecule")
 	ErrInvalidConfig     = New(ErrCodeValidation, "invalid configuration")
+	ErrInvalidArgument   = New(ErrCodeBadRequest, "invalid argument")
 )
 
 func NewParsingError(message string) *AppError {

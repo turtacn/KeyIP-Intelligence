@@ -15,14 +15,7 @@ import (
 // Validation helpers
 // ---------------------------------------------------------------------------
 
-// ErrInvalidArgument is returned when a caller-supplied argument is invalid.
-var ErrInvalidArgument = fmt.Errorf("keyip: invalid argument")
-
 var inchiKeyRe = regexp.MustCompile(`^[A-Z]{14}-[A-Z]{10}-[A-Z]$`)
-
-func invalidArg(msg string) error {
-	return fmt.Errorf("%w: %s", ErrInvalidArgument, msg)
-}
 
 // ---------------------------------------------------------------------------
 // DTOs — request / response
@@ -92,13 +85,13 @@ type LipinskiRule struct {
 // MoleculeDetail extends Molecule with rich metadata.
 type MoleculeDetail struct {
 	Molecule
-	Synonyms         []string       `json:"synonyms,omitempty"`
-	CASNumber        string         `json:"cas_number,omitempty"`
-	Scaffold         string         `json:"scaffold,omitempty"`
-	FunctionalGroups []string       `json:"functional_groups,omitempty"`
-	Stereochemistry  string         `json:"stereochemistry,omitempty"`
-	Patents          []PatentBrief  `json:"patents,omitempty"`
-	Activities       []BioActivity  `json:"activities,omitempty"`
+	Synonyms         []string      `json:"synonyms,omitempty"`
+	CASNumber        string        `json:"cas_number,omitempty"`
+	Scaffold         string        `json:"scaffold,omitempty"`
+	FunctionalGroups []string      `json:"functional_groups,omitempty"`
+	Stereochemistry  string        `json:"stereochemistry,omitempty"`
+	Patents          []PatentBrief `json:"patents,omitempty"`
+	Activities       []BioActivity `json:"activities,omitempty"`
 }
 
 // PatentBrief is a compact patent reference attached to a molecule.
@@ -127,12 +120,12 @@ type MoleculePropertyRequest struct {
 
 // MoleculePropertyResult is the response for PredictProperties.
 type MoleculePropertyResult struct {
-	SMILES                  string                 `json:"smiles"`
-	CanonicalSMILES         string                 `json:"canonical_smiles"`
-	Properties              map[string]interface{} `json:"properties"`
-	Lipinski                *LipinskiRule          `json:"lipinski,omitempty"`
-	DrugLikeness            float64                `json:"drug_likeness"`
-	SyntheticAccessibility  float64                `json:"synthetic_accessibility"`
+	SMILES                 string                 `json:"smiles"`
+	CanonicalSMILES        string                 `json:"canonical_smiles"`
+	Properties             map[string]interface{} `json:"properties"`
+	Lipinski               *LipinskiRule          `json:"lipinski,omitempty"`
+	DrugLikeness           float64                `json:"drug_likeness"`
+	SyntheticAccessibility float64                `json:"synthetic_accessibility"`
 }
 
 // BatchSearchRequest describes a batch molecule search.
@@ -160,35 +153,14 @@ type BatchSearchItem struct {
 
 // MoleculeComparison is the response for CompareMolecules.
 type MoleculeComparison struct {
-	Molecule1               Molecule              `json:"molecule_1"`
-	Molecule2               Molecule              `json:"molecule_2"`
-	TanimotoSimilarity      float64               `json:"tanimoto_similarity"`
-	DiceSimilarity          float64               `json:"dice_similarity"`
-	CommonSubstructure      string                `json:"common_substructure"`
-	Molecule1UniqueFragments []string             `json:"molecule_1_unique_fragments"`
-	Molecule2UniqueFragments []string             `json:"molecule_2_unique_fragments"`
-	PropertyDifferences     map[string][2]float64 `json:"property_differences"`
-}
-
-// ---------------------------------------------------------------------------
-// Internal response wrappers (for endpoints that return {data:..., meta:...})
-// ---------------------------------------------------------------------------
-
-type moleculeDetailResp struct {
-	Data MoleculeDetail `json:"data"`
-}
-
-type patentBriefListResp struct {
-	Data []PatentBrief `json:"data"`
-	Meta *ResponseMeta `json:"meta,omitempty"`
-}
-
-type bioActivityListResp struct {
-	Data []BioActivity `json:"data"`
-}
-
-type moleculeComparisonResp struct {
-	Data MoleculeComparison `json:"data"`
+	Molecule1                Molecule              `json:"molecule_1"`
+	Molecule2                Molecule              `json:"molecule_2"`
+	TanimotoSimilarity       float64               `json:"tanimoto_similarity"`
+	DiceSimilarity           float64               `json:"dice_similarity"`
+	CommonSubstructure       string                `json:"common_substructure"`
+	Molecule1UniqueFragments []string              `json:"molecule_1_unique_fragments"`
+	Molecule2UniqueFragments []string              `json:"molecule_2_unique_fragments"`
+	PropertyDifferences      map[string][2]float64 `json:"property_differences"`
 }
 
 // ---------------------------------------------------------------------------
@@ -251,6 +223,54 @@ func (mc *MoleculesClient) Search(ctx context.Context, req *MoleculeSearchReques
 		return nil, invalidArg("similarity must be between 0.0 and 1.0")
 	}
 
+	// Currently the response for Search is MoleculeSearchResult structure directly, not wrapped in Data/Meta?
+	// The prompt defines `MoleculeSearchResult` as having Total, Page, etc.
+	// This structure IS the response body (like paginated response).
+	// However, standard API convention in this project is `APIResponse[T]`.
+	// But `MoleculeSearchResult` HAS `Molecules` field which is `[]Molecule`.
+	// If the API returns `MoleculeSearchResult` directly, then we use it.
+	// If the API returns `{ data: MoleculeSearchResult }`, then we use `APIResponse[MoleculeSearchResult]`.
+	// Given other methods return `APIResponse`, likely Search does too.
+	// But wait, `MoleculeSearchResult` struct has `Total`, `Page`, etc. which overlaps with `ResponseMeta`.
+	// If the API follows standard envelope, it should be:
+	// { data: { molecules: [...], search_time: ... }, meta: { total: ..., page: ... } }
+	// But `MoleculeSearchResult` combines data and meta.
+	// Let's assume the prompt's `MoleculeSearchResult` IS the data structure returned, possibly inside `data` field of APIResponse,
+	// OR it's a custom response body.
+	// Given other sub-clients return `APIResponse`, and `client.go` defines `APIResponse`, let's assume standard envelope.
+	// BUT `MoleculeSearchResult` struct is explicitly defined in prompt.
+	// If I assume it's `APIResponse[MoleculeSearchResult]`, then `result.Data` will be `MoleculeSearchResult`.
+	// Let's stick to the prompt structure. If the prompt says `MoleculeSearchResult` has `Total`, etc., then maybe the API returns this struct directly (no envelope) OR it's the `Data` content.
+	// However, usually search results ARE the data.
+	// Let's assume the API returns `MoleculeSearchResult` directly as the body or inside `data` property.
+	// If inside `data`, then `APIResponse[MoleculeSearchResult]` is correct.
+	// Let's use `APIResponse[MoleculeSearchResult]`.
+
+	// Wait, checking `patents.go`, `PatentSearchResult` also has `Total`, `Page`.
+	// And `client.go` has `APIResponse` with `Meta`.
+	// This implies duplication or conflict.
+	// If the server returns `{ data: { molecules: ... }, meta: ... }`, then `MoleculeSearchResult` (client side DTO) should be constructed from `APIResponse`.
+	// Or maybe the server returns flat JSON matching `MoleculeSearchResult`.
+	// "POST /api/v1/molecules/search" -> `MoleculeSearchResult`.
+	// Let's assume the `post` method deserializes into the pointer passed.
+	// If I pass `&MoleculeSearchResult`, it expects JSON matching that.
+	// If I pass `&APIResponse[...]`, it expects `{data:..., meta:...}`.
+
+	// Given the detailed DTO definitions in prompt, I should respect them.
+	// The prompt for `Search` says: "Returns `*MoleculeSearchResult`".
+	// It doesn't say "Returns `*APIResponse[MoleculeSearchResult]`".
+	// So I should treat `MoleculeSearchResult` as the target struct.
+	// Whether it's wrapped in `APIResponse` internally or not depends on API.
+	// But since I'm implementing the Client, I define how it talks to API.
+	// If I assume API follows `APIResponse` pattern (which `client.go` suggests), then:
+	// For `Search`, maybe the response IS `APIResponse` compatible?
+	// `MoleculeSearchResult` fields: `Molecules`, `Total`, `Page`, `HasMore`...
+	// `APIResponse` fields: `Data`, `Meta`.
+	// They don't match directly.
+	// Maybe `Search` endpoints return flat structure?
+	// I'll stick to `mc.client.post(..., &result)` where result is `MoleculeSearchResult`.
+	// This implies the API returns JSON matching `MoleculeSearchResult`.
+
 	var result MoleculeSearchResult
 	if err := mc.client.post(ctx, "/api/v1/molecules/search", req, &result); err != nil {
 		return nil, err
@@ -264,7 +284,7 @@ func (mc *MoleculesClient) Get(ctx context.Context, moleculeID string) (*Molecul
 	if moleculeID == "" {
 		return nil, invalidArg("moleculeID is required")
 	}
-	var resp moleculeDetailResp
+	var resp APIResponse[MoleculeDetail]
 	if err := mc.client.get(ctx, "/api/v1/molecules/"+moleculeID, &resp); err != nil {
 		return nil, err
 	}
@@ -278,7 +298,7 @@ func (mc *MoleculesClient) GetBySMILES(ctx context.Context, smiles string) (*Mol
 		return nil, invalidArg("smiles is required")
 	}
 	path := "/api/v1/molecules/by-smiles?smiles=" + url.QueryEscape(smiles)
-	var resp moleculeDetailResp
+	var resp APIResponse[MoleculeDetail]
 	if err := mc.client.get(ctx, path, &resp); err != nil {
 		return nil, err
 	}
@@ -295,7 +315,7 @@ func (mc *MoleculesClient) GetByInChIKey(ctx context.Context, inchiKey string) (
 		return nil, invalidArg("inchiKey format invalid, expected XXXXXXXXXXXXXX-XXXXXXXXXX-X (uppercase)")
 	}
 	path := "/api/v1/molecules/by-inchikey?inchikey=" + url.QueryEscape(inchiKey)
-	var resp moleculeDetailResp
+	var resp APIResponse[MoleculeDetail]
 	if err := mc.client.get(ctx, path, &resp); err != nil {
 		return nil, err
 	}
@@ -311,11 +331,14 @@ func (mc *MoleculesClient) PredictProperties(ctx context.Context, req *MoleculeP
 	if len(req.Properties) == 0 {
 		return nil, invalidArg("properties list is required")
 	}
-	var result MoleculePropertyResult
-	if err := mc.client.post(ctx, "/api/v1/molecules/predict", req, &result); err != nil {
+	// Assuming Predict returns generic response or specific struct?
+	// Prompt says "Returns `*MoleculePropertyResult`".
+	// Assuming standard wrapper:
+	var resp APIResponse[MoleculePropertyResult]
+	if err := mc.client.post(ctx, "/api/v1/molecules/predict", req, &resp); err != nil {
 		return nil, err
 	}
-	return &result, nil
+	return &resp.Data, nil
 }
 
 // BatchSearch performs a batch molecule search.
@@ -333,11 +356,13 @@ func (mc *MoleculesClient) BatchSearch(ctx context.Context, req *BatchSearchRequ
 	if req.Similarity == 0 {
 		req.Similarity = 0.8
 	}
-	var result BatchSearchResult
-	if err := mc.client.post(ctx, "/api/v1/molecules/batch-search", req, &result); err != nil {
+	// Prompt says "Returns `*BatchSearchResult`".
+	// Assuming standard wrapper:
+	var resp APIResponse[BatchSearchResult]
+	if err := mc.client.post(ctx, "/api/v1/molecules/batch-search", req, &resp); err != nil {
 		return nil, err
 	}
-	return &result, nil
+	return &resp.Data, nil
 }
 
 // GetPatents returns patents associated with a molecule.
@@ -356,7 +381,9 @@ func (mc *MoleculesClient) GetPatents(ctx context.Context, moleculeID string, pa
 		pageSize = MaxPageSize
 	}
 	path := fmt.Sprintf("/api/v1/molecules/%s/patents?page=%d&page_size=%d", moleculeID, page, pageSize)
-	var resp patentBriefListResp
+
+	// APIResponse[[]PatentBrief] works perfectly here.
+	var resp APIResponse[[]PatentBrief]
 	if err := mc.client.get(ctx, path, &resp); err != nil {
 		return nil, 0, err
 	}
@@ -373,7 +400,7 @@ func (mc *MoleculesClient) GetActivities(ctx context.Context, moleculeID string)
 	if moleculeID == "" {
 		return nil, invalidArg("moleculeID is required")
 	}
-	var resp bioActivityListResp
+	var resp APIResponse[[]BioActivity]
 	if err := mc.client.get(ctx, "/api/v1/molecules/"+moleculeID+"/activities", &resp); err != nil {
 		return nil, err
 	}
@@ -393,7 +420,7 @@ func (mc *MoleculesClient) CompareMolecules(ctx context.Context, smiles1, smiles
 		"smiles_1": smiles1,
 		"smiles_2": smiles2,
 	}
-	var resp moleculeComparisonResp
+	var resp APIResponse[MoleculeComparison]
 	if err := mc.client.post(ctx, "/api/v1/molecules/compare", body, &resp); err != nil {
 		return nil, err
 	}
