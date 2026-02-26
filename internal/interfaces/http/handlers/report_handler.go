@@ -234,43 +234,43 @@ func (h *ReportHandler) GenerateInfringementReport(w http.ResponseWriter, r *htt
 // GeneratePortfolioReport handles POST /api/v1/reports/portfolio.
 func (h *ReportHandler) GeneratePortfolioReport(w http.ResponseWriter, r *http.Request) {
 	var req GeneratePortfolioReportRequest
-	if err := decodeJSON(r, &req); err != nil {
-		h.logger.Error("failed to decode portfolio report request", "error", err)
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid request body")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("failed to decode portfolio report request", logging.Err(err))
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid request body")
 		return
 	}
 
 	if req.PortfolioID == "" {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "portfolio_id is required")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "portfolio_id is required")
 		return
 	}
 	if req.ReportType == "" {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "report_type is required")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "report_type is required")
 		return
 	}
 	if req.Format == "" {
 		req.Format = "pdf"
 	}
 	if !isValidFormat(req.Format) {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "format must be one of: pdf, docx, xlsx")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "format must be one of: pdf, docx, xlsx")
 		return
 	}
 
+	// Map HTTP request to service request
 	svcReq := &reporting.PortfolioReportRequest{
-		PortfolioID:   req.PortfolioID,
-		ReportType:    req.ReportType,
-		Format:        req.Format,
-		IncludeCharts: req.IncludeCharts,
+		PortfolioID:     req.PortfolioID,
+		IncludeSections: mapReportSections(req.ReportType),
+		OutputFormat:    mapOutputFormat(req.Format),
 	}
 
-	result, err := h.portfolioSvc.Generate(r.Context(), svcReq)
+	result, err := h.portfolioSvc.GenerateFullReport(r.Context(), svcReq)
 	if err != nil {
-		h.logger.Error("failed to initiate portfolio report generation", "error", err)
-		writeAppError(w, err)
+		h.logger.Error("failed to initiate portfolio report generation", logging.Err(err))
+		writeReportAppError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusAccepted, map[string]interface{}{
+	writeReportJSON(w, http.StatusAccepted, map[string]interface{}{
 		"report_id": result.ReportID,
 		"status":    result.Status,
 		"message":   "Portfolio report generation initiated",
@@ -281,36 +281,30 @@ func (h *ReportHandler) GeneratePortfolioReport(w http.ResponseWriter, r *http.R
 func (h *ReportHandler) GetReportStatus(w http.ResponseWriter, r *http.Request) {
 	reportID := r.PathValue("report_id")
 	if reportID == "" {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "report_id is required")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "report_id is required")
 		return
 	}
 
 	status, err := h.ftoSvc.GetStatus(r.Context(), reportID)
 	if err != nil {
-		h.logger.Error("failed to get report status", "error", err, "report_id", reportID)
-		writeAppError(w, err)
+		h.logger.Error("failed to get report status", logging.Err(err), logging.String("report_id", reportID))
+		writeReportAppError(w, err)
 		return
 	}
 
 	resp := ReportStatusResponse{
-		ReportID:   status.ReportID,
-		Status:     status.Status,
-		Progress:   status.Progress,
-		ReportType: status.ReportType,
-		Format:     status.Format,
-		CreatedAt:  status.CreatedAt.Format(time.RFC3339),
+		ReportID: status.ReportID,
+		Status:   string(status.Status),
+		Progress: float64(status.ProgressPct),
 	}
-	if !status.CompletedAt.IsZero() {
-		resp.CompletedAt = status.CompletedAt.Format(time.RFC3339)
+	if status.Message != "" {
+		resp.Error = status.Message
 	}
-	if status.Error != "" {
-		resp.Error = status.Error
-	}
-	if status.Status == "completed" {
+	if string(status.Status) == string(reporting.StatusCompleted) {
 		resp.DownloadURL = fmt.Sprintf("/api/v1/reports/%s/download", reportID)
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	writeReportJSON(w, http.StatusOK, resp)
 }
 
 // DownloadReport handles GET /api/v1/reports/{report_id}/download.
@@ -318,57 +312,50 @@ func (h *ReportHandler) GetReportStatus(w http.ResponseWriter, r *http.Request) 
 func (h *ReportHandler) DownloadReport(w http.ResponseWriter, r *http.Request) {
 	reportID := r.PathValue("report_id")
 	if reportID == "" {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "report_id is required")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "report_id is required")
 		return
 	}
 
 	// Check report status first
 	status, err := h.ftoSvc.GetStatus(r.Context(), reportID)
 	if err != nil {
-		h.logger.Error("failed to get report status for download", "error", err, "report_id", reportID)
-		writeAppError(w, err)
+		h.logger.Error("failed to get report status for download", logging.Err(err), logging.String("report_id", reportID))
+		writeReportAppError(w, err)
 		return
 	}
 
-	if status.Status != "completed" {
-		writeError(w, http.StatusConflict, errors.ErrCodeConflict,
+	if status.Status != reporting.StatusCompleted {
+		writeReportError(w, http.StatusConflict, errors.ErrCodeConflict,
 			fmt.Sprintf("report is not ready for download, current status: %s", status.Status))
 		return
 	}
 
-	// Get report file content
-	file, err := h.ftoSvc.Download(r.Context(), reportID)
+	// Get report file content - use PDF format by default
+	formatParam := r.URL.Query().Get("format")
+	reportFormat := reporting.FormatPDF
+	if formatParam == "docx" {
+		reportFormat = reporting.FormatDOCX
+	}
+
+	reader, err := h.ftoSvc.GetReport(r.Context(), reportID, reportFormat)
 	if err != nil {
-		h.logger.Error("failed to download report", "error", err, "report_id", reportID)
-		writeAppError(w, err)
+		h.logger.Error("failed to download report", logging.Err(err), logging.String("report_id", reportID))
+		writeReportAppError(w, err)
 		return
 	}
-	defer file.Content.Close()
+	defer reader.Close()
 
 	// Set response headers
-	contentType := formatToContentType(file.Format)
+	contentType := formatToContentType(string(reportFormat))
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition",
-		fmt.Sprintf("attachment; filename=\"%s\"", file.Filename))
-	if file.Size > 0 {
-		w.Header().Set("Content-Length", strconv.FormatInt(file.Size, 10))
-	}
+		fmt.Sprintf("attachment; filename=\"report_%s.%s\"", reportID, strings.ToLower(string(reportFormat))))
 
 	w.WriteHeader(http.StatusOK)
 
 	// Stream file content
-	buf := make([]byte, 32*1024)
-	for {
-		n, readErr := file.Content.Read(buf)
-		if n > 0 {
-			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
-				h.logger.Error("failed to write report content", "error", writeErr, "report_id", reportID)
-				return
-			}
-		}
-		if readErr != nil {
-			break
-		}
+	if _, err := io.Copy(w, reader); err != nil {
+		h.logger.Error("failed to write report content", logging.Err(err), logging.String("report_id", reportID))
 	}
 }
 
@@ -382,58 +369,67 @@ func (h *ReportHandler) ListReports(w http.ResponseWriter, r *http.Request) {
 		pageSize = 20
 	}
 	if pageSize > 100 {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "page_size must be between 1 and 100")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "page_size must be between 1 and 100")
 		return
 	}
 
-	filter := &reporting.ReportListFilter{
-		ReportType: query.Get("report_type"),
-		Status:     query.Get("status"),
-		PageToken:  query.Get("page_token"),
-		PageSize:   pageSize,
+	page, _ := strconv.Atoi(query.Get("page"))
+	if page <= 0 {
+		page = 1
+	}
+
+	// Build FTO report filter
+	filter := &reporting.FTOReportFilter{}
+
+	if statusStr := query.Get("status"); statusStr != "" {
+		filter.Status = []reporting.ReportStatus{reporting.ReportStatus(statusStr)}
 	}
 
 	if from := query.Get("created_from"); from != "" {
 		t, err := time.Parse(time.RFC3339, from)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid created_from format, use RFC3339")
+			writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid created_from format, use RFC3339")
 			return
 		}
-		filter.CreatedFrom = &t
+		filter.DateFrom = &t
 	}
 	if to := query.Get("created_to"); to != "" {
 		t, err := time.Parse(time.RFC3339, to)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid created_to format, use RFC3339")
+			writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid created_to format, use RFC3339")
 			return
 		}
-		filter.CreatedTo = &t
+		filter.DateTo = &t
 	}
 
-	result, err := h.ftoSvc.List(r.Context(), filter)
+	pagination := &pkghttp.Pagination{
+		Page:     page,
+		PageSize: pageSize,
+	}
+
+	result, err := h.ftoSvc.ListReports(r.Context(), filter, pagination)
 	if err != nil {
-		h.logger.Error("failed to list reports", "error", err)
-		writeAppError(w, err)
+		h.logger.Error("failed to list reports", logging.Err(err))
+		writeReportAppError(w, err)
 		return
 	}
 
-	items := make([]ReportListItem, len(result.Reports))
-	for i, rpt := range result.Reports {
+	items := make([]ReportListItem, len(result.Items))
+	for i, rpt := range result.Items {
 		items[i] = ReportListItem{
 			ReportID:   rpt.ReportID,
-			ReportType: rpt.ReportType,
-			Status:     rpt.Status,
-			Format:     rpt.Format,
+			ReportType: "fto",
+			Status:     string(rpt.Status),
 			Title:      rpt.Title,
 			CreatedAt:  rpt.CreatedAt.Format(time.RFC3339),
-			FileSize:   rpt.FileSize,
 		}
 	}
 
-	writeJSON(w, http.StatusOK, pkghttp.PaginatedResponse{
-		Items:         items,
-		NextPageToken: result.NextPageToken,
-		TotalCount:    result.TotalCount,
+	writeReportJSON(w, http.StatusOK, pkghttp.PageResponse[ReportListItem]{
+		Items:    items,
+		Total:    int64(result.Pagination.Total),
+		Page:     result.Pagination.Page,
+		PageSize: result.Pagination.PageSize,
 	})
 }
 
@@ -441,17 +437,17 @@ func (h *ReportHandler) ListReports(w http.ResponseWriter, r *http.Request) {
 func (h *ReportHandler) DeleteReport(w http.ResponseWriter, r *http.Request) {
 	reportID := r.PathValue("report_id")
 	if reportID == "" {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "report_id is required")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "report_id is required")
 		return
 	}
 
-	if err := h.ftoSvc.Delete(r.Context(), reportID); err != nil {
-		h.logger.Error("failed to delete report", "error", err, "report_id", reportID)
-		writeAppError(w, err)
+	if err := h.ftoSvc.DeleteReport(r.Context(), reportID); err != nil {
+		h.logger.Error("failed to delete report", logging.Err(err), logging.String("report_id", reportID))
+		writeReportAppError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeReportJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "report deleted successfully",
 	})
 }
@@ -479,6 +475,111 @@ func formatToContentType(format string) string {
 		return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 	default:
 		return "application/octet-stream"
+	}
+}
+
+// mapDepth maps HTTP request depth to service AnalysisDepth
+func mapDepth(depth int) reporting.AnalysisDepth {
+	switch {
+	case depth <= 1:
+		return reporting.DepthQuick
+	case depth == 2:
+		return reporting.DepthStandard
+	default:
+		return reporting.DepthComprehensive
+	}
+}
+
+// mapLanguage maps HTTP request languages to service ReportLanguage
+func mapLanguage(languages []string) reporting.ReportLanguage {
+	if len(languages) > 0 {
+		switch strings.ToUpper(languages[0]) {
+		case "ZH", "CN", "CHINESE":
+			return reporting.LangZH
+		case "EN", "ENGLISH":
+			return reporting.LangEN
+		}
+	}
+	return reporting.LangEN
+}
+
+// mapAnalysisMode maps HTTP request analysis depth to service InfringementAnalysisMode
+func mapAnalysisMode(depth string) reporting.InfringementAnalysisMode {
+	switch strings.ToLower(depth) {
+	case "literal":
+		return reporting.ModeLiteral
+	case "equivalents":
+		return reporting.ModeEquivalents
+	default:
+		return reporting.ModeComprehensive
+	}
+}
+
+// mapReportSections maps report type to sections
+func mapReportSections(reportType string) []reporting.ReportSection {
+	// Return all sections for now - can be customized based on reportType
+	return []reporting.ReportSection{
+		reporting.SectionOverview,
+		reporting.SectionValueDistribution,
+		reporting.SectionTechCoverage,
+		reporting.SectionCompetitiveComparison,
+		reporting.SectionLayoutRecommendation,
+	}
+}
+
+// mapOutputFormat maps HTTP format string to service ExportFormat
+func mapOutputFormat(format string) reporting.ExportFormat {
+	switch strings.ToLower(format) {
+	case "pdf":
+		return reporting.FormatPortfolioPDF
+	case "docx":
+		return reporting.FormatPortfolioDOCX
+	case "pptx":
+		return reporting.FormatPortfolioPPTX
+	default:
+		return reporting.FormatPortfolioPDF
+	}
+}
+
+// writeReportJSON writes a JSON response with the given status code.
+func writeReportJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	if data != nil {
+		_ = json.NewEncoder(w).Encode(data)
+	}
+}
+
+// ReportErrorResponse is the standard error response body for report handler.
+type ReportErrorResponse struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// writeReportError writes a structured error response.
+func writeReportError(w http.ResponseWriter, statusCode int, code errors.ErrorCode, message string) {
+	resp := ReportErrorResponse{
+		Code:    string(code),
+		Message: message,
+	}
+	writeReportJSON(w, statusCode, resp)
+}
+
+// writeReportAppError maps application-level errors to HTTP status codes.
+func writeReportAppError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.IsNotFound(err):
+		writeReportError(w, http.StatusNotFound, errors.ErrCodeNotFound, err.Error())
+	case errors.IsValidation(err):
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, err.Error())
+	case errors.IsConflict(err):
+		writeReportError(w, http.StatusConflict, errors.ErrCodeConflict, err.Error())
+	case errors.IsUnauthorized(err):
+		writeReportError(w, http.StatusUnauthorized, errors.ErrCodeUnauthorized, err.Error())
+	case errors.IsForbidden(err):
+		writeReportError(w, http.StatusForbidden, errors.ErrCodeForbidden, err.Error())
+	default:
+		writeReportError(w, http.StatusInternalServerError, errors.ErrCodeInternal, "internal server error")
 	}
 }
 
