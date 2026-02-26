@@ -110,9 +110,9 @@ func runReportGenerate(
 	logger logging.Logger,
 ) error {
 	// Validate report type
-	validTypes := []string{"fto", "infringement", "portfolio", "annual"}
+	validTypes := []string{"fto", "infringement", "portfolio"}
 	if !contains(validTypes, strings.ToLower(reportType)) {
-		return errors.Errorf("invalid report type: %s (must be fto|infringement|portfolio|annual)", reportType)
+		return errors.Errorf("invalid report type: %s (must be fto|infringement|portfolio)", reportType)
 	}
 
 	// Validate output format
@@ -129,122 +129,116 @@ func runReportGenerate(
 
 	// Ensure output directory exists
 	if err := ensureOutputDir(reportOutputDir); err != nil {
-		return errors.Wrap(err, "failed to create output directory")
+		return errors.WrapMsg(err, "failed to create output directory")
 	}
 
 	logger.Info("Starting report generation",
-		"type", reportType,
-		"target", reportTarget,
-		"format", reportFormat,
-		"language", reportLanguage)
+		logging.String("type", reportType),
+		logging.String("target", reportTarget),
+		logging.String("format", reportFormat),
+		logging.String("language", reportLanguage))
 
 	startTime := time.Now()
 
-	// Build base request
-	baseReq := &reporting.BaseReportRequest{
-		Target:          reportTarget,
-		Format:          strings.ToLower(reportFormat),
-		Language:        strings.ToLower(reportLanguage),
-		IncludeAppendix: reportIncludeAppendix,
-		CustomTemplate:  reportTemplate,
-		Context:         ctx,
-	}
-
 	// Dispatch to appropriate service based on report type
-	var result *reporting.ReportResult
+	var reportID string
 	var err error
 
 	switch strings.ToLower(reportType) {
 	case "fto":
-		req := &reporting.FTOReportRequest{
-			BaseReportRequest: *baseReq,
+		lang := reporting.LangEN
+		if strings.ToLower(reportLanguage) == "zh" {
+			lang = reporting.LangZH
 		}
-		result, err = ftoReportService.Generate(ctx, req)
+		req := &reporting.FTOReportRequest{
+			TargetMolecules: []reporting.MoleculeInput{
+				{Format: "smiles", Value: reportTarget},
+			},
+			Jurisdictions: []string{"CN", "US", "EP"},
+			AnalysisDepth: reporting.DepthStandard,
+			Language:      lang,
+		}
+		result, genErr := ftoReportService.Generate(ctx, req)
+		if genErr != nil {
+			err = genErr
+		} else {
+			reportID = result.ReportID
+		}
 
 	case "infringement":
 		req := &reporting.InfringementReportRequest{
-			BaseReportRequest: *baseReq,
+			OwnedPatentNumbers: []string{reportTarget},
+			AnalysisMode:       reporting.ModeComprehensive,
 		}
-		result, err = infringementReportService.Generate(ctx, req)
+		result, genErr := infringementReportService.Generate(ctx, req)
+		if genErr != nil {
+			err = genErr
+		} else {
+			reportID = result.ReportID
+		}
 
 	case "portfolio":
 		req := &reporting.PortfolioReportRequest{
-			BaseReportRequest: *baseReq,
+			PortfolioID: reportTarget,
+			OutputFormat: reporting.FormatPortfolioPDF,
 		}
-		result, err = portfolioReportService.Generate(ctx, req)
-
-	case "annual":
-		req := &reporting.AnnualReportRequest{
-			BaseReportRequest: *baseReq,
-			Year:              time.Now().Year(),
+		result, genErr := portfolioReportService.GenerateFullReport(ctx, req)
+		if genErr != nil {
+			err = genErr
+		} else {
+			reportID = result.ReportID
 		}
-		// For annual reports, we can reuse portfolio service with year context
-		result, err = portfolioReportService.GenerateAnnual(ctx, req)
 
 	default:
 		return errors.Errorf("unhandled report type: %s", reportType)
 	}
 
 	if err != nil {
-		logger.Error("Report generation failed", "error", err)
-		return errors.Wrap(err, "report generation failed")
-	}
-
-	// Check if async mode was triggered
-	if result.Async {
-		fmt.Printf("\n📊 Large report detected - processing asynchronously\n")
-		fmt.Printf("Job ID: %s\n", result.JobID)
-		fmt.Printf("Estimated pages: %d\n", result.EstimatedPages)
-		fmt.Printf("Estimated completion: %s\n\n", result.EstimatedCompletion.Format("2006-01-02 15:04:05"))
-		fmt.Printf("Check status with: keyip report status --job-id %s\n", result.JobID)
-
-		logger.Info("Report queued for async generation",
-			"job_id", result.JobID,
-			"estimated_pages", result.EstimatedPages)
-
-		return nil
-	}
-
-	// Resolve output path
-	outputPath := resolveOutputPath(reportOutputDir, reportType, reportFormat)
-
-	// Write report content to file
-	if err := writeReportToFile(result.Content, outputPath); err != nil {
-		return errors.Wrap(err, "failed to write report to file")
+		logger.Error("Report generation failed", logging.Err(err))
+		return errors.WrapMsg(err, "report generation failed")
 	}
 
 	generationTime := time.Since(startTime)
 
 	// Print summary
-	fmt.Printf("\n✓ Report generated successfully\n\n")
-	fmt.Printf("Output: %s\n", outputPath)
-	printReportSummary(result)
+	fmt.Printf("\n✓ Report generation initiated\n\n")
+	fmt.Printf("Report ID: %s\n", reportID)
+	fmt.Printf("Type: %s\n", reportType)
+	fmt.Printf("Target: %s\n", reportTarget)
 	fmt.Printf("Generation time: %.2fs\n", generationTime.Seconds())
+	fmt.Printf("\nCheck status with: keyip report status --job-id %s\n", reportID)
 
-	logger.Info("Report generation completed",
-		"type", reportType,
-		"output_path", outputPath,
-		"pages", result.PageCount,
-		"generation_time_seconds", generationTime.Seconds())
+	logger.Info("Report generation initiated",
+		logging.String("type", reportType),
+		logging.String("report_id", reportID),
+		logging.Float64("generation_time_seconds", generationTime.Seconds()))
 
 	return nil
 }
 
 func runReportListTemplates(ctx context.Context, templateService reporting.TemplateService, logger logging.Logger) error {
-	logger.Info("Listing report templates", "filter_type", reportType)
+	logger.Info("Listing report templates", logging.String("filter_type", reportType))
 
-	req := &reporting.ListTemplatesRequest{
-		Type:    reportType,
-		Context: ctx,
+	var typeFilter *string
+	if reportType != "" {
+		typeFilter = &reportType
 	}
 
-	templates, err := templateService.ListTemplates(ctx, req)
+	opts := &reporting.ListTemplateOptions{
+		Type: typeFilter,
+		Pagination: common.Pagination{
+			Page:     1,
+			PageSize: 100,
+		},
+	}
+
+	result, err := templateService.ListTemplates(ctx, opts)
 	if err != nil {
-		logger.Error("Failed to list templates", "error", err)
-		return errors.Wrap(err, "failed to list templates")
+		logger.Error("Failed to list templates", logging.Err(err))
+		return errors.WrapMsg(err, "failed to list templates")
 	}
 
-	if len(templates) == 0 {
+	if len(result.Items) == 0 {
 		fmt.Println("\nNo templates found.")
 		return nil
 	}
@@ -252,67 +246,60 @@ func runReportListTemplates(ctx context.Context, templateService reporting.Templ
 	fmt.Printf("\n=== Available Report Templates ===\n\n")
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"ID", "Name", "Type", "Language", "Version", "Description"})
-	table.SetBorder(true)
+	table.Header([]string{"ID", "Name", "Type", "Format", "Version"})
 
-	for _, tmpl := range templates {
+	for _, tmpl := range result.Items {
 		table.Append([]string{
 			tmpl.ID,
 			tmpl.Name,
 			tmpl.Type,
-			tmpl.Language,
+			string(tmpl.Format),
 			tmpl.Version,
-			truncateString(tmpl.Description, 50),
 		})
 	}
 
 	table.Render()
 
-	fmt.Printf("\nTotal templates: %d\n", len(templates))
+	fmt.Printf("\nTotal templates: %d\n", len(result.Items))
 
-	logger.Info("Templates listed", "count", len(templates))
+	logger.Info("Templates listed", logging.Int("count", len(result.Items)))
 
 	return nil
 }
 
 func runReportStatus(ctx context.Context, ftoReportService reporting.FTOReportService, logger logging.Logger) error {
-	logger.Info("Checking report status", "job_id", reportJobID)
+	logger.Info("Checking report status", logging.String("job_id", reportJobID))
 
-	status, err := ftoReportService.GetJobStatus(ctx, reportJobID)
+	status, err := ftoReportService.GetStatus(ctx, reportJobID)
 	if err != nil {
-		logger.Error("Failed to get job status", "error", err)
-		return errors.Wrap(err, "failed to get job status")
+		logger.Error("Failed to get job status", logging.Err(err))
+		return errors.WrapMsg(err, "failed to get job status")
 	}
 
 	fmt.Printf("\n=== Report Generation Status ===\n\n")
-	fmt.Printf("Job ID: %s\n", status.JobID)
-	fmt.Printf("Status: %s\n", colorizeStatus(status.Status))
-	fmt.Printf("Progress: %d%%\n", status.Progress)
+	fmt.Printf("Report ID: %s\n", status.ReportID)
+	fmt.Printf("Status: %s\n", colorizeStatus(string(status.Status)))
+	fmt.Printf("Progress: %d%%\n", status.ProgressPct)
 
-	if status.Status == "in_progress" {
-		fmt.Printf("Estimated completion: %s\n", status.EstimatedCompletion.Format("2006-01-02 15:04:05"))
-		remainingTime := time.Until(status.EstimatedCompletion)
-		if remainingTime > 0 {
-			fmt.Printf("Time remaining: %s\n", formatDuration(remainingTime))
+	if status.Status == reporting.StatusProcessing {
+		fmt.Printf("Processing...\n")
+	}
+
+	if status.Status == reporting.StatusCompleted {
+		fmt.Printf("\n✓ Report ready for download\n")
+	}
+
+	if status.Status == reporting.StatusFailed {
+		fmt.Printf("\n✗ Report generation failed\n")
+		if status.Message != "" {
+			fmt.Printf("Message: %s\n", status.Message)
 		}
 	}
 
-	if status.Status == "completed" {
-		fmt.Printf("\n✓ Report ready for download\n")
-		fmt.Printf("Output: %s\n", status.OutputPath)
-		fmt.Printf("Pages: %d\n", status.PageCount)
-		fmt.Printf("Generated at: %s\n", status.CompletedAt.Format("2006-01-02 15:04:05"))
-	}
-
-	if status.Status == "failed" {
-		fmt.Printf("\n✗ Report generation failed\n")
-		fmt.Printf("Error: %s\n", status.ErrorMessage)
-	}
-
 	logger.Info("Status retrieved",
-		"job_id", reportJobID,
-		"status", status.Status,
-		"progress", status.Progress)
+		logging.String("report_id", status.ReportID),
+		logging.String("status", string(status.Status)),
+		logging.Int("progress", status.ProgressPct))
 
 	return nil
 }
@@ -361,16 +348,13 @@ func writeReportToFile(content []byte, path string) error {
 }
 
 func printReportSummary(result *reporting.ReportResult) {
-	fmt.Printf("Pages: %d\n", result.PageCount)
-	fmt.Printf("Sections: %d\n", result.SectionCount)
-	fmt.Printf("Data sources: %d\n", result.DataSourceCount)
-
-	if len(result.Warnings) > 0 {
-		fmt.Printf("\n⚠ Warnings (%d):\n", len(result.Warnings))
-		for _, warning := range result.Warnings {
-			fmt.Printf("  - %s\n", warning)
-		}
-	}
+	fmt.Printf("Report ID: %s\n", result.ReportID)
+	fmt.Printf("Report Type: %s\n", result.ReportType)
+	fmt.Printf("Title: %s\n", result.Title)
+	fmt.Printf("Format: %s\n", result.Format)
+	fmt.Printf("Status: %s\n", result.Status)
+	fmt.Printf("Size: %d bytes\n", result.Size)
+	fmt.Printf("Generated At: %s\n", result.GeneratedAt.Format(time.RFC3339))
 }
 
 func colorizeStatus(status string) string {

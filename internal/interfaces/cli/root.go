@@ -95,12 +95,14 @@ func NewRootCommand() *cobra.Command {
 	pf.DurationVar(&opts.Timeout, "timeout", 30*time.Second, "global operation timeout")
 	pf.StringVar(&opts.ServerAddr, "server", "", "API server address (default: http://localhost:8080)")
 
-	// Mount subcommands.
+	// Note: Subcommands are registered via RegisterCommands() after dependency injection
+	// in cmd/keyip/main.go. The following are placeholder commands for when dependencies
+	// are not available (e.g., running keyip --help without a running server).
 	cmd.AddCommand(
-		NewSearchCommand(),
-		NewAssessCommand(),
-		NewLifecycleCommand(),
-		NewReportCommand(),
+		createPlaceholderCommand("search", "Search molecules and patents"),
+		createPlaceholderCommand("assess", "Assess patent portfolio value"),
+		createPlaceholderCommand("lifecycle", "Manage patent lifecycle"),
+		createPlaceholderCommand("report", "Generate IP reports"),
 	)
 
 	return cmd
@@ -355,7 +357,19 @@ func padRight(s string, width int) string {
 	if len(s) >= width {
 		return s
 	}
-	return s + strings.Repeat(" ", width-s)
+	return s + strings.Repeat(" ", width-len(s))
+}
+
+// createPlaceholderCommand creates a placeholder command for when dependencies are not available.
+func createPlaceholderCommand(name, description string) *cobra.Command {
+	return &cobra.Command{
+		Use:   name,
+		Short: description,
+		Long:  description + "\n\nNote: This command requires service dependencies. Run with proper configuration.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return errors.NewMsg("command requires service dependencies; ensure configuration is complete")
+		},
+	}
 }
 
 //Personal.AI order the ending
