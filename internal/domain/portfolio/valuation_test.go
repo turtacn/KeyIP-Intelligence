@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -24,6 +25,10 @@ func (m *MockPortfolioRepository) FindByID(ctx context.Context, id string) (*Por
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*Portfolio), args.Error(1)
+}
+
+func (m *MockPortfolioRepository) GetByID(ctx context.Context, id uuid.UUID) (*Portfolio, error) {
+	return m.FindByID(ctx, id.String())
 }
 
 func (m *MockPortfolioRepository) FindByOwnerID(ctx context.Context, ownerID string, opts ...QueryOption) ([]*Portfolio, error) {
@@ -200,5 +205,3 @@ func containsRec(recs []ValuationRecommendation, action string) bool {
 	}
 	return false
 }
-
-//Personal.AI order the ending

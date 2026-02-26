@@ -77,6 +77,10 @@ type LifecycleService interface {
 	ProcessDailyMaintenance(ctx context.Context) (*MaintenanceReport, error)
 	GetCostAnalysis(ctx context.Context, portfolioID string, forecastYears int) (*CostAnalysis, error)
 	GetTimelineView(ctx context.Context, patentID string) (*TimelineView, error)
+
+	// Methods required by Application layer (delegated)
+	CalculateAnnuityFee(ctx context.Context, patentID string, jurisdiction string, asOf time.Time) (*AnnuityCalcResult, error)
+	GetAnnuitySchedule(ctx context.Context, patentID string, jurisdiction string, start, end time.Time) ([]ScheduleEntry, error)
 }
 
 type lifecycleServiceImpl struct {
@@ -117,7 +121,7 @@ func (s *lifecycleServiceImpl) InitializeLifecycle(ctx context.Context, patentID
 		lr.ExpirationDate = &exp
 	}
 
-	if err := s.repo.Save(ctx, lr); err != nil {
+	if err := s.repo.SaveLifecycle(ctx, lr); err != nil {
 		return nil, err
 	}
 
@@ -125,7 +129,7 @@ func (s *lifecycleServiceImpl) InitializeLifecycle(ctx context.Context, patentID
 }
 
 func (s *lifecycleServiceImpl) AdvancePhase(ctx context.Context, patentID string, targetPhase LifecyclePhase, reason string) error {
-	lr, err := s.repo.FindByPatentID(ctx, patentID)
+	lr, err := s.repo.GetLifecycleByPatentID(ctx, patentID)
 	if err != nil {
 		return err
 	}
@@ -147,11 +151,11 @@ func (s *lifecycleServiceImpl) AdvancePhase(ctx context.Context, patentID string
 		}
 	}
 
-	return s.repo.Save(ctx, lr)
+	return s.repo.SaveLifecycle(ctx, lr)
 }
 
 func (s *lifecycleServiceImpl) RecordEvent(ctx context.Context, patentID, eventType, description string, metadata map[string]string) error {
-	lr, err := s.repo.FindByPatentID(ctx, patentID)
+	lr, err := s.repo.GetLifecycleByPatentID(ctx, patentID)
 	if err != nil {
 		return err
 	}
@@ -160,11 +164,11 @@ func (s *lifecycleServiceImpl) RecordEvent(ctx context.Context, patentID, eventT
 	}
 
 	lr.AddEvent(eventType, description, "user", metadata)
-	return s.repo.Save(ctx, lr)
+	return s.repo.SaveLifecycle(ctx, lr)
 }
 
 func (s *lifecycleServiceImpl) GetLifecycleStatus(ctx context.Context, patentID string) (*LifecycleStatus, error) {
-	lr, err := s.repo.FindByPatentID(ctx, patentID)
+	lr, err := s.repo.GetLifecycleByPatentID(ctx, patentID)
 	if err != nil {
 		return nil, err
 	}
@@ -219,14 +223,14 @@ func (s *lifecycleServiceImpl) ProcessDailyMaintenance(ctx context.Context) (*Ma
 	}
 
 	// 4. Auto-expire patents
-	expiring, err := s.repo.FindExpiring(ctx, 0)
+	expiring, err := s.repo.GetExpiringLifecycles(ctx, 0)
 	if err != nil {
-		report.Errors = append(report.Errors, fmt.Sprintf("FindExpiring: %v", err))
+		report.Errors = append(report.Errors, fmt.Sprintf("GetExpiringLifecycles: %v", err))
 	} else {
 		for _, lr := range expiring {
 			if lr.CurrentPhase != PhaseExpired {
 				lr.TransitionTo(PhaseExpired, "Term expired", "system")
-				s.repo.Save(ctx, lr)
+				s.repo.SaveLifecycle(ctx, lr)
 				report.PhasesAutoAdvanced++
 			}
 		}
@@ -260,7 +264,7 @@ func (s *lifecycleServiceImpl) GetCostAnalysis(ctx context.Context, portfolioID 
 }
 
 func (s *lifecycleServiceImpl) GetTimelineView(ctx context.Context, patentID string) (*TimelineView, error) {
-	lr, err := s.repo.FindByPatentID(ctx, patentID)
+	lr, err := s.repo.GetLifecycleByPatentID(ctx, patentID)
 	if err != nil {
 		return nil, err
 	}
@@ -278,6 +282,73 @@ func (s *lifecycleServiceImpl) GetTimelineView(ctx context.Context, patentID str
 	}
 
 	return view, nil
+}
+
+func (s *lifecycleServiceImpl) CalculateAnnuityFee(ctx context.Context, patentID string, jurisdiction string, asOf time.Time) (*AnnuityCalcResult, error) {
+	// Delegate to AnnuityService logic
+	// But CalculateAnnuityFee in AnnuityService takes (ctx, jurisdiction, yearNumber).
+	// We need to calculate yearNumber from patentID (fetching filing date).
+	lr, err := s.repo.GetLifecycleByPatentID(ctx, patentID)
+	if err != nil {
+		return nil, err
+	}
+	if lr == nil {
+		return nil, apperrors.NewNotFound("lifecycle not found")
+	}
+
+	// Calculate year number
+	// year = ceiling((asOf - FilingDate) / 365)?
+	// Or year number at asOf.
+	// This logic duplicates GenerateSchedule?
+	// Application layer expects this helper.
+
+	// Simple calculation:
+	years := asOf.Year() - lr.FilingDate.Year() + 1
+	// Adjust for anniversary
+	if asOf.Before(time.Date(asOf.Year(), lr.FilingDate.Month(), lr.FilingDate.Day(), 0,0,0,0, time.UTC)) {
+		years--
+	}
+	yearNum := years + 1 // Next payment year?
+	// Application logic calls CalculateAnnuity.
+	// Let's assume yearNum is correct.
+
+	fee, err := s.annuitySvc.CalculateAnnuityFee(ctx, jurisdiction, yearNum)
+	if err != nil {
+		return nil, err
+	}
+
+	dueDate := CalculateAnnuityDueDate(lr.FilingDate, yearNum)
+	grace := CalculateGraceDeadline(dueDate, 6) // Hardcoded or fetch rules
+
+	return &AnnuityCalcResult{
+		Fee: fee.ToFloat64(),
+		YearNumber: yearNum,
+		DueDate: dueDate,
+		GracePeriodEnd: grace,
+		Status: "pending",
+	}, nil
+}
+
+func (s *lifecycleServiceImpl) GetAnnuitySchedule(ctx context.Context, patentID string, jurisdiction string, start, end time.Time) ([]ScheduleEntry, error) {
+	lr, err := s.repo.GetLifecycleByPatentID(ctx, patentID)
+	if err != nil { return nil, err }
+
+	sched, err := s.annuitySvc.GenerateSchedule(ctx, patentID, jurisdiction, lr.FilingDate, 20)
+	if err != nil { return nil, err }
+
+	var res []ScheduleEntry
+	for _, rec := range sched.Records {
+		if (rec.DueDate.After(start) || rec.DueDate.Equal(start)) && (rec.DueDate.Before(end) || rec.DueDate.Equal(end)) {
+			res = append(res, ScheduleEntry{
+				YearNumber: rec.YearNumber,
+				Fee: rec.Amount.ToFloat64(),
+				DueDate: rec.DueDate,
+				GracePeriodEnd: rec.GraceDeadline,
+				Status: string(rec.Status),
+			})
+		}
+	}
+	return res, nil
 }
 
 //Personal.AI order the ending

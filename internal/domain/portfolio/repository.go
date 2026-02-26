@@ -2,12 +2,15 @@ package portfolio
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 // PortfolioRepository defines the persistence operations for portfolios.
 type PortfolioRepository interface {
 	Save(ctx context.Context, portfolio *Portfolio) error
 	FindByID(ctx context.Context, id string) (*Portfolio, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*Portfolio, error) // Legacy alias
 	FindByOwnerID(ctx context.Context, ownerID string, opts ...QueryOption) ([]*Portfolio, error)
 	FindByStatus(ctx context.Context, status PortfolioStatus, opts ...QueryOption) ([]*Portfolio, error)
 	FindByTechDomain(ctx context.Context, techDomain string, opts ...QueryOption) ([]*Portfolio, error)

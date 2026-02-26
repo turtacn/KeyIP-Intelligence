@@ -20,6 +20,11 @@ const (
 	AnnuityStatusOverdue     AnnuityStatus = "overdue"
 	AnnuityStatusGracePeriod AnnuityStatus = "grace_period"
 	AnnuityStatusAbandoned   AnnuityStatus = "abandoned"
+	// Legacy status for compatibility
+	AnnuityStatusUpcoming    AnnuityStatus = "upcoming"
+	AnnuityStatusDue         AnnuityStatus = "due"
+	AnnuityStatusWaived      AnnuityStatus = "waived"
+	AnnuityStatusExpired     AnnuityStatus = "expired"
 )
 
 // Money represents a monetary value.
@@ -64,22 +69,32 @@ func (m Money) Validate() error {
 }
 
 // AnnuityRecord represents a single annuity payment record.
+// Updated to include legacy fields for compatibility.
 type AnnuityRecord struct {
-	ID               string        `json:"id"`
-	PatentID         string        `json:"patent_id"`
-	JurisdictionCode string        `json:"jurisdiction_code"`
-	YearNumber       int           `json:"year_number"`
-	DueDate          time.Time     `json:"due_date"`
-	GraceDeadline    time.Time     `json:"grace_deadline"`
-	Amount           Money         `json:"amount"`
-	PaidAmount       *Money        `json:"paid_amount"`
-	PaidDate         *time.Time    `json:"paid_date"`
-	Status           AnnuityStatus `json:"status"`
-	Currency         string        `json:"currency"`
-	Notes            string        `json:"notes"`
-	CreatedAt        time.Time     `json:"created_at"`
-	UpdatedAt        time.Time     `json:"updated_at"`
+	ID               string                 `json:"id"`
+	PatentID         string                 `json:"patent_id"`
+	JurisdictionCode string                 `json:"jurisdiction_code"`
+	YearNumber       int                    `json:"year_number"`
+	DueDate          time.Time              `json:"due_date"`
+	GraceDeadline    time.Time              `json:"grace_deadline"`
+	Amount           Money                  `json:"amount"`
+	PaidAmount       *Money                 `json:"paid_amount"`
+	PaidDate         *time.Time             `json:"paid_date"`
+	Status           AnnuityStatus          `json:"status"`
+	Currency         string                 `json:"currency"`
+	Notes            string                 `json:"notes"`
+	PaymentReference string                 `json:"payment_reference"` // Added
+	AgentName        string                 `json:"agent_name"`        // Added
+	AgentReference   string                 `json:"agent_reference"`   // Added
+	ReminderSentAt   *time.Time             `json:"reminder_sent_at"`  // Added
+	ReminderCount    int                    `json:"reminder_count"`    // Added
+	Metadata         map[string]interface{} `json:"metadata"`          // Added
+	CreatedAt        time.Time              `json:"created_at"`
+	UpdatedAt        time.Time              `json:"updated_at"`
 }
+
+// Alias for compatibility
+type Annuity = AnnuityRecord
 
 // AnnuitySchedule represents a generated schedule of annuity payments.
 type AnnuitySchedule struct {
@@ -254,7 +269,7 @@ func (s *annuityServiceImpl) CalculateAnnuityFee(ctx context.Context, jurisdicti
 }
 
 func (s *annuityServiceImpl) MarkAsPaid(ctx context.Context, recordID string, paidAmount Money, paidDate time.Time) error {
-	rec, err := s.annuityRepo.FindByID(ctx, recordID)
+	rec, err := s.annuityRepo.GetAnnuityByID(ctx, recordID)
 	if err != nil {
 		return err
 	}
@@ -274,11 +289,11 @@ func (s *annuityServiceImpl) MarkAsPaid(ctx context.Context, recordID string, pa
 	rec.PaidDate = &paidDate
 	rec.UpdatedAt = time.Now().UTC()
 
-	return s.annuityRepo.Save(ctx, rec)
+	return s.annuityRepo.SaveAnnuity(ctx, rec)
 }
 
 func (s *annuityServiceImpl) MarkAsAbandoned(ctx context.Context, recordID string, reason string) error {
-	rec, err := s.annuityRepo.FindByID(ctx, recordID)
+	rec, err := s.annuityRepo.GetAnnuityByID(ctx, recordID)
 	if err != nil {
 		return err
 	}
@@ -290,11 +305,11 @@ func (s *annuityServiceImpl) MarkAsAbandoned(ctx context.Context, recordID strin
 	rec.Notes = reason
 	rec.UpdatedAt = time.Now().UTC()
 
-	return s.annuityRepo.Save(ctx, rec)
+	return s.annuityRepo.SaveAnnuity(ctx, rec)
 }
 
 func (s *annuityServiceImpl) CheckOverdue(ctx context.Context, asOfDate time.Time) ([]*AnnuityRecord, error) {
-	pending, err := s.annuityRepo.FindPending(ctx, asOfDate)
+	pending, err := s.annuityRepo.GetPendingAnnuities(ctx, asOfDate)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +320,7 @@ func (s *annuityServiceImpl) CheckOverdue(ctx context.Context, asOfDate time.Tim
 			if rec.Status != AnnuityStatusGracePeriod {
 				rec.Status = AnnuityStatusGracePeriod
 				rec.UpdatedAt = time.Now().UTC()
-				if err := s.annuityRepo.Save(ctx, rec); err != nil {
+				if err := s.annuityRepo.SaveAnnuity(ctx, rec); err != nil {
 					return nil, err
 				}
 				updated = append(updated, rec)
@@ -314,7 +329,7 @@ func (s *annuityServiceImpl) CheckOverdue(ctx context.Context, asOfDate time.Tim
 			if rec.Status != AnnuityStatusOverdue {
 				rec.Status = AnnuityStatusOverdue
 				rec.UpdatedAt = time.Now().UTC()
-				if err := s.annuityRepo.Save(ctx, rec); err != nil {
+				if err := s.annuityRepo.SaveAnnuity(ctx, rec); err != nil {
 					return nil, err
 				}
 				updated = append(updated, rec)
@@ -355,7 +370,7 @@ func (s *annuityServiceImpl) ForecastCosts(ctx context.Context, portfolioID stri
 	totalUSD := 0.0
 
 	for _, pid := range p.PatentIDs {
-		records, err := s.annuityRepo.FindByPatentID(ctx, pid)
+		records, err := s.annuityRepo.GetAnnuitiesByPatentID(ctx, pid)
 		if err != nil {
 			return nil, err
 		}
@@ -406,7 +421,7 @@ func (s *annuityServiceImpl) GetUpcomingPayments(ctx context.Context, portfolioI
 	var upcoming []*AnnuityRecord
 
 	for _, pid := range p.PatentIDs {
-		records, err := s.annuityRepo.FindByPatentID(ctx, pid)
+		records, err := s.annuityRepo.GetAnnuitiesByPatentID(ctx, pid)
 		if err != nil {
 			return nil, err
 		}

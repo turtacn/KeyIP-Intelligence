@@ -15,12 +15,12 @@ type MockDeadlineRepository struct {
 	mock.Mock
 }
 
-func (m *MockDeadlineRepository) Save(ctx context.Context, deadline *Deadline) error {
+func (m *MockDeadlineRepository) SaveDeadline(ctx context.Context, deadline *Deadline) error {
 	args := m.Called(ctx, deadline)
 	return args.Error(0)
 }
 
-func (m *MockDeadlineRepository) FindByID(ctx context.Context, id string) (*Deadline, error) {
+func (m *MockDeadlineRepository) GetDeadlineByID(ctx context.Context, id string) (*Deadline, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -28,7 +28,7 @@ func (m *MockDeadlineRepository) FindByID(ctx context.Context, id string) (*Dead
 	return args.Get(0).(*Deadline), args.Error(1)
 }
 
-func (m *MockDeadlineRepository) FindByPatentID(ctx context.Context, patentID string) ([]*Deadline, error) {
+func (m *MockDeadlineRepository) GetDeadlinesByPatentID(ctx context.Context, patentID string) ([]*Deadline, error) {
 	args := m.Called(ctx, patentID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -36,7 +36,7 @@ func (m *MockDeadlineRepository) FindByPatentID(ctx context.Context, patentID st
 	return args.Get(0).([]*Deadline), args.Error(1)
 }
 
-func (m *MockDeadlineRepository) FindByOwnerID(ctx context.Context, ownerID string, from, to time.Time) ([]*Deadline, error) {
+func (m *MockDeadlineRepository) GetDeadlinesByOwnerID(ctx context.Context, ownerID string, from, to time.Time) ([]*Deadline, error) {
 	args := m.Called(ctx, ownerID, from, to)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -44,7 +44,7 @@ func (m *MockDeadlineRepository) FindByOwnerID(ctx context.Context, ownerID stri
 	return args.Get(0).([]*Deadline), args.Error(1)
 }
 
-func (m *MockDeadlineRepository) FindOverdue(ctx context.Context, ownerID string, asOf time.Time) ([]*Deadline, error) {
+func (m *MockDeadlineRepository) GetOverdueDeadlines(ctx context.Context, ownerID string, asOf time.Time) ([]*Deadline, error) {
 	args := m.Called(ctx, ownerID, asOf)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -52,7 +52,7 @@ func (m *MockDeadlineRepository) FindOverdue(ctx context.Context, ownerID string
 	return args.Get(0).([]*Deadline), args.Error(1)
 }
 
-func (m *MockDeadlineRepository) FindUpcoming(ctx context.Context, ownerID string, withinDays int) ([]*Deadline, error) {
+func (m *MockDeadlineRepository) GetUpcomingDeadlines(ctx context.Context, ownerID string, withinDays int) ([]*Deadline, error) {
 	args := m.Called(ctx, ownerID, withinDays)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -60,7 +60,7 @@ func (m *MockDeadlineRepository) FindUpcoming(ctx context.Context, ownerID strin
 	return args.Get(0).([]*Deadline), args.Error(1)
 }
 
-func (m *MockDeadlineRepository) FindByType(ctx context.Context, deadlineType DeadlineType) ([]*Deadline, error) {
+func (m *MockDeadlineRepository) GetDeadlinesByType(ctx context.Context, deadlineType DeadlineType) ([]*Deadline, error) {
 	args := m.Called(ctx, deadlineType)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -68,7 +68,7 @@ func (m *MockDeadlineRepository) FindByType(ctx context.Context, deadlineType De
 	return args.Get(0).([]*Deadline), args.Error(1)
 }
 
-func (m *MockDeadlineRepository) FindPendingReminders(ctx context.Context, reminderDate time.Time) ([]*Deadline, error) {
+func (m *MockDeadlineRepository) GetPendingDeadlineReminders(ctx context.Context, reminderDate time.Time) ([]*Deadline, error) {
 	args := m.Called(ctx, reminderDate)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -76,12 +76,12 @@ func (m *MockDeadlineRepository) FindPendingReminders(ctx context.Context, remin
 	return args.Get(0).([]*Deadline), args.Error(1)
 }
 
-func (m *MockDeadlineRepository) Delete(ctx context.Context, id string) error {
+func (m *MockDeadlineRepository) DeleteDeadline(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
 }
 
-func (m *MockDeadlineRepository) CountByUrgency(ctx context.Context, ownerID string) (map[DeadlineUrgency]int64, error) {
+func (m *MockDeadlineRepository) CountDeadlinesByUrgency(ctx context.Context, ownerID string) (map[DeadlineUrgency]int64, error) {
 	args := m.Called(ctx, ownerID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -153,7 +153,7 @@ func TestGetCalendar(t *testing.T) {
 		{ID: "d1", DueDate: from.AddDate(0, 0, 2), Urgency: UrgencyCritical}, // Week
 		{ID: "d2", DueDate: from.AddDate(0, 0, 20), Urgency: UrgencyHigh}, // Month
 	}
-	repo.On("FindByOwnerID", mock.Anything, "owner1", mock.Anything, mock.Anything).Return(deadlines, nil)
+	repo.On("GetDeadlinesByOwnerID", mock.Anything, "owner1", mock.Anything, mock.Anything).Return(deadlines, nil)
 
 	cal, err := svc.GetCalendar(context.Background(), "owner1", from, to)
 	assert.NoError(t, err)
@@ -171,7 +171,7 @@ func TestGenerateReminderBatch(t *testing.T) {
 	today := time.Now().Truncate(24 * time.Hour)
 	d1 := &Deadline{ID: "d1", ReminderDates: []time.Time{today}}
 
-	repo.On("FindPendingReminders", mock.Anything, mock.Anything).Return([]*Deadline{d1}, nil)
+	repo.On("GetPendingDeadlineReminders", mock.Anything, mock.Anything).Return([]*Deadline{d1}, nil)
 
 	rems, err := svc.GenerateReminderBatch(context.Background(), today)
 	assert.NoError(t, err)

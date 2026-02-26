@@ -36,11 +36,14 @@ type Portfolio struct {
 	OwnerID     string            `json:"owner_id"`
 	TechDomains []string          `json:"tech_domains"`
 	PatentIDs   []string          `json:"patent_ids"`
-	Tags        map[string]string `json:"tags"`
-	Status      PortfolioStatus   `json:"status"`
-	HealthScore *HealthScore      `json:"health_score"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	Tags                map[string]string `json:"tags"`
+	Status              PortfolioStatus   `json:"status"`
+	HealthScore         *HealthScore      `json:"health_score"`
+	Metadata            map[string]interface{} `json:"metadata"` // Added for legacy compat
+	TargetJurisdictions []string          `json:"target_jurisdictions"` // Added for legacy compat
+	DeletedAt           *time.Time        `json:"deleted_at"` // Added for legacy compat
+	CreatedAt           time.Time         `json:"created_at"`
+	UpdatedAt           time.Time         `json:"updated_at"`
 }
 
 // PortfolioSummary is a lightweight view of a portfolio for lists.

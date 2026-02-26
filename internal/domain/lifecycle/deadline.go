@@ -33,26 +33,47 @@ const (
 	UrgencyLow      DeadlineUrgency = "low"      // > 90 days
 )
 
+// DeadlineStatus defines status for legacy compatibility.
+type DeadlineStatus string
+
+const (
+	DeadlineStatusActive    DeadlineStatus = "active"
+	DeadlineStatusCompleted DeadlineStatus = "completed"
+	DeadlineStatusMissed    DeadlineStatus = "missed"
+	DeadlineStatusExtended  DeadlineStatus = "extended"
+	DeadlineStatusWaived    DeadlineStatus = "waived"
+)
+
 // Deadline represents a critical date or task.
+// Updated to include fields for legacy repo compatibility.
 type Deadline struct {
-	ID                string          `json:"id"`
-	PatentID          string          `json:"patent_id"`
-	Type              DeadlineType    `json:"type"`
-	Title             string          `json:"title"`
-	Description       string          `json:"description"`
-	DueDate           time.Time       `json:"due_date"`
-	ReminderDates     []time.Time     `json:"reminder_dates"`
-	Urgency           DeadlineUrgency `json:"urgency"`
-	IsCompleted       bool            `json:"is_completed"`
-	CompletedAt       *time.Time      `json:"completed_at"`
-	CompletedBy       string          `json:"completed_by"`
-	JurisdictionCode  string          `json:"jurisdiction_code"`
-	ExtensionAvailable bool            `json:"extension_available"`
-	MaxExtensionDays  int             `json:"max_extension_days"`
-	ExtendedDueDate   *time.Time      `json:"extended_due_date"`
-	Notes             string          `json:"notes"`
-	CreatedAt         time.Time       `json:"created_at"`
-	UpdatedAt         time.Time       `json:"updated_at"`
+	ID                string                 `json:"id"`
+	PatentID          string                 `json:"patent_id"`
+	Type              DeadlineType           `json:"type"`
+	Title             string                 `json:"title"`
+	Description       string                 `json:"description"`
+	DueDate           time.Time              `json:"due_date"`
+	OriginalDueDate   time.Time              `json:"original_due_date"` // Added
+	ReminderDates     []time.Time            `json:"reminder_dates"`
+	Urgency           DeadlineUrgency        `json:"urgency"`
+	IsCompleted       bool                   `json:"is_completed"`
+	Status            DeadlineStatus         `json:"status"` // Added for compatibility
+	Priority          string                 `json:"priority"` // Added: e.g. "critical"
+	AssigneeID        *string                `json:"assignee_id"` // Added
+	CompletedAt       *time.Time             `json:"completed_at"`
+	CompletedBy       string                 `json:"completed_by"`
+	JurisdictionCode  string                 `json:"jurisdiction_code"`
+	ExtensionAvailable bool                  `json:"extension_available"`
+	ExtensionCount    int                    `json:"extension_count"` // Added
+	ExtensionHistory  []map[string]interface{} `json:"extension_history"` // Added
+	MaxExtensionDays  int                    `json:"max_extension_days"`
+	ExtendedDueDate   *time.Time             `json:"extended_due_date"`
+	ReminderConfig    map[string]interface{} `json:"reminder_config"` // Added
+	LastReminderAt    *time.Time             `json:"last_reminder_at"` // Added
+	Notes             string                 `json:"notes"`
+	Metadata          map[string]interface{} `json:"metadata"` // Added
+	CreatedAt         time.Time              `json:"created_at"`
+	UpdatedAt         time.Time              `json:"updated_at"`
 }
 
 // DeadlineCalendar represents a calendar view of deadlines.
@@ -109,30 +130,27 @@ func NewDeadline(patentID string, deadlineType DeadlineType, title string, dueDa
 	if title == "" {
 		return nil, errors.New("title cannot be empty")
 	}
-	if dueDate.Before(time.Now().Truncate(24 * time.Hour)) {
-		// Allow today? Requirement: "dueDate 在未来（允许当天）"
-		// If dueDate < Today (00:00), error.
-		// Handled by logic below.
-	}
-	// "Check PastDueDate: 过去的截止日期返回错误"
-	// But allow today.
+
 	today := time.Now().Truncate(24 * time.Hour)
 	if dueDate.Before(today) {
 		return nil, errors.New("due date cannot be in the past")
 	}
 
 	d := &Deadline{
-		ID:            uuid.New().String(),
-		PatentID:      patentID,
-		Type:          deadlineType,
-		Title:         title,
-		DueDate:       dueDate,
-		CreatedAt:     time.Now().UTC(),
-		UpdatedAt:     time.Now().UTC(),
+		ID:              uuid.New().String(),
+		PatentID:        patentID,
+		Type:            deadlineType,
+		Title:           title,
+		DueDate:         dueDate,
+		OriginalDueDate: dueDate,
+		Status:          DeadlineStatusActive,
+		CreatedAt:       time.Now().UTC(),
+		UpdatedAt:       time.Now().UTC(),
 	}
 
 	d.ReminderDates = GenerateDefaultReminderDates(dueDate, time.Now())
 	d.Urgency = d.CalculateUrgency(time.Now())
+	d.Priority = string(d.Urgency)
 
 	return d, nil
 }
@@ -159,6 +177,7 @@ func (d *Deadline) Complete(completedBy string) error {
 		return apperrors.NewValidation("deadline already completed")
 	}
 	d.IsCompleted = true
+	d.Status = DeadlineStatusCompleted
 	now := time.Now().UTC()
 	d.CompletedAt = &now
 	d.CompletedBy = completedBy
@@ -179,6 +198,8 @@ func (d *Deadline) Extend(extensionDays int) error {
 
 	// Regenerate reminders based on new date
 	d.ReminderDates = GenerateDefaultReminderDates(newDue, time.Now())
+	d.Status = DeadlineStatusExtended
+	d.ExtensionCount++
 	d.UpdatedAt = time.Now().UTC()
 	return nil
 }
@@ -244,14 +265,14 @@ func (s *deadlineServiceImpl) CreateDeadline(ctx context.Context, patentID strin
 	if err != nil {
 		return nil, apperrors.NewValidation(err.Error())
 	}
-	if err := s.repo.Save(ctx, d); err != nil {
+	if err := s.repo.SaveDeadline(ctx, d); err != nil {
 		return nil, err
 	}
 	return d, nil
 }
 
 func (s *deadlineServiceImpl) CompleteDeadline(ctx context.Context, deadlineID, completedBy string) error {
-	d, err := s.repo.FindByID(ctx, deadlineID)
+	d, err := s.repo.GetDeadlineByID(ctx, deadlineID)
 	if err != nil {
 		return err
 	}
@@ -261,11 +282,11 @@ func (s *deadlineServiceImpl) CompleteDeadline(ctx context.Context, deadlineID, 
 	if err := d.Complete(completedBy); err != nil {
 		return err
 	}
-	return s.repo.Save(ctx, d)
+	return s.repo.SaveDeadline(ctx, d)
 }
 
 func (s *deadlineServiceImpl) ExtendDeadline(ctx context.Context, deadlineID string, extensionDays int) error {
-	d, err := s.repo.FindByID(ctx, deadlineID)
+	d, err := s.repo.GetDeadlineByID(ctx, deadlineID)
 	if err != nil {
 		return err
 	}
@@ -275,7 +296,7 @@ func (s *deadlineServiceImpl) ExtendDeadline(ctx context.Context, deadlineID str
 	if err := d.Extend(extensionDays); err != nil {
 		return err
 	}
-	return s.repo.Save(ctx, d)
+	return s.repo.SaveDeadline(ctx, d)
 }
 
 func (s *deadlineServiceImpl) GetCalendar(ctx context.Context, ownerID string, from, to time.Time) (*DeadlineCalendar, error) {
@@ -283,7 +304,7 @@ func (s *deadlineServiceImpl) GetCalendar(ctx context.Context, ownerID string, f
 		to = from.AddDate(1, 0, 0) // Cap at 1 year
 	}
 
-	deadlines, err := s.repo.FindByOwnerID(ctx, ownerID, from, to)
+	deadlines, err := s.repo.GetDeadlinesByOwnerID(ctx, ownerID, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -331,15 +352,15 @@ func (s *deadlineServiceImpl) GetCalendar(ctx context.Context, ownerID string, f
 }
 
 func (s *deadlineServiceImpl) GetOverdueDeadlines(ctx context.Context, ownerID string) ([]*Deadline, error) {
-	return s.repo.FindOverdue(ctx, ownerID, time.Now().UTC())
+	return s.repo.GetOverdueDeadlines(ctx, ownerID, time.Now().UTC())
 }
 
 func (s *deadlineServiceImpl) GetUpcomingDeadlines(ctx context.Context, ownerID string, withinDays int) ([]*Deadline, error) {
-	return s.repo.FindUpcoming(ctx, ownerID, withinDays)
+	return s.repo.GetUpcomingDeadlines(ctx, ownerID, withinDays)
 }
 
 func (s *deadlineServiceImpl) RefreshUrgencies(ctx context.Context, ownerID string) error {
-	deadlines, err := s.repo.FindUpcoming(ctx, ownerID, 3650)
+	deadlines, err := s.repo.GetUpcomingDeadlines(ctx, ownerID, 3650)
 	if err != nil {
 		return err
 	}
@@ -350,7 +371,7 @@ func (s *deadlineServiceImpl) RefreshUrgencies(ctx context.Context, ownerID stri
 		if newUrgency != d.Urgency {
 			d.Urgency = newUrgency
 			d.UpdatedAt = now
-			if err := s.repo.Save(ctx, d); err != nil {
+			if err := s.repo.SaveDeadline(ctx, d); err != nil {
 				return err
 			}
 		}
@@ -359,7 +380,7 @@ func (s *deadlineServiceImpl) RefreshUrgencies(ctx context.Context, ownerID stri
 }
 
 func (s *deadlineServiceImpl) GenerateReminderBatch(ctx context.Context, asOf time.Time) ([]*DeadlineReminder, error) {
-	deadlines, err := s.repo.FindPendingReminders(ctx, asOf)
+	deadlines, err := s.repo.GetPendingDeadlineReminders(ctx, asOf)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +421,7 @@ func (s *deadlineServiceImpl) AddCustomDeadline(ctx context.Context, patentID, t
 		return nil, apperrors.NewValidation(err.Error())
 	}
 	d.Description = description
-	if err := s.repo.Save(ctx, d); err != nil {
+	if err := s.repo.SaveDeadline(ctx, d); err != nil {
 		return nil, err
 	}
 	return d, nil

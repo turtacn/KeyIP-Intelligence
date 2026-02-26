@@ -15,12 +15,12 @@ type MockLifecycleRepository struct {
 	mock.Mock
 }
 
-func (m *MockLifecycleRepository) Save(ctx context.Context, record *LifecycleRecord) error {
+func (m *MockLifecycleRepository) SaveLifecycle(ctx context.Context, record *LifecycleRecord) error {
 	args := m.Called(ctx, record)
 	return args.Error(0)
 }
 
-func (m *MockLifecycleRepository) FindByID(ctx context.Context, id string) (*LifecycleRecord, error) {
+func (m *MockLifecycleRepository) GetLifecycleByID(ctx context.Context, id string) (*LifecycleRecord, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -28,7 +28,7 @@ func (m *MockLifecycleRepository) FindByID(ctx context.Context, id string) (*Lif
 	return args.Get(0).(*LifecycleRecord), args.Error(1)
 }
 
-func (m *MockLifecycleRepository) FindByPatentID(ctx context.Context, patentID string) (*LifecycleRecord, error) {
+func (m *MockLifecycleRepository) GetLifecycleByPatentID(ctx context.Context, patentID string) (*LifecycleRecord, error) {
 	args := m.Called(ctx, patentID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -36,7 +36,7 @@ func (m *MockLifecycleRepository) FindByPatentID(ctx context.Context, patentID s
 	return args.Get(0).(*LifecycleRecord), args.Error(1)
 }
 
-func (m *MockLifecycleRepository) FindByPhase(ctx context.Context, phase LifecyclePhase, opts ...LifecycleQueryOption) ([]*LifecycleRecord, error) {
+func (m *MockLifecycleRepository) GetLifecyclesByPhase(ctx context.Context, phase LifecyclePhase, opts ...LifecycleQueryOption) ([]*LifecycleRecord, error) {
 	args := m.Called(ctx, phase, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -44,7 +44,7 @@ func (m *MockLifecycleRepository) FindByPhase(ctx context.Context, phase Lifecyc
 	return args.Get(0).([]*LifecycleRecord), args.Error(1)
 }
 
-func (m *MockLifecycleRepository) FindExpiring(ctx context.Context, withinDays int) ([]*LifecycleRecord, error) {
+func (m *MockLifecycleRepository) GetExpiringLifecycles(ctx context.Context, withinDays int) ([]*LifecycleRecord, error) {
 	args := m.Called(ctx, withinDays)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -52,7 +52,7 @@ func (m *MockLifecycleRepository) FindExpiring(ctx context.Context, withinDays i
 	return args.Get(0).([]*LifecycleRecord), args.Error(1)
 }
 
-func (m *MockLifecycleRepository) FindByJurisdiction(ctx context.Context, jurisdictionCode string, opts ...LifecycleQueryOption) ([]*LifecycleRecord, error) {
+func (m *MockLifecycleRepository) GetLifecyclesByJurisdiction(ctx context.Context, jurisdictionCode string, opts ...LifecycleQueryOption) ([]*LifecycleRecord, error) {
 	args := m.Called(ctx, jurisdictionCode, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -60,14 +60,22 @@ func (m *MockLifecycleRepository) FindByJurisdiction(ctx context.Context, jurisd
 	return args.Get(0).([]*LifecycleRecord), args.Error(1)
 }
 
-func (m *MockLifecycleRepository) Delete(ctx context.Context, id string) error {
+func (m *MockLifecycleRepository) DeleteLifecycle(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
 }
 
-func (m *MockLifecycleRepository) Count(ctx context.Context, phase LifecyclePhase) (int64, error) {
+func (m *MockLifecycleRepository) CountLifecycles(ctx context.Context, phase LifecyclePhase) (int64, error) {
 	args := m.Called(ctx, phase)
 	return args.Get(0).(int64), args.Error(1)
+}
+
+// Stub implementation for other methods
+func (m *MockLifecycleRepository) SavePayment(ctx context.Context, payment *PaymentRecord) (*PaymentRecord, error) {
+	return payment, nil
+}
+func (m *MockLifecycleRepository) QueryPayments(ctx context.Context, query *PaymentQuery) ([]PaymentRecord, int64, error) {
+	return []PaymentRecord{}, 0, nil
 }
 
 type MockAnnuityService struct {
@@ -192,17 +200,17 @@ type MockJurisdictionRegistry struct {
 	mock.Mock
 }
 
-func (m *MockJurisdictionRegistry) Get(code string) (*Jurisdiction, error) {
+func (m *MockJurisdictionRegistry) Get(code string) (*JurisdictionInfo, error) {
 	args := m.Called(code)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*Jurisdiction), args.Error(1)
+	return args.Get(0).(*JurisdictionInfo), args.Error(1)
 }
 
-func (m *MockJurisdictionRegistry) List() []*Jurisdiction {
+func (m *MockJurisdictionRegistry) List() []*JurisdictionInfo {
 	args := m.Called()
-	return args.Get(0).([]*Jurisdiction)
+	return args.Get(0).([]*JurisdictionInfo)
 }
 
 func (m *MockJurisdictionRegistry) IsSupported(code string) bool {
@@ -243,7 +251,7 @@ func TestInitializeLifecycle_Success(t *testing.T) {
 	reg.On("IsSupported", "CN").Return(true)
 	reg.On("GetPatentTerm", "CN", "invention").Return(20, nil)
 
-	repo.On("Save", mock.Anything, mock.AnythingOfType("*lifecycle.LifecycleRecord")).Return(nil)
+	repo.On("SaveLifecycle", mock.Anything, mock.AnythingOfType("*lifecycle.LifecycleRecord")).Return(nil)
 
 	lr, err := svc.InitializeLifecycle(context.Background(), "p1", "CN", time.Now())
 	assert.NoError(t, err)
@@ -272,8 +280,8 @@ func TestAdvancePhase_Success(t *testing.T) {
 	svc := NewLifecycleService(repo, annuitySvc, deadlineSvc, reg)
 
 	lr, _ := NewLifecycleRecord("p1", "CN", time.Now())
-	repo.On("FindByPatentID", mock.Anything, "p1").Return(lr, nil)
-	repo.On("Save", mock.Anything, lr).Return(nil)
+	repo.On("GetLifecycleByPatentID", mock.Anything, "p1").Return(lr, nil)
+	repo.On("SaveLifecycle", mock.Anything, lr).Return(nil)
 
 	err := svc.AdvancePhase(context.Background(), "p1", PhaseExamination, "Reason")
 	assert.NoError(t, err)
@@ -289,7 +297,7 @@ func TestProcessDailyMaintenance_Success(t *testing.T) {
 
 	annuitySvc.On("CheckOverdue", mock.Anything, mock.Anything).Return([]*AnnuityRecord{}, nil)
 	deadlineSvc.On("GenerateReminderBatch", mock.Anything, mock.Anything).Return([]*DeadlineReminder{}, nil)
-	repo.On("FindExpiring", mock.Anything, 0).Return([]*LifecycleRecord{}, nil)
+	repo.On("GetExpiringLifecycles", mock.Anything, 0).Return([]*LifecycleRecord{}, nil)
 
 	report, err := svc.ProcessDailyMaintenance(context.Background())
 	assert.NoError(t, err)

@@ -8,8 +8,8 @@ import (
 	apperrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// Jurisdiction represents a legal jurisdiction for IP rights.
-type Jurisdiction struct {
+// JurisdictionInfo represents a legal jurisdiction's rules and metadata.
+type JurisdictionInfo struct {
 	Code                 string `json:"code"`
 	Name                 string `json:"name"`
 	PatentOffice         string `json:"patent_office"`
@@ -55,8 +55,8 @@ type OAResponseRules struct {
 
 // JurisdictionRegistry defines the interface for accessing jurisdiction data.
 type JurisdictionRegistry interface {
-	Get(code string) (*Jurisdiction, error)
-	List() []*Jurisdiction
+	Get(code string) (*JurisdictionInfo, error)
+	List() []*JurisdictionInfo
 	IsSupported(code string) bool
 	GetPatentTerm(code string, patentType string) (int, error)
 	GetAnnuityRules(code string) (*AnnuityRules, error)
@@ -65,20 +65,20 @@ type JurisdictionRegistry interface {
 
 // inMemoryJurisdictionRegistry is an in-memory implementation of JurisdictionRegistry.
 type inMemoryJurisdictionRegistry struct {
-	jurisdictions map[string]*Jurisdiction
+	jurisdictions map[string]*JurisdictionInfo
 }
 
 // NewJurisdictionRegistry creates a new pre-loaded registry.
 func NewJurisdictionRegistry() JurisdictionRegistry {
 	r := &inMemoryJurisdictionRegistry{
-		jurisdictions: make(map[string]*Jurisdiction),
+		jurisdictions: make(map[string]*JurisdictionInfo),
 	}
 	r.preload()
 	return r
 }
 
 func (r *inMemoryJurisdictionRegistry) preload() {
-	list := []*Jurisdiction{
+	list := []*JurisdictionInfo{
 		{
 			Code:                 "CN",
 			Name:                 "China",
@@ -103,7 +103,7 @@ func (r *inMemoryJurisdictionRegistry) preload() {
 			InventionTermYears:   20,
 			UtilityModelTermYears: 0,
 			DesignTermYears:      15,
-			AnnuityStartYear:     0, // Special handling
+			AnnuityStartYear:     0,
 			GracePeriodMonths:    6,
 			SupportsUtilityModel: false,
 			SupportsPCT:          true,
@@ -128,7 +128,7 @@ func (r *inMemoryJurisdictionRegistry) preload() {
 			OAExtensionAvailable: true,
 			OAMaxExtensionMonths: 2,
 			Currency:             "EUR",
-			Language:             "en", // Also de, fr
+			Language:             "en",
 		},
 		{
 			Code:                 "JP",
@@ -137,12 +137,11 @@ func (r *inMemoryJurisdictionRegistry) preload() {
 			InventionTermYears:   20,
 			UtilityModelTermYears: 10,
 			DesignTermYears:      25,
-			AnnuityStartYear:     1, // Pre-grant annuities exist? No, usually post-grant but calculated from filing.
-			// Requirement says: "年费第 1 年起（前 3 年一次性）"
+			AnnuityStartYear:     1,
 			GracePeriodMonths:    6,
 			SupportsUtilityModel: true,
 			SupportsPCT:          true,
-			OAResponseMonths:     2, // 60 days approx 2 months
+			OAResponseMonths:     2,
 			OAExtensionAvailable: true,
 			OAMaxExtensionMonths: 2,
 			Currency:             "JPY",
@@ -169,7 +168,7 @@ func (r *inMemoryJurisdictionRegistry) preload() {
 			Code:                 "WO",
 			Name:                 "WIPO (PCT)",
 			PatentOffice:         "WIPO",
-			InventionTermYears:   0, // Not applicable
+			InventionTermYears:   0,
 			UtilityModelTermYears: 0,
 			DesignTermYears:      0,
 			AnnuityStartYear:     0,
@@ -193,7 +192,7 @@ func (r *inMemoryJurisdictionRegistry) preload() {
 			GracePeriodMonths:    6,
 			SupportsUtilityModel: true,
 			SupportsPCT:          true,
-			OAResponseMonths:     4, // Approx
+			OAResponseMonths:     4,
 			OAExtensionAvailable: true,
 			OAMaxExtensionMonths: 2,
 			Currency:             "EUR",
@@ -207,7 +206,7 @@ func (r *inMemoryJurisdictionRegistry) preload() {
 			UtilityModelTermYears: 0,
 			DesignTermYears:      25,
 			AnnuityStartYear:     5,
-			GracePeriodMonths:    1, // Requirement says 1 month? Actually UK is 6 months but maybe user request specific logic? "GB... 宽限期 1 个月". Okay.
+			GracePeriodMonths:    1,
 			SupportsUtilityModel: false,
 			SupportsPCT:          true,
 			OAResponseMonths:     4,
@@ -240,7 +239,7 @@ func (r *inMemoryJurisdictionRegistry) preload() {
 	}
 }
 
-func (r *inMemoryJurisdictionRegistry) Get(code string) (*Jurisdiction, error) {
+func (r *inMemoryJurisdictionRegistry) Get(code string) (*JurisdictionInfo, error) {
 	normalized := NormalizeJurisdictionCode(code)
 	if j, ok := r.jurisdictions[normalized]; ok {
 		return j, nil
@@ -248,8 +247,8 @@ func (r *inMemoryJurisdictionRegistry) Get(code string) (*Jurisdiction, error) {
 	return nil, apperrors.NewNotFound("jurisdiction not found: %s", code)
 }
 
-func (r *inMemoryJurisdictionRegistry) List() []*Jurisdiction {
-	list := make([]*Jurisdiction, 0, len(r.jurisdictions))
+func (r *inMemoryJurisdictionRegistry) List() []*JurisdictionInfo {
+	list := make([]*JurisdictionInfo, 0, len(r.jurisdictions))
 	for _, j := range r.jurisdictions {
 		list = append(list, j)
 	}
@@ -293,10 +292,10 @@ func (r *inMemoryJurisdictionRegistry) GetAnnuityRules(code string) (*AnnuityRul
 	rules := &AnnuityRules{
 		JurisdictionCode:  j.Code,
 		StartYear:         j.AnnuityStartYear,
-		EndYear:           j.InventionTermYears, // Default to invention term
+		EndYear:           j.InventionTermYears,
 		IsAnnual:          true,
 		GracePeriodMonths: j.GracePeriodMonths,
-		LateFeeMultiplier: 1.5, // Default?
+		LateFeeMultiplier: 1.5,
 	}
 
 	if j.Code == "US" {
@@ -322,7 +321,7 @@ func (r *inMemoryJurisdictionRegistry) GetOAResponseRules(code string) (*OARespo
 		ResponseMonths:       j.OAResponseMonths,
 		ExtensionAvailable:   j.OAExtensionAvailable,
 		MaxExtensionMonths:   j.OAMaxExtensionMonths,
-		ExtensionFeeRequired: j.Code == "US", // Only US explicitly requires fee in requirements
+		ExtensionFeeRequired: j.Code == "US",
 	}, nil
 }
 
