@@ -23,3 +23,4 @@ web/dist/
 web/coverage/
 .DS_Store
 verification/
+/trash/
