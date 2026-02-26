@@ -345,8 +345,35 @@ func ValidateProducerConfig(cfg ProducerConfig) error {
 	if len(cfg.Brokers) == 0 {
 		return errors.New(errors.ErrCodeValidation, "Brokers required")
 	}
+	if cfg.Acks != "" && cfg.Acks != "none" && cfg.Acks != "leader" && cfg.Acks != "all" {
+		return errors.New(errors.ErrCodeValidation, "invalid Acks")
+	}
 	if cfg.MaxRetries < 0 {
 		return errors.New(errors.ErrCodeValidation, "MaxRetries must be >= 0")
+	}
+	if cfg.BatchSize < 0 {
+		return errors.New(errors.ErrCodeValidation, "BatchSize must be >= 0")
+	}
+	if cfg.MaxMessageBytes < 0 {
+		return errors.New(errors.ErrCodeValidation, "MaxMessageBytes must be >= 0")
+	}
+	if cfg.CompressionCodec != "" {
+		switch cfg.CompressionCodec {
+		case "none", "gzip", "snappy", "lz4", "zstd":
+		default:
+			return errors.New(errors.ErrCodeValidation, "invalid CompressionCodec")
+		}
+	}
+	if cfg.SASLEnabled {
+		if cfg.SASLMechanism == "" {
+			return errors.New(errors.ErrCodeValidation, "SASLMechanism required")
+		}
+		if cfg.SASLUsername == "" || cfg.SASLPassword == "" {
+			return errors.New(errors.ErrCodeValidation, "SASL credentials required")
+		}
+	}
+	if cfg.TLSEnabled && cfg.TLSCertPath == "" {
+		return errors.New(errors.ErrCodeValidation, "TLSCertPath required")
 	}
 	return nil
 }

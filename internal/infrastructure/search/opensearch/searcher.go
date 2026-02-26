@@ -317,26 +317,38 @@ func (s *Searcher) ScrollSearch(ctx context.Context, req SearchRequest, batchHan
 		return s.handleErrorResponse(resp)
 	}
 
-	// Let's decode into generic map to get scroll_id and hits
-	var rawResp map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&rawResp); err != nil {
+	// Use structured decoding to preserve json.RawMessage
+	type scrollResponse struct {
+		ScrollID string `json:"_scroll_id"`
+		Hits     struct {
+			Hits []struct {
+				ID         string              `json:"_id"`
+				Score      float64             `json:"_score"`
+				Source     json.RawMessage     `json:"_source"`
+				Highlight  map[string][]string `json:"highlight"`
+				Sort       []interface{}       `json:"sort"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	var scrollResp scrollResponse
+	if err := json.NewDecoder(resp.Body).Decode(&scrollResp); err != nil {
 		return errors.Wrap(err, errors.ErrCodeSerialization, "failed to decode scroll response")
 	}
 
-	scrollID, _ := rawResp["_scroll_id"].(string)
-	hitsRaw, _ := rawResp["hits"].(map[string]interface{})
-	hitsList, _ := hitsRaw["hits"].([]interface{})
+	scrollID := scrollResp.ScrollID
 
 	// Process first batch
-	if len(hitsList) > 0 {
-		// We need to parse hitsList into []SearchHit
-		// Re-encode and use parse logic or manual map
-		// This is inefficient. Ideally parseSearchResponse should support ScrollID or return generic.
-		// For now, let's implement a parser for hits.
-		hits, err := s.parseHits(hitsList)
-		if err != nil {
-			s.clearScroll(ctx, scrollID)
-			return err
+	if len(scrollResp.Hits.Hits) > 0 {
+		hits := make([]SearchHit, len(scrollResp.Hits.Hits))
+		for i, h := range scrollResp.Hits.Hits {
+			hits[i] = SearchHit{
+				ID:         h.ID,
+				Score:      h.Score,
+				Source:     h.Source,
+				Highlights: h.Highlight,
+				Sort:       h.Sort,
+			}
 		}
 		if err := batchHandler(hits); err != nil {
 			s.clearScroll(ctx, scrollID)
@@ -367,27 +379,31 @@ func (s *Searcher) ScrollSearch(ctx context.Context, req SearchRequest, batchHan
 			return s.handleErrorResponse(resp)
 		}
 
-		if err := json.NewDecoder(resp.Body).Decode(&rawResp); err != nil {
+		// Reset scrollResp for next decode
+		scrollResp = scrollResponse{}
+		if err := json.NewDecoder(resp.Body).Decode(&scrollResp); err != nil {
 			s.clearScroll(ctx, scrollID)
 			return errors.Wrap(err, errors.ErrCodeSerialization, "failed to decode scroll response")
 		}
 
-		// Update scrollID if changed (usually same)
-		if newID, ok := rawResp["_scroll_id"].(string); ok && newID != "" {
-			scrollID = newID
+		// Update scrollID if changed
+		if scrollResp.ScrollID != "" {
+			scrollID = scrollResp.ScrollID
 		}
 
-		hitsRaw, _ = rawResp["hits"].(map[string]interface{})
-		hitsList, _ = hitsRaw["hits"].([]interface{})
-
-		if len(hitsList) == 0 {
+		if len(scrollResp.Hits.Hits) == 0 {
 			break // Done
 		}
 
-		hits, err := s.parseHits(hitsList)
-		if err != nil {
-			s.clearScroll(ctx, scrollID)
-			return err
+		hits := make([]SearchHit, len(scrollResp.Hits.Hits))
+		for i, h := range scrollResp.Hits.Hits {
+			hits[i] = SearchHit{
+				ID:         h.ID,
+				Score:      h.Score,
+				Source:     h.Source,
+				Highlights: h.Highlight,
+				Sort:       h.Sort,
+			}
 		}
 
 		if err := batchHandler(hits); err != nil {
@@ -827,41 +843,6 @@ func (s *Searcher) parseSearchResponse(body io.Reader) (*SearchResult, error) {
 	}
 
 	return result, nil
-}
-
-func (s *Searcher) parseHits(hitsList []interface{}) ([]SearchHit, error) {
-	hits := make([]SearchHit, len(hitsList))
-	for i, item := range hitsList {
-		m, ok := item.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("invalid hit format")
-		}
-
-		h := SearchHit{}
-		if id, ok := m["_id"].(string); ok { h.ID = id }
-		if score, ok := m["_score"].(float64); ok { h.Score = score }
-		if src, ok := m["_source"]; ok {
-			b, _ := json.Marshal(src)
-			h.Source = b
-		}
-		if hl, ok := m["highlight"].(map[string]interface{}); ok {
-			h.Highlights = make(map[string][]string)
-			for k, v := range hl {
-				if strs, ok := v.([]interface{}); ok {
-					var ss []string
-					for _, s := range strs {
-						ss = append(ss, fmt.Sprint(s))
-					}
-					h.Highlights[k] = ss
-				}
-			}
-		}
-		if srt, ok := m["sort"].([]interface{}); ok {
-			h.Sort = srt
-		}
-		hits[i] = h
-	}
-	return hits, nil
 }
 
 func (s *Searcher) parseAggregationResult(raw json.RawMessage) AggregationResult {
