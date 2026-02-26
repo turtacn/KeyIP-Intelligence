@@ -54,6 +54,12 @@ func TestNewAppMetrics_AllMetricsRegistered(t *testing.T) {
 	assert.NotNil(t, m.AuthAttemptsTotal)
 	assert.NotNil(t, m.PatentIngestTotal)
 
+	// Check new fields
+	assert.NotNil(t, m.RiskAssessmentRequestsTotal)
+	assert.NotNil(t, m.RiskAssessmentCacheHitsTotal)
+	assert.NotNil(t, m.RiskAssessmentDuration)
+	assert.NotNil(t, m.FTOAnalysisDuration)
+
 	// Metrics are registered but not visible until used
 }
 
@@ -140,26 +146,18 @@ func TestRecordCacheAccess_Miss(t *testing.T) {
 func TestMetricNaming_FollowsConvention(t *testing.T) {
 	_, c := newTestAppMetrics(t)
 	output := getMetricOutput(t, c)
-
-	// Check for keyip prefix (substituted by test_unit in test collector)
-	// But in NewAppMetrics we hardcoded "http_requests_total" etc.
-	// The prefix comes from CollectorConfig.
-
-	// Just verified that metrics exist.
-	// The convention check is implicit in registration.
 	_ = output
 }
 
 func TestDefaultBuckets(t *testing.T) {
-	// Verify buckets are not nil
 	assert.NotNil(t, DefaultHTTPDurationBuckets)
 	assert.NotNil(t, DefaultLLMDurationBuckets)
+	assert.NotNil(t, DefaultGRPCDurationBuckets)
 }
 
 func TestConcurrentMetricRecording(t *testing.T) {
 	m, _ := newTestAppMetrics(t)
 
-	// Run concurrent updates
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
 		go func() {
@@ -173,8 +171,18 @@ func TestConcurrentMetricRecording(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		<-done
 	}
+}
 
-	// Assertions?
-	// If it didn't panic, it's good (Prometheus client is thread-safe).
+func TestGRPCMetrics(t *testing.T) {
+	c := newTestCollector(t)
+	m := NewGRPCMetrics(c)
+	assert.NotNil(t, m)
+
+	m.RecordUnaryRequest("service", "method", "OK", 50*time.Millisecond)
+	m.RecordStreamRequest("service", "stream", "OK", 100*time.Millisecond)
+
+	output := getMetricOutput(t, c)
+	assert.Contains(t, output, `test_unit_grpc_unary_requests_total{code="OK",method="method",service="service"} 1`)
+	assert.Contains(t, output, `test_unit_grpc_stream_requests_total{code="OK",method="stream",service="service"} 1`)
 }
 //Personal.AI order the ending

@@ -12,6 +12,7 @@ var (
 	DefaultLLMDurationBuckets      = []float64{.5, 1, 2, 5, 10, 30, 60, 120}
 	DefaultSizeBuckets             = []float64{100, 1000, 10000, 100000, 1000000, 10000000}
 	DefaultDBDurationBuckets       = []float64{.001, .005, .01, .025, .05, .1, .25, .5, 1, 5}
+	DefaultGRPCDurationBuckets     = []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10}
 )
 
 // AppMetrics holds all application metrics.
@@ -42,6 +43,12 @@ type AppMetrics struct {
 	AnalysisTaskQueueDepth GaugeVec
 	AnalysisActiveWorkers  GaugeVec
 	AnalysisTaskRetries    CounterVec
+
+	// Risk Assessment (Infringement)
+	RiskAssessmentRequestsTotal  CounterVec
+	RiskAssessmentCacheHitsTotal CounterVec
+	RiskAssessmentDuration       HistogramVec
+	FTOAnalysisDuration          HistogramVec
 
 	// Graph
 	GraphNodesTotal    GaugeVec
@@ -102,6 +109,12 @@ func NewAppMetrics(collector MetricsCollector) *AppMetrics {
 	m.AnalysisActiveWorkers = collector.RegisterGauge("analysis_active_workers", "Active analysis workers", "type")
 	m.AnalysisTaskRetries = collector.RegisterCounter("analysis_task_retries_total", "Analysis task retries", "type", "reason")
 
+	// Risk Assessment
+	m.RiskAssessmentRequestsTotal = collector.RegisterCounter("risk_assessment_requests_total", "Total risk assessment requests", "method", "depth")
+	m.RiskAssessmentCacheHitsTotal = collector.RegisterCounter("risk_assessment_cache_hits_total", "Risk assessment cache hits")
+	m.RiskAssessmentDuration = collector.RegisterHistogram("risk_assessment_duration_seconds", "Risk assessment duration", DefaultAnalysisDurationBuckets, "depth")
+	m.FTOAnalysisDuration = collector.RegisterHistogram("fto_analysis_duration_seconds", "FTO analysis duration", DefaultAnalysisDurationBuckets, "jurisdiction_count")
+
 	// Graph
 	m.GraphNodesTotal = collector.RegisterGauge("graph_nodes_total", "Total graph nodes", "node_type")
 	m.GraphEdgesTotal = collector.RegisterGauge("graph_edges_total", "Total graph edges", "edge_type")
@@ -138,6 +151,58 @@ func NewAppMetrics(collector MetricsCollector) *AppMetrics {
 // RegisterAppMetrics is an alias for NewAppMetrics.
 func RegisterAppMetrics(collector MetricsCollector) *AppMetrics {
 	return NewAppMetrics(collector)
+}
+
+// GRPCMetrics holds metrics for gRPC servers.
+type GRPCMetrics struct {
+	UnaryRequestsTotal   CounterVec
+	UnaryRequestDuration HistogramVec
+	StreamRequestsTotal  CounterVec
+	StreamRequestDuration HistogramVec
+}
+
+// NewGRPCMetrics creates and registers gRPC metrics.
+func NewGRPCMetrics(collector MetricsCollector) *GRPCMetrics {
+	return &GRPCMetrics{
+		UnaryRequestsTotal: collector.RegisterCounter(
+			"grpc_unary_requests_total",
+			"Total gRPC unary requests",
+			"service", "method", "code",
+		),
+		UnaryRequestDuration: collector.RegisterHistogram(
+			"grpc_unary_request_duration_seconds",
+			"gRPC unary request duration",
+			DefaultGRPCDurationBuckets,
+			"service", "method",
+		),
+		StreamRequestsTotal: collector.RegisterCounter(
+			"grpc_stream_requests_total",
+			"Total gRPC stream requests",
+			"service", "method", "code",
+		),
+		StreamRequestDuration: collector.RegisterHistogram(
+			"grpc_stream_request_duration_seconds",
+			"gRPC stream request duration",
+			DefaultGRPCDurationBuckets,
+			"service", "method",
+		),
+	}
+}
+
+func (m *GRPCMetrics) RecordUnaryRequest(service, method, code string, duration time.Duration) {
+	if m == nil {
+		return
+	}
+	m.UnaryRequestsTotal.WithLabelValues(service, method, code).Inc()
+	m.UnaryRequestDuration.WithLabelValues(service, method).Observe(duration.Seconds())
+}
+
+func (m *GRPCMetrics) RecordStreamRequest(service, method, code string, duration time.Duration) {
+	if m == nil {
+		return
+	}
+	m.StreamRequestsTotal.WithLabelValues(service, method, code).Inc()
+	m.StreamRequestDuration.WithLabelValues(service, method).Observe(duration.Seconds())
 }
 
 // Helpers
