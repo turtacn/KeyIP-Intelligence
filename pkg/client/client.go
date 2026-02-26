@@ -23,13 +23,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	keyiperrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
 // Version is the SDK semantic version.
 const Version = "0.1.0"
-
-// ErrInvalidConfig is returned when client configuration is invalid.
-var ErrInvalidConfig = errors.New("keyip: invalid client configuration")
 
 // ---------------------------------------------------------------------------
 // Logger
@@ -95,8 +93,8 @@ func (e *APIError) IsServerError() bool {
 
 // APIResponse is a generic envelope for successful API responses.
 type APIResponse[T any] struct {
-Data T             `json:"data"`
-Meta *ResponseMeta `json:"meta,omitempty"`
+	Data T             `json:"data"`
+	Meta *ResponseMeta `json:"meta,omitempty"`
 }
 
 // ResponseMeta carries pagination metadata.
@@ -136,7 +134,6 @@ type Client struct {
 	baseHeaders map[string]string
 	rateLimiter *internalRateLimiter
 	debug       bool
-
 }
 
 // NewClient creates a new SDK client.
@@ -145,14 +142,14 @@ type Client struct {
 // Optional behaviour can be customised via Option functions.
 func NewClient(baseURL string, apiKey string, opts ...Option) (*Client, error) {
 	if baseURL == "" {
-		return nil, fmt.Errorf("%w: baseURL is required", ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: baseURL is required", keyiperrors.ErrInvalidConfig)
 	}
 	parsed, err := url.Parse(baseURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return nil, fmt.Errorf("%w: baseURL must use http or https scheme, got %q", ErrInvalidConfig, baseURL)
+		return nil, fmt.Errorf("%w: baseURL must use http or https scheme, got %q", keyiperrors.ErrInvalidConfig, baseURL)
 	}
 	if apiKey == "" {
-		return nil, fmt.Errorf("%w: apiKey is required", ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: apiKey is required", keyiperrors.ErrInvalidConfig)
 	}
 
 	c := &Client{
@@ -180,7 +177,7 @@ func NewClient(baseURL string, apiKey string, opts ...Option) (*Client, error) {
 // Molecules returns the molecule resource sub-client.
 func (c *Client) Molecules() *MoleculesClient {
 	c.moleculesOnce.Do(func() {
-		c.molecules = &MoleculesClient{client: c}
+		c.molecules = newMoleculesClient(c)
 	})
 	return c.molecules
 }
@@ -188,7 +185,7 @@ func (c *Client) Molecules() *MoleculesClient {
 // Patents returns the patent resource sub-client.
 func (c *Client) Patents() *PatentsClient {
 	c.patentsOnce.Do(func() {
-		c.patents = &PatentsClient{client: c}
+		c.patents = newPatentsClient(c)
 	})
 	return c.patents
 }
@@ -196,11 +193,10 @@ func (c *Client) Patents() *PatentsClient {
 // Lifecycle returns the lifecycle resource sub-client.
 func (c *Client) Lifecycle() *LifecycleClient {
 	c.lifecycleOnce.Do(func() {
-		c.lifecycle = &LifecycleClient{client: c}
+		c.lifecycle = newLifecycleClient(c)
 	})
 	return c.lifecycle
 }
-
 
 // Close releases resources held by the Client (e.g. rate limiter goroutine).
 // It is safe to call Close multiple times.
@@ -210,7 +206,6 @@ func (c *Client) Close() error {
 	}
 	return nil
 }
-
 
 // ---------------------------------------------------------------------------
 // Convenience HTTP verbs (unexported, used by sub-clients)
@@ -230,6 +225,11 @@ func (c *Client) put(ctx context.Context, path string, body interface{}, result 
 
 func (c *Client) delete(ctx context.Context, path string) error {
 	return c.do(ctx, http.MethodDelete, path, nil, nil)
+}
+
+// invalidArg wraps ErrInvalidArgument with a message.
+func invalidArg(msg string) error {
+	return fmt.Errorf("%w: %s", keyiperrors.ErrInvalidArgument, msg)
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,6 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 				return err
 			}
 		}
-
 
 		// ---- execute ----
 		start := time.Now()

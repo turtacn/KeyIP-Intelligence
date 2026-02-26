@@ -154,6 +154,7 @@ type internalRateLimiter struct {
 }
 
 func newInternalRateLimiter(rps float64) *internalRateLimiter {
+	// rps validation already done in WithRateLimiter, but safe to double check or assume valid > 0
 	if rps <= 0 {
 		return nil
 	}
@@ -200,6 +201,7 @@ func (rl *internalRateLimiter) Wait(ctx context.Context) error {
 		return ctx.Err()
 	case _, ok := <-rl.tokens:
 		if !ok {
+			// Channel closed
 			return context.Canceled
 		}
 		return nil
@@ -210,10 +212,12 @@ func (rl *internalRateLimiter) Wait(ctx context.Context) error {
 func (rl *internalRateLimiter) Close() {
 	rl.once.Do(func() {
 		close(rl.quit)
-		// Drain remaining tokens so any blocked Wait returns.
+		// Drain remaining tokens and close tokens channel to unblock any waiters
+		// Note: closing tokens channel will cause Wait to receive zero value and !ok
 		for {
 			select {
 			case <-rl.tokens:
+				// drain
 			default:
 				close(rl.tokens)
 				return

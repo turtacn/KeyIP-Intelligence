@@ -236,43 +236,6 @@ type TechnologyCluster struct {
 }
 
 // ---------------------------------------------------------------------------
-// Internal response wrappers
-// ---------------------------------------------------------------------------
-
-type patentDetailResp struct {
-	Data PatentDetail `json:"data"`
-}
-
-type familyMemberListResp struct {
-	Data []FamilyMember `json:"data"`
-}
-
-type citationListResp struct {
-	Data []Citation `json:"data"`
-}
-
-type moleculeBriefListResp struct {
-	Data []MoleculeBrief `json:"data"`
-	Meta *ResponseMeta   `json:"meta,omitempty"`
-}
-
-type legalEventListResp struct {
-	Data []LegalEvent `json:"data"`
-}
-
-type claimListResp struct {
-	Data []Claim `json:"data"`
-}
-
-type patentValueResp struct {
-	Data PatentValueResult `json:"data"`
-}
-
-type patentLandscapeResp struct {
-	Data PatentLandscape `json:"data"`
-}
-
-// ---------------------------------------------------------------------------
 // PatentsClient
 // ---------------------------------------------------------------------------
 
@@ -362,7 +325,7 @@ func (pc *PatentsClient) Get(ctx context.Context, patentID string) (*PatentDetai
 	if patentID == "" {
 		return nil, invalidArg("patentID is required")
 	}
-	var resp patentDetailResp
+	var resp APIResponse[PatentDetail]
 	if err := pc.client.get(ctx, "/api/v1/patents/"+patentID, &resp); err != nil {
 		return nil, err
 	}
@@ -376,7 +339,7 @@ func (pc *PatentsClient) GetByNumber(ctx context.Context, patentNumber string) (
 		return nil, invalidArg("patentNumber is required")
 	}
 	path := "/api/v1/patents/by-number?number=" + url.QueryEscape(patentNumber)
-	var resp patentDetailResp
+	var resp APIResponse[PatentDetail]
 	if err := pc.client.get(ctx, path, &resp); err != nil {
 		return nil, err
 	}
@@ -389,7 +352,7 @@ func (pc *PatentsClient) GetFamily(ctx context.Context, patentNumber string) ([]
 	if patentNumber == "" {
 		return nil, invalidArg("patentNumber is required")
 	}
-	var resp familyMemberListResp
+	var resp APIResponse[[]FamilyMember]
 	if err := pc.client.get(ctx, "/api/v1/patents/"+url.PathEscape(patentNumber)+"/family", &resp); err != nil {
 		return nil, err
 	}
@@ -402,7 +365,7 @@ func (pc *PatentsClient) GetCitations(ctx context.Context, patentNumber string) 
 	if patentNumber == "" {
 		return nil, invalidArg("patentNumber is required")
 	}
-	var resp citationListResp
+	var resp APIResponse[[]Citation]
 	if err := pc.client.get(ctx, "/api/v1/patents/"+url.PathEscape(patentNumber)+"/citations", &resp); err != nil {
 		return nil, err
 	}
@@ -415,7 +378,7 @@ func (pc *PatentsClient) GetCitedBy(ctx context.Context, patentNumber string) ([
 	if patentNumber == "" {
 		return nil, invalidArg("patentNumber is required")
 	}
-	var resp citationListResp
+	var resp APIResponse[[]Citation]
 	if err := pc.client.get(ctx, "/api/v1/patents/"+url.PathEscape(patentNumber)+"/cited-by", &resp); err != nil {
 		return nil, err
 	}
@@ -434,7 +397,7 @@ func (pc *PatentsClient) GetMolecules(ctx context.Context, patentNumber string, 
 	pageSize = clampPageSize(pageSize)
 	path := fmt.Sprintf("/api/v1/patents/%s/molecules?page=%d&page_size=%d",
 		url.PathEscape(patentNumber), page, pageSize)
-	var resp moleculeBriefListResp
+	var resp APIResponse[[]MoleculeBrief]
 	if err := pc.client.get(ctx, path, &resp); err != nil {
 		return nil, 0, err
 	}
@@ -454,7 +417,7 @@ func (pc *PatentsClient) EvaluateValue(ctx context.Context, req *PatentValueRequ
 	if len(req.PatentNumbers) > 100 {
 		return nil, invalidArg("patent_numbers exceeds maximum of 100")
 	}
-	var resp patentValueResp
+	var resp APIResponse[PatentValueResult]
 	if err := pc.client.post(ctx, "/api/v1/patents/evaluate", req, &resp); err != nil {
 		return nil, err
 	}
@@ -473,7 +436,7 @@ func (pc *PatentsClient) GetLandscape(ctx context.Context, req *PatentLandscapeR
 	if req.TopIPCCodes <= 0 {
 		req.TopIPCCodes = 20
 	}
-	var resp patentLandscapeResp
+	var resp APIResponse[PatentLandscape]
 	if err := pc.client.post(ctx, "/api/v1/patents/landscape", req, &resp); err != nil {
 		return nil, err
 	}
@@ -486,7 +449,7 @@ func (pc *PatentsClient) GetLegalEvents(ctx context.Context, patentNumber string
 	if patentNumber == "" {
 		return nil, invalidArg("patentNumber is required")
 	}
-	var resp legalEventListResp
+	var resp APIResponse[[]LegalEvent]
 	if err := pc.client.get(ctx, "/api/v1/patents/"+url.PathEscape(patentNumber)+"/legal-events", &resp); err != nil {
 		return nil, err
 	}
@@ -499,7 +462,7 @@ func (pc *PatentsClient) GetClaims(ctx context.Context, patentNumber string) ([]
 	if patentNumber == "" {
 		return nil, invalidArg("patentNumber is required")
 	}
-	var resp claimListResp
+	var resp APIResponse[[]Claim]
 	if err := pc.client.get(ctx, "/api/v1/patents/"+url.PathEscape(patentNumber)+"/claims", &resp); err != nil {
 		return nil, err
 	}

@@ -99,13 +99,13 @@ type ReminderConfigRequest struct {
 
 // AnnuitySummary provides an aggregate view of annuity obligations.
 type AnnuitySummary struct {
-	TotalDue         int                                    `json:"total_due"`
-	TotalPaid        int                                    `json:"total_paid"`
-	TotalOverdue     int                                    `json:"total_overdue"`
-	TotalAmountDue   float64                                `json:"total_amount_due"`
-	TotalAmountPaid  float64                                `json:"total_amount_paid"`
-	Currency         string                                 `json:"currency"`
-	ByJurisdiction   map[string]AnnuityJurisdictionSummary  `json:"by_jurisdiction"`
+	TotalDue         int                                   `json:"total_due"`
+	TotalPaid        int                                   `json:"total_paid"`
+	TotalOverdue     int                                   `json:"total_overdue"`
+	TotalAmountDue   float64                               `json:"total_amount_due"`
+	TotalAmountPaid  float64                               `json:"total_amount_paid"`
+	Currency         string                                `json:"currency"`
+	ByJurisdiction   map[string]AnnuityJurisdictionSummary `json:"by_jurisdiction"`
 }
 
 // AnnuityJurisdictionSummary provides per-jurisdiction annuity stats.
@@ -117,42 +117,6 @@ type AnnuityJurisdictionSummary struct {
 	AmountDue    float64 `json:"amount_due"`
 	AmountPaid   float64 `json:"amount_paid"`
 	Currency     string  `json:"currency"`
-}
-
-// ---------------------------------------------------------------------------
-// Internal response wrappers
-// ---------------------------------------------------------------------------
-
-type deadlineListResp struct {
-	Data []Deadline `json:"data"`
-}
-
-type deadlineResp struct {
-	Data Deadline `json:"data"`
-}
-
-type annuityListResp struct {
-	Data []AnnuityRecord `json:"data"`
-}
-
-type annuitySummaryResp struct {
-	Data AnnuitySummary `json:"data"`
-}
-
-type annuityRecordResp struct {
-	Data AnnuityRecord `json:"data"`
-}
-
-type legalStatusResp struct {
-	Data LegalStatusRecord `json:"data"`
-}
-
-type reminderListResp struct {
-	Data []ReminderConfig `json:"data"`
-}
-
-type reminderResp struct {
-	Data ReminderConfig `json:"data"`
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +169,7 @@ func (lc *LifecycleClient) GetDeadlines(ctx context.Context, query *DeadlineQuer
 	qs := lc.buildDeadlineQueryParams(query)
 	path := "/api/v1/lifecycle/deadlines?" + qs
 
-	var resp deadlineListResp
+	var resp APIResponse[[]Deadline]
 	if err := lc.client.get(ctx, path, &resp); err != nil {
 		return nil, err
 	}
@@ -221,7 +185,7 @@ func (lc *LifecycleClient) GetDeadline(ctx context.Context, deadlineID string) (
 	if deadlineID == "" {
 		return nil, invalidArg("deadlineID is required")
 	}
-	var resp deadlineResp
+	var resp APIResponse[Deadline]
 	if err := lc.client.get(ctx, "/api/v1/lifecycle/deadlines/"+deadlineID, &resp); err != nil {
 		return nil, err
 	}
@@ -234,7 +198,7 @@ func (lc *LifecycleClient) GetAnnuities(ctx context.Context, patentNumber string
 	if patentNumber == "" {
 		return nil, invalidArg("patentNumber is required")
 	}
-	var resp annuityListResp
+	var resp APIResponse[[]AnnuityRecord]
 	if err := lc.client.get(ctx, "/api/v1/lifecycle/patents/"+url.PathEscape(patentNumber)+"/annuities", &resp); err != nil {
 		return nil, err
 	}
@@ -244,7 +208,7 @@ func (lc *LifecycleClient) GetAnnuities(ctx context.Context, patentNumber string
 // GetAnnuitySummary retrieves an aggregate annuity summary.
 // GET /api/v1/lifecycle/annuities/summary
 func (lc *LifecycleClient) GetAnnuitySummary(ctx context.Context) (*AnnuitySummary, error) {
-	var resp annuitySummaryResp
+	var resp APIResponse[AnnuitySummary]
 	if err := lc.client.get(ctx, "/api/v1/lifecycle/annuities/summary", &resp); err != nil {
 		return nil, err
 	}
@@ -263,7 +227,7 @@ func (lc *LifecycleClient) RecordAnnuityPayment(ctx context.Context, req *Annuit
 	if req.Amount <= 0 {
 		return nil, invalidArg("amount must be greater than 0")
 	}
-	var resp annuityRecordResp
+	var resp APIResponse[AnnuityRecord]
 	if err := lc.client.post(ctx, "/api/v1/lifecycle/annuities/payments", req, &resp); err != nil {
 		return nil, err
 	}
@@ -276,7 +240,7 @@ func (lc *LifecycleClient) GetLegalStatus(ctx context.Context, patentNumber stri
 	if patentNumber == "" {
 		return nil, invalidArg("patentNumber is required")
 	}
-	var resp legalStatusResp
+	var resp APIResponse[LegalStatusRecord]
 	if err := lc.client.get(ctx, "/api/v1/lifecycle/patents/"+url.PathEscape(patentNumber)+"/legal-status", &resp); err != nil {
 		return nil, err
 	}
@@ -305,7 +269,7 @@ func (lc *LifecycleClient) GetReminders(ctx context.Context, patentNumber string
 	if patentNumber == "" {
 		return nil, invalidArg("patentNumber is required")
 	}
-	var resp reminderListResp
+	var resp APIResponse[[]ReminderConfig]
 	if err := lc.client.get(ctx, "/api/v1/lifecycle/patents/"+url.PathEscape(patentNumber)+"/reminders", &resp); err != nil {
 		return nil, err
 	}
@@ -324,7 +288,7 @@ func (lc *LifecycleClient) SetReminder(ctx context.Context, req *ReminderConfigR
 	if len(req.Channels) == 0 {
 		return nil, invalidArg("channels is required")
 	}
-	var resp reminderResp
+	var resp APIResponse[ReminderConfig]
 	if err := lc.client.post(ctx, "/api/v1/lifecycle/reminders", req, &resp); err != nil {
 		return nil, err
 	}
