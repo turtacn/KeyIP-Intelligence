@@ -170,7 +170,7 @@ func runLifecycleDeadlines(ctx context.Context, deadlineService lifecycle.Deadli
 	}
 
 	logger.Info("Deadlines query completed",
-		"count", len(deadlines))
+		logging.Int("count", len(deadlines)))
 
 	return nil
 }
@@ -183,40 +183,35 @@ func runLifecycleAnnuity(ctx context.Context, annuityService lifecycle.AnnuitySe
 	}
 
 	logger.Info("Calculating annuity fees",
-		"patent_number", lifecyclePatentNumber,
-		"year", lifecycleYear,
-		"currency", lifecycleCurrency,
-		"include_forecast", lifecycleIncludeForecast)
+		logging.String("patent_number", lifecyclePatentNumber),
+		logging.Int("year", lifecycleYear),
+		logging.String("currency", lifecycleCurrency),
+		logging.Bool("include_forecast", lifecycleIncludeForecast))
 
 	// Build calculation request
-	req := &lifecycle.AnnuityQueryRequest{
-		PatentNumber:     lifecyclePatentNumber,
-		Year:             lifecycleYear,
-		Currency:         strings.ToUpper(lifecycleCurrency),
-		IncludeForecast:  lifecycleIncludeForecast,
-		Context:          ctx,
+	req := &lifecycle.CalculateAnnuityRequest{
+		PatentID:       lifecyclePatentNumber,
+		TargetCurrency: lifecycle.Currency(strings.ToUpper(lifecycleCurrency)),
 	}
 
 	// Calculate annuities
-	result, err := annuityService.Calculate(ctx, req)
+	result, err := annuityService.CalculateAnnuity(ctx, req)
 	if err != nil {
-		logger.Error("Failed to calculate annuities", "error", err)
+		logger.Error("Failed to calculate annuities", logging.Err(err))
 		return errors.WrapMsg(err, "failed to calculate annuities")
 	}
 
 	// Format output
-	output := formatAnnuityTable(result.Details, result.Currency)
-	fmt.Print(output)
-
-	// Summary
-	fmt.Printf("\nTotal for %d: %s %.2f\n", lifecycleYear, result.Currency, result.TotalAmount)
-	if lifecycleIncludeForecast {
-		fmt.Printf("5-year forecast: %s %.2f\n", result.Currency, result.ForecastTotal)
-	}
+	fmt.Printf("\n=== Annuity Calculation ===\n\n")
+	fmt.Printf("Patent: %s\n", result.PatentNumber)
+	fmt.Printf("Jurisdiction: %s\n", result.Jurisdiction)
+	fmt.Printf("Year %d Fee: %s %.2f\n", result.YearNumber, result.BaseFee.Currency, result.BaseFee.Amount)
+	fmt.Printf("Due Date: %s\n", result.DueDate.Format("2006-01-02"))
+	fmt.Printf("Status: %s\n", result.Status)
 
 	logger.Info("Annuity calculation completed",
-		"patent_number", lifecyclePatentNumber,
-		"total_amount", result.TotalAmount)
+		logging.String("patent_number", lifecyclePatentNumber),
+		logging.Float64("amount", result.BaseFee.Amount))
 
 	return nil
 }
@@ -433,7 +428,7 @@ func parseAdvanceDays(input string) []int {
 	return result
 }
 
-func sortDeadlinesByUrgency(deadlines []*lifecycle.Deadline) {
+func sortDeadlinesByUrgency(deadlines []lifecycle.Deadline) {
 	sort.Slice(deadlines, func(i, j int) bool {
 		// Sort by urgency first (CRITICAL > WARNING > NORMAL)
 		if deadlines[i].Urgency != deadlines[j].Urgency {
@@ -449,7 +444,7 @@ func sortDeadlinesByUrgency(deadlines []*lifecycle.Deadline) {
 	})
 }
 
-func formatDeadlineTable(deadlines []*lifecycle.Deadline) string {
+func formatDeadlineTable(deadlines []lifecycle.Deadline) string {
 	if len(deadlines) == 0 {
 		return "\nNo upcoming deadlines found.\n"
 	}
@@ -463,8 +458,7 @@ func formatDeadlineTable(deadlines []*lifecycle.Deadline) string {
 	green := color.New(color.FgGreen).SprintFunc()
 
 	table := tablewriter.NewWriter(&buf)
-	table.SetHeader([]string{"Urgency", "Patent", "Type", "Due Date", "Days Left", "Status"})
-	table.SetBorder(true)
+	table.Header("Urgency", "Patent", "Type", "Due Date", "Days Left", "Status")
 
 	for _, d := range deadlines {
 		urgencyStr := d.Urgency

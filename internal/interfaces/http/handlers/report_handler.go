@@ -26,7 +26,9 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -131,45 +133,47 @@ func (h *ReportHandler) RegisterRoutes(mux *http.ServeMux) {
 // It initiates asynchronous FTO report generation and returns 202 Accepted with a report ID.
 func (h *ReportHandler) GenerateFTOReport(w http.ResponseWriter, r *http.Request) {
 	var req GenerateFTOReportRequest
-	if err := decodeJSON(r, &req); err != nil {
-		h.logger.Error("failed to decode FTO report request", "error", err)
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid request body")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("failed to decode FTO report request", logging.Err(err))
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid request body")
 		return
 	}
 
 	if req.TargetSMILES == "" {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "target_smiles is required")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "target_smiles is required")
 		return
 	}
 	if req.Jurisdiction == "" {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "jurisdiction is required")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "jurisdiction is required")
 		return
 	}
 	if req.Format == "" {
 		req.Format = "pdf"
 	}
 	if !isValidFormat(req.Format) {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "format must be one of: pdf, docx, xlsx")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "format must be one of: pdf, docx, xlsx")
 		return
 	}
 
+	// Map HTTP request to service request
 	svcReq := &reporting.FTOReportRequest{
-		TargetSMILES:   req.TargetSMILES,
-		Jurisdiction:   req.Jurisdiction,
-		IncludeExpired: req.IncludeExpired,
-		Depth:          req.Depth,
-		Format:         req.Format,
-		Languages:      req.Languages,
+		TargetMolecules: []reporting.MoleculeInput{
+			{Format: "smiles", Value: req.TargetSMILES},
+		},
+		Jurisdictions:       []string{req.Jurisdiction},
+		AnalysisDepth:       mapDepth(req.Depth),
+		IncludeDesignAround: req.IncludeExpired,
+		Language:            mapLanguage(req.Languages),
 	}
 
 	result, err := h.ftoSvc.Generate(r.Context(), svcReq)
 	if err != nil {
-		h.logger.Error("failed to initiate FTO report generation", "error", err)
-		writeAppError(w, err)
+		h.logger.Error("failed to initiate FTO report generation", logging.Err(err))
+		writeReportAppError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusAccepted, map[string]interface{}{
+	writeReportJSON(w, http.StatusAccepted, map[string]interface{}{
 		"report_id": result.ReportID,
 		"status":    result.Status,
 		"message":   "FTO report generation initiated",
@@ -179,43 +183,48 @@ func (h *ReportHandler) GenerateFTOReport(w http.ResponseWriter, r *http.Request
 // GenerateInfringementReport handles POST /api/v1/reports/infringement.
 func (h *ReportHandler) GenerateInfringementReport(w http.ResponseWriter, r *http.Request) {
 	var req GenerateInfringementReportRequest
-	if err := decodeJSON(r, &req); err != nil {
-		h.logger.Error("failed to decode infringement report request", "error", err)
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid request body")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("failed to decode infringement report request", logging.Err(err))
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid request body")
 		return
 	}
 
 	if req.PatentNumber == "" {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "patent_number is required")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "patent_number is required")
 		return
 	}
 	if len(req.TargetSMILES) == 0 {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "target_smiles is required")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "target_smiles is required")
 		return
 	}
 	if req.Format == "" {
 		req.Format = "pdf"
 	}
 	if !isValidFormat(req.Format) {
-		writeError(w, http.StatusBadRequest, errors.ErrCodeValidation, "format must be one of: pdf, docx, xlsx")
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "format must be one of: pdf, docx, xlsx")
 		return
 	}
 
+	// Map HTTP request to service request
+	moleculeInputs := make([]reporting.MoleculeInput, len(req.TargetSMILES))
+	for i, smiles := range req.TargetSMILES {
+		moleculeInputs[i] = reporting.MoleculeInput{Format: "smiles", Value: smiles}
+	}
+
 	svcReq := &reporting.InfringementReportRequest{
-		PatentNumber:  req.PatentNumber,
-		TargetSMILES:  req.TargetSMILES,
-		AnalysisDepth: req.AnalysisDepth,
-		Format:        req.Format,
+		OwnedPatentNumbers: []string{req.PatentNumber},
+		SuspectedMolecules: moleculeInputs,
+		AnalysisMode:       mapAnalysisMode(req.AnalysisDepth),
 	}
 
 	result, err := h.infringeSvc.Generate(r.Context(), svcReq)
 	if err != nil {
-		h.logger.Error("failed to initiate infringement report generation", "error", err)
-		writeAppError(w, err)
+		h.logger.Error("failed to initiate infringement report generation", logging.Err(err))
+		writeReportAppError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusAccepted, map[string]interface{}{
+	writeReportJSON(w, http.StatusAccepted, map[string]interface{}{
 		"report_id": result.ReportID,
 		"status":    result.Status,
 		"message":   "Infringement report generation initiated",
