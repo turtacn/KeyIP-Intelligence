@@ -2,6 +2,9 @@ package milvus
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -9,10 +12,17 @@ import (
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 )
 
+// MilvusClientFactory defines the signature for creating a Milvus client
+type MilvusClientFactory func(ctx context.Context, conf client.Config) (client.Client, error)
+
 // milvusNewClient is a variable to allow mocking in tests
-var milvusNewClient = client.NewClient
+var milvusNewClient MilvusClientFactory = client.NewClient
 
 var (
 	ErrInvalidConfig    = errors.New(errors.ErrCodeValidation, "invalid configuration")
@@ -116,9 +126,42 @@ func connect(ctx context.Context, cfg ClientConfig) (client.Client, error) {
 		DBName:   cfg.DBName,
 	}
 
-	// TLS and Keepalive support depends on client.WithDialOptions which is missing in this version
-	// We proceed with basic config.
-	// If TLS is required via Config, we might fail or rely on Address scheme if supported.
+	var dialOpts []grpc.DialOption
+
+	// TLS Configuration
+	if cfg.TLSEnabled {
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: true, // Default to insecure if no cert provided? Or strict?
+			ServerName:         cfg.TLSServerName,
+		}
+		if cfg.TLSCertPath != "" {
+			caCert, err := os.ReadFile(cfg.TLSCertPath)
+			if err != nil {
+				return nil, errors.Wrap(err, errors.ErrCodeValidation, "failed to read TLS cert")
+			}
+			caCertPool := x509.NewCertPool()
+			if ok := caCertPool.AppendCertsFromPEM(caCert); !ok {
+				return nil, errors.New(errors.ErrCodeValidation, "failed to parse TLS cert")
+			}
+			tlsConfig.RootCAs = caCertPool
+			tlsConfig.InsecureSkipVerify = false
+		}
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+		milvusCfg.EnableTLSAuth = true
+	} else {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+
+	// KeepAlive Configuration
+	kp := keepalive.ClientParameters{
+		Time:                cfg.KeepAliveTime,
+		Timeout:             cfg.KeepAliveTimeout,
+		PermitWithoutStream: true,
+	}
+	dialOpts = append(dialOpts, grpc.WithKeepaliveParams(kp))
+
+	// Assign DialOptions to config
+	milvusCfg.DialOptions = dialOpts
 
 	// Apply ConnectTimeout via context
 	connectCtx, cancel := context.WithTimeout(ctx, cfg.ConnectTimeout)

@@ -88,6 +88,7 @@ func TestNewClient_Success(t *testing.T) {
 
 	// Mock NewClient
 	milvusNewClient = func(ctx context.Context, conf client.Config) (client.Client, error) {
+		// Verify conf if needed
 		return &mockMilvusClientCheckHealth{}, nil
 	}
 
