@@ -299,8 +299,12 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 		req.Header.Set("User-Agent", c.userAgent)
 		req.Header.Set("X-Request-ID", requestID)
 
-		// Apply caller-supplied base headers (protected keys already stripped).
+		// Apply caller-supplied base headers (skip protected keys).
 		for k, v := range c.baseHeaders {
+			// Don't allow overriding Authorization, Content-Type, or other critical headers
+			if k == "Authorization" || k == "Content-Type" || k == "Accept" || k == "User-Agent" {
+				continue
+			}
 			req.Header.Set(k, v)
 		}
 

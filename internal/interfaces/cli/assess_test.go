@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
@@ -36,25 +37,58 @@ func (m *MockValuationService) AssessPortfolio(ctx context.Context, req *portfol
 	return args.Get(0).(*portfolio.CLIPortfolioAssessResult), args.Error(1)
 }
 
-// MockLogger is a mock implementation of Logger
+// MockLogger is a mock implementation of logging.Logger
 type MockLogger struct {
 	mock.Mock
 }
 
-func (m *MockLogger) Info(msg string, keysAndValues ...interface{}) {
-	m.Called(msg, keysAndValues)
+func (m *MockLogger) Debug(msg string, fields ...logging.Field) {
+	m.Called(msg, fields)
 }
 
-func (m *MockLogger) Error(msg string, keysAndValues ...interface{}) {
-	m.Called(msg, keysAndValues)
+func (m *MockLogger) Info(msg string, fields ...logging.Field) {
+	m.Called(msg, fields)
 }
 
-func (m *MockLogger) Debug(msg string, keysAndValues ...interface{}) {
-	m.Called(msg, keysAndValues)
+func (m *MockLogger) Warn(msg string, fields ...logging.Field) {
+	m.Called(msg, fields)
 }
 
-func (m *MockLogger) Warn(msg string, keysAndValues ...interface{}) {
-	m.Called(msg, keysAndValues)
+func (m *MockLogger) Error(msg string, fields ...logging.Field) {
+	m.Called(msg, fields)
+}
+
+func (m *MockLogger) Fatal(msg string, fields ...logging.Field) {
+	m.Called(msg, fields)
+}
+
+func (m *MockLogger) With(fields ...logging.Field) logging.Logger {
+	args := m.Called(fields)
+	if args.Get(0) == nil {
+		return m
+	}
+	return args.Get(0).(logging.Logger)
+}
+
+func (m *MockLogger) WithContext(ctx context.Context) logging.Logger {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return m
+	}
+	return args.Get(0).(logging.Logger)
+}
+
+func (m *MockLogger) WithError(err error) logging.Logger {
+	args := m.Called(err)
+	if args.Get(0) == nil {
+		return m
+	}
+	return args.Get(0).(logging.Logger)
+}
+
+func (m *MockLogger) Sync() error {
+	args := m.Called()
+	return args.Error(0)
 }
 
 func TestParsePatentNumbers(t *testing.T) {
