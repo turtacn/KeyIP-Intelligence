@@ -21,130 +21,59 @@ type Neo4jConfig struct {
 	Encrypted                    bool          `yaml:"encrypted"`
 }
 
-// Result abstracts neo4j.ResultWithContext
+// Result interface abstracts neo4j result to allow mocking
 type Result interface {
 	Next(ctx context.Context) bool
 	Record() *neo4j.Record
 	Err() error
 	Consume(ctx context.Context) (neo4j.ResultSummary, error)
-	// Add other methods as needed
+	Peek(ctx context.Context) bool
+	// We avoid methods that might be unexported or hard to mock
 }
 
-// Transaction abstracts neo4j.ManagedTransaction
+// Transaction interface to abstract neo4j operations
 type Transaction interface {
 	Run(ctx context.Context, cypher string, params map[string]any) (Result, error)
 }
 
-// internalSession abstracts neo4j.SessionWithContext
-type internalSession interface {
-	ExecuteRead(ctx context.Context, work func(Transaction) (any, error)) (any, error)
-	ExecuteWrite(ctx context.Context, work func(Transaction) (any, error)) (any, error)
+// TransactionWork matches our interface
+type TransactionWork func(tx Transaction) (any, error)
+
+// DriverInterface abstracts the Neo4j driver wrapper
+type DriverInterface interface {
+	ExecuteRead(ctx context.Context, work TransactionWork) (interface{}, error)
+	ExecuteWrite(ctx context.Context, work TransactionWork) (interface{}, error)
+	HealthCheck(ctx context.Context) error
 	Close(ctx context.Context) error
 }
 
-// internalDriver abstracts neo4j.DriverWithContext
-type internalDriver interface {
-	VerifyConnectivity(ctx context.Context) error
-	NewSession(ctx context.Context, config neo4j.SessionConfig) internalSession
-	Close(ctx context.Context) error
-}
-
-// stdResult implements Result
-type stdResult struct {
-	res neo4j.ResultWithContext
-}
-
-func (r *stdResult) Next(ctx context.Context) bool {
-	return r.res.Next(ctx)
-}
-func (r *stdResult) Record() *neo4j.Record {
-	return r.res.Record()
-}
-func (r *stdResult) Err() error {
-	return r.res.Err()
-}
-func (r *stdResult) Consume(ctx context.Context) (neo4j.ResultSummary, error) {
-	return r.res.Consume(ctx)
-}
-
-// stdTransaction implements Transaction
-type stdTransaction struct {
-	tx neo4j.ManagedTransaction
-}
-
-func (t *stdTransaction) Run(ctx context.Context, cypher string, params map[string]any) (Result, error) {
-	res, err := t.tx.Run(ctx, cypher, params)
-	if err != nil {
-		return nil, err
-	}
-	return &stdResult{res: res}, nil
-}
-
-// stdSession implements internalSession
-type stdSession struct {
-	s neo4j.SessionWithContext
-}
-
-func (s *stdSession) ExecuteRead(ctx context.Context, work func(Transaction) (any, error)) (any, error) {
-	return s.s.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		return work(&stdTransaction{tx: tx})
-	})
-}
-
-func (s *stdSession) ExecuteWrite(ctx context.Context, work func(Transaction) (any, error)) (any, error) {
-	return s.s.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		return work(&stdTransaction{tx: tx})
-	})
-}
-
-func (s *stdSession) Close(ctx context.Context) error {
-	return s.s.Close(ctx)
-}
-
-// stdDriver implements internalDriver
-type stdDriver struct {
-	d neo4j.DriverWithContext
-}
-
-func (d *stdDriver) VerifyConnectivity(ctx context.Context) error {
-	return d.d.VerifyConnectivity(ctx)
-}
-
-func (d *stdDriver) NewSession(ctx context.Context, config neo4j.SessionConfig) internalSession {
-	return &stdSession{s: d.d.NewSession(ctx, config)}
-}
-
-func (d *stdDriver) Close(ctx context.Context) error {
-	return d.d.Close(ctx)
-}
-
-// Driver is the high-level wrapper
 type Driver struct {
-	driver internalDriver
+	driver neo4j.DriverWithContext
 	cfg    Neo4jConfig
 	logger logging.Logger
 	once   sync.Once
 }
 
 func NewDriver(cfg Neo4jConfig, log logging.Logger) (*Driver, error) {
-	authToken := neo4j.BasicAuth(cfg.Username, cfg.Password, "")
+	if cfg.Database == "" {
+		cfg.Database = "neo4j"
+	}
+	if cfg.MaxConnectionPoolSize == 0 {
+		cfg.MaxConnectionPoolSize = 50
+	}
+	if cfg.MaxConnectionLifetime == 0 {
+		cfg.MaxConnectionLifetime = 1 * time.Hour
+	}
+	if cfg.ConnectionAcquisitionTimeout == 0 {
+		cfg.ConnectionAcquisitionTimeout = 60 * time.Second
+	}
 
-	driver, err := neo4j.NewDriverWithContext(cfg.URI, authToken, func(c *neo4j.Config) {
-		if cfg.MaxConnectionPoolSize > 0 {
-			c.MaxConnectionPoolSize = cfg.MaxConnectionPoolSize
-		} else {
-			c.MaxConnectionPoolSize = 50
-		}
-		if cfg.MaxConnectionLifetime > 0 {
-			c.MaxConnectionLifetime = cfg.MaxConnectionLifetime
-		} else {
-			c.MaxConnectionLifetime = 1 * time.Hour
-		}
-		if cfg.ConnectionAcquisitionTimeout > 0 {
-			c.ConnectionAcquisitionTimeout = cfg.ConnectionAcquisitionTimeout
-		} else {
-			c.ConnectionAcquisitionTimeout = 60 * time.Second
-		}
+	auth := neo4j.BasicAuth(cfg.Username, cfg.Password, "")
+
+	driver, err := neo4j.NewDriverWithContext(cfg.URI, auth, func(c *neo4j.Config) {
+		c.MaxConnectionPoolSize = cfg.MaxConnectionPoolSize
+		c.MaxConnectionLifetime = cfg.MaxConnectionLifetime
+		c.ConnectionAcquisitionTimeout = cfg.ConnectionAcquisitionTimeout
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to create neo4j driver")
@@ -154,59 +83,88 @@ func NewDriver(cfg Neo4jConfig, log logging.Logger) (*Driver, error) {
 	defer cancel()
 
 	if err := driver.VerifyConnectivity(ctx); err != nil {
-		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to connect to neo4j")
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to verify neo4j connectivity")
 	}
 
-	log.Info("Connected to Neo4j", logging.String("uri", cfg.URI), logging.String("database", cfg.Database))
+	log.Info("Connected to Neo4j database",
+		logging.String("uri", cfg.URI),
+		logging.String("database", cfg.Database),
+	)
 
 	return &Driver{
-		driver: &stdDriver{d: driver},
+		driver: driver,
 		cfg:    cfg,
 		logger: log,
 	}, nil
 }
 
-func (d *Driver) Session(ctx context.Context, accessMode neo4j.AccessMode) internalSession {
-	dbName := d.cfg.Database
-	if dbName == "" {
-		dbName = "neo4j"
+func NewDriverWithInstance(driver neo4j.DriverWithContext, log logging.Logger) *Driver {
+	return &Driver{
+		driver: driver,
+		logger: log,
+		cfg:    Neo4jConfig{Database: "neo4j"},
 	}
+}
+
+func (d *Driver) Session(ctx context.Context, accessMode neo4j.AccessMode) neo4j.SessionWithContext {
 	return d.driver.NewSession(ctx, neo4j.SessionConfig{
-		DatabaseName: dbName,
+		DatabaseName: d.cfg.Database,
 		AccessMode:   accessMode,
 	})
 }
 
-func (d *Driver) ReadSession(ctx context.Context) internalSession {
-	return d.Session(ctx, neo4j.AccessModeRead)
+// adapter implements Transaction using neo4j.ExplicitTransaction
+type txAdapter struct {
+	tx neo4j.ExplicitTransaction
 }
 
-func (d *Driver) WriteSession(ctx context.Context) internalSession {
-	return d.Session(ctx, neo4j.AccessModeWrite)
+func (t *txAdapter) Run(ctx context.Context, cypher string, params map[string]any) (Result, error) {
+	return t.tx.Run(ctx, cypher, params)
 }
 
-func (d *Driver) ExecuteRead(ctx context.Context, work func(Transaction) (interface{}, error)) (interface{}, error) {
-	session := d.ReadSession(ctx)
+func (d *Driver) ExecuteRead(ctx context.Context, work TransactionWork) (interface{}, error) {
+	session := d.Session(ctx, neo4j.AccessModeRead)
 	defer session.Close(ctx)
 
-	result, err := session.ExecuteRead(ctx, work)
+	tx, err := session.BeginTransaction(ctx)
 	if err != nil {
-		d.logger.Error("Neo4j read transaction failed", logging.Err(err))
-		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "neo4j read failed")
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to begin read transaction")
 	}
-	return result, nil
+	defer tx.Close(ctx)
+
+	res, err := work(&txAdapter{tx: tx})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to commit read transaction")
+	}
+
+	return res, nil
 }
 
-func (d *Driver) ExecuteWrite(ctx context.Context, work func(Transaction) (interface{}, error)) (interface{}, error) {
-	session := d.WriteSession(ctx)
+func (d *Driver) ExecuteWrite(ctx context.Context, work TransactionWork) (interface{}, error) {
+	session := d.Session(ctx, neo4j.AccessModeWrite)
 	defer session.Close(ctx)
 
-	result, err := session.ExecuteWrite(ctx, work)
+	tx, err := session.BeginTransaction(ctx)
 	if err != nil {
-		d.logger.Error("Neo4j write transaction failed", logging.Err(err))
-		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "neo4j write failed")
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to begin write transaction")
 	}
-	return result, nil
+	defer tx.Close(ctx)
+
+	res, err := work(&txAdapter{tx: tx})
+	if err != nil {
+		tx.Rollback(ctx)
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to commit write transaction")
+	}
+
+	return res, nil
 }
 
 func (d *Driver) HealthCheck(ctx context.Context) error {
@@ -214,22 +172,24 @@ func (d *Driver) HealthCheck(ctx context.Context) error {
 		return errors.Wrap(err, errors.ErrCodeDatabaseError, "neo4j connectivity check failed")
 	}
 
-	// Execute simple query
 	_, err := d.ExecuteRead(ctx, func(tx Transaction) (interface{}, error) {
-		result, err := tx.Run(ctx, "RETURN 1 AS health", nil)
-		if err != nil { return nil, err }
-		if result.Next(ctx) {
-			return result.Record().Values[0], nil
+		res, err := tx.Run(ctx, "RETURN 1 AS health", nil)
+		if err != nil {
+			return nil, err
 		}
-		return nil, result.Err()
+		if res.Next(ctx) {
+			return res.Record().Values[0], nil
+		}
+		return nil, res.Err()
 	})
+
 	return err
 }
 
-func (d *Driver) Close() error {
+func (d *Driver) Close(ctx context.Context) error {
 	var err error
 	d.once.Do(func() {
-		err = d.driver.Close(context.Background())
+		err = d.driver.Close(ctx)
 		if err == nil {
 			d.logger.Info("Closed Neo4j driver")
 		} else {
@@ -241,10 +201,16 @@ func (d *Driver) Close() error {
 
 // Helpers
 
-func ExtractSingleRecord[T any](ctx context.Context, result Result, mapper func(*neo4j.Record) (T, error)) (T, error) {
+func ExtractSingleRecord[T any](result Result, ctx context.Context) (T, error) {
 	var zero T
 	if result.Next(ctx) {
-		return mapper(result.Record())
+		rec := result.Record()
+		if len(rec.Values) > 0 {
+			if v, ok := rec.Values[0].(T); ok {
+				return v, nil
+			}
+			return zero, errors.New(errors.ErrCodeSerialization, "unexpected type")
+		}
 	}
 	if err := result.Err(); err != nil {
 		return zero, err
@@ -252,7 +218,7 @@ func ExtractSingleRecord[T any](ctx context.Context, result Result, mapper func(
 	return zero, errors.New(errors.ErrCodeNotFound, "no record found")
 }
 
-func CollectRecords[T any](ctx context.Context, result Result, mapper func(*neo4j.Record) (T, error)) ([]T, error) {
+func CollectRecords[T any](result Result, ctx context.Context, mapper func(*neo4j.Record) (T, error)) ([]T, error) {
 	var items []T
 	for result.Next(ctx) {
 		item, err := mapper(result.Record())
@@ -266,5 +232,4 @@ func CollectRecords[T any](ctx context.Context, result Result, mapper func(*neo4
 	}
 	return items, nil
 }
-
 //Personal.AI order the ending

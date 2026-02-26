@@ -1,4 +1,5 @@
 -- +migrate Up
+
 CREATE TYPE workspace_type AS ENUM ('personal', 'team', 'project');
 CREATE TYPE notification_type AS ENUM ('deadline_reminder', 'annuity_due', 'task_assigned', 'comment_mention', 'analysis_complete', 'portfolio_alert', 'system_announcement', 'invitation');
 
@@ -130,20 +131,26 @@ CREATE INDEX idx_workspaces_org_id ON workspaces(organization_id);
 CREATE INDEX idx_workspaces_owner_id ON workspaces(owner_id);
 CREATE INDEX idx_workspaces_type ON workspaces(workspace_type);
 CREATE INDEX idx_workspaces_deleted_at ON workspaces(deleted_at) WHERE deleted_at IS NULL;
+
 CREATE INDEX idx_ws_members_user_id ON workspace_members(user_id);
+
 CREATE INDEX idx_ws_projects_workspace_id ON workspace_projects(workspace_id);
 CREATE INDEX idx_ws_projects_status ON workspace_projects(status);
 CREATE INDEX idx_ws_projects_lead_id ON workspace_projects(lead_id);
+
 CREATE INDEX idx_project_patents_patent_id ON project_patents(patent_id);
 CREATE INDEX idx_project_molecules_molecule_id ON project_molecules(molecule_id);
+
 CREATE INDEX idx_comments_resource ON comments(resource_type, resource_id);
 CREATE INDEX idx_comments_author_id ON comments(author_id);
 CREATE INDEX idx_comments_parent_id ON comments(parent_comment_id);
 CREATE INDEX idx_comments_deleted_at ON comments(deleted_at) WHERE deleted_at IS NULL;
+
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_unread ON notifications(user_id, is_read) WHERE is_read = FALSE;
 CREATE INDEX idx_notifications_type ON notifications(notification_type);
 CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+
 CREATE INDEX idx_saved_searches_user_id ON saved_searches(user_id);
 CREATE INDEX idx_saved_searches_workspace_id ON saved_searches(workspace_id);
 CREATE INDEX idx_saved_searches_alert ON saved_searches(is_alert_enabled) WHERE is_alert_enabled = TRUE;
@@ -169,15 +176,21 @@ FOR EACH ROW
 EXECUTE FUNCTION trigger_set_updated_at();
 
 -- +migrate Down
-DROP TABLE saved_searches;
-DROP TABLE notifications;
-DROP TABLE comments;
-DROP TABLE project_molecules;
-DROP TABLE project_patents;
-DROP TABLE workspace_projects;
-DROP TABLE workspace_members;
-DROP TABLE workspaces;
-DROP TYPE notification_type;
-DROP TYPE workspace_type;
 
+DROP TRIGGER IF EXISTS set_updated_at ON saved_searches;
+DROP TRIGGER IF EXISTS set_updated_at ON comments;
+DROP TRIGGER IF EXISTS set_updated_at ON workspace_projects;
+DROP TRIGGER IF EXISTS set_updated_at ON workspaces;
+
+DROP TABLE IF EXISTS saved_searches;
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS project_molecules;
+DROP TABLE IF EXISTS project_patents;
+DROP TABLE IF EXISTS workspace_projects;
+DROP TABLE IF EXISTS workspace_members;
+DROP TABLE IF EXISTS workspaces;
+
+DROP TYPE IF EXISTS notification_type;
+DROP TYPE IF EXISTS workspace_type;
 --Personal.AI order the ending
