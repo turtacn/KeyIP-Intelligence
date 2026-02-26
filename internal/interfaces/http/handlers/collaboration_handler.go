@@ -519,4 +519,54 @@ func (h *CollaborationHandler) RevokeShareLink(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "revoke share link not yet implemented"})
 }
 
+// ListTeams handles listing teams (placeholder).
+func (h *CollaborationHandler) ListTeams(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "list teams not yet implemented"})
+}
+
+// CreateTeam handles creating a team (placeholder).
+func (h *CollaborationHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "create team not yet implemented"})
+}
+
+// GetTeam handles getting a team (placeholder).
+func (h *CollaborationHandler) GetTeam(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "get team not yet implemented"})
+}
+
+// UpdateTeam handles updating a team (placeholder).
+func (h *CollaborationHandler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "update team not yet implemented"})
+}
+
+// DeleteTeam handles deleting a team (placeholder).
+func (h *CollaborationHandler) DeleteTeam(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "delete team not yet implemented"})
+}
+
+// ListApprovals handles listing approvals (placeholder).
+func (h *CollaborationHandler) ListApprovals(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "list approvals not yet implemented"})
+}
+
+// CreateApproval handles creating an approval (placeholder).
+func (h *CollaborationHandler) CreateApproval(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "create approval not yet implemented"})
+}
+
+// ApproveRequest handles approving a request (placeholder).
+func (h *CollaborationHandler) ApproveRequest(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "approve request not yet implemented"})
+}
+
+// RejectRequest handles rejecting a request (placeholder).
+func (h *CollaborationHandler) RejectRequest(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "reject request not yet implemented"})
+}
+
+// ListActivities handles listing activities (placeholder).
+func (h *CollaborationHandler) ListActivities(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "list activities not yet implemented"})
+}
+
 //Personal.AI order the ending

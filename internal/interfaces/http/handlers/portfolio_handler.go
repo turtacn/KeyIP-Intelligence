@@ -289,4 +289,53 @@ func (h *PortfolioHandler) Optimize(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "optimization not yet implemented"})
 }
 
+// ListPortfolioPatents handles listing patents in a portfolio (placeholder/alias).
+func (h *PortfolioHandler) ListPortfolioPatents(w http.ResponseWriter, r *http.Request) {
+	// Reusing ListPortfolios or a placeholder if logic differs significantly
+	// Assuming it's a sub-resource list
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "list portfolio patents not yet implemented"})
+}
+
+// RemovePatent handles removing a single patent (singular alias).
+func (h *PortfolioHandler) RemovePatent(w http.ResponseWriter, r *http.Request) {
+	// We can adapt to RemovePatents
+	patentID := r.PathValue("patentNumber")
+	if patentID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "patent number is required"))
+		return
+	}
+	// Call RemovePatents with single ID logic or placeholder
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "remove single patent not yet implemented"})
+}
+
+// AssessPortfolio handles portfolio assessment (placeholder).
+func (h *PortfolioHandler) AssessPortfolio(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "assess portfolio not yet implemented"})
+}
+
+// GetAnalytics handles portfolio analytics (placeholder).
+func (h *PortfolioHandler) GetAnalytics(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "analytics not yet implemented"})
+}
+
+// GetRecommendations handles portfolio recommendations (placeholder).
+func (h *PortfolioHandler) GetRecommendations(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "recommendations not yet implemented"})
+}
+
+// OptimizePortfolio handles portfolio optimization (alias).
+func (h *PortfolioHandler) OptimizePortfolio(w http.ResponseWriter, r *http.Request) {
+	h.Optimize(w, r)
+}
+
+// GetTimeline handles portfolio timeline (placeholder).
+func (h *PortfolioHandler) GetTimeline(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "timeline not yet implemented"})
+}
+
+// GetJurisdictionHeatmap handles jurisdiction heatmap (placeholder).
+func (h *PortfolioHandler) GetJurisdictionHeatmap(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "heatmap not yet implemented"})
+}
+
 //Personal.AI order the ending

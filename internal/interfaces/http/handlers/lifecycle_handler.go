@@ -345,4 +345,59 @@ func (h *LifecycleHandler) ExportCalendar(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "calendar export not yet implemented"})
 }
 
+// CreateDeadline handles deadline creation (placeholder).
+func (h *LifecycleHandler) CreateDeadline(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "create deadline not yet implemented"})
+}
+
+// UpdateDeadline handles deadline update (placeholder).
+func (h *LifecycleHandler) UpdateDeadline(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "update deadline not yet implemented"})
+}
+
+// CompleteDeadline handles deadline completion (placeholder).
+func (h *LifecycleHandler) CompleteDeadline(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "complete deadline not yet implemented"})
+}
+
+// GetAnnuities handles annuities retrieval (alias for ListFees).
+func (h *LifecycleHandler) GetAnnuities(w http.ResponseWriter, r *http.Request) {
+	h.ListFees(w, r)
+}
+
+// CalculateAnnuity handles annuity calculation (singular alias).
+func (h *LifecycleHandler) CalculateAnnuity(w http.ResponseWriter, r *http.Request) {
+	h.CalculateAnnuities(w, r)
+}
+
+// ForecastAnnuities handles annuity forecasting (placeholder).
+func (h *LifecycleHandler) ForecastAnnuities(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "annuity forecast not yet implemented"})
+}
+
+// GetLegalStatusHistory handles legal status history (placeholder).
+func (h *LifecycleHandler) GetLegalStatusHistory(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "legal status history not yet implemented"})
+}
+
+// ListReminders handles reminders listing (placeholder).
+func (h *LifecycleHandler) ListReminders(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "reminders listing not yet implemented"})
+}
+
+// CreateReminder handles reminder creation (placeholder).
+func (h *LifecycleHandler) CreateReminder(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "create reminder not yet implemented"})
+}
+
+// UpdateReminder handles reminder update (placeholder).
+func (h *LifecycleHandler) UpdateReminder(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "update reminder not yet implemented"})
+}
+
+// DeleteReminder handles reminder deletion (placeholder).
+func (h *LifecycleHandler) DeleteReminder(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "delete reminder not yet implemented"})
+}
+
 //Personal.AI order the ending
