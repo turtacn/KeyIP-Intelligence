@@ -7,6 +7,13 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
+// MoleculeDomainService defines the interface for molecule domain operations.
+// Restored for backward compatibility with infringement module.
+type MoleculeDomainService interface {
+	Canonicalize(ctx context.Context, smiles string) (string, string, error)
+	CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error)
+}
+
 // MoleculeService coordinates molecule-related business operations.
 type MoleculeService struct {
 	repo             MoleculeRepository
@@ -64,10 +71,6 @@ func (s *MoleculeService) RegisterMolecule(ctx context.Context, smiles string, s
 	morgan, err := s.fpCalculator.Calculate(ctx, ids.CanonicalSMILES, FingerprintMorgan, opts)
 	if err != nil {
 		s.logger.Warn("failed to calculate Morgan fingerprint", logging.String("smiles", smiles), logging.Error(err))
-		// Should we fail registration? Requirement says "Standardize... Calculate... Add... Activate".
-		// Usually fingerprints are critical for search. But maybe proceed if one fails?
-		// Requirement for RegisterMolecule: "Step 6... Step 7... Step 8... Return wrapper error on failure".
-		// So we should fail if calculation fails.
 		return nil, errors.Wrap(err, errors.ErrCodeFingerprintGenerationFailed, "failed to calculate Morgan fingerprint")
 	}
 	if err := mol.AddFingerprint(morgan); err != nil {
@@ -132,10 +135,6 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 		return result, nil
 	}
 
-	// Optimization: Process sequentially for now, or batch if calculator supports it.
-	// Requirement mentions using `fpCalculator.BatchCalculate` and `repo.BatchSave`.
-
-	// Stage 1: Validation and Standardization
 	type PendingMolecule struct {
 		Index int
 		Mol   *Molecule
@@ -166,10 +165,8 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 			continue
 		}
 		if exists {
-			// Fetch existing to return it
 			existing, err := s.repo.FindByInChIKey(ctx, ids.InChIKey)
 			if err != nil {
-				// Should not happen if Exists returned true, but race condition possible
 				result.Failed = append(result.Failed, BatchRegistrationError{Index: i, SMILES: req.SMILES, Error: err})
 			} else {
 				result.Succeeded = append(result.Succeeded, existing)
@@ -178,10 +175,8 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 			continue
 		}
 
-		// Set identifiers
 		_ = mol.SetStructureIdentifiers(ids.CanonicalSMILES, ids.InChI, ids.InChIKey, ids.Formula, ids.Weight)
 
-		// Add extras
 		for _, tag := range req.Tags {
 			_ = mol.AddTag(tag)
 		}
@@ -197,21 +192,16 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 		return result, nil
 	}
 
-	// Stage 2: Batch Fingerprint Calculation
 	opts := DefaultFingerprintCalcOptions()
 
-	// Morgan
 	morgans, err := s.fpCalculator.BatchCalculate(ctx, smilesList, FingerprintMorgan, opts)
 	if err != nil {
-		// If batch calc fails, fail all pending? Or fallback to individual?
-		// Assuming fail all pending for simplicity as per requirement "Use BatchCalculate".
 		for _, p := range pending {
 			result.Failed = append(result.Failed, BatchRegistrationError{Index: p.Index, SMILES: p.Req.SMILES, Error: err})
 		}
-		return result, nil // Or continue?
+		return result, nil
 	}
 
-	// MACCS
 	maccss, err := s.fpCalculator.BatchCalculate(ctx, smilesList, FingerprintMACCS, opts)
 	if err != nil {
 		for _, p := range pending {
@@ -220,12 +210,8 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 		return result, nil
 	}
 
-	// Stage 3: Assembly and Batch Save
 	var toSave []*Molecule
-	// Map fingerprints back to molecules
-	// BatchCalculate returns slice corresponding to input smilesList
 	if len(morgans) != len(pending) || len(maccss) != len(pending) {
-		// Mismatch error
 		err := errors.New(errors.ErrCodeInternal, "fingerprint batch size mismatch")
 		for _, p := range pending {
 			result.Failed = append(result.Failed, BatchRegistrationError{Index: p.Index, SMILES: p.Req.SMILES, Error: err})
@@ -251,12 +237,8 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 	if len(toSave) > 0 {
 		_, err := s.repo.BatchSave(ctx, toSave)
 		if err != nil {
-			// If batch save fails (transactional), all fail
 			s.logger.Error("batch save failed", logging.Error(err))
-			// Add all to failed
 			for _, p := range pending {
-				// Only if it was in toSave list...
-				// Simplify: mark all pending as failed with save error
 				result.Failed = append(result.Failed, BatchRegistrationError{Index: p.Index, SMILES: p.Req.SMILES, Error: err})
 			}
 		} else {
@@ -447,6 +429,24 @@ func (s *MoleculeService) TagMolecule(ctx context.Context, moleculeID string, ta
 		if err := mol.AddTag(t); err != nil { return err }
 	}
 	return s.repo.Update(ctx, mol)
+}
+
+// Canonicalize standardizes a SMILES string and returns canonical SMILES and InChIKey.
+func (s *MoleculeService) Canonicalize(ctx context.Context, smiles string) (string, string, error) {
+	ids, err := s.fpCalculator.Standardize(ctx, smiles)
+	if err != nil {
+		return "", "", err
+	}
+	return ids.CanonicalSMILES, ids.InChIKey, nil
+}
+
+// CanonicalizeFromInChI converts InChI to canonical SMILES and InChIKey.
+// Note: This relies on fpCalculator supporting InChI or a workaround.
+// Currently returns error as standardized interface only accepts SMILES.
+// In a real implementation, we would add StandardizeInChI to the calculator interface.
+func (s *MoleculeService) CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error) {
+	// Not implemented in current calculator interface
+	return "", "", errors.New(errors.ErrCodeNotImplemented, "InChI canonicalization not implemented")
 }
 
 //Personal.AI order the ending

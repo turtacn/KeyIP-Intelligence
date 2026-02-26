@@ -28,6 +28,9 @@ const (
 	MoleculeStatusDeleted                        // 3
 )
 
+// Status alias for backward compatibility
+type Status = MoleculeStatus
+
 func (s MoleculeStatus) String() string {
 	switch s {
 	case MoleculeStatusPending:
@@ -82,6 +85,34 @@ type MolecularProperty struct {
 	Confidence float64 `json:"confidence"`
 }
 
+// Property alias for backward compatibility
+type Property = MolecularProperty
+
+// PatentRelation represents a link between a molecule and a patent.
+// Restored for compatibility with repository.
+type PatentRelation struct {
+	MoleculeID   string    `json:"molecule_id"`
+	PatentNumber string    `json:"patent_number"`
+	RelationType string    `json:"relation_type"` // e.g., "primary", "related"
+	Confidence   float64   `json:"confidence"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// DistributionBucket represents a histogram bucket for property distribution.
+// Restored for compatibility with repository.
+type DistributionBucket struct {
+	Min   float64 `json:"min"`
+	Max   float64 `json:"max"`
+	Count int64   `json:"count"`
+}
+
+// MoleculeWithScore wraps a molecule with a similarity score.
+// Restored for compatibility with repository.
+type MoleculeWithScore struct {
+	Molecule *Molecule `json:"molecule"`
+	Score    float64   `json:"score"`
+}
+
 // Molecule represents a chemical compound as an Aggregate Root.
 type Molecule struct {
 	id               string // UUID v4 string
@@ -100,7 +131,11 @@ type Molecule struct {
 	metadata         map[string]string
 	createdAt        time.Time
 	updatedAt        time.Time
+	deletedAt        *time.Time // Added for soft delete support in repo
 	version          int64
+
+	// Legacy fields support (via methods)
+	// exactMass float64 // removed, strictly follow new spec or add if needed
 }
 
 // NewMolecule creates a new molecule instance.
@@ -111,12 +146,11 @@ func NewMolecule(smiles string, source MoleculeSource, sourceRef string) (*Molec
 	if len(smiles) > 10000 {
 		return nil, errors.New(errors.ErrCodeValidation, "smiles too long")
 	}
-	// Basic validation
-	// Check for balanced parentheses? RDKit does this better, but let's do simple check if required
-	// Requirement: "检查括号配对、合法字符集"
+
 	if !smilesRegex.MatchString(smiles) {
 		return nil, errors.New(errors.ErrCodeValidation, "invalid characters in SMILES")
 	}
+
 	open := 0
 	for _, c := range smiles {
 		if c == '(' {
@@ -152,6 +186,47 @@ func NewMolecule(smiles string, source MoleculeSource, sourceRef string) (*Molec
 	}, nil
 }
 
+// RestoreMolecule reconstructs a molecule from persistence.
+// TRUSTED CALL: Should only be used by Repositories.
+func RestoreMolecule(
+	id, smiles, inchi, inchiKey, formula, canonicalSmiles string,
+	weight float64,
+	source MoleculeSource, sourceRef string,
+	status MoleculeStatus,
+	tags []string,
+	metadata map[string]string,
+	createdAt, updatedAt time.Time,
+	deletedAt *time.Time,
+	version int64,
+) *Molecule {
+	if tags == nil {
+		tags = make([]string, 0)
+	}
+	if metadata == nil {
+		metadata = make(map[string]string)
+	}
+	return &Molecule{
+		id:               id,
+		smiles:           smiles,
+		inchi:            inchi,
+		inchiKey:         inchiKey,
+		molecularFormula: formula,
+		molecularWeight:  weight,
+		canonicalSmiles:  canonicalSmiles,
+		source:           source,
+		sourceRef:        sourceRef,
+		status:           status,
+		tags:             tags,
+		metadata:         metadata,
+		createdAt:        createdAt,
+		updatedAt:        updatedAt,
+		deletedAt:        deletedAt,
+		version:          version,
+		fingerprints:     make(map[FingerprintType]*Fingerprint),
+		properties:       make(map[string]*MolecularProperty),
+	}
+}
+
 // Validate ensures all domain invariants are satisfied.
 func (m *Molecule) Validate() error {
 	if m.id == "" {
@@ -161,15 +236,7 @@ func (m *Molecule) Validate() error {
 		return errors.New(errors.ErrCodeValidation, "missing smiles")
 	}
 	if m.molecularWeight < 0 {
-		return errors.New(errors.ErrCodeValidation, "molecularWeight cannot be negative") // Requirement said "positive", usually > 0, but 0 is technically non-negative. "Must be positive" usually means > 0.
-		// Requirement: "校验 molecularWeight 为正数（如已设置）"
-		// If it is 0.0 (default), is it valid? "如已设置" implies if it's not 0?
-		// But float default is 0. Let's assume strict > 0 if we consider it "set".
-		// However, in Pending state it might be 0.
-		// Let's stick to < 0 check for safety.
-	}
-	if m.molecularWeight == 0 && m.status == MoleculeStatusActive {
-		// Maybe active molecules must have weight?
+		return errors.New(errors.ErrCodeValidation, "molecularWeight cannot be negative")
 	}
 
 	if m.inchiKey != "" && !inchiKeyRegex.MatchString(m.inchiKey) {
@@ -188,7 +255,6 @@ func (m *Molecule) Validate() error {
 			return errors.New(errors.ErrCodeValidation, fmt.Sprintf("invalid confidence for property %s", p.Name))
 		}
 	}
-
 	return nil
 }
 
@@ -221,9 +287,11 @@ func (m *Molecule) MarkDeleted() error {
 		return errors.New(errors.ErrCodeValidation, "already deleted")
 	}
 	if m.status == MoleculeStatusPending {
-		return errors.New(errors.ErrCodeValidation, "cannot delete pending molecule") // Requirement: "允许从 Active 或 Archived 状态转换为 Deleted"
+		return errors.New(errors.ErrCodeValidation, "cannot delete pending molecule")
 	}
 	m.status = MoleculeStatusDeleted
+	now := time.Now().UTC()
+	m.deletedAt = &now
 	m.update()
 	return nil
 }
@@ -289,23 +357,6 @@ func (m *Molecule) AddProperty(prop *MolecularProperty) error {
 		return errors.New(errors.ErrCodeValidation, "invalid confidence")
 	}
 	m.properties[prop.Name] = prop
-	// Don't update version/timestamp for simple property addition?
-	// Requirement: "同名属性覆盖" implies state change.
-	// But requirements for AddProperty didn't explicitly mention update version/timestamp, unlike others.
-	// However, usually any state change should update timestamp.
-	// I'll assume yes.
-	// Wait, requirements for SetStructureIdentifiers said "Update updatedAt and version".
-	// AddFingerprint said "Update updatedAt".
-	// AddProperty didn't say. But it's safer to update.
-	// Actually, `SetStructureIdentifiers` requirements: "Update updatedAt and version".
-	// `AddFingerprint` requirements: "Update updatedAt". (Missed version?)
-	// I'll standardize: any change updates `updatedAt` and `version`.
-	// But check: "AddFingerprint ... 如果同类型指纹已存在则覆盖并更新 updatedAt". No mention of version.
-	// `Activate`: "更新 status、updatedAt、version".
-	// I will update both for consistency.
-	// Let's check strict requirement: "AddFingerprint ... 如果同类型指纹已存在则覆盖并更新 updatedAt".
-	// Maybe version is only for structural changes or status changes?
-	// But `version` is for optimistic locking. Any change persisted needs version bump.
 	m.update()
 	return nil
 }
@@ -363,7 +414,6 @@ func (m *Molecule) CanonicalSmiles() string { return m.canonicalSmiles }
 func (m *Molecule) Source() MoleculeSource { return m.source }
 func (m *Molecule) SourceRef() string { return m.sourceRef }
 func (m *Molecule) Tags() []string {
-	// Return copy
 	cp := make([]string, len(m.tags))
 	copy(cp, m.tags)
 	return cp
@@ -378,6 +428,7 @@ func (m *Molecule) Metadata() map[string]string {
 }
 func (m *Molecule) CreatedAt() time.Time { return m.createdAt }
 func (m *Molecule) UpdatedAt() time.Time { return m.updatedAt }
+func (m *Molecule) DeletedAt() *time.Time { return m.deletedAt }
 func (m *Molecule) Version() int64 { return m.version }
 func (m *Molecule) Fingerprints() map[FingerprintType]*Fingerprint {
 	cp := make(map[FingerprintType]*Fingerprint)
@@ -389,30 +440,7 @@ func (m *Molecule) Fingerprints() map[FingerprintType]*Fingerprint {
 func (m *Molecule) Properties() map[string]*MolecularProperty {
 	cp := make(map[string]*MolecularProperty)
 	for k, v := range m.properties {
-		cp[k] = v // MolecularProperty is struct, so value copy if not pointer?
-		// Wait, map value is *MolecularProperty. Pointer copy.
-		// Value object should be immutable?
-		// MolecularProperty is struct with public fields.
-		// If I return pointer, caller can modify it.
-		// Requirement says: "MolecularProperty 值对象结构体".
-		// "Returns copy map".
-		// If I return map of pointers, map is copy but pointers point to same objects.
-		// I should probably return map of values or deep copy.
-		// But definition is `map[string]*MolecularProperty`.
-		// Let's check `entity_test.go` requirement: "TestMolecule_Properties_ReturnsCopy：修改返回的 map 不影响实体内部状态".
-		// This usually means map structure.
-		// If I modify `prop.Value`, does it affect entity?
-		// Value objects should be immutable. `MolecularProperty` fields are exported.
-		// If I want strict immutability, I should return struct values `map[string]MolecularProperty` or deep copies.
-		// Given `Fingerprint` is also returned as `map[FingerprintType]*Fingerprint` and it is "immutable value object",
-		// I'll trust that callers won't mutate the *Fingerprint content (fields are exported though).
-		// But wait, `Fingerprint` fields are exported.
-		// The requirements say "Fingerprint 值对象结构体（不可变，创建后不允许修改）".
-		// This implies I should not allow modification.
-		// But in Go, if I return `*Fingerprint`, they can modify fields.
-		// Unless I return `Fingerprint` (value).
-		// But the map in `Molecule` stores `*Fingerprint`.
-		// I'll return the map as is (copy of map), which aligns with "Returns copy map" requirement wording.
+		cp[k] = v
 	}
 	return cp
 }
