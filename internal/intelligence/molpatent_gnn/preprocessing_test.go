@@ -160,8 +160,8 @@ func TestPreprocessSMILES_Ethanol(t *testing.T) {
 		}
 	}
 	// Global features
-	if len(graph.GlobalFeatures) != 6 {
-		t.Errorf("expected 6 global features, got %d", len(graph.GlobalFeatures))
+	if len(graph.GlobalFeatures) != 3 {
+		t.Errorf("expected 3 global features, got %d", len(graph.GlobalFeatures))
 	}
 	if graph.SMILES != "CCO" {
 		t.Errorf("expected SMILES 'CCO', got %q", graph.SMILES)
@@ -178,8 +178,10 @@ func TestPreprocessSMILES_Benzene(t *testing.T) {
 		t.Errorf("expected 6 atoms for benzene, got %d", graph.NumAtoms)
 	}
 	// Check aromatic flag on first atom
-	if graph.NodeFeatures[0][atomicNumberBins+degreeBins+formalChargeBins+numHBins+hybridizationBins+chiralityBins+ringSizeBins] != 1.0 {
-		t.Log("note: aromatic flag position may vary — check encoding offset")
+	// Offset: AtomType(10) + Hybridization(5) + FormalCharge(5) -> index 20
+	aromaticIdx := atomTypeBins + hybridizationBins + formalChargeBins
+	if graph.NodeFeatures[0][aromaticIdx] != 1.0 {
+		t.Errorf("expected aromatic flag at index %d to be 1.0", aromaticIdx)
 	}
 }
 
@@ -332,10 +334,9 @@ func TestEncodeAtomFeatures_Carbon(t *testing.T) {
 	if len(features) != totalNodeFeatures {
 		t.Fatalf("expected %d features, got %d", totalNodeFeatures, len(features))
 	}
-	// Carbon is bin index 1 (H=0, C=1)
-	carbonBin := atomicNumToBin(6)
-	if features[carbonBin] != 1.0 {
-		t.Errorf("expected carbon one-hot at bin %d", carbonBin)
+	// Carbon is bin index 0
+	if features[0] != 1.0 {
+		t.Errorf("expected carbon one-hot at bin 0")
 	}
 }
 
@@ -346,8 +347,7 @@ func TestEncodeAtomFeatures_Aromatic(t *testing.T) {
 		IsAromatic: true,
 	}
 	features := encodeAtomFeatures(atom)
-	aromaticIdx := atomicNumberBins + degreeBins + formalChargeBins +
-		numHBins + hybridizationBins + chiralityBins + ringSizeBins
+	aromaticIdx := atomTypeBins + hybridizationBins + formalChargeBins
 	if features[aromaticIdx] != 1.0 {
 		t.Errorf("expected aromatic flag at index %d to be 1.0", aromaticIdx)
 	}
@@ -391,8 +391,8 @@ func TestComputeGlobalFeatures(t *testing.T) {
 		{Src: 1, Dst: 2, BondType: 1},
 	}
 	gf := computeGlobalFeatures(atoms, bonds)
-	if len(gf) != 6 {
-		t.Fatalf("expected 6 global features, got %d", len(gf))
+	if len(gf) != 3 {
+		t.Fatalf("expected 3 global features, got %d", len(gf))
 	}
 	// Normalised atom count: 3/200 = 0.015
 	if gf[0] < 0.01 || gf[0] > 0.02 {
@@ -400,24 +400,8 @@ func TestComputeGlobalFeatures(t *testing.T) {
 	}
 }
 
-func TestAtomicNumToBin(t *testing.T) {
-	tests := []struct {
-		atomicNum int
-		wantBin   int
-	}{
-		{1, 0},   // H
-		{6, 1},   // C
-		{7, 2},   // N
-		{8, 3},   // O
-		{999, atomicNumberBins - 1}, // unknown → other
-	}
-	for _, tt := range tests {
-		got := atomicNumToBin(tt.atomicNum)
-		if got != tt.wantBin {
-			t.Errorf("atomicNumToBin(%d) = %d, want %d", tt.atomicNum, got, tt.wantBin)
-		}
-	}
-}
+// TestAtomicNumToBin is removed as the function was inlined/changed in the new implementation.
+// Instead we verify feature encoding directly in TestEncodeAtomFeatures_*.
 
 func TestEstimateImplicitH(t *testing.T) {
 	tests := []struct {
@@ -670,5 +654,3 @@ func TestLookupAtomicNumber_Unknown(t *testing.T) {
 		t.Error("expected unknown → 0")
 	}
 }
-
-
