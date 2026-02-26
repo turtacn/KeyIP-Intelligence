@@ -5,53 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
-
-// Interfaces
-type MarkushRepository interface {
-	FindByPatentID(ctx context.Context, patentID string) ([]*MarkushStructure, error)
-}
-
-type EventBus interface {
-	Publish(ctx context.Context, events ...common.DomainEvent) error
-}
-
-// SimilaritySearchRequest defines criteria for finding patents by molecular similarity.
-type SimilaritySearchRequest struct {
-	SMILES          string
-	Threshold       float64
-	MaxResults      int
-	PatentOffices   []string
-	Assignees       []string
-	TechDomains     []string
-	DateFrom        *time.Time
-	DateTo          *time.Time
-	ExcludePatents  []string
-}
-
-// SimilaritySearchResult represents a patent found via similarity search.
-type SimilaritySearchResult struct {
-	PatentNumber       string
-	Title              string
-	Assignee           string
-	FilingDate         time.Time
-	LegalStatus        string
-	IPCCodes           []string
-	MorganSimilarity   float64
-	RDKitSimilarity    float64
-	AtomPairSimilarity float64
-}
-
-// PatentDomainService defines the interface for patent domain operations.
-type PatentDomainService interface {
-	SearchBySimilarity(ctx context.Context, req *SimilaritySearchRequest) ([]*SimilaritySearchResult, error)
-	GetPatentsByMoleculeID(ctx context.Context, moleculeID string) ([]*Patent, error)
-	GetPatentByNumber(ctx context.Context, patentNumber string) (*Patent, error)
-}
 
 // PatentService provides domain services for patent management.
 type PatentService struct {
@@ -70,7 +27,9 @@ func NewPatentService(
 	if patentRepo == nil {
 		panic("patentRepo is required")
 	}
-	// Optional dependencies for now to allow partial testing
+	if markushRepo == nil {
+		panic("markushRepo is required")
+	}
 	return &PatentService{
 		patentRepo:  patentRepo,
 		markushRepo: markushRepo,
@@ -85,9 +44,12 @@ func (s *PatentService) CreatePatent(
 	office PatentOffice,
 	filingDate time.Time,
 ) (*Patent, error) {
-	exists, err := s.patentRepo.GetByPatentNumber(ctx, patentNumber)
-	if err == nil && exists != nil {
-		return nil, errors.New(errors.ErrCodePatentAlreadyExists, fmt.Sprintf("patent %s already exists", patentNumber))
+	exists, err := s.patentRepo.Exists(ctx, patentNumber)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, errors.ErrPatentAlreadyExists(patentNumber)
 	}
 
 	p, err := NewPatent(patentNumber, title, office, filingDate)
@@ -95,34 +57,40 @@ func (s *PatentService) CreatePatent(
 		return nil, err
 	}
 
-	if err := s.patentRepo.Create(ctx, p); err != nil {
+	if err := s.patentRepo.Save(ctx, p); err != nil {
 		return nil, err
 	}
 
-	s.publishEvents(ctx, p, NewPatentFiledEvent(p))
+	s.publishEvents(ctx, p, NewPatentCreatedEvent(p))
 	return p, nil
 }
 
 func (s *PatentService) GetPatent(ctx context.Context, id string) (*Patent, error) {
-	uid, err := uuid.Parse(id)
-	if err != nil {
-		return nil, errors.New(errors.ErrCodeValidation, "invalid UUID")
-	}
-	p, err := s.patentRepo.GetByID(ctx, uid)
+	p, err := s.patentRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if p == nil {
-		return nil, errors.New(errors.ErrCodePatentNotFound, fmt.Sprintf("patent %s not found", id))
+		return nil, errors.ErrPatentNotFound(id)
 	}
 	return p, nil
 }
 
 func (s *PatentService) GetPatentByNumber(ctx context.Context, patentNumber string) (*Patent, error) {
-	return s.patentRepo.GetByPatentNumber(ctx, patentNumber)
+	p, err := s.patentRepo.FindByPatentNumber(ctx, patentNumber)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil {
+		return nil, errors.ErrPatentNotFound(patentNumber)
+	}
+	return p, nil
 }
 
-func (s *PatentService) SearchPatents(ctx context.Context, criteria SearchQuery) (*SearchResult, error) {
+func (s *PatentService) SearchPatents(ctx context.Context, criteria PatentSearchCriteria) (*PatentSearchResult, error) {
+	if err := criteria.Validate(); err != nil {
+		return nil, err
+	}
 	return s.patentRepo.Search(ctx, criteria)
 }
 
@@ -146,32 +114,49 @@ func (s *PatentService) UpdatePatentStatus(
 	}
 
 	var event common.DomainEvent
+	var updateErr error
+
 	switch targetStatus {
 	case PatentStatusPublished:
 		if params.PublicationDate == nil {
-			return nil, errors.New(errors.ErrCodeValidation, "publication date is required")
+			return nil, errors.InvalidParam("publication date is required")
 		}
-		if err := p.Publish(*params.PublicationDate); err != nil {
-			return nil, err
-		}
+		updateErr = p.Publish(*params.PublicationDate)
 		event = NewPatentPublishedEvent(p)
 	case PatentStatusUnderExamination:
-		if err := p.EnterExamination(); err != nil {
-			return nil, err
-		}
-		// event = NewPatentExaminationStartedEvent(p) // Not defined yet
+		updateErr = p.EnterExamination()
+		// event = NewPatentExaminationStartedEvent(p)
 	case PatentStatusGranted:
 		if params.GrantDate == nil || params.ExpiryDate == nil {
-			return nil, errors.New(errors.ErrCodeValidation, "grant and expiry dates are required")
+			return nil, errors.InvalidParam("grant and expiry dates are required")
 		}
-		if err := p.Grant(*params.GrantDate, *params.ExpiryDate); err != nil {
-			return nil, err
-		}
+		updateErr = p.Grant(*params.GrantDate, *params.ExpiryDate)
 		event = NewPatentGrantedEvent(p)
-	// ... other statuses
+	case PatentStatusRejected:
+		updateErr = p.Reject()
+		event = NewPatentRejectedEvent(p, params.Reason)
+	case PatentStatusWithdrawn:
+		prevStatus := p.Status
+		updateErr = p.Withdraw()
+		event = NewPatentWithdrawnEvent(p, prevStatus)
+	case PatentStatusExpired:
+		updateErr = p.Expire()
+		event = NewPatentExpiredEvent(p)
+	case PatentStatusInvalidated:
+		updateErr = p.Invalidate()
+		event = NewPatentInvalidatedEvent(p, params.Reason)
+	case PatentStatusLapsed:
+		updateErr = p.Lapse()
+		event = NewPatentLapsedEvent(p)
+	default:
+		return nil, errors.InvalidParam(fmt.Sprintf("unsupported target status: %s", targetStatus))
 	}
 
-	if err := s.patentRepo.Update(ctx, p); err != nil {
+	if updateErr != nil {
+		return nil, updateErr
+	}
+
+	if err := s.patentRepo.Save(ctx, p); err != nil {
 		return nil, err
 	}
 
@@ -181,35 +166,349 @@ func (s *PatentService) UpdatePatentStatus(
 	return p, nil
 }
 
+func (s *PatentService) SetPatentClaims(ctx context.Context, patentID string, claims ClaimSet) (*Patent, error) {
+	p, err := s.GetPatent(ctx, patentID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := claims.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := p.SetClaims(claims); err != nil {
+		return nil, err
+	}
+
+	if err := s.patentRepo.Save(ctx, p); err != nil {
+		return nil, err
+	}
+
+	s.publishEvents(ctx, p, NewPatentClaimsUpdatedEvent(p))
+	return p, nil
+}
+
+func (s *PatentService) LinkMolecule(ctx context.Context, patentID, moleculeID string) error {
+	p, err := s.GetPatent(ctx, patentID)
+	if err != nil {
+		return err
+	}
+
+	if p.HasMolecule(moleculeID) {
+		return errors.ErrConflict("patent", "molecule_link_exists")
+	}
+
+	if err := p.AddMolecule(moleculeID); err != nil {
+		return err
+	}
+
+	if err := s.patentRepo.Save(ctx, p); err != nil {
+		return err
+	}
+
+	s.publishEvents(ctx, p, NewPatentMoleculeLinkedEvent(p, moleculeID))
+	return nil
+}
+
+func (s *PatentService) UnlinkMolecule(ctx context.Context, patentID, moleculeID string) error {
+	p, err := s.GetPatent(ctx, patentID)
+	if err != nil {
+		return err
+	}
+
+	if !p.HasMolecule(moleculeID) {
+		return errors.ErrConflict("patent", "molecule_link_not_found")
+	}
+
+	if err := p.RemoveMolecule(moleculeID); err != nil {
+		return err
+	}
+
+	if err := s.patentRepo.Save(ctx, p); err != nil {
+		return err
+	}
+
+	s.publishEvents(ctx, p, NewPatentMoleculeUnlinkedEvent(p, moleculeID))
+	return nil
+}
+
+func (s *PatentService) AddCitation(ctx context.Context, patentID, citedPatentNumber, direction string) error {
+	if direction != "forward" && direction != "backward" {
+		return errors.InvalidParam("direction must be 'forward' or 'backward'")
+	}
+
+	p, err := s.GetPatent(ctx, patentID)
+	if err != nil {
+		return err
+	}
+
+	if direction == "forward" {
+		// Forward citation: Current patent CITES the other patent
+		if err := p.AddCitation(citedPatentNumber); err != nil {
+			return err
+		}
+	} else {
+		// Backward citation: Current patent IS CITED BY the other patent
+		if err := p.AddCitedBy(citedPatentNumber); err != nil {
+			return err
+		}
+	}
+
+	if err := s.patentRepo.Save(ctx, p); err != nil {
+		return err
+	}
+
+	s.publishEvents(ctx, p, NewPatentCitationAddedEvent(p, citedPatentNumber, direction))
+	return nil
+}
+
+func (s *PatentService) AnalyzeMarkushCoverage(ctx context.Context, patentID string, moleculeSMILES []string) (*MarkushCoverageAnalysis, error) {
+	structures, err := s.markushRepo.FindByPatentID(ctx, patentID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(structures) == 0 {
+		return &MarkushCoverageAnalysis{
+			MarkushID:    "",
+			CoverageRate: 0,
+		}, nil
+	}
+
+	// Iterate through all Markush structures to find matches.
+	// A molecule is considered covered if it matches ANY of the Markush structures in the patent.
+	matchedCount := 0
+
+	for _, smiles := range moleculeSMILES {
+		isCovered := false
+		for _, ms := range structures {
+			match, _, _ := ms.MatchesMolecule(smiles)
+			if match {
+				isCovered = true
+				break
+			}
+		}
+		if isCovered {
+			matchedCount++
+		}
+	}
+
+	rate := 0.0
+	if len(moleculeSMILES) > 0 {
+		rate = float64(matchedCount) / float64(len(moleculeSMILES))
+	}
+
+	// Use the first structure's ID as reference, or a composite ID if needed.
+	// For analysis purposes, we report the aggregate coverage.
+	primaryID := ""
+	var totalCombinations int64 = 0
+	if len(structures) > 0 {
+		primaryID = structures[0].ID
+		for _, ms := range structures {
+			totalCombinations += ms.TotalCombinations
+		}
+	}
+
+	return &MarkushCoverageAnalysis{
+		MarkushID:         primaryID,
+		TotalCombinations: totalCombinations,
+		SampledMolecules:  len(moleculeSMILES),
+		MatchedMolecules:  matchedCount,
+		CoverageRate:      rate,
+		AnalyzedAt:        time.Now().UTC(),
+	}, nil
+}
+
+func (s *PatentService) FindRelatedPatents(ctx context.Context, patentID string) ([]*Patent, error) {
+	p, err := s.GetPatent(ctx, patentID)
+	if err != nil {
+		return nil, err
+	}
+
+	relatedMap := make(map[string]*Patent)
+
+	// By Family
+	if p.FamilyID != "" {
+		familyPatents, err := s.patentRepo.FindByFamilyID(ctx, p.FamilyID)
+		if err == nil {
+			for _, fp := range familyPatents {
+				if fp.ID.String() != patentID {
+					relatedMap[fp.ID.String()] = fp
+				}
+			}
+		}
+	}
+
+	// By Citations (simplified: just taking cited/citing if we had method to get full objects)
+	// Current repository interface methods FindCitedBy/FindCiting return []*Patent
+	citing, err := s.patentRepo.FindCiting(ctx, p.PatentNumber)
+	if err == nil {
+		for _, cp := range citing {
+			if cp.ID.String() != patentID {
+				relatedMap[cp.ID.String()] = cp
+			}
+		}
+	}
+	citedBy, err := s.patentRepo.FindCitedBy(ctx, p.PatentNumber)
+	if err == nil {
+		for _, cp := range citedBy {
+			if cp.ID.String() != patentID {
+				relatedMap[cp.ID.String()] = cp
+			}
+		}
+	}
+
+	// By Molecules
+	for _, molID := range p.MoleculeIDs {
+		molPatents, err := s.patentRepo.FindByMoleculeID(ctx, molID)
+		if err == nil {
+			for _, mp := range molPatents {
+				if mp.ID.String() != patentID {
+					relatedMap[mp.ID.String()] = mp
+				}
+			}
+		}
+	}
+
+	related := make([]*Patent, 0, len(relatedMap))
+	for _, rp := range relatedMap {
+		related = append(related, rp)
+	}
+
+	return related, nil
+}
+
+type PatentStatistics struct {
+	TotalCount         int64
+	ByStatus           map[PatentStatus]int64
+	ByOffice           map[PatentOffice]int64
+	ByIPCSection       map[string]int64
+	ByFilingYear       map[int]int64
+	ByGrantYear        map[int]int64
+	ActiveCount        int64
+	ExpiringWithinYear int64
+	GeneratedAt        time.Time
+}
+
+func (s *PatentService) GetPatentStatistics(ctx context.Context) (*PatentStatistics, error) {
+	stats := &PatentStatistics{
+		GeneratedAt: time.Now().UTC(),
+	}
+
+	var err error
+	stats.ByStatus, err = s.patentRepo.CountByStatus(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stats.ByOffice, err = s.patentRepo.CountByOffice(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stats.ByIPCSection, err = s.patentRepo.CountByIPCSection(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stats.ByFilingYear, err = s.patentRepo.CountByYear(ctx, "filing_date")
+	if err != nil {
+		return nil, err
+	}
+
+	stats.ByGrantYear, err = s.patentRepo.CountByYear(ctx, "grant_date")
+	if err != nil {
+		return nil, err
+	}
+
+	for status, count := range stats.ByStatus {
+		stats.TotalCount += count
+		if status.IsActive() {
+			stats.ActiveCount += count
+		}
+	}
+
+	expiring, err := s.patentRepo.FindExpiringBefore(ctx, time.Now().AddDate(1, 0, 0))
+	if err == nil {
+		stats.ExpiringWithinYear = int64(len(expiring))
+	}
+
+	return stats, nil
+}
+
+type BatchImportError struct {
+	Index        int
+	PatentNumber string
+	Error        string
+}
+
+type BatchImportResult struct {
+	TotalCount   int
+	SuccessCount int
+	FailedCount  int
+	SkippedCount int
+	Errors       []BatchImportError
+}
+
+func (s *PatentService) BatchImportPatents(ctx context.Context, patents []*Patent) (*BatchImportResult, error) {
+	result := &BatchImportResult{
+		TotalCount: len(patents),
+	}
+
+	toSave := make([]*Patent, 0, len(patents))
+
+	for i, p := range patents {
+		exists, err := s.patentRepo.Exists(ctx, p.PatentNumber)
+		if err != nil {
+			result.FailedCount++
+			result.Errors = append(result.Errors, BatchImportError{Index: i, PatentNumber: p.PatentNumber, Error: err.Error()})
+			continue
+		}
+		if exists {
+			result.SkippedCount++
+			continue
+		}
+
+		if err := p.Validate(); err != nil {
+			result.FailedCount++
+			result.Errors = append(result.Errors, BatchImportError{Index: i, PatentNumber: p.PatentNumber, Error: err.Error()})
+			continue
+		}
+
+		toSave = append(toSave, p)
+	}
+
+	if len(toSave) > 0 {
+		if err := s.patentRepo.SaveBatch(ctx, toSave); err != nil {
+			// If batch save fails, we assume all pending failed for simplicity, or handle partials if repo supports it
+			// Assuming SaveBatch is all-or-nothing or returns error
+			return nil, err
+		}
+		result.SuccessCount = len(toSave)
+
+		for _, p := range toSave {
+			s.publishEvents(ctx, p, NewPatentCreatedEvent(p))
+		}
+	}
+
+	return result, nil
+}
+
 func (s *PatentService) publishEvents(ctx context.Context, p *Patent, events ...common.DomainEvent) {
 	if s.eventBus == nil {
 		return
 	}
-	if err := s.eventBus.Publish(ctx, events...); err != nil {
-		s.logger.Error("failed to publish events", logging.Err(err))
+	// Append any internally collected events
+	allEvents := append(events, p.DomainEvents()...)
+
+	if len(allEvents) > 0 {
+		if err := s.eventBus.Publish(ctx, allEvents...); err != nil {
+			if s.logger != nil {
+				s.logger.Error("failed to publish events", logging.Err(err))
+			}
+		}
+		p.ClearEvents()
 	}
-}
-
-// SearchBySimilarity finds patents containing molecules similar to the query.
-func (s *PatentService) SearchBySimilarity(ctx context.Context, req *SimilaritySearchRequest) ([]*SimilaritySearchResult, error) {
-	// Dummy implementation to satisfy the interface.
-	// In a real implementation, this would query a specialized index or cross-reference molecule similarity.
-	return []*SimilaritySearchResult{}, nil
-}
-
-// GetPatentsByMoleculeID retrieves patents associated with a molecule ID.
-func (s *PatentService) GetPatentsByMoleculeID(ctx context.Context, moleculeID string) ([]*Patent, error) {
-	return s.patentRepo.FindByMoleculeID(ctx, moleculeID)
-}
-
-// Type aliases for backward compatibility
-
-// Service is an alias for PatentService for backward compatibility with apiserver.
-type Service = PatentService
-
-// NewService creates a new patent service. Alias for NewPatentService.
-func NewService(repo PatentRepository, logger logging.Logger) *PatentService {
-	return NewPatentService(repo, nil, nil, logger)
 }
 
 //Personal.AI order the ending

@@ -1,28 +1,67 @@
 package patent
 
 import (
+	"context"
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-type PatentFiledEvent struct {
-	common.BaseEvent
-	PatentNumber string       `json:"patent_number"`
-	Office       PatentOffice `json:"office"`
-	FilingDate   *time.Time   `json:"filing_date"`
-	Title        string       `json:"title"`
-	Version      int          `json:"version"`
+// EventType constants
+const (
+	EventPatentCreated          common.EventType = "patent.created"
+	EventPatentPublished        common.EventType = "patent.published"
+	EventPatentExaminationStarted common.EventType = "patent.examination_started"
+	EventPatentGranted          common.EventType = "patent.granted"
+	EventPatentRejected         common.EventType = "patent.rejected"
+	EventPatentWithdrawn        common.EventType = "patent.withdrawn"
+	EventPatentExpired          common.EventType = "patent.expired"
+	EventPatentInvalidated      common.EventType = "patent.invalidated"
+	EventPatentLapsed           common.EventType = "patent.lapsed"
+	EventPatentClaimsUpdated    common.EventType = "patent.claims_updated"
+	EventPatentMoleculeLinked   common.EventType = "patent.molecule_linked"
+	EventPatentMoleculeUnlinked common.EventType = "patent.molecule_unlinked"
+	EventPatentCitationAdded    common.EventType = "patent.citation_added"
+	EventPatentAnalysisCompleted common.EventType = "patent.analysis_completed"
+)
+
+// EventHandler interface for handling domain events.
+type EventHandler interface {
+	Handle(ctx context.Context, event common.DomainEvent) error
+	Supports() []common.EventType
 }
 
-func NewPatentFiledEvent(p *Patent) *PatentFiledEvent {
-	return &PatentFiledEvent{
-		BaseEvent:    common.NewBaseEvent(p.ID.String()),
+// EventBus interface for publishing and subscribing to domain events.
+type EventBus interface {
+	Publish(ctx context.Context, events ...common.DomainEvent) error
+	Subscribe(handler EventHandler) error
+	Unsubscribe(handler EventHandler) error
+}
+
+// EventStore interface for persisting domain events.
+type EventStore interface {
+	Save(ctx context.Context, events ...common.DomainEvent) error
+	Load(ctx context.Context, aggregateID string) ([]common.DomainEvent, error)
+	LoadSince(ctx context.Context, aggregateID string, version int) ([]common.DomainEvent, error)
+}
+
+// PatentCreatedEvent (Using PatentFiledEvent name in previous code, renaming to match prompt or keeping consistent)
+// Prompt asked for PatentCreatedEvent.
+type PatentCreatedEvent struct {
+	common.BaseEvent
+	PatentNumber string       `json:"patent_number"`
+	Title        string       `json:"title"`
+	Office       PatentOffice `json:"office"`
+	FilingDate   *time.Time   `json:"filing_date"`
+}
+
+func NewPatentCreatedEvent(p *Patent) *PatentCreatedEvent {
+	return &PatentCreatedEvent{
+		BaseEvent:    common.NewBaseEventWithVersion(EventPatentCreated, p.ID.String(), p.Version),
 		PatentNumber: p.PatentNumber,
+		Title:        p.Title,
 		Office:       p.Office,
 		FilingDate:   p.Dates.FilingDate,
-		Title:        p.Title,
-		Version:      p.Version,
 	}
 }
 
@@ -30,15 +69,13 @@ type PatentPublishedEvent struct {
 	common.BaseEvent
 	PatentNumber    string     `json:"patent_number"`
 	PublicationDate *time.Time `json:"publication_date"`
-	Version         int        `json:"version"`
 }
 
 func NewPatentPublishedEvent(p *Patent) *PatentPublishedEvent {
 	return &PatentPublishedEvent{
-		BaseEvent:       common.NewBaseEvent(p.ID.String()),
+		BaseEvent:       common.NewBaseEventWithVersion(EventPatentPublished, p.ID.String(), p.Version),
 		PatentNumber:    p.PatentNumber,
 		PublicationDate: p.Dates.PublicationDate,
-		Version:         p.Version,
 	}
 }
 
@@ -47,64 +84,177 @@ type PatentGrantedEvent struct {
 	PatentNumber string     `json:"patent_number"`
 	GrantDate    *time.Time `json:"grant_date"`
 	ExpiryDate   *time.Time `json:"expiry_date"`
-	Version      int        `json:"version"`
+	ClaimCount   int        `json:"claim_count"`
 }
 
 func NewPatentGrantedEvent(p *Patent) *PatentGrantedEvent {
 	return &PatentGrantedEvent{
-		BaseEvent:    common.NewBaseEvent(p.ID.String()),
+		BaseEvent:    common.NewBaseEventWithVersion(EventPatentGranted, p.ID.String(), p.Version),
 		PatentNumber: p.PatentNumber,
 		GrantDate:    p.Dates.GrantDate,
 		ExpiryDate:   p.Dates.ExpiryDate,
-		Version:      p.Version,
-	}
-}
-
-type ClaimsUpdatedEvent struct {
-	common.BaseEvent
-	PatentNumber string `json:"patent_number"`
-	ClaimCount   int    `json:"claim_count"`
-	Version      int    `json:"version"`
-}
-
-func NewClaimsUpdatedEvent(p *Patent) *ClaimsUpdatedEvent {
-	return &ClaimsUpdatedEvent{
-		BaseEvent:    common.NewBaseEvent(p.ID.String()),
-		PatentNumber: p.PatentNumber,
 		ClaimCount:   p.ClaimCount(),
-		Version:      p.Version,
 	}
 }
 
-type MoleculeAssociatedEvent struct {
+type PatentRejectedEvent struct {
 	common.BaseEvent
 	PatentNumber string `json:"patent_number"`
-	MoleculeID   string `json:"molecule_id"`
-	Version      int    `json:"version"`
+	Reason       string `json:"reason"`
 }
 
-func NewMoleculeAssociatedEvent(p *Patent, moleculeID string) *MoleculeAssociatedEvent {
-	return &MoleculeAssociatedEvent{
-		BaseEvent:    common.NewBaseEvent(p.ID.String()),
+func NewPatentRejectedEvent(p *Patent, reason string) *PatentRejectedEvent {
+	return &PatentRejectedEvent{
+		BaseEvent:    common.NewBaseEventWithVersion(EventPatentRejected, p.ID.String(), p.Version),
 		PatentNumber: p.PatentNumber,
-		MoleculeID:   moleculeID,
-		Version:      p.Version,
+		Reason:       reason,
 	}
 }
 
-type CitationAddedEvent struct {
+type PatentWithdrawnEvent struct {
+	common.BaseEvent
+	PatentNumber   string       `json:"patent_number"`
+	PreviousStatus PatentStatus `json:"previous_status"`
+}
+
+func NewPatentWithdrawnEvent(p *Patent, previousStatus PatentStatus) *PatentWithdrawnEvent {
+	return &PatentWithdrawnEvent{
+		BaseEvent:      common.NewBaseEventWithVersion(EventPatentWithdrawn, p.ID.String(), p.Version),
+		PatentNumber:   p.PatentNumber,
+		PreviousStatus: previousStatus,
+	}
+}
+
+type PatentExpiredEvent struct {
+	common.BaseEvent
+	PatentNumber string     `json:"patent_number"`
+	ExpiryDate   *time.Time `json:"expiry_date"`
+}
+
+func NewPatentExpiredEvent(p *Patent) *PatentExpiredEvent {
+	return &PatentExpiredEvent{
+		BaseEvent:    common.NewBaseEventWithVersion(EventPatentExpired, p.ID.String(), p.Version),
+		PatentNumber: p.PatentNumber,
+		ExpiryDate:   p.Dates.ExpiryDate,
+	}
+}
+
+type PatentInvalidatedEvent struct {
+	common.BaseEvent
+	PatentNumber       string `json:"patent_number"`
+	InvalidationReason string `json:"invalidation_reason"`
+}
+
+func NewPatentInvalidatedEvent(p *Patent, reason string) *PatentInvalidatedEvent {
+	return &PatentInvalidatedEvent{
+		BaseEvent:          common.NewBaseEventWithVersion(EventPatentInvalidated, p.ID.String(), p.Version),
+		PatentNumber:       p.PatentNumber,
+		InvalidationReason: reason,
+	}
+}
+
+type PatentLapsedEvent struct {
+	common.BaseEvent
+	PatentNumber string `json:"patent_number"`
+}
+
+func NewPatentLapsedEvent(p *Patent) *PatentLapsedEvent {
+	return &PatentLapsedEvent{
+		BaseEvent:    common.NewBaseEventWithVersion(EventPatentLapsed, p.ID.String(), p.Version),
+		PatentNumber: p.PatentNumber,
+	}
+}
+
+type PatentClaimsUpdatedEvent struct {
+	common.BaseEvent
+	PatentNumber          string `json:"patent_number"`
+	ClaimCount            int    `json:"claim_count"`
+	IndependentClaimCount int    `json:"independent_claim_count"`
+	HasMarkush            bool   `json:"has_markush"`
+}
+
+func NewPatentClaimsUpdatedEvent(p *Patent) *PatentClaimsUpdatedEvent {
+	independentCount := 0
+	hasMarkush := false
+	for _, c := range p.Claims {
+		if c.Type == ClaimTypeIndependent {
+			independentCount++
+		}
+		if c.HasMarkushStructure() {
+			hasMarkush = true
+		}
+	}
+
+	return &PatentClaimsUpdatedEvent{
+		BaseEvent:             common.NewBaseEventWithVersion(EventPatentClaimsUpdated, p.ID.String(), p.Version),
+		PatentNumber:          p.PatentNumber,
+		ClaimCount:            p.ClaimCount(),
+		IndependentClaimCount: independentCount,
+		HasMarkush:            hasMarkush,
+	}
+}
+
+type PatentMoleculeLinkedEvent struct {
+	common.BaseEvent
+	PatentNumber         string `json:"patent_number"`
+	MoleculeID           string `json:"molecule_id"`
+	TotalLinkedMolecules int    `json:"total_linked_molecules"`
+}
+
+func NewPatentMoleculeLinkedEvent(p *Patent, moleculeID string) *PatentMoleculeLinkedEvent {
+	return &PatentMoleculeLinkedEvent{
+		BaseEvent:            common.NewBaseEventWithVersion(EventPatentMoleculeLinked, p.ID.String(), p.Version),
+		PatentNumber:         p.PatentNumber,
+		MoleculeID:           moleculeID,
+		TotalLinkedMolecules: len(p.MoleculeIDs),
+	}
+}
+
+type PatentMoleculeUnlinkedEvent struct {
+	common.BaseEvent
+	PatentNumber         string `json:"patent_number"`
+	MoleculeID           string `json:"molecule_id"`
+	TotalLinkedMolecules int    `json:"total_linked_molecules"`
+}
+
+func NewPatentMoleculeUnlinkedEvent(p *Patent, moleculeID string) *PatentMoleculeUnlinkedEvent {
+	return &PatentMoleculeUnlinkedEvent{
+		BaseEvent:            common.NewBaseEventWithVersion(EventPatentMoleculeUnlinked, p.ID.String(), p.Version),
+		PatentNumber:         p.PatentNumber,
+		MoleculeID:           moleculeID,
+		TotalLinkedMolecules: len(p.MoleculeIDs),
+	}
+}
+
+type PatentCitationAddedEvent struct {
 	common.BaseEvent
 	PatentNumber      string `json:"patent_number"`
 	CitedPatentNumber string `json:"cited_patent_number"`
-	Version           int    `json:"version"`
+	Direction         string `json:"direction"` // "forward" or "backward"
 }
 
-func NewCitationAddedEvent(p *Patent, citedPatentNumber string) *CitationAddedEvent {
-	return &CitationAddedEvent{
-		BaseEvent:         common.NewBaseEvent(p.ID.String()),
+func NewPatentCitationAddedEvent(p *Patent, citedNumber string, direction string) *PatentCitationAddedEvent {
+	return &PatentCitationAddedEvent{
+		BaseEvent:         common.NewBaseEventWithVersion(EventPatentCitationAdded, p.ID.String(), p.Version),
 		PatentNumber:      p.PatentNumber,
-		CitedPatentNumber: citedPatentNumber,
-		Version:           p.Version,
+		CitedPatentNumber: citedNumber,
+		Direction:         direction,
+	}
+}
+
+type PatentAnalysisCompletedEvent struct {
+	common.BaseEvent
+	PatentNumber  string `json:"patent_number"`
+	AnalysisType  string `json:"analysis_type"`
+	ResultSummary string `json:"result_summary"`
+}
+
+func NewPatentAnalysisCompletedEvent(p *Patent, analysisType string, summary string) *PatentAnalysisCompletedEvent {
+	return &PatentAnalysisCompletedEvent{
+		BaseEvent:     common.NewBaseEventWithVersion(EventPatentAnalysisCompleted, p.ID.String(), p.Version),
+		PatentNumber:  p.PatentNumber,
+		AnalysisType:  analysisType,
+		ResultSummary: summary,
 	}
 }
 

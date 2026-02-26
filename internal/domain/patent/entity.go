@@ -163,7 +163,7 @@ type Patent struct {
 	Source          string              `json:"source"`
 	RawData         map[string]any      `json:"raw_data,omitempty"`
 	Metadata        map[string]any      `json:"metadata,omitempty"`
-	Claims          []*Claim            `json:"claims,omitempty"`
+	Claims          ClaimSet            `json:"claims,omitempty"`
 	Inventors       []*Inventor         `json:"inventors,omitempty"`
 	PriorityClaims  []*PriorityClaim    `json:"priority_claims,omitempty"`
 	CreatedAt       time.Time           `json:"created_at"`
@@ -302,8 +302,24 @@ func (p *Patent) AddMolecule(moleculeID string) error {
 }
 
 func (p *Patent) RemoveMolecule(moleculeID string) error {
-	// simplified
+	newIDs := make([]string, 0, len(p.MoleculeIDs))
+	for _, id := range p.MoleculeIDs {
+		if id != moleculeID {
+			newIDs = append(newIDs, id)
+		}
+	}
+	p.MoleculeIDs = newIDs
+	p.touch()
 	return nil
+}
+
+func (p *Patent) HasMolecule(moleculeID string) bool {
+	for _, id := range p.MoleculeIDs {
+		if id == moleculeID {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Patent) AddCitation(patentNumber string) error {
@@ -318,7 +334,7 @@ func (p *Patent) AddCitedBy(patentNumber string) error {
 	return nil
 }
 
-func (p *Patent) SetClaims(claims []*Claim) error {
+func (p *Patent) SetClaims(claims ClaimSet) error {
 	p.Claims = claims
 	p.touch()
 	return nil
@@ -365,10 +381,6 @@ type SearchResult struct {
 	TotalCount int64
 	Facets     map[string]map[string]int64
 }
-
-// PatentSearchCriteria (alias for SearchQuery to fix service.go error if needed, or just rename in service.go)
-type PatentSearchCriteria = SearchQuery
-type PatentSearchResult = SearchResult
 
 // ClaimCount returns the total number of claims.
 func (p *Patent) ClaimCount() int {
@@ -442,12 +454,12 @@ func (p *Patent) AnalyzeClaims() *ClaimTree {
 	nodeMap := make(map[int]*ClaimNode)
 	allNodes := make([]*ClaimNode, 0, len(p.Claims))
 
-	for _, claim := range p.Claims {
+	for i := range p.Claims {
 		node := &ClaimNode{
-			Claim:    claim,
+			Claim:    &p.Claims[i],
 			Children: []*ClaimNode{},
 		}
-		nodeMap[claim.Number] = node
+		nodeMap[p.Claims[i].Number] = node
 		allNodes = append(allNodes, node)
 	}
 
