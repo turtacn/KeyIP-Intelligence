@@ -21,6 +21,18 @@ type Config struct {
 	Intelligence IntelligenceConfig `mapstructure:"intelligence"`
 	Monitoring   MonitoringConfig   `mapstructure:"monitoring"`
 	Notification NotificationConfig `mapstructure:"notification"`
+	Worker       WorkerConfig       `mapstructure:"worker"`
+}
+
+// WorkerConfig holds worker process settings.
+type WorkerConfig struct {
+	Concurrency     int           `mapstructure:"concurrency"`
+	Topics          []string      `mapstructure:"topics"`
+	ConsumerGroup   string        `mapstructure:"consumer_group"`
+	MaxRetries      int           `mapstructure:"max_retries"`
+	RetryBackoff    time.Duration `mapstructure:"retry_backoff"`
+	TaskTimeout     time.Duration `mapstructure:"task_timeout"`
+	ShutdownTimeout time.Duration `mapstructure:"shutdown_timeout"`
 }
 
 // ServerConfig holds server-related settings.

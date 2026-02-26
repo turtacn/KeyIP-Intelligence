@@ -13,6 +13,7 @@ import (
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/client"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -34,10 +35,7 @@ var (
 )
 
 // NewSearchCmd creates the search command
-func NewSearchCmd(
-	similaritySearchService patent_mining.SimilaritySearchService,
-	logger logging.Logger,
-) *cobra.Command {
+func NewSearchCmd() *cobra.Command {
 	searchCmd := &cobra.Command{
 		Use:   "search",
 		Short: "Search patents by molecule similarity or text query",
@@ -49,7 +47,12 @@ func NewSearchCmd(
 		Use:   "molecule",
 		Short: "Search patents by molecular similarity",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runSearchMolecule(cmd.Context(), similaritySearchService, logger)
+			cliCtx, err := GetCLIContext(cmd)
+			if err != nil {
+				return err
+			}
+			adapter := &remoteSearchService{client: cliCtx.Client}
+			return runSearchMolecule(cmd.Context(), adapter, cliCtx.Logger)
 		},
 	}
 
@@ -67,7 +70,12 @@ func NewSearchCmd(
 		Use:   "patent",
 		Short: "Search patents by text query",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runSearchPatent(cmd.Context(), similaritySearchService, logger)
+			cliCtx, err := GetCLIContext(cmd)
+			if err != nil {
+				return err
+			}
+			adapter := &remoteSearchService{client: cliCtx.Client}
+			return runSearchPatent(cmd.Context(), adapter, cliCtx.Logger)
 		},
 	}
 
@@ -86,7 +94,94 @@ func NewSearchCmd(
 	return searchCmd
 }
 
+type remoteSearchService struct {
+	client *client.Client
+}
+
+// Search implements patent_mining.SimilaritySearchService for remote client
+func (s *remoteSearchService) Search(ctx context.Context, query *patent_mining.SimilarityQuery) ([]patent_mining.SimilarityResult, error) {
+	req := &client.MoleculeSearchRequest{
+		Query:      query.SMILES,
+		Similarity: query.Threshold,
+		PageSize:   query.MaxResults,
+	}
+	if req.Query == "" {
+		req.Query = query.InChI
+	}
+
+	resp, err := s.client.Molecules().Search(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []patent_mining.SimilarityResult
+	for _, m := range resp.Molecules {
+		results = append(results, patent_mining.SimilarityResult{
+			Similarity: m.Similarity,
+			Molecule: &patent_mining.MoleculeInfo{
+				ID:     m.ID,
+				SMILES: m.SMILES,
+				Name:   m.ID,
+			},
+			Method: "remote",
+		})
+	}
+	return results, nil
+}
+
+func (s *remoteSearchService) SearchByText(ctx context.Context, req *patent_mining.PatentTextSearchRequest) ([]*patent_mining.CLIPatentSearchResult, error) {
+	clientReq := &client.PatentSearchRequest{
+		Query:     req.Query,
+		PageSize:  req.MaxResults,
+		SortOrder: req.Sort,
+	}
+	// Map date range
+	if req.DateFrom != nil && req.DateTo != nil {
+		clientReq.DateRange = &client.DateRange{
+			From: req.DateFrom.Format("2006-01-02"),
+			To:   req.DateTo.Format("2006-01-02"),
+		}
+	}
+
+	resp, err := s.client.Patents().Search(ctx, clientReq)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []*patent_mining.CLIPatentSearchResult
+	for _, p := range resp.Patents {
+		filingDate, _ := time.Parse("2006-01-02", p.FilingDate)
+		results = append(results, &patent_mining.CLIPatentSearchResult{
+			PatentNumber: p.PatentNumber,
+			Title:        p.Title,
+			FilingDate:   filingDate,
+			// IPC: p.IPCCodes[0] if available
+			Relevance:    p.RelevanceScore,
+		})
+	}
+	return results, nil
+}
+
+// Stub unused methods of interface
+func (s *remoteSearchService) SearchByStructure(ctx context.Context, req *patent_mining.SearchByStructureRequest) (*patent_mining.SimilaritySearchResult, error) {
+	return nil, errors.NewMsg("not implemented in CLI")
+}
+func (s *remoteSearchService) SearchByFingerprint(ctx context.Context, req *patent_mining.SearchByFingerprintRequest) (*patent_mining.SimilaritySearchResult, error) {
+	return nil, errors.NewMsg("not implemented in CLI")
+}
+func (s *remoteSearchService) SearchBySemantic(ctx context.Context, req *patent_mining.SearchBySemanticRequest) (*patent_mining.SimilaritySearchResult, error) {
+	return nil, errors.NewMsg("not implemented in CLI")
+}
+func (s *remoteSearchService) SearchByPatent(ctx context.Context, req *patent_mining.SearchByPatentRequest) (*patent_mining.SimilaritySearchResult, error) {
+	return nil, errors.NewMsg("not implemented in CLI")
+}
+func (s *remoteSearchService) GetSearchHistory(ctx context.Context, userID string, limit int) ([]patent_mining.SearchHistoryEntry, error) {
+	return nil, errors.NewMsg("not implemented in CLI")
+}
+
+
 func runSearchMolecule(ctx context.Context, service patent_mining.SimilaritySearchService, logger logging.Logger) error {
+	// ... (rest of implementation unchanged)
 	// Validate mutually exclusive flags
 	if searchSMILES == "" && searchInChI == "" {
 		return errors.NewMsg("either --smiles or --inchi must be provided")
@@ -244,6 +339,7 @@ func runSearchPatent(ctx context.Context, service patent_mining.SimilaritySearch
 	return nil
 }
 
+// ... (helpers)
 func parseFingerprints(input string) ([]string, error) {
 	validFingerprints := map[string]bool{
 		"morgan":      true,
@@ -376,17 +472,5 @@ func formatCLIPatentResults(results []*patent_mining.CLIPatentSearchResult, form
 	return buf.String(), nil
 }
 
-func colorizeRiskLevel(level string) string {
-	switch strings.ToUpper(level) {
-	case "HIGH":
-		return color.RedString("HIGH")
-	case "MEDIUM":
-		return color.YellowString("MEDIUM")
-	case "LOW":
-		return color.GreenString("LOW")
-	default:
-		return level
-	}
-}
 
 //Personal.AI order the ending
