@@ -1,10 +1,11 @@
 package collaboration
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	apperrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
 // WorkspaceStatus defines the status of a workspace.
@@ -17,7 +18,7 @@ const (
 	WorkspaceStatusDeleted   WorkspaceStatus = "deleted"
 )
 
-// WorkspacePlan defines the subscription plan of a workspace.
+// WorkspacePlan defines the subscription plan.
 type WorkspacePlan string
 
 const (
@@ -26,7 +27,7 @@ const (
 	PlanEnterprise WorkspacePlan = "enterprise"
 )
 
-// WorkspaceSettings defines the settings of a workspace.
+// WorkspaceSettings holds configuration for a workspace.
 type WorkspaceSettings struct {
 	DefaultCurrency          string   `json:"default_currency"`
 	DefaultJurisdiction      string   `json:"default_jurisdiction"`
@@ -34,14 +35,14 @@ type WorkspaceSettings struct {
 	DeadlineReminderDays     []int    `json:"deadline_reminder_days"`
 	EnableEmailNotifications bool     `json:"enable_email_notifications"`
 	EnableInAppNotifications bool     `json:"enable_in_app_notifications"`
-	MaxPortfolios            int      `json:"max_portfolios"`
-	MaxMembers               int      `json:"max_members"`
+	MaxPortfolios            int      `json:"max_portfolios"` // -1 for unlimited
+	MaxMembers               int      `json:"max_members"`    // -1 for unlimited
 	AIFeaturesEnabled        bool     `json:"ai_features_enabled"`
 	Language                 string   `json:"language"`
 	Timezone                 string   `json:"timezone"`
 }
 
-// Workspace is the aggregate root for a collaboration unit.
+// Workspace represents a collaboration environment.
 type Workspace struct {
 	ID           string            `json:"id"`
 	Name         string            `json:"name"`
@@ -58,56 +59,20 @@ type Workspace struct {
 	UpdatedAt    time.Time         `json:"updated_at"`
 }
 
-// DefaultWorkspaceSettings returns default settings for a free plan.
-func DefaultWorkspaceSettings() WorkspaceSettings {
-	return WorkspaceSettings{
-		DefaultCurrency:          "USD",
-		DefaultJurisdiction:      "US",
-		AnnuityReminderDays:      []int{7, 30, 60},
-		DeadlineReminderDays:     []int{7, 14, 30},
-		EnableEmailNotifications: true,
-		EnableInAppNotifications: true,
-		MaxPortfolios:            5,
-		MaxMembers:               3,
-		AIFeaturesEnabled:        false,
-		Language:                 "en",
-		Timezone:                 "UTC",
-	}
-}
-
-// PlanLimits returns settings for a specific plan.
-func PlanLimits(plan WorkspacePlan) WorkspaceSettings {
-	settings := DefaultWorkspaceSettings()
-	switch plan {
-	case PlanFree:
-		settings.MaxPortfolios = 5
-		settings.MaxMembers = 3
-		settings.AIFeaturesEnabled = false
-	case PlanPro:
-		settings.MaxPortfolios = 50
-		settings.MaxMembers = 20
-		settings.AIFeaturesEnabled = true
-	case PlanEnterprise:
-		settings.MaxPortfolios = -1
-		settings.MaxMembers = -1
-		settings.AIFeaturesEnabled = true
-	}
-	return settings
-}
-
 // NewWorkspace creates a new workspace.
 func NewWorkspace(name, ownerID string) (*Workspace, error) {
 	if name == "" || len(name) > 100 {
-		return nil, errors.InvalidParam("name must be between 1 and 100 characters")
+		return nil, errors.New("invalid name")
 	}
 	if ownerID == "" {
-		return nil, errors.InvalidParam("ownerID is required")
+		return nil, errors.New("ownerID required")
 	}
 
 	now := time.Now().UTC()
 	return &Workspace{
 		ID:          uuid.New().String(),
 		Name:        name,
+		Slug:        "",
 		OwnerID:     ownerID,
 		Status:      WorkspaceStatusActive,
 		Plan:        PlanFree,
@@ -118,29 +83,61 @@ func NewWorkspace(name, ownerID string) (*Workspace, error) {
 	}, nil
 }
 
-// UpdateName updates the workspace name.
+func DefaultWorkspaceSettings() WorkspaceSettings {
+	return WorkspaceSettings{
+		DefaultCurrency:          "USD",
+		DefaultJurisdiction:      "US",
+		AnnuityReminderDays:      []int{60, 30, 7},
+		DeadlineReminderDays:     []int{30, 14, 7},
+		EnableEmailNotifications: true,
+		EnableInAppNotifications: true,
+		MaxPortfolios:            5,
+		MaxMembers:               3,
+		AIFeaturesEnabled:        false,
+		Language:                 "en",
+		Timezone:                 "UTC",
+	}
+}
+
+func PlanLimits(plan WorkspacePlan) WorkspaceSettings {
+	s := DefaultWorkspaceSettings()
+	switch plan {
+	case PlanFree:
+		s.MaxPortfolios = 5
+		s.MaxMembers = 3
+		s.AIFeaturesEnabled = false
+	case PlanPro:
+		s.MaxPortfolios = 50
+		s.MaxMembers = 20
+		s.AIFeaturesEnabled = true
+	case PlanEnterprise:
+		s.MaxPortfolios = -1
+		s.MaxMembers = -1
+		s.AIFeaturesEnabled = true
+	}
+	return s
+}
+
 func (w *Workspace) UpdateName(name string) error {
 	if name == "" || len(name) > 100 {
-		return errors.InvalidParam("name must be between 1 and 100 characters")
+		return apperrors.NewValidation("invalid name")
 	}
 	w.Name = name
 	w.UpdatedAt = time.Now().UTC()
 	return nil
 }
 
-// UpdateDescription updates the workspace description.
 func (w *Workspace) UpdateDescription(description string) error {
 	if len(description) > 500 {
-		return errors.InvalidParam("description must be at most 500 characters")
+		return apperrors.NewValidation("description too long")
 	}
 	w.Description = description
 	w.UpdatedAt = time.Now().UTC()
 	return nil
 }
 
-// UpdateSettings updates the workspace settings.
 func (w *Workspace) UpdateSettings(settings WorkspaceSettings) error {
-	// Preserve plan-controlled limits
+	// Preserve plan limits
 	settings.MaxPortfolios = w.Settings.MaxPortfolios
 	settings.MaxMembers = w.Settings.MaxMembers
 	settings.AIFeaturesEnabled = w.Settings.AIFeaturesEnabled
@@ -150,22 +147,12 @@ func (w *Workspace) UpdateSettings(settings WorkspaceSettings) error {
 	return nil
 }
 
-// UpgradePlan upgrades the workspace plan.
 func (w *Workspace) UpgradePlan(plan WorkspacePlan) error {
-	planRank := map[WorkspacePlan]int{
-		PlanFree:       0,
-		PlanPro:        1,
-		PlanEnterprise: 2,
+	if w.Plan == PlanEnterprise && plan != PlanEnterprise {
+		return apperrors.NewValidation("cannot downgrade from Enterprise")
 	}
-
-	currentRank, ok1 := planRank[w.Plan]
-	newRank, ok2 := planRank[plan]
-
-	if !ok2 {
-		return errors.InvalidParam("invalid plan")
-	}
-	if !ok1 || newRank <= currentRank {
-		return errors.InvalidParam("can only upgrade to a higher plan")
+	if w.Plan == PlanPro && plan == PlanFree {
+		return apperrors.NewValidation("cannot downgrade from Pro to Free")
 	}
 
 	w.Plan = plan
@@ -177,25 +164,20 @@ func (w *Workspace) UpgradePlan(plan WorkspacePlan) error {
 	return nil
 }
 
-// AddPortfolio adds a portfolio to the workspace.
 func (w *Workspace) AddPortfolio(portfolioID string) error {
-	if portfolioID == "" {
-		return errors.InvalidParam("portfolioID is required")
-	}
 	for _, id := range w.PortfolioIDs {
 		if id == portfolioID {
-			return errors.Conflict("portfolio already added to workspace")
+			return apperrors.NewValidation("portfolio already added")
 		}
 	}
-	if w.Settings.MaxPortfolios != -1 && len(w.PortfolioIDs) >= w.Settings.MaxPortfolios {
-		return errors.Forbidden("maximum number of portfolios reached for current plan")
+	if !w.CanAddPortfolio() {
+		return apperrors.NewValidation("portfolio limit reached")
 	}
 	w.PortfolioIDs = append(w.PortfolioIDs, portfolioID)
 	w.UpdatedAt = time.Now().UTC()
 	return nil
 }
 
-// RemovePortfolio removes a portfolio from the workspace.
 func (w *Workspace) RemovePortfolio(portfolioID string) error {
 	for i, id := range w.PortfolioIDs {
 		if id == portfolioID {
@@ -204,16 +186,14 @@ func (w *Workspace) RemovePortfolio(portfolioID string) error {
 			return nil
 		}
 	}
-	return errors.NotFound("portfolio not found in workspace")
+	return apperrors.NewNotFound("portfolio not found in workspace")
 }
 
-// IncrementMemberCount increments the member count.
 func (w *Workspace) IncrementMemberCount() {
 	w.MemberCount++
 	w.UpdatedAt = time.Now().UTC()
 }
 
-// DecrementMemberCount decrements the member count.
 func (w *Workspace) DecrementMemberCount() {
 	if w.MemberCount > 1 {
 		w.MemberCount--
@@ -221,7 +201,6 @@ func (w *Workspace) DecrementMemberCount() {
 	}
 }
 
-// CanAddMember checks if a member can be added to the workspace.
 func (w *Workspace) CanAddMember() bool {
 	if w.Settings.MaxMembers == -1 {
 		return true
@@ -229,7 +208,6 @@ func (w *Workspace) CanAddMember() bool {
 	return w.MemberCount < w.Settings.MaxMembers
 }
 
-// CanAddPortfolio checks if a portfolio can be added to the workspace.
 func (w *Workspace) CanAddPortfolio() bool {
 	if w.Settings.MaxPortfolios == -1 {
 		return true
@@ -237,81 +215,58 @@ func (w *Workspace) CanAddPortfolio() bool {
 	return len(w.PortfolioIDs) < w.Settings.MaxPortfolios
 }
 
-// Suspend suspends the workspace.
 func (w *Workspace) Suspend(reason string) error {
 	if w.Status != WorkspaceStatusActive {
-		return errors.InvalidState("only active workspaces can be suspended")
+		return apperrors.NewValidation("workspace not active")
 	}
 	w.Status = WorkspaceStatusSuspended
 	w.UpdatedAt = time.Now().UTC()
 	return nil
 }
 
-// Reactivate reactivates the workspace.
 func (w *Workspace) Reactivate() error {
 	if w.Status != WorkspaceStatusSuspended {
-		return errors.InvalidState("only suspended workspaces can be reactivated")
+		return apperrors.NewValidation("workspace not suspended")
 	}
 	w.Status = WorkspaceStatusActive
 	w.UpdatedAt = time.Now().UTC()
 	return nil
 }
 
-// Archive archives the workspace.
 func (w *Workspace) Archive() error {
 	if w.Status != WorkspaceStatusActive && w.Status != WorkspaceStatusSuspended {
-		return errors.InvalidState("only active or suspended workspaces can be archived")
+		return apperrors.NewValidation("workspace cannot be archived")
 	}
 	w.Status = WorkspaceStatusArchived
 	w.UpdatedAt = time.Now().UTC()
 	return nil
 }
 
-// MarkDeleted marks the workspace as deleted.
 func (w *Workspace) MarkDeleted() error {
 	w.Status = WorkspaceStatusDeleted
 	w.UpdatedAt = time.Now().UTC()
 	return nil
 }
 
-// IsActive checks if the workspace is active.
 func (w *Workspace) IsActive() bool {
 	return w.Status == WorkspaceStatusActive
 }
 
-// TransferOwnership transfers the workspace ownership.
 func (w *Workspace) TransferOwnership(newOwnerID string) error {
-	if newOwnerID == "" {
-		return errors.InvalidParam("newOwnerID is required")
-	}
-	if newOwnerID == w.OwnerID {
-		return errors.InvalidParam("cannot transfer ownership to current owner")
+	if newOwnerID == "" || newOwnerID == w.OwnerID {
+		return apperrors.NewValidation("invalid new owner")
 	}
 	w.OwnerID = newOwnerID
 	w.UpdatedAt = time.Now().UTC()
 	return nil
 }
 
-// Validate validates the workspace.
 func (w *Workspace) Validate() error {
-	if w.ID == "" || w.Name == "" || w.Slug == "" || w.OwnerID == "" {
-		return errors.InvalidParam("ID, Name, Slug, and OwnerID are required")
+	if w.ID == "" || w.Name == "" || w.OwnerID == "" {
+		return errors.New("invalid workspace")
 	}
 	if w.MemberCount < 1 {
-		return errors.InvalidParam("MemberCount must be at least 1")
-	}
-	validStatus := map[WorkspaceStatus]bool{
-		WorkspaceStatusActive: true, WorkspaceStatusSuspended: true,
-		WorkspaceStatusArchived: true, WorkspaceStatusDeleted: true,
-	}
-	if !validStatus[w.Status] {
-		return errors.InvalidParam("invalid status")
-	}
-	validPlan := map[WorkspacePlan]bool{
-		PlanFree: true, PlanPro: true, PlanEnterprise: true,
-	}
-	if !validPlan[w.Plan] {
-		return errors.InvalidParam("invalid plan")
+		return errors.New("member count must be >= 1")
 	}
 	return nil
 }
