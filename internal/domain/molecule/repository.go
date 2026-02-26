@@ -9,13 +9,13 @@ import (
 
 // MoleculeRepository defines the interface for molecular data persistence.
 type MoleculeRepository interface {
-	// Command methods
+	// Command methods (Write)
 	Save(ctx context.Context, molecule *Molecule) error
 	Update(ctx context.Context, molecule *Molecule) error
 	Delete(ctx context.Context, id string) error
 	BatchSave(ctx context.Context, molecules []*Molecule) (int, error)
 
-	// Query methods
+	// Query methods (Read)
 	FindByID(ctx context.Context, id string) (*Molecule, error)
 	FindByInChIKey(ctx context.Context, inchiKey string) (*Molecule, error)
 	FindBySMILES(ctx context.Context, smiles string) ([]*Molecule, error)
@@ -84,7 +84,7 @@ func (r *MoleculeSearchResult) IsEmpty() bool {
 // Validate ensures query parameters are valid.
 func (q *MoleculeQuery) Validate() error {
 	if q.Limit < 0 {
-		return errors.New(errors.ErrCodeValidation, "limit cannot be negative")
+		return errors.New(errors.ErrCodeValidation, "limit cannot be negative") // Requirement: "limit_negative: Limit=-1，期望返回错误"
 	}
 	if q.Limit == 0 {
 		q.Limit = 20
@@ -131,6 +131,13 @@ func (q *MoleculeQuery) Validate() error {
 		}
 	}
 
+	// Sources
+	for _, s := range q.Sources {
+		if !s.IsValid() {
+			return errors.New(errors.ErrCodeValidation, "invalid source in query")
+		}
+	}
+
 	// Property filters
 	for _, f := range q.PropertyFilters {
 		if f.Name == "" {
@@ -152,8 +159,5 @@ type MoleculeUnitOfWork interface {
 	Commit(ctx context.Context) error
 	Rollback(ctx context.Context) error
 }
-
-// Repository alias for MoleculeRepository to support external packages using simple name
-type Repository = MoleculeRepository
 
 //Personal.AI order the ending
