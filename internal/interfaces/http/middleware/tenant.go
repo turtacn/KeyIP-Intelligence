@@ -164,4 +164,32 @@ func writeTenantError(w http.ResponseWriter, statusCode int, code errors.ErrorCo
 	json.NewEncoder(w).Encode(resp)
 }
 
+// DefaultTenantConfig returns a TenantMiddlewareConfig with default values.
+func DefaultTenantConfig() TenantMiddlewareConfig {
+	return TenantMiddlewareConfig{
+		HeaderName:      "X-Tenant-ID",
+		QueryParam:      "tenant_id",
+		Required:        true,
+		DefaultTenantID: "",
+	}
+}
+
+// TenantMiddleware wraps the tenant middleware function.
+type TenantMiddleware struct {
+	handler func(http.Handler) http.Handler
+}
+
+// NewTenantMiddlewareWrapper creates a new TenantMiddleware wrapper.
+func NewTenantMiddlewareWrapper(cfg TenantMiddlewareConfig, logger logging.Logger) *TenantMiddleware {
+	cfg.Logger = logger
+	return &TenantMiddleware{
+		handler: NewTenantMiddleware(cfg),
+	}
+}
+
+// Handler returns the middleware handler.
+func (m *TenantMiddleware) Handler(next http.Handler) http.Handler {
+	return m.handler(next)
+}
+
 //Personal.AI order the ending

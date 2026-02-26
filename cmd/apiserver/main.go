@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,6 +17,8 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	httpserver "github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http"
+	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/handlers"
+	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/middleware"
 )
 
 const (
@@ -66,18 +67,47 @@ func main() {
 		logging.Int("grpc_port", actualGRPCPort),
 	)
 
-	// Create HTTP router with minimal configuration
-	routerCfg := httpserver.RouterConfig{
-		Logger: logger,
+	// Create middleware wrappers
+	// Note: In a real implementation, we would inject actual validators and services here.
+	// For now, we use defaults or nil where appropriate for the skeleton.
+
+	loggingMw := middleware.NewLoggingMiddleware(logger, middleware.DefaultLoggingConfig())
+	tenantCfg := middleware.DefaultTenantConfig()
+	tenantCfg.Logger = logger
+	tenantMw := middleware.NewTenantMiddlewareWrapper(tenantCfg, logger)
+
+	// Router Dependencies
+	// Handlers are currently nil as services are not yet wired up in main.go
+	// This will be populated in Phase 12 fully.
+	routerDeps := httpserver.RouterDeps{
+		HealthHandler:     handlers.NewHealthHandler(config.Version),
+		LoggingMiddleware: loggingMw.Handler,
+		TenantMiddleware:  tenantMw.Handler,
+		// Other handlers and middlewares will be injected here
 	}
-	httpRouter := httpserver.NewRouter(routerCfg)
+
+	// Create HTTP router
+	routerCfg := httpserver.RouterConfig{
+		Logger:          logger,
+		EnableAuth:      false, // Disabled until auth service is wired
+		EnableTenant:    true,
+		EnableRateLimit: false,
+		EnableCORS:      true,
+	}
+	httpRouter := httpserver.NewRouter(routerCfg, routerDeps)
 
 	// Create HTTP server
-	httpSrv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", actualHTTPPort),
-		Handler:      httpRouter,
-		ReadTimeout:  cfg.Server.HTTP.ReadTimeout,
-		WriteTimeout: cfg.Server.HTTP.WriteTimeout,
+	// We use our new Server wrapper if possible, but keeping existing structure for minimal diff
+	// unless we want to replace it with httpserver.NewServer
+
+	srvCfg := httpserver.ServerConfig{
+		Host: "0.0.0.0",
+		Port: actualHTTPPort,
+		Logger: logger,
+	}
+	serverWrapper, err := httpserver.NewServer(srvCfg, httpRouter)
+	if err != nil {
+		logger.Fatal("failed to create HTTP server", logging.Err(err))
 	}
 
 	// Create gRPC server (placeholder)
@@ -85,8 +115,7 @@ func main() {
 
 	// Start HTTP server
 	go func() {
-		logger.Info("HTTP server listening", logging.Int("port", actualHTTPPort))
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := serverWrapper.Start(context.Background()); err != nil {
 			logger.Error("HTTP server error", logging.Err(err))
 		}
 	}()
@@ -112,10 +141,7 @@ func main() {
 	logger.Info("shutting down servers...")
 
 	// Graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer cancel()
-
-	if err := httpSrv.Shutdown(ctx); err != nil {
+	if err := serverWrapper.Shutdown(); err != nil {
 		logger.Error("HTTP server shutdown error", logging.Err(err))
 	}
 	grpcSrv.GracefulStop()
