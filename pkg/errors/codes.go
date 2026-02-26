@@ -30,6 +30,8 @@ const (
 	ErrCodeExternalService    ErrorCode = "COMMON_014"
 	ErrCodeFeatureDisabled    ErrorCode = "COMMON_015"
 	ErrCodeNotImplemented     ErrorCode = "COMMON_016"
+	ErrCodeInvalidArgument    ErrorCode = "COMMON_017"
+	ErrCodeServerAlreadyRunning ErrorCode = "SRV_001"
 )
 
 // Aliases for backward compatibility
@@ -42,7 +44,12 @@ const (
 	CodeConflict       = ErrCodeConflict
 	CodeRateLimit      = ErrCodeTooManyRequests
 	CodeNotImplemented = ErrCodeNotImplemented
+	CodeInvalidArgument = ErrCodeInvalidArgument
 	CodeOK             = ErrorCode("OK")
+
+	// Domain specific aliases
+	ErrInvalidArgument    = ErrCodeInvalidArgument
+	ErrServerAlreadyRunning = ErrCodeServerAlreadyRunning
 
 	// Domain specific aliases
 	CodePatentNotFound        = ErrCodePatentNotFound
@@ -68,6 +75,14 @@ const (
 	ErrCodePropertyPredictionFailed   ErrorCode = "MOL_013"
 	ErrCodeGNNModelError              ErrorCode = "MOL_014"
 	ErrCodeGNNModelNotLoaded          ErrorCode = "MOL_015"
+)
+
+// Tenant Module Error Codes
+const (
+	ErrTenantRequired      ErrorCode = "TNT_001"
+	ErrInvalidTenantID     ErrorCode = "TNT_002"
+	ErrTenantNotFound      ErrorCode = "TNT_003"
+	ErrTenantResolveFailed ErrorCode = "TNT_004"
 )
 
 // Patent Module Error Codes
@@ -168,6 +183,13 @@ var ErrorCodeHTTPStatus = map[ErrorCode]int{
 	ErrCodeCacheError:         http.StatusInternalServerError,
 	ErrCodeExternalService:    http.StatusInternalServerError,
 	ErrCodeFeatureDisabled:    http.StatusForbidden,
+	ErrCodeInvalidArgument:    http.StatusBadRequest,
+	ErrCodeServerAlreadyRunning: http.StatusInternalServerError,
+
+	ErrTenantRequired:      http.StatusUnauthorized,
+	ErrInvalidTenantID:     http.StatusBadRequest,
+	ErrTenantNotFound:      http.StatusForbidden,
+	ErrTenantResolveFailed: http.StatusInternalServerError,
 
 	ErrCodeMoleculeInvalidSMILES:      http.StatusBadRequest,
 	ErrCodeMoleculeInvalidInChI:       http.StatusBadRequest,
@@ -250,6 +272,13 @@ var ErrorCodeMessage = map[ErrorCode]string{
 	ErrCodeCacheError:         "cache error",
 	ErrCodeExternalService:    "external service error",
 	ErrCodeFeatureDisabled:    "feature disabled",
+	ErrCodeInvalidArgument:    "invalid argument",
+	ErrCodeServerAlreadyRunning: "server already running",
+
+	ErrTenantRequired:      "tenant ID is required",
+	ErrInvalidTenantID:     "invalid tenant ID format",
+	ErrTenantNotFound:      "tenant not found",
+	ErrTenantResolveFailed: "failed to resolve tenant",
 
 	ErrCodeMoleculeInvalidSMILES:      "invalid SMILES format",
 	ErrCodeMoleculeInvalidInChI:       "invalid InChI format",

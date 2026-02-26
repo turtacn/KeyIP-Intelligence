@@ -212,6 +212,11 @@ type ErrorDetail struct {
 	Details map[string]interface{} `json:"details,omitempty"`
 }
 
+// ErrorResponse is a standard error response structure.
+type ErrorResponse struct {
+	Error ErrorDetail `json:"error"`
+}
+
 // APIResponse is the generic wrapper for all API responses.
 type APIResponse[T any] struct {
 	Success   bool         `json:"success"`

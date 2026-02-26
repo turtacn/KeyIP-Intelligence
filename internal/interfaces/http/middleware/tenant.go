@@ -1,103 +1,55 @@
-// File: internal/interfaces/http/middleware/tenant.go
-// Phase 11 - 序号 280
-//
-// 生成计划:
-// 功能定位: HTTP 多租户中间件，从请求中提取租户标识并注入上下文，实现多租户数据隔离入口控制
-// 核心实现:
-//   - TenantConfig 配置结构体（HeaderName, QueryParam, DefaultTenantID, Required, AllowedTenants, TenantValidator）
-//   - TenantValidatorFunc 函数类型
-//   - TenantInfo 结构体（ID, Name, Plan, IsActive）
-//   - NewTenantMiddleware: 三级提取（Header→QueryParam→Default）、格式校验、白名单、外部验证、上下文注入
-//   - TenantFromContext / MustTenantFromContext 上下文读取
-//   - DefaultTenantConfig 工厂函数
-//   - validateTenantID 格式校验
-// 业务逻辑:
-//   - 默认 Header: X-Tenant-ID, QueryParam: tenant_id
-//   - Required=true 时无租户返回 400; Required=false 时回退 DefaultTenantID 或跳过
-//   - 白名单 O(1) 查找; 响应头回写 X-Tenant-ID
-// 依赖: logging, pkg/errors
-// 被依赖: router.go, handlers/*
-
 package middleware
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"regexp"
-	"strings"
+	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // tenantContextKey is the unexported key type for storing tenant info in context.
 type tenantContextKey struct{}
 
-// TenantValidatorFunc defines a function that validates a tenant ID against
-// an external source (e.g., database, auth service). Returns true if valid.
-type TenantValidatorFunc func(tenantID string) (bool, error)
-
 // TenantInfo holds the resolved tenant information injected into the request context.
 type TenantInfo struct {
-	// ID is the unique tenant identifier extracted from the request.
-	ID string `json:"id"`
-	// Name is the human-readable tenant name, populated by the validator if available.
-	Name string `json:"name,omitempty"`
-	// Plan is the subscription plan of the tenant (e.g., "free", "pro", "enterprise").
-	Plan string `json:"plan,omitempty"`
-	// IsActive indicates whether the tenant account is currently active.
-	IsActive bool `json:"is_active"`
+	TenantID   string            `json:"tenant_id"`
+	TenantName string            `json:"tenant_name,omitempty"`
+	Plan       string            `json:"plan,omitempty"` // free/pro/enterprise
+	Metadata   map[string]string `json:"metadata,omitempty"`
 }
 
-// TenantConfig holds configuration for the tenant middleware.
-type TenantConfig struct {
-	// HeaderName is the HTTP header to extract the tenant ID from.
-	// Default: "X-Tenant-ID".
-	HeaderName string
+// TenantResolver resolves tenant information from a tenant ID.
+type TenantResolver interface {
+	Resolve(ctx context.Context, tenantID string) (*TenantInfo, error)
+}
 
-	// QueryParam is the query parameter name used as a fallback for tenant ID extraction.
-	// Default: "tenant_id".
-	QueryParam string
+// TenantCache caches resolved tenant information.
+type TenantCache interface {
+	Get(ctx context.Context, tenantID string) (*TenantInfo, bool)
+	Set(ctx context.Context, tenantID string, info *TenantInfo, ttl time.Duration)
+}
 
-	// DefaultTenantID is used when no tenant ID can be extracted and Required is false.
+// TenantMiddlewareConfig holds configuration for the tenant middleware.
+type TenantMiddlewareConfig struct {
+	HeaderName      string
+	QueryParam      string
+	Required        bool
 	DefaultTenantID string
-
-	// Required, when true, causes the middleware to reject requests that lack a tenant ID
-	// with HTTP 400 Bad Request.
-	Required bool
-
-	// AllowedTenants is an optional whitelist. When non-empty, only listed tenant IDs
-	// are permitted. An empty slice disables whitelist checking.
-	AllowedTenants []string
-
-	// TenantValidator is an optional external validation function. When set, it is called
-	// after format and whitelist checks pass.
-	TenantValidator TenantValidatorFunc
+	TenantResolver  TenantResolver
+	Cache           TenantCache
+	Logger          logging.Logger
 }
 
-// tenantIDPattern enforces: alphanumeric, underscore, hyphen, length 1-64.
-var tenantIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
+// tenantIDPattern enforces: alphanumeric, underscore, hyphen, length 1-128.
+var tenantIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
 
-// DefaultTenantConfig returns a TenantConfig with sensible defaults.
-func DefaultTenantConfig() TenantConfig {
-	return TenantConfig{
-		HeaderName:      "X-Tenant-ID",
-		QueryParam:      "tenant_id",
-		DefaultTenantID: "",
-		Required:        true,
-		AllowedTenants:  nil,
-		TenantValidator: nil,
-	}
-}
-
-// NewTenantMiddleware creates an HTTP middleware that extracts and validates a tenant ID
-// from incoming requests, then injects TenantInfo into the request context.
-//
-// Extraction order: Header (HeaderName) → Query parameter (QueryParam) → DefaultTenantID.
-func NewTenantMiddleware(cfg TenantConfig, logger logging.Logger) func(http.Handler) http.Handler {
-	// Normalize config defaults.
+// NewTenantMiddleware creates a new tenant middleware.
+func NewTenantMiddleware(cfg TenantMiddlewareConfig) func(http.Handler) http.Handler {
 	if cfg.HeaderName == "" {
 		cfg.HeaderName = "X-Tenant-ID"
 	}
@@ -105,190 +57,137 @@ func NewTenantMiddleware(cfg TenantConfig, logger logging.Logger) func(http.Hand
 		cfg.QueryParam = "tenant_id"
 	}
 
-	// Pre-build allowed tenants lookup map for O(1) checks.
-	var allowedSet map[string]struct{}
-	if len(cfg.AllowedTenants) > 0 {
-		allowedSet = make(map[string]struct{}, len(cfg.AllowedTenants))
-		for _, t := range cfg.AllowedTenants {
-			allowedSet[strings.TrimSpace(t)] = struct{}{}
-		}
-	}
-
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			tenantID := extractTenantID(r, cfg.HeaderName, cfg.QueryParam)
-
-			// Fallback to default if extraction yields nothing.
+			ctx := r.Context()
+			tenantID := r.Header.Get(cfg.HeaderName)
 			if tenantID == "" {
+				tenantID = r.URL.Query().Get(cfg.QueryParam)
+			}
+
+			if tenantID == "" {
+				if cfg.Required {
+					writeTenantError(w, http.StatusUnauthorized, errors.ErrTenantRequired, "tenant ID is required")
+					return
+				}
 				tenantID = cfg.DefaultTenantID
 			}
 
-			// If still empty, decide based on Required flag.
-			if tenantID == "" {
-				if cfg.Required {
-					logger.Warn("tenant ID missing in required mode",
-						logging.String("method", r.Method),
-						logging.String("path", r.URL.Path),
-						logging.String("remote", r.RemoteAddr),
-					)
-					writeTenantError(w, http.StatusBadRequest,
-						errors.ErrCodeValidation,
-						"tenant ID is required: provide via header or query parameter")
+			// If tenantID is still empty (not required and no default), proceed without tenant info
+			if tenantID != "" {
+				if !tenantIDPattern.MatchString(tenantID) {
+					writeTenantError(w, http.StatusBadRequest, errors.ErrInvalidTenantID, "invalid tenant ID format")
 					return
 				}
-				// Not required and no default — pass through without tenant context.
-				next.ServeHTTP(w, r)
-				return
-			}
 
-			// Format validation.
-			if !validateTenantID(tenantID) {
-				logger.Warn("invalid tenant ID format",
-					logging.String("tenant_id", tenantID),
-					logging.String("method", r.Method),
-					logging.String("path", r.URL.Path),
-				)
-				writeTenantError(w, http.StatusBadRequest,
-					errors.ErrCodeValidation,
-					fmt.Sprintf("invalid tenant ID format: must match [a-zA-Z0-9_-]{1,64}, got %q", tenantID))
-				return
-			}
+				var info *TenantInfo
+				var found bool
 
-			// Whitelist check.
-			if allowedSet != nil {
-				if _, ok := allowedSet[tenantID]; !ok {
-					logger.Warn("tenant ID not in allowed list",
-						logging.String("tenant_id", tenantID),
-						logging.String("method", r.Method),
-						logging.String("path", r.URL.Path),
-					)
-					writeTenantError(w, http.StatusForbidden,
-						errors.ErrCodeUnauthorized,
-						fmt.Sprintf("tenant %q is not permitted", tenantID))
-					return
+				// Check cache
+				if cfg.Cache != nil {
+					info, found = cfg.Cache.Get(ctx, tenantID)
 				}
-			}
 
-			// External validator.
-			if cfg.TenantValidator != nil {
-				valid, err := cfg.TenantValidator(tenantID)
-				if err != nil {
-					logger.Error("tenant validation failed",
-						logging.String("tenant_id", tenantID),
-						logging.Err(err),
-					)
-					writeTenantError(w, http.StatusInternalServerError,
-						errors.ErrCodeInternal,
-						"tenant validation error")
-					return
+				if !found {
+					if cfg.TenantResolver != nil {
+						resolvedInfo, err := cfg.TenantResolver.Resolve(ctx, tenantID)
+						if err != nil {
+							cfg.Logger.Error("failed to resolve tenant", logging.Err(err), logging.String("tenant_id", tenantID))
+							writeTenantError(w, http.StatusInternalServerError, errors.ErrTenantResolveFailed, "failed to resolve tenant")
+							return
+						}
+						if resolvedInfo == nil {
+							writeTenantError(w, http.StatusForbidden, errors.ErrTenantNotFound, "tenant not found")
+							return
+						}
+						info = resolvedInfo
+						if cfg.Cache != nil {
+							cfg.Cache.Set(ctx, tenantID, info, 5*time.Minute)
+						}
+					} else {
+						// Minimal info if no resolver
+						info = &TenantInfo{TenantID: tenantID}
+					}
 				}
-				if !valid {
-					logger.Warn("tenant rejected by validator",
-						logging.String("tenant_id", tenantID),
-						logging.String("method", r.Method),
-						logging.String("path", r.URL.Path),
-					)
-					writeTenantError(w, http.StatusForbidden,
-						errors.ErrCodeUnauthorized,
-						fmt.Sprintf("tenant %q is not authorized", tenantID))
-					return
-				}
+
+				ctx = ContextWithTenant(ctx, info)
+				w.Header().Set("X-Tenant-ID", tenantID)
 			}
 
-			// Build TenantInfo and inject into context.
-			info := &TenantInfo{
-				ID:       tenantID,
-				IsActive: true,
-			}
-
-			ctx := context.WithValue(r.Context(), tenantContextKey{}, info)
-			r = r.WithContext(ctx)
-
-			// Echo tenant ID in response header for client confirmation.
-			w.Header().Set("X-Tenant-ID", tenantID)
-
-			logger.Debug("tenant resolved",
-				logging.String("tenant_id", tenantID),
-				logging.String("method", r.Method),
-				logging.String("path", r.URL.Path),
-			)
-
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
 // TenantFromContext retrieves TenantInfo from the request context.
-// Returns nil and false if no tenant info is present.
 func TenantFromContext(ctx context.Context) (*TenantInfo, bool) {
 	info, ok := ctx.Value(tenantContextKey{}).(*TenantInfo)
 	return info, ok
 }
 
-// MustTenantFromContext retrieves TenantInfo from the context or panics.
-// Use only in code paths where tenant presence is guaranteed (e.g., after middleware).
-func MustTenantFromContext(ctx context.Context) *TenantInfo {
-	info, ok := TenantFromContext(ctx)
-	if !ok || info == nil {
-		panic("middleware/tenant: TenantInfo not found in context; ensure TenantMiddleware is applied")
+// ContextWithTenant injects TenantInfo into the context.
+func ContextWithTenant(ctx context.Context, info *TenantInfo) context.Context {
+	return context.WithValue(ctx, tenantContextKey{}, info)
+}
+
+// DefaultTenantResolver is a simple in-memory resolver implementation.
+type DefaultTenantResolver struct {
+	tenants map[string]*TenantInfo
+}
+
+func NewDefaultTenantResolver() *DefaultTenantResolver {
+	return &DefaultTenantResolver{
+		tenants: make(map[string]*TenantInfo),
 	}
-	return info
 }
 
-// extractTenantID attempts to extract the tenant ID from the request using
-// the configured header name and query parameter, in that order.
-func extractTenantID(r *http.Request, headerName, queryParam string) string {
-	// Priority 1: HTTP header.
-	if v := strings.TrimSpace(r.Header.Get(headerName)); v != "" {
-		return v
+func (r *DefaultTenantResolver) Register(info *TenantInfo) {
+	r.tenants[info.TenantID] = info
+}
+
+func (r *DefaultTenantResolver) Resolve(ctx context.Context, tenantID string) (*TenantInfo, error) {
+	if info, ok := r.tenants[tenantID]; ok {
+		return info, nil
 	}
-
-	// Priority 2: Query parameter.
-	if v := strings.TrimSpace(r.URL.Query().Get(queryParam)); v != "" {
-		return v
-	}
-
-	return ""
+	return nil, nil
 }
 
-// validateTenantID checks that the tenant ID matches the allowed pattern:
-// alphanumeric characters, underscores, and hyphens, length 1-64.
-func validateTenantID(id string) bool {
-	return tenantIDPattern.MatchString(id)
-}
-
-// tenantErrorResponse is the JSON body returned on tenant validation failures.
-type tenantErrorResponse struct {
-	Error struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-	} `json:"error"`
-}
-
-// writeTenantError writes a JSON error response for tenant-related failures.
 func writeTenantError(w http.ResponseWriter, statusCode int, code errors.ErrorCode, message string) {
-	resp := tenantErrorResponse{}
-	resp.Error.Code = string(code)
-	resp.Error.Message = message
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	_ = json.NewEncoder(w).Encode(resp)
+	resp := common.ErrorResponse{
+		Error: common.ErrorDetail{
+			Code:    string(code),
+			Message: message,
+		},
+	}
+	json.NewEncoder(w).Encode(resp)
 }
 
-// TenantMiddleware wraps tenant middleware for use with router configuration.
+// DefaultTenantConfig returns a TenantMiddlewareConfig with default values.
+func DefaultTenantConfig() TenantMiddlewareConfig {
+	return TenantMiddlewareConfig{
+		HeaderName:      "X-Tenant-ID",
+		QueryParam:      "tenant_id",
+		Required:        true,
+		DefaultTenantID: "",
+	}
+}
+
+// TenantMiddleware wraps the tenant middleware function.
 type TenantMiddleware struct {
 	handler func(http.Handler) http.Handler
 }
 
-// NewTenantMiddlewareWrapper creates a new tenant middleware with the given config.
-func NewTenantMiddlewareWrapper(cfg TenantConfig, logger logging.Logger) *TenantMiddleware {
+// NewTenantMiddlewareWrapper creates a new TenantMiddleware wrapper.
+func NewTenantMiddlewareWrapper(cfg TenantMiddlewareConfig, logger logging.Logger) *TenantMiddleware {
+	cfg.Logger = logger
 	return &TenantMiddleware{
-		handler: NewTenantMiddleware(cfg, logger),
+		handler: NewTenantMiddleware(cfg),
 	}
 }
 
-// Handler returns the middleware handler function.
+// Handler returns the middleware handler.
 func (m *TenantMiddleware) Handler(next http.Handler) http.Handler {
 	return m.handler(next)
 }

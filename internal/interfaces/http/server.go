@@ -1,324 +1,287 @@
-// ---
-//
-// 继续输出 284 `internal/interfaces/http/server.go` 要实现 HTTP 服务器生命周期管理。
-//
-// 实现要求:
-//
-// * **功能定位**：封装 net/http.Server 的创建、启动、优雅关闭全生命周期，
-//   作为 KeyIP-Intelligence API 服务的 HTTP 入口点
-// * **核心实现**：
-//   * 定义 `ServerConfig` 结构体：
-//     - Host string（监听地址，默认 "0.0.0.0"）
-//     - Port int（监听端口，默认 8080）
-//     - ReadTimeout time.Duration（读超时，默认 30s）
-//     - WriteTimeout time.Duration（写超时，默认 60s）
-//     - IdleTimeout time.Duration（空闲超时，默认 120s）
-//     - ReadHeaderTimeout time.Duration（读 Header 超时，默认 10s）
-//     - MaxHeaderBytes int（最大 Header 字节数，默认 1MB）
-//     - ShutdownTimeout time.Duration（优雅关闭超时，默认 30s）
-//     - TLSCertFile string（TLS 证书路径，可选）
-//     - TLSKeyFile string（TLS 密钥路径，可选）
-//   * 定义 `Server` 结构体：
-//     - httpServer *http.Server
-//     - config ServerConfig
-//     - handler http.Handler
-//     - logger logging.Logger
-//     - started atomic.Bool
-//   * 定义 `NewServer(cfg ServerConfig, handler http.Handler, logger logging.Logger) *Server`：
-//     - 应用默认值填充
-//     - 构建 net/http.Server 实例
-//   * 定义 `(s *Server) Start(ctx context.Context) error`：
-//     - 启动 HTTP/HTTPS 监听
-//     - 在 goroutine 中运行 ListenAndServe / ListenAndServeTLS
-//     - 监听 ctx.Done() 触发优雅关闭
-//     - 返回启动错误（非 ErrServerClosed）
-//   * 定义 `(s *Server) Shutdown(ctx context.Context) error`：
-//     - 调用 httpServer.Shutdown 优雅关闭
-//     - 等待所有活跃连接处理完毕或超时
-//   * 定义 `(s *Server) Addr() string`：返回实际监听地址
-//   * 定义 `(s *Server) IsRunning() bool`：返回服务器运行状态
-// * **业务逻辑**：
-//   - 支持 HTTP 和 HTTPS 双模式，通过 TLS 配置自动切换
-//   - 优雅关闭时先停止接受新连接，等待活跃请求完成
-//   - 超时后强制关闭剩余连接
-//   - 启动时记录监听地址和协议到日志
-// * **依赖关系**：
-//   * 依赖：net/http、crypto/tls、internal/infrastructure/monitoring/logging/logger.go
-//   * 被依赖：cmd/apiserver/main.go
-// * **测试要求**：启动/关闭生命周期、TLS 模式切换、超时配置、并发安全
-// * **强制约束**：文件最后一行必须为 `//Personal.AI order the ending`
-//
-// ---
 package http
 
 import (
 	"context"
 	"crypto/tls"
-	"errors"
+	"crypto/x509"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
-	"sync/atomic"
+	"os"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// Default server configuration values.
-const (
-	defaultHost              = "0.0.0.0"
-	defaultPort              = 8080
-	defaultReadTimeout       = 30 * time.Second
-	defaultWriteTimeout      = 60 * time.Second
-	defaultIdleTimeout       = 120 * time.Second
-	defaultReadHeaderTimeout = 10 * time.Second
-	defaultMaxHeaderBytes    = 1 << 20 // 1 MB
-	defaultShutdownTimeout   = 30 * time.Second
-)
-
-// ServerConfig holds all configuration parameters for the HTTP server.
+// ServerConfig holds configuration for the HTTP server.
 type ServerConfig struct {
-	// Host is the network interface to bind to. Default: "0.0.0.0".
-	Host string
-
-	// Port is the TCP port to listen on. Default: 8080.
-	Port int
-
-	// ReadTimeout is the maximum duration for reading the entire request,
-	// including the body. Default: 30s.
-	ReadTimeout time.Duration
-
-	// WriteTimeout is the maximum duration before timing out writes of the
-	// response. Default: 60s.
-	WriteTimeout time.Duration
-
-	// IdleTimeout is the maximum amount of time to wait for the next request
-	// when keep-alives are enabled. Default: 120s.
-	IdleTimeout time.Duration
-
-	// ReadHeaderTimeout is the amount of time allowed to read request headers.
-	// Default: 10s.
+	Host              string
+	Port              int
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
 	ReadHeaderTimeout time.Duration
-
-	// MaxHeaderBytes controls the maximum number of bytes the server will read
-	// parsing the request header's keys and values. Default: 1MB.
-	MaxHeaderBytes int
-
-	// ShutdownTimeout is the maximum duration to wait for active connections
-	// to finish during graceful shutdown. Default: 30s.
-	ShutdownTimeout time.Duration
-
-	// TLSCertFile is the path to the TLS certificate file. If both TLSCertFile
-	// and TLSKeyFile are set, the server starts in HTTPS mode.
-	TLSCertFile string
-
-	// TLSKeyFile is the path to the TLS private key file.
-	TLSKeyFile string
+	MaxHeaderBytes    int
+	ShutdownTimeout   time.Duration
+	TLS               *TLSConfig
+	Logger            logging.Logger
 }
 
-// applyDefaults fills zero-value fields with sensible defaults.
-func (c *ServerConfig) applyDefaults() {
-	if c.Host == "" {
-		c.Host = defaultHost
-	}
-	if c.Port == 0 {
-		c.Port = defaultPort
-	}
-	if c.ReadTimeout == 0 {
-		c.ReadTimeout = defaultReadTimeout
-	}
-	if c.WriteTimeout == 0 {
-		c.WriteTimeout = defaultWriteTimeout
-	}
-	if c.IdleTimeout == 0 {
-		c.IdleTimeout = defaultIdleTimeout
-	}
-	if c.ReadHeaderTimeout == 0 {
-		c.ReadHeaderTimeout = defaultReadHeaderTimeout
-	}
-	if c.MaxHeaderBytes == 0 {
-		c.MaxHeaderBytes = defaultMaxHeaderBytes
-	}
-	if c.ShutdownTimeout == 0 {
-		c.ShutdownTimeout = defaultShutdownTimeout
+// TLSConfig holds TLS configuration.
+type TLSConfig struct {
+	CertFile         string
+	KeyFile          string
+	MinVersion       uint16
+	ClientAuth       tls.ClientAuthType
+	ClientCACertFile string
+}
+
+// DefaultServerConfig returns a ServerConfig with default values.
+func DefaultServerConfig() ServerConfig {
+	return ServerConfig{
+		Host:              "0.0.0.0",
+		Port:              8080,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+		MaxHeaderBytes:    1 << 20, // 1 MB
+		ShutdownTimeout:   30 * time.Second,
 	}
 }
 
-// isTLSEnabled returns true when both certificate and key paths are configured.
-func (c *ServerConfig) isTLSEnabled() bool {
-	return c.TLSCertFile != "" && c.TLSKeyFile != ""
-}
-
-// listenAddr returns the "host:port" string for net.Listen.
-func (c *ServerConfig) listenAddr() string {
-	return fmt.Sprintf("%s:%d", c.Host, c.Port)
-}
-
-// Server wraps net/http.Server with lifecycle management including graceful
-// shutdown, TLS support, and observability hooks.
+// Server represents the HTTP server.
 type Server struct {
-	httpServer *http.Server
-	config     ServerConfig
-	handler    http.Handler
-	logger     logging.Logger
-	listener   net.Listener
-	started    atomic.Bool
-	actualAddr string
+	cfg          ServerConfig
+	httpServer   *http.Server
+	listener     net.Listener
+	logger       logging.Logger
+	started      chan struct{}
+	shutdownOnce sync.Once
+	mu           sync.Mutex
+	running      bool
 }
 
-// NewServer creates a new Server with the given configuration, handler, and logger.
-// Zero-value configuration fields are replaced with sensible defaults.
-func NewServer(cfg ServerConfig, handler http.Handler, logger logging.Logger) *Server {
-	cfg.applyDefaults()
+// NewServer creates a new Server instance.
+func NewServer(cfg ServerConfig, handler http.Handler) (*Server, error) {
+	if handler == nil {
+		return nil, errors.New(errors.ErrCodeInvalidArgument, "handler cannot be nil")
+	}
+	if cfg.Port < 0 || cfg.Port > 65535 {
+		return nil, errors.New(errors.ErrCodeInvalidArgument, fmt.Sprintf("invalid port: %d", cfg.Port))
+	}
+	if cfg.ReadTimeout < 0 || cfg.WriteTimeout < 0 || cfg.IdleTimeout < 0 || cfg.ReadHeaderTimeout < 0 || cfg.ShutdownTimeout < 0 {
+		return nil, errors.New(errors.ErrCodeInvalidArgument, "timeout values cannot be negative")
+	}
 
-	httpSrv := &http.Server{
-		Addr:              cfg.listenAddr(),
+	applyDefaults(&cfg)
+
+	if cfg.TLS != nil {
+		if _, err := os.Stat(cfg.TLS.CertFile); os.IsNotExist(err) {
+			return nil, errors.New(errors.ErrCodeInvalidArgument, fmt.Sprintf("cert file not found: %s", cfg.TLS.CertFile))
+		}
+		if _, err := os.Stat(cfg.TLS.KeyFile); os.IsNotExist(err) {
+			return nil, errors.New(errors.ErrCodeInvalidArgument, fmt.Sprintf("key file not found: %s", cfg.TLS.KeyFile))
+		}
+		if cfg.TLS.ClientAuth >= tls.VerifyClientCertIfGiven && cfg.TLS.ClientCACertFile == "" {
+			return nil, errors.New(errors.ErrCodeInvalidArgument, "client CA cert file is required for client auth")
+		}
+	}
+
+	s := &Server{
+		cfg:     cfg,
+		logger:  cfg.Logger,
+		started: make(chan struct{}),
+	}
+
+	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	s.httpServer = &http.Server{
+		Addr:              addr,
 		Handler:           handler,
 		ReadTimeout:       cfg.ReadTimeout,
 		WriteTimeout:      cfg.WriteTimeout,
 		IdleTimeout:       cfg.IdleTimeout,
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		MaxHeaderBytes:    cfg.MaxHeaderBytes,
+		ErrorLog:          log.New(&logWriter{logger: cfg.Logger}, "", 0),
 	}
 
-	// If TLS is enabled, configure minimum TLS version for security.
-	if cfg.isTLSEnabled() {
-		httpSrv.TLSConfig = &tls.Config{
-			MinVersion:               tls.VersionTLS12,
-			PreferServerCipherSuites: true,
-			CurvePreferences: []tls.CurveID{
-				tls.X25519,
-				tls.CurveP256,
+	if cfg.TLS != nil {
+		tlsConfig := &tls.Config{
+			MinVersion:       cfg.TLS.MinVersion,
+			CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 			},
+			PreferServerCipherSuites: true,
+			ClientAuth:               cfg.TLS.ClientAuth,
 		}
+
+		if cfg.TLS.ClientCACertFile != "" {
+			caCert, err := os.ReadFile(cfg.TLS.ClientCACertFile)
+			if err != nil {
+				return nil, errors.New(errors.ErrCodeInvalidArgument, fmt.Sprintf("failed to read client CA cert: %v", err))
+			}
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(caCert)
+			tlsConfig.ClientCAs = caCertPool
+		}
+		s.httpServer.TLSConfig = tlsConfig
 	}
 
-	return &Server{
-		httpServer: httpSrv,
-		config:     cfg,
-		handler:    handler,
-		logger:     logger,
-	}
+	return s, nil
 }
 
-// Start begins listening for HTTP(S) requests. It blocks until the provided
-// context is cancelled or an unrecoverable error occurs.
-//
-// When ctx is cancelled, Start initiates a graceful shutdown: it stops
-// accepting new connections and waits up to ShutdownTimeout for active
-// requests to complete before forcibly closing remaining connections.
-//
-// Start returns nil on clean shutdown (context cancellation) and a non-nil
-// error if the server fails to start or encounters an unexpected error.
+// Start starts the HTTP server.
 func (s *Server) Start(ctx context.Context) error {
-	if s.started.Load() {
-		return errors.New("server already started")
+	s.mu.Lock()
+	if s.running {
+		s.mu.Unlock()
+		return errors.New(errors.ErrCodeServerAlreadyRunning, "server already running")
 	}
 
-	// Create listener early so we can capture the actual bound address
-	// (important when Port is 0 for ephemeral port allocation in tests).
-	ln, err := net.Listen("tcp", s.config.listenAddr())
+	listener, err := net.Listen("tcp", s.httpServer.Addr)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", s.config.listenAddr(), err)
-	}
-	s.listener = ln
-	s.actualAddr = ln.Addr().String()
-	s.started.Store(true)
-
-	protocol := "HTTP"
-	if s.config.isTLSEnabled() {
-		protocol = "HTTPS"
-	}
-
-	s.logger.Info("server starting",
-		logging.String("protocol", protocol),
-		logging.String("address", s.actualAddr),
-		logging.String("readTimeout", s.config.ReadTimeout.String()),
-		logging.String("writeTimeout", s.config.WriteTimeout.String()),
-		logging.String("idleTimeout", s.config.IdleTimeout.String()),
-		logging.String("shutdownTimeout", s.config.ShutdownTimeout.String()),
-	)
-
-	// Channel to capture the serve error from the goroutine.
-	serveCh := make(chan error, 1)
-
-	go func() {
-		var serveErr error
-		if s.config.isTLSEnabled() {
-			// Wrap the listener with TLS.
-			tlsLn := tls.NewListener(ln, s.httpServer.TLSConfig)
-			serveErr = s.httpServer.ServeTLS(tlsLn, s.config.TLSCertFile, s.config.TLSKeyFile)
-		} else {
-			serveErr = s.httpServer.Serve(ln)
-		}
-		serveCh <- serveErr
-	}()
-
-	// Wait for either context cancellation or serve error.
-	select {
-	case <-ctx.Done():
-		s.logger.Info("shutdown signal received, initiating graceful shutdown")
-		shutdownErr := s.Shutdown(context.Background())
-		// Drain the serve channel to avoid goroutine leak.
-		serveErr := <-serveCh
-		if shutdownErr != nil {
-			return fmt.Errorf("shutdown error: %w", shutdownErr)
-		}
-		if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
-			return serveErr
-		}
-		return nil
-
-	case err := <-serveCh:
-		s.started.Store(false)
-		if errors.Is(err, http.ErrServerClosed) {
-			return nil
-		}
+		s.mu.Unlock()
 		return err
 	}
-}
+	s.listener = listener
+	s.running = true
+	s.mu.Unlock()
 
-// Shutdown gracefully shuts down the server without interrupting any active
-// connections. It waits up to ShutdownTimeout for active requests to finish.
-func (s *Server) Shutdown(ctx context.Context) error {
-	if !s.started.Load() {
-		return nil
+	if s.logger != nil {
+		s.logger.Info("HTTP server starting", logging.String("addr", listener.Addr().String()), logging.Bool("tls", s.cfg.TLS != nil))
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(ctx, s.config.ShutdownTimeout)
-	defer cancel()
+	errCh := make(chan error, 1)
+	go func() {
+		var err error
+		if s.cfg.TLS != nil {
+			err = s.httpServer.ServeTLS(listener, s.cfg.TLS.CertFile, s.cfg.TLS.KeyFile)
+		} else {
+			err = s.httpServer.Serve(listener)
+		}
+		if err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+		close(errCh)
+	}()
 
-	s.logger.Info("shutting down server",
-		logging.String("timeout", s.config.ShutdownTimeout.String()),
-	)
+	close(s.started)
 
-	err := s.httpServer.Shutdown(shutdownCtx)
-	s.started.Store(false)
-
-	if err != nil {
-		s.logger.Error("server shutdown error", logging.String("error", err.Error()))
-		return fmt.Errorf("server shutdown: %w", err)
+	select {
+	case <-ctx.Done():
+		return s.Shutdown()
+	case err := <-errCh:
+		if err != nil {
+			if s.logger != nil {
+				s.logger.Error("HTTP server error", logging.Err(err))
+			}
+			return err
+		}
 	}
-
-	s.logger.Info("server stopped gracefully")
 	return nil
 }
 
-// Addr returns the actual network address the server is listening on.
-// This is particularly useful when the server was configured with port 0
-// (ephemeral port) for testing purposes.
+// Shutdown gracefully shuts down the server.
+func (s *Server) Shutdown() error {
+	var err error
+	s.shutdownOnce.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), s.cfg.ShutdownTimeout)
+		defer cancel()
+
+		if s.logger != nil {
+			s.logger.Info("HTTP server shutting down", logging.Duration("timeout", s.cfg.ShutdownTimeout))
+		}
+
+		err = s.httpServer.Shutdown(ctx)
+		if err == context.DeadlineExceeded {
+			if s.logger != nil {
+				s.logger.Warn("HTTP server shutdown timed out, forcing close")
+			}
+			err = s.httpServer.Close()
+		}
+
+		s.mu.Lock()
+		s.running = false
+		s.mu.Unlock()
+
+		if s.logger != nil {
+			s.logger.Info("HTTP server stopped")
+		}
+	})
+	return err
+}
+
+// Addr returns the address the server is listening on.
 func (s *Server) Addr() string {
-	return s.actualAddr
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.listener != nil {
+		return s.listener.Addr().String()
+	}
+	return s.httpServer.Addr
 }
 
-// IsRunning reports whether the server is currently accepting connections.
+// WaitForReady returns a channel that is closed when the server is ready.
+func (s *Server) WaitForReady() <-chan struct{} {
+	return s.started
+}
+
+// IsRunning returns true if the server is running.
 func (s *Server) IsRunning() bool {
-	return s.started.Load()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.running
 }
 
-// Config returns a copy of the server's configuration.
-func (s *Server) Config() ServerConfig {
-	return s.config
+func applyDefaults(cfg *ServerConfig) {
+	if cfg.Host == "" {
+		cfg.Host = "0.0.0.0"
+	}
+	// Port 0 is allowed for random port assignment
+	if cfg.ReadTimeout == 0 {
+		cfg.ReadTimeout = 30 * time.Second
+	}
+	if cfg.WriteTimeout == 0 {
+		cfg.WriteTimeout = 60 * time.Second
+	}
+	if cfg.IdleTimeout == 0 {
+		cfg.IdleTimeout = 120 * time.Second
+	}
+	if cfg.ReadHeaderTimeout == 0 {
+		cfg.ReadHeaderTimeout = 10 * time.Second
+	}
+	if cfg.MaxHeaderBytes == 0 {
+		cfg.MaxHeaderBytes = 1 << 20
+	}
+	if cfg.ShutdownTimeout == 0 {
+		cfg.ShutdownTimeout = 30 * time.Second
+	}
+	if cfg.TLS != nil && cfg.TLS.MinVersion == 0 {
+		cfg.TLS.MinVersion = tls.VersionTLS12
+	}
+}
+
+type logWriter struct {
+	logger logging.Logger
+}
+
+func (w *logWriter) Write(p []byte) (n int, err error) {
+	msg := strings.TrimSpace(string(p))
+	if len(msg) > 0 && w.logger != nil {
+		w.logger.Error(msg)
+	}
+	return len(p), nil
 }
 
 //Personal.AI order the ending

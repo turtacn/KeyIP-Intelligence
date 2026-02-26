@@ -620,4 +620,29 @@ func (h *ReportHandler) GetTemplate(w http.ResponseWriter, r *http.Request) {
 	writeReportJSON(w, http.StatusNotImplemented, map[string]string{"message": "get template not yet implemented"})
 }
 
+// GenerateReport handles unified report generation (placeholder).
+func (h *ReportHandler) GenerateReport(w http.ResponseWriter, r *http.Request) {
+	writeReportJSON(w, http.StatusNotImplemented, map[string]string{"message": "unified report generation not yet implemented"})
+}
+
+// GetReport handles report metadata retrieval (alias for GetReportStatus).
+func (h *ReportHandler) GetReport(w http.ResponseWriter, r *http.Request) {
+	h.GetReportStatus(w, r)
+}
+
+// CreateTemplate handles template creation (placeholder).
+func (h *ReportHandler) CreateTemplate(w http.ResponseWriter, r *http.Request) {
+	writeReportJSON(w, http.StatusNotImplemented, map[string]string{"message": "create template not yet implemented"})
+}
+
+// UpdateTemplate handles template update (placeholder).
+func (h *ReportHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request) {
+	writeReportJSON(w, http.StatusNotImplemented, map[string]string{"message": "update template not yet implemented"})
+}
+
+// DeleteTemplate handles template deletion (placeholder).
+func (h *ReportHandler) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
+	writeReportJSON(w, http.StatusNotImplemented, map[string]string{"message": "delete template not yet implemented"})
+}
+
 //Personal.AI order the ending

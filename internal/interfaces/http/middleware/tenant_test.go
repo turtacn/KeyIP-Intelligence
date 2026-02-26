@@ -1,579 +1,295 @@
-// File: internal/interfaces/http/middleware/tenant_test.go
-// Phase 11 - 序号 281
-//
-// 生成计划:
-// 功能定位: 验证 TenantMiddleware 全部提取路径、校验逻辑、上下文注入行为
-// 测试用例: Header提取、QueryParam提取、默认值回退、Required模式、格式校验、
-//           白名单、自定义验证器、响应头回写、上下文读取、panic恢复
-// Mock依赖: mockLogger
-// 断言: HTTP状态码、JSON响应体、上下文值、响应头
-
 package middleware
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	perrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// --- Mock Logger ---
-
-type tenantMockLogger struct{}
-
-func (l *tenantMockLogger) Debug(msg string, fields ...logging.Field) {}
-func (l *tenantMockLogger) Info(msg string, fields ...logging.Field)  {}
-func (l *tenantMockLogger) Warn(msg string, fields ...logging.Field)  {}
-func (l *tenantMockLogger) Error(msg string, fields ...logging.Field) {}
-func (l *tenantMockLogger) Fatal(msg string, fields ...logging.Field) {}
-func (l *tenantMockLogger) With(fields ...logging.Field) logging.Logger { return l }
-func (l *tenantMockLogger) WithContext(ctx context.Context) logging.Logger { return l }
-func (l *tenantMockLogger) WithError(err error) logging.Logger { return l }
-func (l *tenantMockLogger) Sync() error { return nil }
-
-func newTenantMockLogger() *tenantMockLogger {
-	return &tenantMockLogger{}
+// MockLogger
+type mockLogger struct {
+	logging.Logger
 }
 
-// --- Helper: execute middleware and capture result ---
+func (m *mockLogger) Error(msg string, fields ...logging.Field) {}
+func (m *mockLogger) Info(msg string, fields ...logging.Field)  {}
+func (m *mockLogger) Warn(msg string, fields ...logging.Field)  {}
+func (m *mockLogger) Debug(msg string, fields ...logging.Field) {}
 
-func executeTenantMiddleware(cfg TenantConfig, r *http.Request) (*httptest.ResponseRecorder, *TenantInfo) {
-	logger := newTenantMockLogger()
-	mw := NewTenantMiddleware(cfg, logger)
-
-	var captured *TenantInfo
-	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		info, ok := TenantFromContext(r.Context())
-		if ok {
-			captured = info
-		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	}))
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, r)
-	return rr, captured
+// MockTenantResolver
+type mockTenantResolver struct {
+	resolveFunc func(ctx context.Context, tenantID string) (*TenantInfo, error)
 }
 
-// --- Tests ---
-
-func TestTenantMiddleware_ExtractFromHeader(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-alpha")
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "tenant-alpha", info.ID)
-	assert.True(t, info.IsActive)
+func (m *mockTenantResolver) Resolve(ctx context.Context, tenantID string) (*TenantInfo, error) {
+	if m.resolveFunc != nil {
+		return m.resolveFunc(ctx, tenantID)
+	}
+	return nil, nil
 }
 
-func TestTenantMiddleware_ExtractFromQueryParam(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents?tenant_id=tenant-beta", nil)
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "tenant-beta", info.ID)
+// MockTenantCache
+type mockTenantCache struct {
+	getFunc func(ctx context.Context, tenantID string) (*TenantInfo, bool)
+	setFunc func(ctx context.Context, tenantID string, info *TenantInfo, ttl time.Duration)
 }
 
-func TestTenantMiddleware_FallbackToDefault(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.Required = false
-	cfg.DefaultTenantID = "default-tenant"
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "default-tenant", info.ID)
+func (m *mockTenantCache) Get(ctx context.Context, tenantID string) (*TenantInfo, bool) {
+	if m.getFunc != nil {
+		return m.getFunc(ctx, tenantID)
+	}
+	return nil, false
 }
 
-func TestTenantMiddleware_RequiredMode_Missing(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.Required = true
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Nil(t, info)
-
-	var body tenantErrorResponse
-	err := json.NewDecoder(rr.Body).Decode(&body)
-	require.NoError(t, err)
-	assert.Contains(t, body.Error.Message, "tenant ID is required")
+func (m *mockTenantCache) Set(ctx context.Context, tenantID string, info *TenantInfo, ttl time.Duration) {
+	if m.setFunc != nil {
+		m.setFunc(ctx, tenantID, info, ttl)
+	}
 }
 
-func TestTenantMiddleware_NotRequired_NoDefault_PassThrough(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.Required = false
-	cfg.DefaultTenantID = ""
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
+func TestTenantFromContext(t *testing.T) {
+	ctx := context.Background()
 
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	// No tenant info injected — handler still called.
-	assert.Nil(t, info)
-}
-
-func TestTenantMiddleware_InvalidFormat_TooLong(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	longID := strings.Repeat("a", 65)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", longID)
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Nil(t, info)
-
-	var body tenantErrorResponse
-	err := json.NewDecoder(rr.Body).Decode(&body)
-	require.NoError(t, err)
-	assert.Contains(t, body.Error.Message, "invalid tenant ID format")
-}
-
-func TestTenantMiddleware_InvalidFormat_SpecialChars(t *testing.T) {
-	cfg := DefaultTenantConfig()
-
-	invalidIDs := []string{
-		"tenant@evil",
-		"tenant/path",
-		"tenant id",
-		"tenant;drop",
-		"<script>",
-		"tenant.dot",
-		"",
+	// Test without tenant info
+	if _, ok := TenantFromContext(ctx); ok {
+		t.Error("expected false when tenant info is missing")
 	}
 
-	for _, id := range invalidIDs {
-		if id == "" {
-			continue // empty is handled by Required logic, not format
-		}
-		t.Run(fmt.Sprintf("id=%s", id), func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-			req.Header.Set("X-Tenant-ID", id)
+	// Test with tenant info
+	info := &TenantInfo{TenantID: "test-tenant"}
+	ctx = ContextWithTenant(ctx, info)
+	got, ok := TenantFromContext(ctx)
+	if !ok {
+		t.Error("expected true when tenant info is present")
+	}
+	if got != info {
+		t.Errorf("expected %v, got %v", info, got)
+	}
+}
 
-			rr, info := executeTenantMiddleware(cfg, req)
+func TestNewTenantMiddleware(t *testing.T) {
+	logger := &mockLogger{}
 
-			assert.Equal(t, http.StatusBadRequest, rr.Code)
-			assert.Nil(t, info)
+	tests := []struct {
+		name           string
+		cfg            TenantMiddlewareConfig
+		reqHeaders     map[string]string
+		reqQuery       string
+		expectedStatus int
+		expectedCode   string
+		expectTenant   bool
+	}{
+		{
+			name:           "Valid Header",
+			cfg:            TenantMiddlewareConfig{Required: true, Logger: logger},
+			reqHeaders:     map[string]string{"X-Tenant-ID": "valid-tenant"},
+			expectedStatus: http.StatusOK,
+			expectTenant:   true,
+		},
+		{
+			name:           "Valid Query Param",
+			cfg:            TenantMiddlewareConfig{Required: true, Logger: logger},
+			reqQuery:       "tenant_id=valid-tenant",
+			expectedStatus: http.StatusOK,
+			expectTenant:   true,
+		},
+		{
+			name:           "Missing Tenant ID (Required)",
+			cfg:            TenantMiddlewareConfig{Required: true, Logger: logger},
+			expectedStatus: http.StatusUnauthorized,
+			expectedCode:   string(perrors.ErrTenantRequired),
+		},
+		{
+			name:           "Missing Tenant ID (Not Required)",
+			cfg:            TenantMiddlewareConfig{Required: false, Logger: logger},
+			expectedStatus: http.StatusOK,
+			expectTenant:   false,
+		},
+		{
+			name:           "Default Tenant ID",
+			cfg:            TenantMiddlewareConfig{Required: false, DefaultTenantID: "default-tenant", Logger: logger},
+			expectedStatus: http.StatusOK,
+			expectTenant:   true,
+		},
+		{
+			name:           "Invalid Format",
+			cfg:            TenantMiddlewareConfig{Required: true, Logger: logger},
+			reqHeaders:     map[string]string{"X-Tenant-ID": "invalid@tenant"},
+			expectedStatus: http.StatusBadRequest,
+			expectedCode:   string(perrors.ErrInvalidTenantID),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mw := NewTenantMiddleware(tt.cfg)
+			handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				info, ok := TenantFromContext(r.Context())
+				if tt.expectTenant && !ok {
+					t.Error("expected tenant info in context")
+				}
+				if !tt.expectTenant && ok {
+					t.Error("unexpected tenant info in context")
+				}
+				if tt.expectTenant && ok {
+					expectedID := tt.reqHeaders["X-Tenant-ID"]
+					if expectedID == "" {
+						if strings.Contains(tt.reqQuery, "=") {
+							expectedID = strings.Split(tt.reqQuery, "=")[1]
+						} else if tt.cfg.DefaultTenantID != "" {
+							expectedID = tt.cfg.DefaultTenantID
+						}
+					}
+					if info.TenantID != expectedID {
+						t.Errorf("expected tenant ID %s, got %s", expectedID, info.TenantID)
+					}
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			req := httptest.NewRequest("GET", "/?"+tt.reqQuery, nil)
+			for k, v := range tt.reqHeaders {
+				req.Header.Set(k, v)
+			}
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d", tt.expectedStatus, rec.Code)
+			}
+
+			if tt.expectedCode != "" {
+				var resp common.ErrorResponse
+				if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+				if resp.Error.Code != tt.expectedCode {
+					t.Errorf("expected error code %s, got %s", tt.expectedCode, resp.Error.Code)
+				}
+			}
 		})
 	}
 }
 
-func TestTenantMiddleware_AllowedTenants_Permitted(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.AllowedTenants = []string{"tenant-a", "tenant-b", "tenant-c"}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-b")
+func TestTenantMiddleware_ResolverAndCache(t *testing.T) {
+	logger := &mockLogger{}
+	tenantID := "test-tenant"
+	expectedInfo := &TenantInfo{TenantID: tenantID, Plan: "pro"}
 
-	rr, info := executeTenantMiddleware(cfg, req)
+	t.Run("Cache Hit", func(t *testing.T) {
+		cache := &mockTenantCache{
+			getFunc: func(ctx context.Context, id string) (*TenantInfo, bool) {
+				if id == tenantID {
+					return expectedInfo, true
+				}
+				return nil, false
+			},
+		}
+		cfg := TenantMiddlewareConfig{Required: true, Cache: cache, Logger: logger}
+		mw := NewTenantMiddleware(cfg)
 
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "tenant-b", info.ID)
-}
+		handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			info, _ := TenantFromContext(r.Context())
+			if info.Plan != "pro" {
+				t.Errorf("expected plan pro, got %s", info.Plan)
+			}
+		}))
 
-func TestTenantMiddleware_AllowedTenants_Rejected(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.AllowedTenants = []string{"tenant-a", "tenant-b"}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-x")
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("X-Tenant-ID", tenantID)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
 
-	rr, info := executeTenantMiddleware(cfg, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+	})
 
-	assert.Equal(t, http.StatusForbidden, rr.Code)
-	assert.Nil(t, info)
+	t.Run("Cache Miss, Resolver Success", func(t *testing.T) {
+		cacheSet := false
+		cache := &mockTenantCache{
+			getFunc: func(ctx context.Context, id string) (*TenantInfo, bool) {
+				return nil, false
+			},
+			setFunc: func(ctx context.Context, id string, info *TenantInfo, ttl time.Duration) {
+				if id == tenantID && info == expectedInfo {
+					cacheSet = true
+				}
+			},
+		}
+		resolver := &mockTenantResolver{
+			resolveFunc: func(ctx context.Context, id string) (*TenantInfo, error) {
+				if id == tenantID {
+					return expectedInfo, nil
+				}
+				return nil, nil
+			},
+		}
+		cfg := TenantMiddlewareConfig{Required: true, Cache: cache, TenantResolver: resolver, Logger: logger}
+		mw := NewTenantMiddleware(cfg)
 
-	var body tenantErrorResponse
-	err := json.NewDecoder(rr.Body).Decode(&body)
-	require.NoError(t, err)
-	assert.Contains(t, body.Error.Message, "not permitted")
-}
+		handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("X-Tenant-ID", tenantID)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
 
-func TestTenantMiddleware_CustomValidator_Valid(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.TenantValidator = func(tenantID string) (bool, error) {
-		return tenantID == "validated-tenant", nil
-	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "validated-tenant")
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+		if !cacheSet {
+			t.Error("expected cache set")
+		}
+	})
 
-	rr, info := executeTenantMiddleware(cfg, req)
+	t.Run("Resolver Error", func(t *testing.T) {
+		resolver := &mockTenantResolver{
+			resolveFunc: func(ctx context.Context, id string) (*TenantInfo, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		cfg := TenantMiddlewareConfig{Required: true, TenantResolver: resolver, Logger: logger}
+		mw := NewTenantMiddleware(cfg)
 
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "validated-tenant", info.ID)
-}
+		handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("X-Tenant-ID", tenantID)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
 
-func TestTenantMiddleware_CustomValidator_Invalid(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.TenantValidator = func(tenantID string) (bool, error) {
-		return false, nil
-	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "unknown-tenant")
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("expected status 500, got %d", rec.Code)
+		}
+	})
 
-	rr, info := executeTenantMiddleware(cfg, req)
+	t.Run("Resolver Not Found", func(t *testing.T) {
+		resolver := &mockTenantResolver{
+			resolveFunc: func(ctx context.Context, id string) (*TenantInfo, error) {
+				return nil, nil
+			},
+		}
+		cfg := TenantMiddlewareConfig{Required: true, TenantResolver: resolver, Logger: logger}
+		mw := NewTenantMiddleware(cfg)
 
-	assert.Equal(t, http.StatusForbidden, rr.Code)
-	assert.Nil(t, info)
+		handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("X-Tenant-ID", tenantID)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
 
-	var body tenantErrorResponse
-	err := json.NewDecoder(rr.Body).Decode(&body)
-	require.NoError(t, err)
-	assert.Contains(t, body.Error.Message, "not authorized")
-}
-
-func TestTenantMiddleware_CustomValidator_Error(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.TenantValidator = func(tenantID string) (bool, error) {
-		return false, fmt.Errorf("database connection failed")
-	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "some-tenant")
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Nil(t, info)
-
-	var body tenantErrorResponse
-	err := json.NewDecoder(rr.Body).Decode(&body)
-	require.NoError(t, err)
-	assert.Contains(t, body.Error.Message, "validation error")
-}
-
-func TestTenantMiddleware_ResponseHeader(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "echo-tenant")
-
-	rr, _ := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, "echo-tenant", rr.Header().Get("X-Tenant-ID"))
-}
-
-func TestTenantMiddleware_HeaderPriorityOverQuery(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents?tenant_id=query-tenant", nil)
-	req.Header.Set("X-Tenant-ID", "header-tenant")
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "header-tenant", info.ID, "header should take priority over query param")
-}
-
-func TestTenantFromContext_Present(t *testing.T) {
-	expected := &TenantInfo{
-		ID:       "ctx-tenant",
-		Name:     "Context Tenant",
-		Plan:     "enterprise",
-		IsActive: true,
-	}
-	ctx := context.WithValue(context.Background(), tenantContextKey{}, expected)
-
-	info, ok := TenantFromContext(ctx)
-
-	assert.True(t, ok)
-	require.NotNil(t, info)
-	assert.Equal(t, "ctx-tenant", info.ID)
-	assert.Equal(t, "Context Tenant", info.Name)
-	assert.Equal(t, "enterprise", info.Plan)
-	assert.True(t, info.IsActive)
-}
-
-func TestTenantFromContext_Absent(t *testing.T) {
-	ctx := context.Background()
-
-	info, ok := TenantFromContext(ctx)
-
-	assert.False(t, ok)
-	assert.Nil(t, info)
-}
-
-func TestMustTenantFromContext_Panic(t *testing.T) {
-	ctx := context.Background()
-
-	assert.Panics(t, func() {
-		MustTenantFromContext(ctx)
-	}, "MustTenantFromContext should panic when no tenant info in context")
-}
-
-func TestMustTenantFromContext_Success(t *testing.T) {
-	expected := &TenantInfo{
-		ID:       "must-tenant",
-		IsActive: true,
-	}
-	ctx := context.WithValue(context.Background(), tenantContextKey{}, expected)
-
-	assert.NotPanics(t, func() {
-		info := MustTenantFromContext(ctx)
-		assert.Equal(t, "must-tenant", info.ID)
-		assert.True(t, info.IsActive)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected status 403, got %d", rec.Code)
+		}
 	})
 }
-
-func TestDefaultTenantConfig(t *testing.T) {
-	cfg := DefaultTenantConfig()
-
-	assert.Equal(t, "X-Tenant-ID", cfg.HeaderName)
-	assert.Equal(t, "tenant_id", cfg.QueryParam)
-	assert.Equal(t, "", cfg.DefaultTenantID)
-	assert.True(t, cfg.Required)
-	assert.Nil(t, cfg.AllowedTenants)
-	assert.Nil(t, cfg.TenantValidator)
-}
-
-func TestValidateTenantID_ValidCases(t *testing.T) {
-	validIDs := []string{
-		"a",
-		"tenant-1",
-		"tenant_2",
-		"TENANT-UPPER",
-		"MixedCase_123",
-		"a-b-c-d-e",
-		"0123456789",
-		strings.Repeat("x", 64), // exactly 64 chars — max allowed
-		"my_org-prod-01",
-		"T",
-		"_leading-underscore",
-		"-leading-hyphen",
-	}
-
-	for _, id := range validIDs {
-		t.Run(fmt.Sprintf("valid=%s", id), func(t *testing.T) {
-			assert.True(t, validateTenantID(id), "expected %q to be valid", id)
-		})
-	}
-}
-
-func TestValidateTenantID_InvalidCases(t *testing.T) {
-	invalidIDs := []string{
-		"",                        // empty
-		strings.Repeat("a", 65),   // too long
-		"tenant id",               // space
-		"tenant@org",              // @
-		"tenant.org",              // dot
-		"tenant/path",             // slash
-		"tenant\\back",            // backslash
-		"tenant:colon",            // colon
-		"tenant;semi",             // semicolon
-		"<script>alert</script>",  // HTML injection
-		"tenant\ttab",             // tab
-		"tenant\nnewline",         // newline
-		"日本語テナント",              // unicode
-		"tenant=value",            // equals
-		"tenant&other",            // ampersand
-		"tenant#hash",             // hash
-		"tenant%20encoded",        // percent
-		"tenant+plus",             // plus
-		"tenant!bang",             // exclamation
-		"tenant$dollar",           // dollar
-		"tenant(paren)",           // parentheses
-		"tenant{brace}",           // braces
-		"tenant[bracket]",         // brackets
-		"tenant|pipe",             // pipe
-		"tenant~tilde",            // tilde
-		"tenant`backtick",         // backtick
-		"tenant'quote",            // single quote
-		"tenant\"dquote",          // double quote
-		"tenant,comma",            // comma
-		"tenant?question",         // question mark
-		"tenant*star",             // asterisk
-	}
-
-	for _, id := range invalidIDs {
-		t.Run(fmt.Sprintf("invalid=%s", id), func(t *testing.T) {
-			assert.False(t, validateTenantID(id), "expected %q to be invalid", id)
-		})
-	}
-}
-
-func TestTenantMiddleware_CustomHeaderName(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.HeaderName = "X-Organization-ID"
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Organization-ID", "custom-header-tenant")
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "custom-header-tenant", info.ID)
-}
-
-func TestTenantMiddleware_CustomQueryParam(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.QueryParam = "org_id"
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents?org_id=custom-query-tenant", nil)
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "custom-query-tenant", info.ID)
-}
-
-func TestTenantMiddleware_WhitespaceTrimming(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "  trimmed-tenant  ")
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "trimmed-tenant", info.ID)
-}
-
-func TestTenantMiddleware_EmptyHeaderFallsToQuery(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents?tenant_id=fallback-query", nil)
-	req.Header.Set("X-Tenant-ID", "   ") // whitespace-only header
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "fallback-query", info.ID)
-}
-
-func TestTenantMiddleware_AllowedTenants_EmptyList_NoRestriction(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.AllowedTenants = []string{} // empty — no restriction
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "any-tenant")
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "any-tenant", info.ID)
-}
-
-func TestTenantMiddleware_ValidatorCalledAfterWhitelist(t *testing.T) {
-	validatorCalled := false
-	cfg := DefaultTenantConfig()
-	cfg.AllowedTenants = []string{"allowed-tenant"}
-	cfg.TenantValidator = func(tenantID string) (bool, error) {
-		validatorCalled = true
-		return true, nil
-	}
-
-	// Tenant NOT in whitelist — validator should NOT be called.
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "blocked-tenant")
-
-	rr, _ := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusForbidden, rr.Code)
-	assert.False(t, validatorCalled, "validator should not be called when whitelist rejects")
-
-	// Tenant IN whitelist — validator should be called.
-	validatorCalled = false
-	req2 := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req2.Header.Set("X-Tenant-ID", "allowed-tenant")
-
-	rr2, info := executeTenantMiddleware(cfg, req2)
-
-	assert.Equal(t, http.StatusOK, rr2.Code)
-	assert.True(t, validatorCalled, "validator should be called after whitelist passes")
-	require.NotNil(t, info)
-	assert.Equal(t, "allowed-tenant", info.ID)
-}
-
-func TestTenantMiddleware_ErrorResponseFormat(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	cfg.Required = true
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-
-	rr, _ := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Contains(t, rr.Header().Get("Content-Type"), "application/json")
-
-	var body map[string]interface{}
-	err := json.NewDecoder(rr.Body).Decode(&body)
-	require.NoError(t, err)
-
-	errorObj, ok := body["error"].(map[string]interface{})
-	require.True(t, ok, "response should have 'error' object")
-	assert.NotEmpty(t, errorObj["code"])
-	assert.NotEmpty(t, errorObj["message"])
-}
-
-func TestTenantMiddleware_POSTRequest(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/patents", strings.NewReader(`{"title":"test"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Tenant-ID", "post-tenant")
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "post-tenant", info.ID)
-}
-
-func TestTenantMiddleware_DefaultTenantID_WithRequired(t *testing.T) {
-	// When Required=true but DefaultTenantID is set and no header/query,
-	// the default should be used (default is applied before Required check).
-	cfg := DefaultTenantConfig()
-	cfg.Required = true
-	cfg.DefaultTenantID = "fallback-required"
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "fallback-required", info.ID)
-}
-
-func TestTenantMiddleware_BoundaryLength_Exactly64(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	id64 := strings.Repeat("A", 64)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", id64)
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, id64, info.ID)
-}
-
-func TestTenantMiddleware_BoundaryLength_SingleChar(t *testing.T) {
-	cfg := DefaultTenantConfig()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/patents", nil)
-	req.Header.Set("X-Tenant-ID", "X")
-
-	rr, info := executeTenantMiddleware(cfg, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	require.NotNil(t, info)
-	assert.Equal(t, "X", info.ID)
-}
-
 //Personal.AI order the ending
