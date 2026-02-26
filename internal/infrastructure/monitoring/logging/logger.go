@@ -30,7 +30,7 @@ type Logger interface {
 type Field zap.Field
 
 // Field constructors
-func String(key, val string) Field      { return Field(zap.String(key, val)) }
+func String(key, val string) Field         { return Field(zap.String(key, val)) }
 func Int(key string, val int) Field        { return Field(zap.Int(key, val)) }
 func Int64(key string, val int64) Field    { return Field(zap.Int64(key, val)) }
 func Float64(key string, val float64) Field { return Field(zap.Float64(key, val)) }
@@ -267,17 +267,21 @@ func NewLogger(cfg LogConfig) (Logger, error) {
 		encoder = zapcore.NewJSONEncoder(encoderConfig)
 	}
 
-	var writer zapcore.WriteSyncer
-	var syncers []zapcore.WriteSyncer
+	// Use MultiWriteSyncer if multiple paths are provided (simplified for this task)
+	// Handling file rotation vs stdout
+
+	// Create core for each output path type (std vs file) or just one core with multi-writer
+	// Zap handles stdout/stderr easily. Lumberjack is for files.
+	// Simple approach: create a MultiWriteSyncer for all outputs.
+	var writers []zapcore.WriteSyncer
 
 	for _, path := range cfg.OutputPaths {
 		switch path {
 		case "stdout":
-			syncers = append(syncers, zapcore.AddSync(os.Stdout))
+			writers = append(writers, zapcore.AddSync(os.Stdout))
 		case "stderr":
-			syncers = append(syncers, zapcore.AddSync(os.Stderr))
+			writers = append(writers, zapcore.AddSync(os.Stderr))
 		default:
-			// Treat as file path with rotation
 			lumberjackLogger := &lumberjack.Logger{
 				Filename:   path,
 				MaxSize:    cfg.MaxSize,
@@ -285,40 +289,18 @@ func NewLogger(cfg LogConfig) (Logger, error) {
 				MaxAge:     cfg.MaxAge,
 				Compress:   cfg.Compress,
 			}
-			syncers = append(syncers, zapcore.AddSync(lumberjackLogger))
+			writers = append(writers, zapcore.AddSync(lumberjackLogger))
 		}
 	}
 
-	// Re-using zap's internal logic for stdout/stderr to be safe
-	if len(cfg.OutputPaths) == 1 && (cfg.OutputPaths[0] == "stdout" || cfg.OutputPaths[0] == "stderr") {
-		// Just use zap.Config for simplicity if it's just std streams
-		zCfg := zap.Config{
-			Level:       zap.NewAtomicLevelAt(zapcore.Level(cfg.Level)),
-			Development: cfg.Format == "console",
-			Sampling: &zap.SamplingConfig{
-				Initial:    cfg.SamplingInitial,
-				Thereafter: cfg.SamplingThereafter,
-			},
-			Encoding:      cfg.Format,
-			EncoderConfig: encoderConfig,
-			OutputPaths:   cfg.OutputPaths,
-			ErrorOutputPaths: cfg.ErrorOutputPaths,
-		}
-		if zCfg.Encoding == "" {
-			zCfg.Encoding = "json"
-		}
-		z, err := zCfg.Build()
-		if err != nil {
-			return nil, err
-		}
-		if cfg.ServiceName != "" || cfg.Environment != "" {
-			z = z.With(zap.String("service_name", cfg.ServiceName), zap.String("environment", cfg.Environment))
-		}
-		return &zapLogger{z: z}, nil
-	}
+	writer := zapcore.NewMultiWriteSyncer(writers...)
 
-	writer = zapcore.NewMultiWriteSyncer(syncers...)
 	core := zapcore.NewCore(encoder, writer, zap.NewAtomicLevelAt(zapcore.Level(cfg.Level)))
+
+	// Sampling
+	if cfg.SamplingInitial > 0 {
+		core = zapcore.NewSamplerWithOptions(core, time.Second, cfg.SamplingInitial, cfg.SamplingThereafter)
+	}
 
 	opts := []zap.Option{}
 	if cfg.EnableCaller {
@@ -467,29 +449,29 @@ func LogAIInference(logger Logger, model string, operation string, inputSize int
 
 // Field constants
 const (
-	FieldRequestID      = "request_id"
-	FieldTraceID        = "trace_id"
-	FieldSpanID         = "span_id"
-	FieldUserID         = "user_id"
-	FieldSessionID      = "session_id"
-	FieldModule         = "module"
-	FieldOperation      = "operation"
-	FieldDurationMs     = "duration_ms"
-	FieldErrorCode      = "error_code"
-	FieldHTTPMethod     = "http_method"
-	FieldHTTPPath       = "http_path"
-	FieldHTTPStatus     = "http_status"
-	FieldMoleculeID     = "molecule_id"
-	FieldPatentNumber   = "patent_number"
-	FieldSMILES         = "smiles"
+	FieldRequestID       = "request_id"
+	FieldTraceID         = "trace_id"
+	FieldSpanID          = "span_id"
+	FieldUserID          = "user_id"
+	FieldSessionID       = "session_id"
+	FieldModule          = "module"
+	FieldOperation       = "operation"
+	FieldDurationMs      = "duration_ms"
+	FieldErrorCode       = "error_code"
+	FieldHTTPMethod      = "http_method"
+	FieldHTTPPath        = "http_path"
+	FieldHTTPStatus      = "http_status"
+	FieldMoleculeID      = "molecule_id"
+	FieldPatentNumber    = "patent_number"
+	FieldSMILES          = "smiles"
 	FieldFingerprintType = "fingerprint_type"
 	FieldSimilarityScore = "similarity_score"
-	FieldRiskLevel      = "risk_level"
-	FieldQuery          = "query"
-	FieldRowsAffected   = "rows_affected"
-	FieldService        = "service"
-	FieldModel          = "model"
-	FieldInputSize      = "input_size"
+	FieldRiskLevel       = "risk_level"
+	FieldQuery           = "query"
+	FieldRowsAffected    = "rows_affected"
+	FieldService         = "service"
+	FieldModel           = "model"
+	FieldInputSize       = "input_size"
 )
 
 //Personal.AI order the ending

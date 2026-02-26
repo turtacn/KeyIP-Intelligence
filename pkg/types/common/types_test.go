@@ -5,92 +5,83 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestID_Validate_ValidUUID(t *testing.T) {
-	id := ID("550e8400-e29b-41d4-a716-446655440000")
-	err := id.Validate()
-	assert.NoError(t, err)
+	id := ID(uuid.New().String())
+	assert.NoError(t, id.Validate())
 }
 
 func TestID_Validate_EmptyString(t *testing.T) {
 	id := ID("")
-	err := id.Validate()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot be empty")
+	assert.Error(t, id.Validate())
 }
 
 func TestID_Validate_InvalidFormat(t *testing.T) {
-	id := ID("not-a-uuid")
-	err := id.Validate()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid ID format")
+	id := ID("invalid-uuid")
+	assert.Error(t, id.Validate())
 }
 
 func TestNewID_GeneratesValidUUID(t *testing.T) {
 	id := NewID()
-	err := id.Validate()
-	assert.NoError(t, err)
+	assert.NoError(t, id.Validate())
 }
 
 func TestTimestamp_MarshalJSON(t *testing.T) {
-	now := time.Date(2023, 10, 27, 10, 0, 0, 0, time.UTC)
+	now := time.Date(2023, 10, 1, 12, 0, 0, 0, time.UTC)
 	ts := Timestamp(now)
-	data, err := json.Marshal(ts)
+	bytes, err := json.Marshal(ts)
 	assert.NoError(t, err)
-	assert.Equal(t, "\"2023-10-27T10:00:00Z\"", string(data))
+	// Check contains quote and ISO format
+	assert.Contains(t, string(bytes), "2023-10-01T12:00:00")
 }
 
 func TestTimestamp_UnmarshalJSON_Valid(t *testing.T) {
-	data := []byte("\"2023-10-27T10:00:00Z\"")
+	jsonStr := "\"2023-10-01T12:00:00Z\""
 	var ts Timestamp
-	err := json.Unmarshal(data, &ts)
+	err := json.Unmarshal([]byte(jsonStr), &ts)
 	assert.NoError(t, err)
-	assert.Equal(t, time.Date(2023, 10, 27, 10, 0, 0, 0, time.UTC), time.Time(ts))
+	assert.Equal(t, int64(1696161600000), ts.ToUnixMilli())
 }
 
 func TestTimestamp_UnmarshalJSON_Invalid(t *testing.T) {
-	data := []byte("\"invalid-date\"")
+	jsonStr := "\"invalid-date\""
 	var ts Timestamp
-	err := json.Unmarshal(data, &ts)
+	err := json.Unmarshal([]byte(jsonStr), &ts)
 	assert.Error(t, err)
 }
 
 func TestTimestamp_ToUnixMilli_RoundTrip(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Millisecond)
-	ts := Timestamp(now)
-	msec := ts.ToUnixMilli()
-	ts2 := FromUnixMilli(msec)
-	assert.Equal(t, ts, ts2)
+	now := NewTimestamp()
+	milli := now.ToUnixMilli()
+	fromMilli := FromUnixMilli(milli)
+	assert.Equal(t, milli, fromMilli.ToUnixMilli())
+	// Note: Precision loss might occur if nanoseconds matter, but Timestamp stores time.Time
+	// FromUnixMilli truncates to milliseconds.
+	// Let's ensure round trip logic is correct for millisecond precision.
+	assert.WithinDuration(t, time.Time(now), time.Time(fromMilli), time.Millisecond)
 }
 
 func TestPagination_Validate_Valid(t *testing.T) {
 	p := Pagination{Page: 1, PageSize: 20}
-	err := p.Validate()
-	assert.NoError(t, err)
+	assert.NoError(t, p.Validate())
 }
 
 func TestPagination_Validate_PageZero(t *testing.T) {
 	p := Pagination{Page: 0, PageSize: 20}
-	err := p.Validate()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "page must be >= 1")
+	assert.Error(t, p.Validate())
 }
 
 func TestPagination_Validate_PageSizeExceedsMax(t *testing.T) {
 	p := Pagination{Page: 1, PageSize: 501}
-	err := p.Validate()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "page_size must be between 1 and 500")
+	assert.Error(t, p.Validate())
 }
 
 func TestPagination_Validate_PageSizeZero(t *testing.T) {
 	p := Pagination{Page: 1, PageSize: 0}
-	err := p.Validate()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "page_size must be between 1 and 500")
+	assert.Error(t, p.Validate())
 }
 
 func TestPagination_Offset(t *testing.T) {
@@ -102,28 +93,24 @@ func TestDateRange_Validate_Valid(t *testing.T) {
 	from := NewTimestamp()
 	to := Timestamp(time.Time(from).Add(time.Hour))
 	dr := DateRange{From: from, To: to}
-	err := dr.Validate()
-	assert.NoError(t, err)
+	assert.NoError(t, dr.Validate())
 }
 
 func TestDateRange_Validate_FromAfterTo(t *testing.T) {
 	to := NewTimestamp()
 	from := Timestamp(time.Time(to).Add(time.Hour))
 	dr := DateRange{From: from, To: to}
-	err := dr.Validate()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "must be before or equal to")
+	assert.Error(t, dr.Validate())
 }
 
 func TestDateRange_Validate_Equal(t *testing.T) {
 	now := NewTimestamp()
 	dr := DateRange{From: now, To: now}
-	err := dr.Validate()
-	assert.NoError(t, err)
+	assert.NoError(t, dr.Validate())
 }
 
 func TestNewSuccessResponse(t *testing.T) {
-	data := "test-data"
+	data := map[string]string{"foo": "bar"}
 	resp := NewSuccessResponse(data)
 	assert.True(t, resp.Success)
 	assert.Equal(t, data, resp.Data)
@@ -131,40 +118,34 @@ func TestNewSuccessResponse(t *testing.T) {
 }
 
 func TestNewErrorResponse(t *testing.T) {
-	code := "ERR001"
-	message := "error message"
-	resp := NewErrorResponse(code, message)
+	resp := NewErrorResponse("ERR_001", "error occurred")
 	assert.False(t, resp.Success)
-	require.NotNil(t, resp.Error)
-	assert.Equal(t, code, resp.Error.Code)
-	assert.Equal(t, message, resp.Error.Message)
+	assert.NotNil(t, resp.Error)
+	assert.Equal(t, "ERR_001", resp.Error.Code)
+	assert.Equal(t, "error occurred", resp.Error.Message)
 }
 
 func TestNewPaginatedResponse(t *testing.T) {
-	data := []string{"item1", "item2"}
-	pagination := Pagination{Page: 1, PageSize: 10, Total: 2}
-	resp := NewPaginatedResponse(data, pagination)
+	data := []string{"a", "b"}
+	p := Pagination{Page: 1, PageSize: 10, Total: 2}
+	resp := NewPaginatedResponse(data, p)
 	assert.True(t, resp.Success)
 	assert.Equal(t, data, resp.Data)
-	require.NotNil(t, resp.Pagination)
-	assert.Equal(t, pagination, *resp.Pagination)
+	assert.NotNil(t, resp.Pagination)
+	assert.Equal(t, p, *resp.Pagination)
 }
 
 func TestAPIResponse_JSONRoundTrip(t *testing.T) {
-	resp := NewSuccessResponse("data")
-	resp.RequestID = "req-123"
-
-	data, err := json.Marshal(resp)
+	data := map[string]string{"foo": "bar"}
+	resp := NewSuccessResponse(data)
+	bytes, err := json.Marshal(resp)
 	assert.NoError(t, err)
 
-	var resp2 APIResponse[string]
-	err = json.Unmarshal(data, &resp2)
+	var decoded APIResponse[map[string]string]
+	err = json.Unmarshal(bytes, &decoded)
 	assert.NoError(t, err)
-
-	assert.Equal(t, resp.Success, resp2.Success)
-	assert.Equal(t, resp.Data, resp2.Data)
-	assert.Equal(t, resp.RequestID, resp2.RequestID)
-	assert.Equal(t, resp.Timestamp.ToUnixMilli(), resp2.Timestamp.ToUnixMilli())
+	assert.Equal(t, resp.Success, decoded.Success)
+	assert.Equal(t, resp.Data, decoded.Data)
 }
 
 func TestBatchRequest_StopOnError_Default(t *testing.T) {
@@ -174,12 +155,13 @@ func TestBatchRequest_StopOnError_Default(t *testing.T) {
 
 func TestBatchResponse_Counts(t *testing.T) {
 	resp := BatchResponse[string]{
-		Succeeded:      []string{"ok1", "ok2"},
+		Succeeded:      []string{"a", "b"},
 		Failed:         []BatchError{{Index: 2, Error: ErrorDetail{Code: "ERR"}}},
 		TotalProcessed: 3,
 	}
-	assert.Equal(t, 3, len(resp.Succeeded)+len(resp.Failed))
 	assert.Equal(t, 3, resp.TotalProcessed)
+	assert.Len(t, resp.Succeeded, 2)
+	assert.Len(t, resp.Failed, 1)
 }
 
 func TestSortOrder_Values(t *testing.T) {

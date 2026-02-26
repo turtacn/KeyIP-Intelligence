@@ -126,6 +126,7 @@ func (e *AppError) LogFields() map[string]interface{} {
 func captureStack(skip int) string {
 	const maxDepth = 32
 	pcs := make([]uintptr, maxDepth)
+	// skip + 2 because runtime.Callers -> captureStack -> newAppError
 	n := runtime.Callers(skip+2, pcs)
 	if n == 0 {
 		return ""
@@ -172,7 +173,10 @@ func Wrap(err error, code ErrorCode, message string) *AppError {
 	if code == ErrCodeInternal || code == "" {
 		var existing *AppError
 		if stdliberrors.As(err, &existing) {
+			// fmt.Printf("DEBUG: Found existing AppError in Wrap. Code: %s\n", existing.Code)
 			code = existing.Code
+		} else {
+			// fmt.Printf("DEBUG: No existing AppError in Wrap for err: %T\n", err)
 		}
 	}
 	ae := newAppError(code, message)
@@ -189,21 +193,6 @@ func Wrapf(err error, code ErrorCode, format string, args ...interface{}) *AppEr
 	return ae
 }
 
-// WrapMsg wraps an error with a message using ErrCodeInternal as default code.
-func WrapMsg(err error, message string) *AppError {
-	return Wrap(err, ErrCodeInternal, message)
-}
-
-// WrapMsgf wraps an error with a formatted message using ErrCodeInternal as default code.
-func WrapMsgf(err error, format string, args ...interface{}) *AppError {
-	return Wrapf(err, ErrCodeInternal, format, args...)
-}
-
-// NewMsg creates a new error with the given message using ErrCodeInternal as default code.
-func NewMsg(message string) *AppError {
-	return New(ErrCodeInternal, message)
-}
-
 func FromCode(code ErrorCode) *AppError {
 	return newAppError(code, DefaultMessageForCode(code))
 }
@@ -216,41 +205,6 @@ func ErrInternal(message string) *AppError {
 
 func ErrBadRequest(message string) *AppError {
 	return New(ErrCodeBadRequest, message)
-}
-
-func NewInvalidInputError(message string) *AppError {
-	return ErrBadRequest(message)
-}
-
-func NewInvalidParameterError(message string) *AppError {
-	return ErrBadRequest(message)
-}
-
-func NewValidation(message string, args ...interface{}) *AppError {
-	if len(args) > 0 {
-		// If additional args are provided, treat the first one as context/field if string
-		if ctx, ok := args[0].(string); ok {
-			return New(ErrCodeValidation, message).WithDetail(ctx)
-		}
-	}
-	return New(ErrCodeValidation, message)
-}
-
-func NewValidationError(field, message string) *AppError {
-	return New(ErrCodeValidation, message).WithDetail(field)
-}
-
-// NewValidationMsg creates a validation error with only a message (no field).
-func NewValidationMsg(message string) *AppError {
-	return New(ErrCodeValidation, message)
-}
-
-func NewInternal(format string, args ...interface{}) *AppError {
-	return Newf(ErrCodeInternal, format, args...)
-}
-
-func NewNotFound(format string, args ...interface{}) *AppError {
-	return Newf(ErrCodeNotFound, format, args...)
 }
 
 func ErrNotFound(resource string, id string) *AppError {
@@ -272,16 +226,6 @@ func ErrConflict(resource string, identifier string) *AppError {
 		WithDetails("resource", resource).
 		WithDetails("identifier", identifier)
 }
-
-// Aliases for backward compatibility
-func Internal(message string) *AppError     { return ErrInternal(message) }
-func InvalidParam(message string) *AppError { return ErrBadRequest(message) }
-func Unauthorized(message string) *AppError { return ErrUnauthorized(message) }
-func Forbidden(message string) *AppError    { return ErrForbidden(message) }
-func NotFound(message string) *AppError     { return New(ErrCodeNotFound, message) }
-func Conflict(message string) *AppError     { return New(ErrCodeConflict, message) }
-func InvalidState(message string) *AppError { return New(ErrCodeConflict, message) }
-func RateLimit(message string) *AppError    { return New(ErrCodeTooManyRequests, message) }
 
 func ErrValidation(message string, details map[string]interface{}) *AppError {
 	ae := New(ErrCodeValidation, message)
@@ -313,6 +257,15 @@ func ErrCache(operation string, err error) *AppError {
 	return Wrap(err, ErrCodeCacheError, fmt.Sprintf("cache error during %s", operation)).
 		WithDetails("operation", operation)
 }
+
+// Aliases for backward compatibility
+func Internal(message string) *AppError     { return ErrInternal(message) }
+func InvalidParam(message string) *AppError { return ErrBadRequest(message) }
+func Unauthorized(message string) *AppError { return ErrUnauthorized(message) }
+func Forbidden(message string) *AppError    { return ErrForbidden(message) }
+func NotFound(message string) *AppError     { return New(ErrCodeNotFound, message) }
+func Conflict(message string) *AppError     { return New(ErrCodeConflict, message) }
+func RateLimit(message string) *AppError    { return New(ErrCodeTooManyRequests, message) }
 
 // Molecule module convenient factory functions
 
@@ -517,6 +470,32 @@ func Is(err, target error) bool {
 
 func As(err error, target interface{}) bool {
 	return stdliberrors.As(err, target)
+}
+
+// Helper functions for NewValidation as requested in original prompt to match exactly (overloading logic)
+func NewValidation(message string, args ...interface{}) *AppError {
+	if len(args) > 0 {
+		if ctx, ok := args[0].(string); ok {
+			return New(ErrCodeValidation, message).WithDetail(ctx)
+		}
+	}
+	return New(ErrCodeValidation, message)
+}
+
+func NewValidationError(field, message string) *AppError {
+	return New(ErrCodeValidation, message).WithDetail(field)
+}
+
+func NewValidationMsg(message string) *AppError {
+	return New(ErrCodeValidation, message)
+}
+
+func NewInternal(format string, args ...interface{}) *AppError {
+	return Newf(ErrCodeInternal, format, args...)
+}
+
+func NewNotFound(format string, args ...interface{}) *AppError {
+	return Newf(ErrCodeNotFound, format, args...)
 }
 
 //Personal.AI order the ending
