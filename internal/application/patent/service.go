@@ -205,6 +205,11 @@ func (s *serviceImpl) Create(ctx context.Context, input *CreateInput) (*Patent, 
 		return nil, errors.NewValidationError("patent", err.Error())
 	}
 
+	patent.ApplicationNumber = input.ApplicationNo
+	if input.PublicationNo != "" {
+		patent.PatentNumber = input.PublicationNo
+	}
+
 	patent.Abstract = input.Abstract
 	patent.AssigneeName = input.Applicant
 	patent.IPCCodes = input.IPCCodes
