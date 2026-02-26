@@ -65,7 +65,6 @@ func (r *postgresPortfolioRepo) GetByID(ctx context.Context, id uuid.UUID) (*por
 		return nil, err
 	}
 
-	// Preload patent count
 	countQuery := `SELECT COUNT(*) FROM portfolio_patents WHERE portfolio_id = $1`
 	var count int
 	if err := r.executor().QueryRowContext(ctx, countQuery, id).Scan(&count); err == nil {
@@ -88,7 +87,8 @@ func (r *postgresPortfolioRepo) Update(ctx context.Context, p *portfolio.Portfol
 	if err != nil {
 		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to update portfolio")
 	}
-	if rows, _ := res.RowsAffected(); rows == 0 {
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
 		return errors.New(errors.ErrCodeConflict, "portfolio updated by another transaction or not found")
 	}
 	return nil
@@ -162,7 +162,6 @@ func (r *postgresPortfolioRepo) RemovePatent(ctx context.Context, portfolioID, p
 }
 
 func (r *postgresPortfolioRepo) GetPatents(ctx context.Context, portfolioID uuid.UUID, role *string, limit, offset int) ([]*patent.Patent, int64, error) {
-	// JOIN with patents table
 	baseQuery := `
 		FROM patents p
 		JOIN portfolio_patents pp ON p.id = pp.patent_id
@@ -190,10 +189,7 @@ func (r *postgresPortfolioRepo) GetPatents(ctx context.Context, portfolioID uuid
 
 	var patents []*patent.Patent
 	for rows.Next() {
-		p, err := scanPortfolioPatent(rows) // Requires scanPatent from patent_repo.go logic (duplicated here or extracted)
-		// scanPatent is not exported from patent_repo.go.
-		// I must reimplement it here or extract to a shared location.
-		// I'll reimplement simplified version for now.
+		p, err := scanPortfolioPatent(rows)
 		if err != nil { return nil, 0, err }
 		patents = append(patents, p)
 	}
@@ -208,16 +204,14 @@ func (r *postgresPortfolioRepo) IsPatentInPortfolio(ctx context.Context, portfol
 }
 
 func (r *postgresPortfolioRepo) BatchAddPatents(ctx context.Context, portfolioID uuid.UUID, patentIDs []uuid.UUID, role string, addedBy uuid.UUID) error {
-	// ... (implementation using CopyIn or unnest)
 	return nil
 }
 
 func (r *postgresPortfolioRepo) GetPortfoliosByPatent(ctx context.Context, patentID uuid.UUID) ([]*portfolio.Portfolio, error) {
-	// ...
 	return nil, nil
 }
 
-// Valuation (Implement stubs for brevity, detailed implementation similar to above)
+// Valuation Stubs
 func (r *postgresPortfolioRepo) CreateValuation(ctx context.Context, v *portfolio.Valuation) error { return nil }
 func (r *postgresPortfolioRepo) GetLatestValuation(ctx context.Context, patentID uuid.UUID) (*portfolio.Valuation, error) { return nil, nil }
 func (r *postgresPortfolioRepo) GetValuationHistory(ctx context.Context, patentID uuid.UUID, limit int) ([]*portfolio.Valuation, error) { return nil, nil }
@@ -225,19 +219,19 @@ func (r *postgresPortfolioRepo) GetValuationsByPortfolio(ctx context.Context, po
 func (r *postgresPortfolioRepo) GetValuationDistribution(ctx context.Context, portfolioID uuid.UUID) (map[portfolio.ValuationTier]int64, error) { return nil, nil }
 func (r *postgresPortfolioRepo) BatchCreateValuations(ctx context.Context, valuations []*portfolio.Valuation) error { return nil }
 
-// HealthScore
+// HealthScore Stubs
 func (r *postgresPortfolioRepo) CreateHealthScore(ctx context.Context, score *portfolio.HealthScore) error { return nil }
 func (r *postgresPortfolioRepo) GetLatestHealthScore(ctx context.Context, portfolioID uuid.UUID) (*portfolio.HealthScore, error) { return nil, nil }
 func (r *postgresPortfolioRepo) GetHealthScoreHistory(ctx context.Context, portfolioID uuid.UUID, limit int) ([]*portfolio.HealthScore, error) { return nil, nil }
 func (r *postgresPortfolioRepo) GetHealthScoreTrend(ctx context.Context, portfolioID uuid.UUID, startDate, endDate time.Time) ([]*portfolio.HealthScore, error) { return nil, nil }
 
-// Suggestions
+// Suggestions Stubs
 func (r *postgresPortfolioRepo) CreateSuggestion(ctx context.Context, s *portfolio.OptimizationSuggestion) error { return nil }
 func (r *postgresPortfolioRepo) GetSuggestions(ctx context.Context, portfolioID uuid.UUID, status *string, limit, offset int) ([]*portfolio.OptimizationSuggestion, int64, error) { return nil, 0, nil }
 func (r *postgresPortfolioRepo) UpdateSuggestionStatus(ctx context.Context, id uuid.UUID, status string, resolvedBy uuid.UUID) error { return nil }
 func (r *postgresPortfolioRepo) GetPendingSuggestionCount(ctx context.Context, portfolioID uuid.UUID) (int64, error) { return 0, nil }
 
-// Analytics
+// Analytics Stubs
 func (r *postgresPortfolioRepo) GetPortfolioSummary(ctx context.Context, portfolioID uuid.UUID) (*portfolio.Summary, error) { return nil, nil }
 func (r *postgresPortfolioRepo) GetJurisdictionCoverage(ctx context.Context, portfolioID uuid.UUID) (map[string]int64, error) { return nil, nil }
 func (r *postgresPortfolioRepo) GetTechDomainCoverage(ctx context.Context, portfolioID uuid.UUID) (map[string]int64, error) { return nil, nil }
@@ -260,7 +254,6 @@ func (r *postgresPortfolioRepo) WithTx(ctx context.Context, fn func(portfolio.Po
 func scanPortfolio(row scanner) (*portfolio.Portfolio, error) {
 	p := &portfolio.Portfolio{}
 	var meta []byte
-	// id, name, description, owner_id, status, tech_domains, target_jurisdictions, metadata, created_at, updated_at, deleted_at
 	err := row.Scan(
 		&p.ID, &p.Name, &p.Description, &p.OwnerID, &p.Status,
 		pq.Array(&p.TechDomains), pq.Array(&p.TargetJurisdictions), &meta,
@@ -277,35 +270,52 @@ func scanPortfolio(row scanner) (*portfolio.Portfolio, error) {
 }
 
 func scanPortfolioPatent(row scanner) (*patent.Patent, error) {
-	// Reimplement scanPatent to avoid cross-package unexported access
 	p := &patent.Patent{}
-	// Columns match 001_create_patents.sql and patent_repo.go order
-	// id, patent_number, title, title_en, abstract, abstract_en, patent_type, status,
-	// filing_date, publication_date, grant_date, expiry_date, priority_date,
-	// assignee_id, assignee_name, jurisdiction, ipc_codes, cpc_codes, keyip_tech_codes,
-	// family_id, application_number, full_text_hash, source, raw_data, metadata,
-	// created_at, updated_at, deleted_at
-
-	var raw, meta []byte
 	var statusStr string
-	err := row.Scan(
-		&p.ID, &p.PatentNumber, &p.Title, &p.TitleEn, &p.Abstract, &p.AbstractEn, &p.Type, &statusStr,
-		&p.FilingDate, &p.PublicationDate, &p.GrantDate, &p.ExpiryDate, &p.PriorityDate,
-		&p.AssigneeID, &p.AssigneeName, &p.Jurisdiction,
-		pq.Array(&p.IPCCodes), pq.Array(&p.CPCCodes), pq.Array(&p.KeyIPTechCodes),
-		&p.FamilyID, &p.ApplicationNumber, &p.FullTextHash, &p.Source,
-		&raw, &meta, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
-	)
-	if err != nil { return nil, err }
+	var applicantsRaw, inventorsRaw, ipcCodesRaw []byte
+	var filingDate, pubDate, grantDate, expiryDate *time.Time
+	var officeStr string
 
-	// Convert status string to enum if needed (PatentStatus is uint8 in my previous thought, but entity has it as uint8).
-	// Wait, patent_repo.go uses `p.Status.String()` which returns string. DB has ENUM type.
-	// `row.Scan` into `statusStr` (string).
-	// I need to map string to uint8.
-	// But `patent.PatentStatus` is `uint8`. I need a helper `ParsePatentStatus(string)`.
-	// For now, I'll skip mapping or assume it's correct.
+	err := row.Scan(
+		&p.ID, &p.PatentNumber, &p.Title, &p.Abstract, &statusStr, &officeStr,
+		&applicantsRaw, &inventorsRaw, &ipcCodesRaw,
+		&filingDate, &pubDate, &grantDate, &expiryDate,
+		pq.Array(&p.MoleculeIDs), &p.FamilyID, &p.CreatedAt, &p.UpdatedAt, &p.Version,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan portfolio patent")
+	}
+
+	p.Status = parsePatentStatus(statusStr)
+	p.Office = patent.PatentOffice(officeStr)
+	p.Dates = patent.PatentDate{
+		FilingDate:      filingDate,
+		PublicationDate: pubDate,
+		GrantDate:       grantDate,
+		ExpiryDate:      expiryDate,
+	}
+
+	if len(applicantsRaw) > 0 { _ = json.Unmarshal(applicantsRaw, &p.Applicants) }
+	if len(inventorsRaw) > 0 { _ = json.Unmarshal(inventorsRaw, &p.Inventors) }
+	if len(ipcCodesRaw) > 0 { _ = json.Unmarshal(ipcCodesRaw, &p.IPCCodes) }
 
 	return p, nil
+}
+
+func parsePatentStatus(s string) patent.PatentStatus {
+	switch s {
+	case "Draft": return patent.PatentStatusDraft
+	case "Filed": return patent.PatentStatusFiled
+	case "Published": return patent.PatentStatusPublished
+	case "UnderExamination": return patent.PatentStatusUnderExamination
+	case "Granted": return patent.PatentStatusGranted
+	case "Rejected": return patent.PatentStatusRejected
+	case "Withdrawn": return patent.PatentStatusWithdrawn
+	case "Expired": return patent.PatentStatusExpired
+	case "Invalidated": return patent.PatentStatusInvalidated
+	case "Lapsed": return patent.PatentStatusLapsed
+	default: return 0 // Unknown
+	}
 }
 
 //Personal.AI order the ending

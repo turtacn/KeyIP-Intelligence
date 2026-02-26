@@ -290,7 +290,7 @@ func (s *portfolioServiceImpl) GetOverlapAnalysis(ctx context.Context, portfolio
 	patents2, _, err := s.repo.GetPatents(ctx, uid2, nil, 10000, 0)
 	if err != nil { return nil, err }
 
-	map1 := make(map[uuid.UUID]bool)
+	map1 := make(map[string]bool)
 	for _, p := range patents1 {
 		map1[p.ID] = true
 	}
@@ -308,15 +308,15 @@ func (s *portfolioServiceImpl) GetOverlapAnalysis(ctx context.Context, portfolio
 			}
 		}
 		if !found {
-			uniqueToP1 = append(uniqueToP1, p.ID.String())
+			uniqueToP1 = append(uniqueToP1, p.ID)
 		}
 	}
 
 	for _, p := range patents2 {
 		if map1[p.ID] {
-			overlapping = append(overlapping, p.ID.String())
+			overlapping = append(overlapping, p.ID)
 		} else {
-			uniqueToP2 = append(uniqueToP2, p.ID.String())
+			uniqueToP2 = append(uniqueToP2, p.ID)
 		}
 	}
 

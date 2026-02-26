@@ -207,8 +207,8 @@ func (s *gapAnalysisServiceImpl) AnalyzeGaps(ctx context.Context, req *GapAnalys
 		return nil, errors.ErrNotFound("portfolio", req.PortfolioID)
 	}
 
-	// Load own patents.
-	ownPatentPtrs, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
+	// Load own patents using PortfolioRepository
+	ownPatentPtrs, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to load portfolio patents")
 	}
@@ -335,7 +335,7 @@ func (s *gapAnalysisServiceImpl) GetExpirationRisks(ctx context.Context, portfol
 		return nil, errors.ErrNotFound("portfolio", portfolioID)
 	}
 
-	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
+	patents, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load patents")
 	}
@@ -370,7 +370,7 @@ func (s *gapAnalysisServiceImpl) GetGeographicGaps(ctx context.Context, portfoli
 		return nil, errors.ErrNotFound("portfolio", portfolioID)
 	}
 
-	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
+	patents, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load patents")
 	}
@@ -398,8 +398,8 @@ func (s *gapAnalysisServiceImpl) identifyTechGaps(
 ) []TechnologyGap {
 	// Build own domain coverage.
 	ownDomains := make(map[string]int)
-	for _, p := range ownPatents {
-		domain := p.GetPrimaryTechDomain()
+	for i := range ownPatents {
+		domain := getPrimaryTechDomain(&ownPatents[i])
 		if domain != "" {
 			ownDomains[domain]++
 		}
@@ -412,8 +412,8 @@ func (s *gapAnalysisServiceImpl) identifyTechGaps(
 	}
 	compDomains := make(map[string]*compDomainInfo)
 	for compName, patents := range competitorPatents {
-		for _, p := range patents {
-			domain := p.GetPrimaryTechDomain()
+		for i := range patents {
+			domain := getPrimaryTechDomain(&patents[i])
 			if domain == "" {
 				continue
 			}
@@ -508,8 +508,8 @@ func (s *gapAnalysisServiceImpl) identifyExpirationRisks(patents []domainpatent.
 
 	// Count patents per domain for coverage impact calculation.
 	domainCounts := make(map[string]int)
-	for _, p := range patents {
-		domain := p.GetPrimaryTechDomain()
+	for i := range patents {
+		domain := getPrimaryTechDomain(&patents[i])
 		if domain != "" {
 			domainCounts[domain]++
 		}
@@ -517,8 +517,9 @@ func (s *gapAnalysisServiceImpl) identifyExpirationRisks(patents []domainpatent.
 
 	risks := make([]ExpirationRisk, 0)
 
-	for _, p := range patents {
-		filingDate := p.GetFilingDate()
+	for i := range patents {
+		p := &patents[i]
+		filingDate := getFilingDate(p)
 		if filingDate == nil || filingDate.IsZero() {
 			continue
 		}
@@ -544,7 +545,7 @@ func (s *gapAnalysisServiceImpl) identifyExpirationRisks(patents []domainpatent.
 		}
 
 		// Coverage impact: how much of the domain's coverage is lost.
-		domain := p.GetPrimaryTechDomain()
+		domain := getPrimaryTechDomain(p)
 		coverageImpact := 0.0
 		if count, ok := domainCounts[domain]; ok && count > 0 {
 			coverageImpact = 1.0 / float64(count)
@@ -552,12 +553,13 @@ func (s *gapAnalysisServiceImpl) identifyExpirationRisks(patents []domainpatent.
 
 		// Check if there's a replacement (newer patent in same domain).
 		hasReplacement := false
-		for _, other := range patents {
-			if other.GetID() == p.GetID() {
+		for j := range patents {
+			other := &patents[j]
+			if other.ID == p.ID {
 				continue
 			}
-			if other.GetPrimaryTechDomain() == domain {
-				otherFiling := other.GetFilingDate()
+			if getPrimaryTechDomain(other) == domain {
+				otherFiling := getFilingDate(other)
 				if otherFiling != nil && !otherFiling.IsZero() && filingDate != nil && otherFiling.After(*filingDate) {
 					otherExpiration := otherFiling.AddDate(patentTermYears, 0, 0)
 					if otherExpiration.After(expirationDate) {
@@ -569,8 +571,8 @@ func (s *gapAnalysisServiceImpl) identifyExpirationRisks(patents []domainpatent.
 		}
 
 		risks = append(risks, ExpirationRisk{
-			PatentID:       p.GetID(),
-			PatentNumber:   p.GetPatentNumber(),
+			PatentID:       p.ID,
+			PatentNumber:   p.PatentNumber,
 			TechDomain:     domain,
 			ExpirationDate: expirationDate,
 			DaysRemaining:  daysRemaining,
@@ -596,8 +598,8 @@ func (s *gapAnalysisServiceImpl) identifyGeographicGaps(
 ) []GeographicGap {
 	// Build own jurisdiction coverage.
 	ownJurisdictions := make(map[string]bool)
-	for _, p := range ownPatents {
-		juris := extractJurisdiction(p.GetPatentNumber())
+	for i := range ownPatents {
+		juris := extractJurisdiction(ownPatents[i].PatentNumber)
 		if juris != "" {
 			ownJurisdictions[juris] = true
 		}
@@ -607,8 +609,8 @@ func (s *gapAnalysisServiceImpl) identifyGeographicGaps(
 	compJurisCount := make(map[string]int)
 	for _, patents := range competitorPatents {
 		seen := make(map[string]bool)
-		for _, p := range patents {
-			juris := extractJurisdiction(p.GetPatentNumber())
+		for i := range patents {
+			juris := extractJurisdiction(patents[i].PatentNumber)
 			if juris != "" && !seen[juris] {
 				seen[juris] = true
 				compJurisCount[juris]++
@@ -887,4 +889,3 @@ func jurisdictionName(juris string) string {
 }
 
 //Personal.AI order the ending
-

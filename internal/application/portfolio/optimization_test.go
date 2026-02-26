@@ -23,7 +23,7 @@ const (
 func TestNewOptimizationService_Success(t *testing.T) {
 	cfg := OptimizationServiceConfig{
 		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
+		PortfolioRepository: newMockPortfolioRepo(),
 		PatentRepository: newMockPatentRepo(),
 		Logger:           &mockLogger{},
 	}
@@ -49,9 +49,9 @@ func TestNewOptimizationService_MissingDeps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := OptimizationServiceConfig{
 				PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-				PatentRepository: newMockPatentRepo(),
-				Logger:           &mockLogger{},
+		PortfolioRepository: newMockPortfolioRepo(),
+		PatentRepository: newMockPatentRepo(),
+		Logger:           &mockLogger{},
 			}
 			tt.mod(&cfg)
 			_, err := NewOptimizationService(cfg)
@@ -66,7 +66,7 @@ PortfolioRepository: newMockPortfolioRepoConstellation(),
 // Tests: Optimize
 // -----------------------------------------------------------------------
 
-func buildOptTestRepo() *mockPatentRepo {
+func buildOptTestRepo() (*mockPatentRepo, []*domainpatent.Patent) {
 	repo := newMockPatentRepo()
 	now := time.Now()
 	patentPtrs := []*domainpatent.Patent{
@@ -77,15 +77,18 @@ func buildOptTestRepo() *mockPatentRepo {
 		createTestPatentWithMolecules("o5", "CN005", "G16B", "Own", now.AddDate(-3, 0, 0), 7.0, []string{"m5"}),
 	}
 	repo.byPortfolio["40000000-0000-0000-0000-000000000003"] = patentPtrs
-	return repo
+	return repo, patentPtrs
 }
 
 func TestOptimize_Success(t *testing.T) {
-	repo := buildOptTestRepo()
+	repo, patents := buildOptTestRepo()
 	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
+	portfolioRepo := newMockPortfolioRepoWithData(testPortfolio)
+	portfolioRepo.patents[testPortfolioOptID] = patents
+
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
-		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PortfolioRepository: portfolioRepo,
 		PatentRepository:    repo,
 		Logger:              &mockLogger{},
 	}
@@ -146,11 +149,14 @@ func TestOptimize_EmptyPortfolioID(t *testing.T) {
 }
 
 func TestOptimize_DefaultObjective(t *testing.T) {
-	repo := buildOptTestRepo()
+	repo, patents := buildOptTestRepo()
 	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
+	portfolioRepo := newMockPortfolioRepoWithData(testPortfolio)
+	portfolioRepo.patents[testPortfolioOptID] = patents
+
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
-		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PortfolioRepository: portfolioRepo,
 		PatentRepository:    repo,
 		Logger:              &mockLogger{},
 	}
@@ -168,11 +174,14 @@ func TestOptimize_DefaultObjective(t *testing.T) {
 }
 
 func TestOptimize_MinCostObjective(t *testing.T) {
-	repo := buildOptTestRepo()
+	repo, patents := buildOptTestRepo()
 	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
+	portfolioRepo := newMockPortfolioRepoWithData(testPortfolio)
+	portfolioRepo.patents[testPortfolioOptID] = patents
+
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
-		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PortfolioRepository: portfolioRepo,
 		PatentRepository:    repo,
 		Logger:              &mockLogger{},
 	}
@@ -209,11 +218,14 @@ func TestOptimize_MinCostObjective(t *testing.T) {
 }
 
 func TestOptimize_MaxROIObjective(t *testing.T) {
-	repo := buildOptTestRepo()
+	repo, patents := buildOptTestRepo()
 	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
+	portfolioRepo := newMockPortfolioRepoWithData(testPortfolio)
+	portfolioRepo.patents[testPortfolioOptID] = patents
+
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
-		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PortfolioRepository: portfolioRepo,
 		PatentRepository:    repo,
 		Logger:              &mockLogger{},
 	}
@@ -232,11 +244,14 @@ func TestOptimize_MaxROIObjective(t *testing.T) {
 }
 
 func TestOptimize_WithPreferences(t *testing.T) {
-	repo := buildOptTestRepo()
+	repo, patents := buildOptTestRepo()
 	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
+	portfolioRepo := newMockPortfolioRepoWithData(testPortfolio)
+	portfolioRepo.patents[testPortfolioOptID] = patents
+
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
-		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PortfolioRepository: portfolioRepo,
 		PatentRepository:    repo,
 		Logger:              &mockLogger{},
 	}
@@ -264,7 +279,7 @@ func TestOptimize_WithPreferences(t *testing.T) {
 func TestOptimize_PortfolioNotFound(t *testing.T) {
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: nil},
-		PortfolioRepository: newMockPortfolioRepoConstellation(),
+		PortfolioRepository: newMockPortfolioRepo(),
 		PatentRepository:    newMockPatentRepo(),
 		Logger:              &mockLogger{},
 	}
@@ -309,11 +324,14 @@ func TestOptimize_EmptyPortfolio(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestGetPruneCandidates_Success(t *testing.T) {
-	repo := buildOptTestRepo()
+	repo, patents := buildOptTestRepo()
 	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
+	portfolioRepo := newMockPortfolioRepoWithData(testPortfolio)
+	portfolioRepo.patents[testPortfolioOptID] = patents
+
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
-		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PortfolioRepository: portfolioRepo,
 		PatentRepository:    repo,
 		Logger:              &mockLogger{},
 	}
@@ -345,11 +363,14 @@ func TestGetPruneCandidates_EmptyPortfolioID(t *testing.T) {
 }
 
 func TestGetPruneCandidates_DefaultLimit(t *testing.T) {
-	repo := buildOptTestRepo()
+	repo, patents := buildOptTestRepo()
 	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
+	portfolioRepo := newMockPortfolioRepoWithData(testPortfolio)
+	portfolioRepo.patents[testPortfolioOptID] = patents
+
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
-		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PortfolioRepository: portfolioRepo,
 		PatentRepository:    repo,
 		Logger:              &mockLogger{},
 	}
@@ -369,11 +390,14 @@ func TestGetPruneCandidates_DefaultLimit(t *testing.T) {
 // -----------------------------------------------------------------------
 
 func TestEstimateCost_Success(t *testing.T) {
-	repo := buildOptTestRepo()
+	repo, patents := buildOptTestRepo()
 	testPortfolio := createTestPortfolioWithID(testPortfolioOptID, "Optimization Test")
+	portfolioRepo := newMockPortfolioRepoWithData(testPortfolio)
+	portfolioRepo.patents[testPortfolioOptID] = patents
+
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
-		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
+		PortfolioRepository: portfolioRepo,
 		PatentRepository:    repo,
 		Logger:              &mockLogger{},
 	}
@@ -433,7 +457,7 @@ func TestEstimateCost_EmptyPortfolioID(t *testing.T) {
 func TestEstimateCost_PortfolioNotFound(t *testing.T) {
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: nil},
-		PortfolioRepository: newMockPortfolioRepoConstellation(),
+		PortfolioRepository: newMockPortfolioRepo(),
 		PatentRepository:    newMockPatentRepo(),
 		Logger:              &mockLogger{},
 	}
@@ -531,17 +555,19 @@ func createTestPatentSimple(number string, filingDate time.Time) *domainpatent.P
 	now := time.Now()
 	expiryDate := filingDate.AddDate(20, 0, 0)
 	return &domainpatent.Patent{
-		ID:              uuid.New(),
-		PatentNumber:    number,
-		Title:           "Test Patent",
-		FilingDate:      &filingDate,
-		GrantDate:       &now,
-		ExpiryDate:      &expiryDate,
-		Status:          domainpatent.PatentStatusGranted,
-		Office:          domainpatent.OfficeUSPTO,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-		Version:         1,
+		ID:           uuid.New().String(),
+		PatentNumber: number,
+		Title:        "Test Patent",
+		Dates: domainpatent.PatentDate{
+			FilingDate: &filingDate,
+			GrantDate:  &now,
+			ExpiryDate: &expiryDate,
+		},
+		Status:    domainpatent.PatentStatusGranted,
+		Office:    domainpatent.OfficeUSPTO,
+		CreatedAt: now,
+		UpdatedAt: now,
+		Version:   1,
 	}
 }
 

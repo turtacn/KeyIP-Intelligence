@@ -1,19 +1,3 @@
-// internal/application/lifecycle/deadline.go
-//
-// Phase 10 - File #210
-// Application service for patent deadline management.
-// Orchestrates deadline tracking, alerting, and compliance monitoring
-// across multiple jurisdictions and patent portfolios.
-//
-// Functional positioning:
-//   Provides centralized deadline management including statutory deadlines,
-//   office action response deadlines, PCT/Paris Convention deadlines,
-//   configurable alert policies, and deadline compliance dashboards.
-//
-// Dependencies:
-//   Depends on: domain/lifecycle, domain/patent, pkg/errors
-//   Depended by: interfaces/http/handlers/lifecycle_handler
-
 package lifecycle
 
 import (
@@ -25,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	domainPortfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -189,7 +174,8 @@ type DeadlineService interface {
 type deadlineServiceImpl struct {
 	lifecycleSvc  domainLifecycle.Service
 	lifecycleRepo domainLifecycle.LifecycleRepository
-	patentRepo    patentRepoPort
+	patentRepo    domainPatent.PatentRepository
+	portfolioRepo domainPortfolio.PortfolioRepository
 	cache         CachePort
 	logger        Logger
 }
@@ -203,7 +189,8 @@ type DeadlineServiceConfig struct {
 func NewDeadlineService(
 	lifecycleSvc domainLifecycle.Service,
 	lifecycleRepo domainLifecycle.LifecycleRepository,
-	patentRepo patentRepoPort,
+	patentRepo domainPatent.PatentRepository,
+	portfolioRepo domainPortfolio.PortfolioRepository,
 	cache CachePort,
 	logger Logger,
 ) DeadlineService {
@@ -211,6 +198,7 @@ func NewDeadlineService(
 		lifecycleSvc:  lifecycleSvc,
 		lifecycleRepo: lifecycleRepo,
 		patentRepo:    patentRepo,
+		portfolioRepo: portfolioRepo,
 		cache:         cache,
 		logger:        logger,
 	}
@@ -240,18 +228,14 @@ func (s *deadlineServiceImpl) ListDeadlines(ctx context.Context, query *Deadline
 	var allDeadlines []Deadline
 
 	for _, pid := range patentIDs {
-		uid, err := uuid.Parse(pid)
-		if err != nil {
-			s.logger.Warn("deadline: skipping invalid patent_id", "patent_id", pid, "error", err)
-			continue
-		}
-		patent, fetchErr := s.patentRepo.GetByID(ctx, uid)
+		// Verify valid patent
+		patent, fetchErr := s.patentRepo.FindByID(ctx, pid)
 		if fetchErr != nil {
 			s.logger.Warn("deadline: skipping patent", "patent_id", pid, "error", fetchErr)
 			continue
 		}
 
-		jurisdiction := domainLifecycle.Jurisdiction(patent.Jurisdiction)
+		jurisdiction := domainLifecycle.Jurisdiction(patent.Office)
 		if !matchJurisdictions(jurisdiction, query.Jurisdictions) {
 			continue
 		}
@@ -318,12 +302,11 @@ func (s *deadlineServiceImpl) CreateDeadline(ctx context.Context, req *CreateDea
 		return nil, errors.NewValidationOp("deadline.create", "due_date is required")
 	}
 
-	patentID, err := uuid.Parse(req.PatentID)
-	if err != nil {
+	if _, err := uuid.Parse(req.PatentID); err != nil {
 		return nil, errors.NewValidationOp("deadline.create", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
 	}
 
-	patent, err := s.patentRepo.GetByID(ctx, patentID)
+	patent, err := s.patentRepo.FindByID(ctx, req.PatentID)
 	if err != nil {
 		return nil, errors.NewNotFoundOp("deadline.create", fmt.Sprintf("patent %s not found", req.PatentID))
 	}
@@ -331,7 +314,7 @@ func (s *deadlineServiceImpl) CreateDeadline(ctx context.Context, req *CreateDea
 	now := time.Now()
 	jurisdiction := req.Jurisdiction
 	if jurisdiction == "" {
-		jurisdiction = domainLifecycle.Jurisdiction(patent.Jurisdiction)
+		jurisdiction = domainLifecycle.Jurisdiction(patent.Office)
 	}
 
 	dl := &Deadline{
@@ -524,17 +507,16 @@ func (s *deadlineServiceImpl) SyncStatutoryDeadlines(ctx context.Context, patent
 		return 0, errors.NewValidationOp("deadline.sync", "patent_id is required")
 	}
 
-	uid, err := uuid.Parse(patentID)
-	if err != nil {
+	if _, err := uuid.Parse(patentID); err != nil {
 		return 0, errors.NewValidationOp("deadline.sync", fmt.Sprintf("invalid patent_id: %s", patentID))
 	}
 
-	patent, err := s.patentRepo.GetByID(ctx, uid)
+	patent, err := s.patentRepo.FindByID(ctx, patentID)
 	if err != nil {
 		return 0, errors.NewNotFoundOp("deadline.sync", fmt.Sprintf("patent %s not found", patentID))
 	}
 
-	jurisdiction := domainLifecycle.Jurisdiction(patent.Jurisdiction)
+	jurisdiction := domainLifecycle.Jurisdiction(patent.Office)
 	now := time.Now()
 	deadlines := s.generateDeadlinesForPatent(patent, jurisdiction, now)
 
@@ -567,13 +549,20 @@ func (s *deadlineServiceImpl) resolvePatentIDs(ctx context.Context, portfolioID,
 	if portfolioID == "" {
 		return nil, errors.NewValidationOp("deadline", "either portfolio_id or patent_id is required")
 	}
-	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
+
+	portUUID, err := uuid.Parse(portfolioID)
 	if err != nil {
-		return nil, errors.NewInternalOp("deadline", fmt.Sprintf("failed to list portfolio: %v", err))
+		return nil, errors.NewValidationOp("deadline", fmt.Sprintf("invalid portfolio_id: %v", err))
 	}
+
+	patents, _, err := s.portfolioRepo.GetPatents(ctx, portUUID, nil, 10000, 0)
+	if err != nil {
+		return nil, errors.NewInternalOp("deadline", fmt.Sprintf("failed to list portfolio patents: %v", err))
+	}
+
 	ids := make([]string, 0, len(patents))
 	for _, p := range patents {
-		ids = append(ids, p.ID.String())
+		ids = append(ids, p.ID)
 	}
 	return ids, nil
 }
@@ -585,17 +574,17 @@ func (s *deadlineServiceImpl) generateDeadlinesForPatent(
 ) []Deadline {
 	var deadlines []Deadline
 
-	if patent.FilingDate == nil {
+	if patent.Dates.FilingDate == nil {
 		return nil
 	}
-	filingDate := *patent.FilingDate
+	filingDate := *patent.Dates.FilingDate
 
 	maxYears := jurisdictionMaxLife(jurisdiction)
 	for year := 1; year <= maxYears; year++ {
 		dueDate := filingDate.AddDate(year, 0, 0)
 		deadlines = append(deadlines, Deadline{
-			ID:            fmt.Sprintf("dl-ann-%s-%d", patent.ID.String(), year),
-			PatentID:      patent.ID.String(),
+			ID:            fmt.Sprintf("dl-ann-%s-%d", patent.ID, year),
+			PatentID:      patent.ID,
 			PatentNumber:  patent.PatentNumber,
 			Title:         fmt.Sprintf("Year %d Annuity - %s", year, patent.PatentNumber),
 			DeadlineType:  DeadlineTypeAnnuityPayment,
@@ -615,8 +604,8 @@ func (s *deadlineServiceImpl) generateDeadlinesForPatent(
 	if jurisdiction == domainLifecycle.JurisdictionCN {
 		examDeadline := filingDate.AddDate(3, 0, 0)
 		deadlines = append(deadlines, Deadline{
-			ID:            fmt.Sprintf("dl-exam-%s", patent.ID.String()),
-			PatentID:      patent.ID.String(),
+			ID:            fmt.Sprintf("dl-exam-%s", patent.ID),
+			PatentID:      patent.ID,
 			PatentNumber:  patent.PatentNumber,
 			Title:         fmt.Sprintf("Examination Request Deadline - %s", patent.PatentNumber),
 			DeadlineType:  DeadlineTypeExamRequest,
@@ -634,8 +623,8 @@ func (s *deadlineServiceImpl) generateDeadlinesForPatent(
 	// Paris Convention priority (12 months)
 	parisDeadline := filingDate.AddDate(1, 0, 0)
 	deadlines = append(deadlines, Deadline{
-		ID:            fmt.Sprintf("dl-paris-%s", patent.ID.String()),
-		PatentID:      patent.ID.String(),
+		ID:            fmt.Sprintf("dl-paris-%s", patent.ID),
+		PatentID:      patent.ID,
 		PatentNumber:  patent.PatentNumber,
 		Title:         fmt.Sprintf("Paris Convention Priority - %s", patent.PatentNumber),
 		DeadlineType:  DeadlineTypeParisPriority,
@@ -652,8 +641,8 @@ func (s *deadlineServiceImpl) generateDeadlinesForPatent(
 	// PCT national phase (30 months)
 	pctDeadline := filingDate.AddDate(0, 30, 0)
 	deadlines = append(deadlines, Deadline{
-		ID:            fmt.Sprintf("dl-pct-%s", patent.ID.String()),
-		PatentID:      patent.ID.String(),
+		ID:            fmt.Sprintf("dl-pct-%s", patent.ID),
+		PatentID:      patent.ID,
 		PatentNumber:  patent.PatentNumber,
 		Title:         fmt.Sprintf("PCT National Phase - %s", patent.PatentNumber),
 		DeadlineType:  DeadlineTypePCTNational,
@@ -779,4 +768,3 @@ func urgencyOrder(u DeadlineUrgency) int {
 }
 
 //Personal.AI order the ending
-

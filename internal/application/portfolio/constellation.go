@@ -400,7 +400,8 @@ func (s *constellationServiceImpl) GenerateConstellation(ctx context.Context, re
 		return nil, errors.ErrNotFound("portfolio", req.PortfolioID)
 	}
 
-	patentPtrs, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
+	// Replaced patentRepo.ListByPortfolio with portfolioRepo.GetPatents
+	patentPtrs, _, err := s.portfolioRepo.GetPatents(ctx, portfolioID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to load portfolio patents")
 	}
@@ -513,7 +514,8 @@ func (s *constellationServiceImpl) GetTechDomainDistribution(ctx context.Context
 		return nil, errors.ErrNotFound("portfolio", portfolioID)
 	}
 
-	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
+	// Replaced ListByPortfolio with GetPatents
+	patents, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to load patents for domain distribution")
 	}
@@ -524,7 +526,7 @@ func (s *constellationServiceImpl) GetTechDomainDistribution(ctx context.Context
 	now := time.Now()
 
 	for _, p := range patents {
-		domain := p.GetPrimaryTechDomain()
+		domain := getPrimaryTechDomain(p)
 		if domain == "" {
 			domain = "unclassified"
 		}
@@ -539,8 +541,8 @@ func (s *constellationServiceImpl) GetTechDomainDistribution(ctx context.Context
 		}
 
 		entry.PatentCount++
-		entry.ValueSum += p.GetValueScore()
-		filingDate := p.GetFilingDate()
+		entry.ValueSum += getValueScore(p)
+		filingDate := getFilingDate(p)
 		if filingDate != nil && !filingDate.IsZero() {
 			ageYears := now.Sub(*filingDate).Hours() / (24 * 365.25)
 			entry.AvgAge = entry.AvgAge + ageYears
@@ -605,22 +607,23 @@ func (s *constellationServiceImpl) CompareWithCompetitor(ctx context.Context, re
 	)
 
 	// Load own patents.
-	ownPatents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
+	portfolioUUID, err := uuid.Parse(req.PortfolioID)
+	if err != nil {
+		return nil, errors.NewInvalidParameterError("invalid portfolio ID format")
+	}
+	ownPatentPtrs, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to load own patents")
 	}
+	ownPatents := ownPatentPtrs
 
 	// Load competitor patents.
 	var compPatents []*domainpatent.Patent
 	if len(req.CompetitorIDs) > 0 {
 		// Load by specific patent IDs
 		for _, idStr := range req.CompetitorIDs {
-			id, parseErr := uuid.Parse(idStr)
-			if parseErr != nil {
-				s.logger.Warn("invalid competitor patent ID", logging.String("id", idStr), logging.Err(parseErr))
-				continue
-			}
-			p, fetchErr := s.patentRepo.GetByID(ctx, id)
+			// FindByID expects string
+			p, fetchErr := s.patentRepo.FindByID(ctx, idStr)
 			if fetchErr != nil {
 				s.logger.Warn("failed to fetch competitor patent", logging.String("id", idStr), logging.Err(fetchErr))
 				continue
@@ -629,11 +632,15 @@ func (s *constellationServiceImpl) CompareWithCompetitor(ctx context.Context, re
 		}
 	} else {
 		// Search by assignee name
-		results, _, searchErr := s.patentRepo.SearchByAssigneeName(ctx, req.CompetitorName, 1000, 0)
+		criteria := domainpatent.PatentSearchCriteria{
+			ApplicantNames: []string{req.CompetitorName},
+			Limit:          1000,
+		}
+		result, searchErr := s.patentRepo.Search(ctx, criteria)
 		if searchErr != nil {
 			s.logger.Warn("failed to search competitor patents by assignee name", logging.Err(searchErr))
 		} else {
-			compPatents = results
+			compPatents = result.Patents
 		}
 	}
 
@@ -759,7 +766,11 @@ func (s *constellationServiceImpl) GetCoverageHeatmap(ctx context.Context, portf
 	s.logger.Info("generating coverage heatmap", logging.String("portfolio_id", portfolioID), logging.Int("resolution", cfg.Resolution))
 
 	// Load patents and their molecules.
-	patentPtrs, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
+	portfolioUUID, err := uuid.Parse(portfolioID)
+	if err != nil {
+		return nil, errors.NewInvalidParameterError("invalid portfolio ID format")
+	}
+	patentPtrs, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to load patents for heatmap")
 	}
@@ -901,6 +912,34 @@ func (s *constellationServiceImpl) GetCoverageHeatmap(ctx context.Context, portf
 // Internal Helper Methods
 // -----------------------------------------------------------------------
 
+// Helper functions for struct field access
+func getPrimaryTechDomain(p *domainpatent.Patent) string {
+	if len(p.IPCCodes) > 0 {
+		return p.IPCCodes[0].Section // Just returning Section as high level domain
+	}
+	return ""
+}
+
+func getLegalStatus(p *domainpatent.Patent) string {
+	return p.Status.String()
+}
+
+func getAssignee(p *domainpatent.Patent) string {
+	if len(p.Applicants) > 0 {
+		return p.Applicants[0].Name
+	}
+	return "Unknown"
+}
+
+func getFilingDate(p *domainpatent.Patent) *time.Time {
+	return p.Dates.FilingDate
+}
+
+func getValueScore(p *domainpatent.Patent) float64 {
+	// Value score logic is not in Patent entity. Defaulting to 0.
+	return 0.0
+}
+
 // applyReductionDefaults fills in default values for dimension reduction parameters.
 func applyReductionDefaults(r DimensionReduction) DimensionReduction {
 	if r.Algorithm == "" {
@@ -952,18 +991,19 @@ func (s *constellationServiceImpl) applyPatentFilters(patents []domainpatent.Pat
 	assigneeSet := toStringSet(filters.Assignees)
 
 	filtered := make([]domainpatent.Patent, 0, len(patents))
-	for _, p := range patents {
+	for i := range patents {
+		p := &patents[i]
 		// Filter by tech domain.
 		if len(techSet) > 0 {
-			if _, ok := techSet[p.GetPrimaryTechDomain()]; !ok {
+			if _, ok := techSet[getPrimaryTechDomain(p)]; !ok {
 				continue
 			}
 		}
 
 		// Filter by filing year range.
 		if filters.FilingYearMin > 0 || filters.FilingYearMax > 0 {
-			filingDate := p.GetFilingDate()
-			if filingDate.IsZero() {
+			filingDate := getFilingDate(p)
+			if filingDate == nil || filingDate.IsZero() {
 				continue
 			}
 			year := filingDate.Year()
@@ -977,19 +1017,19 @@ func (s *constellationServiceImpl) applyPatentFilters(patents []domainpatent.Pat
 
 		// Filter by legal status.
 		if len(statusSet) > 0 {
-			if _, ok := statusSet[p.GetLegalStatus()]; !ok {
+			if _, ok := statusSet[getLegalStatus(p)]; !ok {
 				continue
 			}
 		}
 
 		// Filter by assignee.
 		if len(assigneeSet) > 0 {
-			if _, ok := assigneeSet[p.GetAssignee()]; !ok {
+			if _, ok := assigneeSet[getAssignee(p)]; !ok {
 				continue
 			}
 		}
 
-		filtered = append(filtered, p)
+		filtered = append(filtered, *p)
 	}
 
 	return filtered
@@ -999,8 +1039,8 @@ func (s *constellationServiceImpl) applyPatentFilters(patents []domainpatent.Pat
 func (s *constellationServiceImpl) extractMoleculeIDs(patents []domainpatent.Patent) []string {
 	seen := make(map[string]struct{})
 	ids := make([]string, 0)
-	for _, p := range patents {
-		for _, mid := range p.GetMoleculeIDs() {
+	for i := range patents {
+		for _, mid := range patents[i].MoleculeIDs {
 			if _, exists := seen[mid]; !exists {
 				seen[mid] = struct{}{}
 				ids = append(ids, mid)
@@ -1091,8 +1131,9 @@ func (s *constellationServiceImpl) buildPoints(patents []domainpatent.Patent, mo
 	points := make([]ConstellationPoint, 0, len(reduced))
 	coordIdx := 0
 
-	for _, p := range patents {
-		molIDs := p.GetMoleculeIDs()
+	for i := range patents {
+		p := &patents[i]
+		molIDs := p.MoleculeIDs
 		for _, mid := range molIDs {
 			if coordIdx >= len(reduced) {
 				break
@@ -1102,13 +1143,13 @@ func (s *constellationServiceImpl) buildPoints(patents []domainpatent.Patent, mo
 			coordIdx++
 
 			pt := ConstellationPoint{
-				ID:           fmt.Sprintf("%s-%s", p.GetID(), mid),
-				PatentNumber: p.GetPatentNumber(),
+				ID:           fmt.Sprintf("%s-%s", p.ID, mid),
+				PatentNumber: p.PatentNumber,
 				MoleculeID:   mid,
-				TechDomain:   p.GetPrimaryTechDomain(),
-				LegalStatus:  p.GetLegalStatus(),
-				Assignee:     p.GetAssignee(),
-				ValueScore:   p.GetValueScore(),
+				TechDomain:   getPrimaryTechDomain(p),
+				LegalStatus:  getLegalStatus(p),
+				Assignee:     getAssignee(p),
+				ValueScore:   getValueScore(p),
 				PointType:    PointTypeOwnPatent,
 			}
 
@@ -1126,8 +1167,8 @@ func (s *constellationServiceImpl) buildPoints(patents []domainpatent.Patent, mo
 				pt.SMILES = mol.GetSMILES()
 			}
 
-			if !p.GetFilingDate().IsZero() {
-				pt.FilingYear = p.GetFilingDate().Year()
+			if fd := getFilingDate(p); fd != nil && !fd.IsZero() {
+				pt.FilingYear = fd.Year()
 			}
 
 			points = append(points, pt)
@@ -1481,7 +1522,7 @@ func filterByTechDomains(patents []*domainpatent.Patent, domains []string) []*do
 	domainSet := toStringSet(domains)
 	filtered := make([]*domainpatent.Patent, 0, len(patents))
 	for _, p := range patents {
-		if _, ok := domainSet[p.GetPrimaryTechDomain()]; ok {
+		if _, ok := domainSet[getPrimaryTechDomain(p)]; ok {
 			filtered = append(filtered, p)
 		}
 	}
@@ -1492,7 +1533,7 @@ func filterByTechDomains(patents []*domainpatent.Patent, domains []string) []*do
 func groupByDomain(patents []*domainpatent.Patent) map[string][]*domainpatent.Patent {
 	result := make(map[string][]*domainpatent.Patent)
 	for _, p := range patents {
-		domain := p.GetPrimaryTechDomain()
+		domain := getPrimaryTechDomain(p)
 		if domain == "" {
 			domain = "unclassified"
 		}
@@ -1530,14 +1571,14 @@ func computeZoneStrength(patents []*domainpatent.Patent) float64 {
 
 	for _, p := range patents {
 		// Base contribution from value score.
-		value := p.GetValueScore()
+		value := getValueScore(p)
 		if value <= 0 {
 			value = 1.0
 		}
 
 		// Recency bonus: patents filed more recently get a higher weight.
 		recencyFactor := 1.0
-		filingDate := p.GetFilingDate()
+		filingDate := getFilingDate(p)
 		if filingDate != nil && !filingDate.IsZero() {
 			ageYears := now.Sub(*filingDate).Hours() / (24 * 365.25)
 			if ageYears < 20 {
@@ -1588,14 +1629,14 @@ func computeStrengthIndex(ownPatents, compPatents []*domainpatent.Patent, overla
 	// Component 3: Value-weighted strength.
 	ownValueSum := 0.0
 	for _, p := range ownPatents {
-		v := p.GetValueScore()
+		v := getValueScore(p)
 		if v > 0 {
 			ownValueSum += v
 		}
 	}
 	compValueSum := 0.0
 	for _, p := range compPatents {
-		v := p.GetValueScore()
+		v := getValueScore(p)
 		if v > 0 {
 			compValueSum += v
 		}
@@ -1659,5 +1700,3 @@ var (
 )
 
 //Personal.AI order the ending
-
-

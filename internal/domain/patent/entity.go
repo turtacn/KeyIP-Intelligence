@@ -2,54 +2,53 @@ package patent
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// PatentStatus represents the legal lifecycle stage of a patent.
+// PatentStatus represents the lifecycle stage of a patent.
 type PatentStatus uint8
 
 const (
-	PatentStatusUnknown          PatentStatus = 0
-	PatentStatusDraft            PatentStatus = 1
-	PatentStatusFiled            PatentStatus = 2
-	PatentStatusPublished        PatentStatus = 3
-	PatentStatusUnderExamination PatentStatus = 4
-	PatentStatusGranted          PatentStatus = 5
-	PatentStatusRejected         PatentStatus = 6
-	PatentStatusWithdrawn        PatentStatus = 7
-	PatentStatusExpired          PatentStatus = 8
-	PatentStatusInvalidated       PatentStatus = 9
-	PatentStatusLapsed           PatentStatus = 10
+	PatentStatusDraft             PatentStatus = 0
+	PatentStatusFiled             PatentStatus = 1
+	PatentStatusPublished         PatentStatus = 2
+	PatentStatusUnderExamination  PatentStatus = 3
+	PatentStatusGranted           PatentStatus = 4
+	PatentStatusRejected          PatentStatus = 5
+	PatentStatusWithdrawn         PatentStatus = 6
+	PatentStatusExpired           PatentStatus = 7
+	PatentStatusInvalidated       PatentStatus = 8
+	PatentStatusLapsed            PatentStatus = 9
 )
 
 func (s PatentStatus) String() string {
 	switch s {
 	case PatentStatusDraft:
-		return "draft"
+		return "Draft"
 	case PatentStatusFiled:
-		return "filed"
+		return "Filed"
 	case PatentStatusPublished:
-		return "published"
+		return "Published"
 	case PatentStatusUnderExamination:
-		return "under_examination"
+		return "UnderExamination"
 	case PatentStatusGranted:
-		return "granted"
+		return "Granted"
 	case PatentStatusRejected:
-		return "rejected"
+		return "Rejected"
 	case PatentStatusWithdrawn:
-		return "withdrawn"
+		return "Withdrawn"
 	case PatentStatusExpired:
-		return "expired"
+		return "Expired"
 	case PatentStatusInvalidated:
-		return "invalidated"
+		return "Invalidated"
 	case PatentStatusLapsed:
-		return "lapsed"
+		return "Lapsed"
 	default:
-		return "unknown"
+		return "Unknown"
 	}
 }
 
@@ -61,7 +60,11 @@ func (s PatentStatus) IsActive() bool {
 	return s == PatentStatusFiled || s == PatentStatusPublished || s == PatentStatusUnderExamination || s == PatentStatusGranted
 }
 
-// PatentOffice identifies a national or regional patent office.
+func (s PatentStatus) IsTerminal() bool {
+	return s == PatentStatusRejected || s == PatentStatusWithdrawn || s == PatentStatusExpired || s == PatentStatusInvalidated || s == PatentStatusLapsed
+}
+
+// PatentOffice represents a patent authority.
 type PatentOffice string
 
 const (
@@ -82,40 +85,56 @@ func (o PatentOffice) IsValid() bool {
 	}
 }
 
+// IPCClassification represents an International Patent Classification code.
+type IPCClassification struct {
+	Section  string `json:"section"`
+	Class    string `json:"class"`
+	Subclass string `json:"subclass"`
+	Group    string `json:"group"`
+	Subgroup string `json:"subgroup"`
+	Full     string `json:"full"`
+}
+
+func (ipc *IPCClassification) Validate() error {
+	if ipc.Full == "" {
+		return errors.NewValidation("IPC code cannot be empty")
+	}
+	// Basic regex for IPC format e.g. "C09K 11/06"
+	matched, _ := regexp.MatchString(`^[A-H]\d{2}[A-Z] \d{1,4}/\d{2,6}$`, ipc.Full)
+	if !matched {
+		return errors.NewValidation(fmt.Sprintf("invalid IPC format: %s", ipc.Full))
+	}
+	return nil
+}
+
+func (ipc *IPCClassification) String() string {
+	return ipc.Full
+}
+
 // Applicant represents a patent applicant.
 type Applicant struct {
 	Name    string `json:"name"`
-	Country string `json:"country"`
-	Type    string `json:"type"`
+	Country string `json:"country"` // ISO 3166-1 alpha-2
+	Type    string `json:"type"`    // "company", "individual", etc.
 }
 
 // Inventor represents a patent inventor.
 type Inventor struct {
 	Name        string `json:"name"`
 	Country     string `json:"country"`
-	Affiliation string `json:"affiliation"`
-	Sequence    int    `json:"sequence"`
+	Affiliation string `json:"affiliation,omitempty"`
 }
 
-// PriorityClaim represents a priority claim.
-type PriorityClaim struct {
-	ID             uuid.UUID `json:"id"`
-	PatentID       uuid.UUID `json:"patent_id"`
-	PriorityNumber string    `json:"priority_number"`
-	PriorityDate   time.Time `json:"priority_date"`
-	PriorityCountry string   `json:"priority_country"`
-}
-
-// PatentDate encapsulates important lifecycle dates.
+// PatentDate encapsulates critical patent dates.
 type PatentDate struct {
 	FilingDate      *time.Time `json:"filing_date"`
-	PublicationDate *time.Time `json:"publication_date"`
-	GrantDate       *time.Time `json:"grant_date"`
-	ExpiryDate      *time.Time `json:"expiry_date"`
-	PriorityDate    *time.Time `json:"priority_date"`
+	PublicationDate *time.Time `json:"publication_date,omitempty"`
+	GrantDate       *time.Time `json:"grant_date,omitempty"`
+	ExpiryDate      *time.Time `json:"expiry_date,omitempty"`
+	PriorityDate    *time.Time `json:"priority_date,omitempty"`
 }
 
-func (d PatentDate) RemainingLifeYears() float64 {
+func (d *PatentDate) RemainingLifeYears() float64 {
 	if d.ExpiryDate == nil {
 		return 0
 	}
@@ -124,74 +143,89 @@ func (d PatentDate) RemainingLifeYears() float64 {
 		return 0
 	}
 	duration := d.ExpiryDate.Sub(now)
-	return duration.Hours() / (24 * 365.25)
+	years := duration.Hours() / (24 * 365.25)
+	return float64(int(years*100)) / 100 // Round to 2 decimal places
 }
 
-func (d PatentDate) Validate() error {
+func (d *PatentDate) Validate() error {
 	if d.FilingDate == nil {
-		return errors.InvalidParam("filing date is required")
+		return errors.NewValidation("filing date is required")
+	}
+	if d.PublicationDate != nil && d.PublicationDate.Before(*d.FilingDate) {
+		return errors.NewValidation("publication date cannot be before filing date")
+	}
+	if d.GrantDate != nil {
+		if d.PublicationDate != nil && d.GrantDate.Before(*d.PublicationDate) {
+			return errors.NewValidation("grant date cannot be before publication date")
+		}
+		if d.GrantDate.Before(*d.FilingDate) {
+			return errors.NewValidation("grant date cannot be before filing date")
+		}
+	}
+	if d.ExpiryDate != nil {
+		if d.GrantDate != nil && d.ExpiryDate.Before(*d.GrantDate) {
+			return errors.NewValidation("expiry date cannot be before grant date")
+		}
+		if d.ExpiryDate.Before(*d.FilingDate) {
+			return errors.NewValidation("expiry date cannot be before filing date")
+		}
 	}
 	return nil
 }
 
-// Patent is the aggregate root for a patent.
+// Patent is the aggregate root entity for a patent.
 type Patent struct {
-	ID              uuid.UUID           `json:"id"`
-	PatentNumber    string              `json:"patent_number"`
-	Title           string              `json:"title"`
-	TitleEn         string              `json:"title_en,omitempty"`
-	Abstract        string              `json:"abstract"`
-	AbstractEn      string              `json:"abstract_en,omitempty"`
-	Type            string              `json:"patent_type"`
-	Status          PatentStatus        `json:"status"`
-	Office          PatentOffice        `json:"office"`
-	Dates           PatentDate          `json:"dates"`
-	FilingDate      *time.Time          `json:"filing_date,omitempty"` // Kept for DB compat
-	PublicationDate *time.Time          `json:"publication_date,omitempty"`
-	GrantDate       *time.Time          `json:"grant_date,omitempty"`
-	ExpiryDate      *time.Time          `json:"expiry_date,omitempty"`
-	PriorityDate    *time.Time          `json:"priority_date,omitempty"`
-	AssigneeID      *uuid.UUID          `json:"assignee_id,omitempty"`
-	AssigneeName    string              `json:"assignee_name,omitempty"`
-	Jurisdiction    string              `json:"jurisdiction"`
-	IPCCodes        []string            `json:"ipc_codes"`
-	CPCCodes        []string            `json:"cpc_codes"`
-	KeyIPTechCodes  []string            `json:"keyip_tech_codes"`
-	FamilyID        string              `json:"family_id,omitempty"`
-	ApplicationNumber string            `json:"application_number,omitempty"`
-	FullTextHash    string              `json:"full_text_hash,omitempty"`
-	Source          string              `json:"source"`
-	RawData         map[string]any      `json:"raw_data,omitempty"`
-	Metadata        map[string]any      `json:"metadata,omitempty"`
-	Claims          []*Claim            `json:"claims,omitempty"`
-	Inventors       []*Inventor         `json:"inventors,omitempty"`
-	PriorityClaims  []*PriorityClaim    `json:"priority_claims,omitempty"`
-	CreatedAt       time.Time           `json:"created_at"`
-	UpdatedAt       time.Time           `json:"updated_at"`
-	DeletedAt       *time.Time          `json:"deleted_at,omitempty"`
-	Version         int                 `json:"version"`
+	ID                string              `json:"id"`
+	PatentNumber      string              `json:"patent_number"`
+	Title             string              `json:"title"`
+	Abstract          string              `json:"abstract"`
+	Office            PatentOffice        `json:"office"`
+	Status            PatentStatus        `json:"status"`
+	Dates             PatentDate          `json:"dates"`
+	Applicants        []Applicant         `json:"applicants"`
+	Inventors         []Inventor          `json:"inventors"`
+	IPCCodes          []IPCClassification `json:"ipc_codes"`
+	Claims            ClaimSet            `json:"claims,omitempty"`
+	MoleculeIDs       []string            `json:"molecule_ids,omitempty"`
+	FamilyID          string              `json:"family_id,omitempty"`
+	PriorityNumbers   []string            `json:"priority_numbers,omitempty"`
+	CitedBy           []string            `json:"cited_by,omitempty"`
+	Cites             []string            `json:"cites,omitempty"`
+	FullText          string              `json:"full_text,omitempty"`
+	Language          string              `json:"language"`
+	Metadata          map[string]interface{} `json:"metadata,omitempty"`
+	CreatedAt         time.Time           `json:"created_at"`
+	UpdatedAt         time.Time           `json:"updated_at"`
+	Version           int                 `json:"version"`
 
-	domainEvents []common.DomainEvent
-	CitedBy []string // Added for service
-	Cites []string // Added for service
-	MoleculeIDs []string // Added for service
+	// Deprecated fields that might be used by existing consumers until refactored
+	AssigneeName      string              `json:"assignee_name,omitempty"`
+	Jurisdiction      string              `json:"jurisdiction,omitempty"`
+	ApplicationNumber string              `json:"application_number,omitempty"`
+	CPCCodes          []string            `json:"cpc_codes,omitempty"`
+
+	// Domain events
+	domainEvents []DomainEvent
 }
 
-// NewPatent creates a new patent instance.
+// NewPatent creates a new Patent entity.
 func NewPatent(patentNumber, title string, office PatentOffice, filingDate time.Time) (*Patent, error) {
 	if patentNumber == "" {
-		return nil, errors.InvalidParam("patent number cannot be empty")
+		return nil, errors.NewValidation("patent number cannot be empty")
 	}
 	if title == "" {
-		return nil, errors.InvalidParam("title cannot be empty")
+		return nil, errors.NewValidation("title cannot be empty")
+	}
+	if len(title) > 1000 {
+		return nil, errors.NewValidation("title too long")
 	}
 	if !office.IsValid() {
-		return nil, errors.InvalidParam("invalid office")
+		return nil, errors.NewValidation("invalid patent office")
 	}
 
 	now := time.Now().UTC()
-	return &Patent{
-		ID:           uuid.New(),
+	p := &Patent{
+		ID:           uuid.New().String(),
 		PatentNumber: patentNumber,
 		Title:        title,
 		Office:       office,
@@ -199,276 +233,254 @@ func NewPatent(patentNumber, title string, office PatentOffice, filingDate time.
 		Dates: PatentDate{
 			FilingDate: &filingDate,
 		},
-		CreatedAt: now,
-		UpdatedAt: now,
-		Version:   1,
-	}, nil
+		Metadata:     make(map[string]interface{}),
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		Version:      1,
+		Jurisdiction: string(office),
+		domainEvents: make([]DomainEvent, 0),
+	}
+	// Note: Creation event is typically raised by service after saving, or here if using pure DDD.
+	// The service.go spec says: "CreatePatent... publishes PatentCreatedEvent".
+	// So we don't need to add it here, or we can.
+	// But usually constructor returns entity, service saves it and publishes event.
+	// The spec for `NewPatent` doesn't mention adding event.
+	return p, nil
 }
 
+// Validate checks the consistency of the patent aggregate.
 func (p *Patent) Validate() error {
 	if p.PatentNumber == "" {
-		return errors.InvalidParam("patent number cannot be empty")
+		return errors.NewValidation("patent number cannot be empty")
+	}
+	if p.Title == "" {
+		return errors.NewValidation("title cannot be empty")
+	}
+	if !p.Office.IsValid() {
+		return errors.NewValidation("invalid patent office")
+	}
+	if !p.Status.IsValid() {
+		return errors.NewValidation("invalid patent status")
+	}
+	if err := p.Dates.Validate(); err != nil {
+		return err
+	}
+	if len(p.Applicants) == 0 {
+		return errors.NewValidation("at least one applicant required")
+	}
+	if len(p.Inventors) == 0 {
+		return errors.NewValidation("at least one inventor required")
+	}
+	if len(p.Claims) > 0 {
+		if err := p.Claims.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, ipc := range p.IPCCodes {
+		if err := ipc.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// Publish transitions the patent from Filed to Published.
+// Domain Events methods
+
+func (p *Patent) DomainEvents() []DomainEvent {
+	return p.domainEvents
+}
+
+func (p *Patent) ClearEvents() {
+	p.domainEvents = []DomainEvent{}
+}
+
+func (p *Patent) addEvent(event DomainEvent) {
+	p.domainEvents = append(p.domainEvents, event)
+}
+
+// State transition methods
+
 func (p *Patent) Publish(publicationDate time.Time) error {
 	if p.Status != PatentStatusFiled {
-		return errors.InvalidParam(fmt.Sprintf("cannot publish from status %s", p.Status))
+		return errors.NewValidation("can only publish from Filed status")
 	}
 	p.Status = PatentStatusPublished
 	p.Dates.PublicationDate = &publicationDate
-	p.touch()
+	p.updateTimestamp()
+	p.addEvent(NewPatentPublishedEvent(p))
 	return nil
 }
 
-// EnterExamination transitions the patent from Published to UnderExamination.
 func (p *Patent) EnterExamination() error {
 	if p.Status != PatentStatusPublished {
-		return errors.InvalidParam(fmt.Sprintf("cannot enter examination from status %s", p.Status))
+		return errors.NewValidation("can only enter examination from Published status")
 	}
 	p.Status = PatentStatusUnderExamination
-	p.touch()
+	p.updateTimestamp()
+	p.addEvent(NewPatentExaminationStartedEvent(p))
 	return nil
 }
 
-// Grant transitions the patent from UnderExamination to Granted.
 func (p *Patent) Grant(grantDate, expiryDate time.Time) error {
 	if p.Status != PatentStatusUnderExamination {
-		return errors.InvalidParam(fmt.Sprintf("cannot grant from status %s", p.Status))
+		return errors.NewValidation("can only grant from UnderExamination status")
 	}
 	p.Status = PatentStatusGranted
 	p.Dates.GrantDate = &grantDate
 	p.Dates.ExpiryDate = &expiryDate
-	p.touch()
+	p.updateTimestamp()
+	p.addEvent(NewPatentGrantedEvent(p))
 	return nil
 }
 
-// Reject transitions the patent from UnderExamination to Rejected.
 func (p *Patent) Reject() error {
 	if p.Status != PatentStatusUnderExamination {
-		return errors.InvalidParam(fmt.Sprintf("cannot reject from status %s", p.Status))
+		return errors.NewValidation("can only reject from UnderExamination status")
 	}
 	p.Status = PatentStatusRejected
-	p.touch()
+	p.updateTimestamp()
+	p.addEvent(NewPatentRejectedEvent(p, "Rejected during examination"))
 	return nil
 }
 
-// Withdraw transitions the patent to Withdrawn.
 func (p *Patent) Withdraw() error {
-	if p.Status == PatentStatusGranted {
-		return errors.InvalidParam(fmt.Sprintf("cannot withdraw from status %s", p.Status))
+	if p.Status.IsTerminal() || p.Status == PatentStatusGranted {
+		return errors.NewValidation("cannot withdraw from current status")
 	}
+	prevStatus := p.Status
 	p.Status = PatentStatusWithdrawn
-	p.touch()
+	p.updateTimestamp()
+	p.addEvent(NewPatentWithdrawnEvent(p, prevStatus))
 	return nil
 }
 
-// Expire transitions the patent from Granted to Expired.
 func (p *Patent) Expire() error {
 	if p.Status != PatentStatusGranted {
-		return errors.InvalidParam(fmt.Sprintf("cannot expire from status %s", p.Status))
+		return errors.NewValidation("can only expire from Granted status")
 	}
 	p.Status = PatentStatusExpired
-	p.touch()
+	p.updateTimestamp()
+	p.addEvent(NewPatentExpiredEvent(p))
 	return nil
 }
 
-// Invalidate transitions the patent from Granted to Invalidated.
 func (p *Patent) Invalidate() error {
 	if p.Status != PatentStatusGranted {
-		return errors.InvalidParam(fmt.Sprintf("cannot invalidate from status %s", p.Status))
+		return errors.NewValidation("can only invalidate from Granted status")
 	}
 	p.Status = PatentStatusInvalidated
-	p.touch()
+	p.updateTimestamp()
+	p.addEvent(NewPatentInvalidatedEvent(p, "Invalidated by legal process"))
 	return nil
 }
 
-// Lapse transitions the patent from Granted to Lapsed.
 func (p *Patent) Lapse() error {
 	if p.Status != PatentStatusGranted {
-		return errors.InvalidParam(fmt.Sprintf("cannot lapse from status %s", p.Status))
+		return errors.NewValidation("can only lapse from Granted status")
 	}
 	p.Status = PatentStatusLapsed
-	p.touch()
+	p.updateTimestamp()
+	p.addEvent(NewPatentLapsedEvent(p))
 	return nil
 }
 
-func (p *Patent) AddMolecule(moleculeID string) error {
-	p.MoleculeIDs = append(p.MoleculeIDs, moleculeID)
-	p.touch()
-	return nil
-}
-
-func (p *Patent) RemoveMolecule(moleculeID string) error {
-	// simplified
-	return nil
-}
-
-func (p *Patent) AddCitation(patentNumber string) error {
-	p.Cites = append(p.Cites, patentNumber)
-	p.touch()
-	return nil
-}
-
-func (p *Patent) AddCitedBy(patentNumber string) error {
-	p.CitedBy = append(p.CitedBy, patentNumber)
-	p.touch()
-	return nil
-}
-
-func (p *Patent) SetClaims(claims []*Claim) error {
-	p.Claims = claims
-	p.touch()
-	return nil
-}
-
-func (p *Patent) touch() {
+func (p *Patent) updateTimestamp() {
 	p.UpdatedAt = time.Now().UTC()
 	p.Version++
 }
 
-// DomainEvents returns the list of uncommitted domain events.
-func (p *Patent) DomainEvents() []common.DomainEvent {
-	return p.domainEvents
+// Association methods
+
+func (p *Patent) AddMolecule(moleculeID string) error {
+	if moleculeID == "" {
+		return errors.NewValidation("molecule ID cannot be empty")
+	}
+	for _, id := range p.MoleculeIDs {
+		if id == moleculeID {
+			return errors.NewValidation("duplicate molecule ID")
+		}
+	}
+	p.MoleculeIDs = append(p.MoleculeIDs, moleculeID)
+	p.updateTimestamp()
+	p.addEvent(NewPatentMoleculeLinkedEvent(p, moleculeID))
+	return nil
 }
 
-// ClearEvents clears the domain events collector.
-func (p *Patent) ClearEvents() {
-	p.domainEvents = nil
+func (p *Patent) RemoveMolecule(moleculeID string) error {
+	for i, id := range p.MoleculeIDs {
+		if id == moleculeID {
+			p.MoleculeIDs = append(p.MoleculeIDs[:i], p.MoleculeIDs[i+1:]...)
+			p.updateTimestamp()
+			p.addEvent(NewPatentMoleculeUnlinkedEvent(p, moleculeID))
+			return nil
+		}
+	}
+	return errors.NewValidation("molecule ID not found")
 }
 
-func (p *Patent) addEvent(event common.DomainEvent) {
-	p.domainEvents = append(p.domainEvents, event)
+func (p *Patent) AddCitation(patentNumber string) error {
+	for _, n := range p.Cites {
+		if n == patentNumber {
+			return errors.NewValidation("duplicate citation")
+		}
+	}
+	p.Cites = append(p.Cites, patentNumber)
+	p.updateTimestamp()
+	p.addEvent(NewPatentCitationAddedEvent(p, patentNumber, "forward"))
+	return nil
 }
 
-// SearchQuery represents criteria for searching patents.
-type SearchQuery struct {
-	Keyword        string
-	Status         *PatentStatus
-	PatentType     string
-	Jurisdiction   string
-	FilingDateFrom *time.Time
-	FilingDateTo   *time.Time
-	AssigneeID     *uuid.UUID
-	FamilyID       string
-	IPCCode        string
-	Limit          int
-	Offset         int
-	SortBy         string
+func (p *Patent) AddCitedBy(patentNumber string) error {
+	for _, n := range p.CitedBy {
+		if n == patentNumber {
+			return errors.NewValidation("duplicate cited by")
+		}
+	}
+	p.CitedBy = append(p.CitedBy, patentNumber)
+	p.updateTimestamp()
+	p.addEvent(NewPatentCitationAddedEvent(p, patentNumber, "backward"))
+	return nil
 }
 
-// SearchResult contains search hits.
-type SearchResult struct {
-	Items      []*Patent
-	TotalCount int64
-	Facets     map[string]map[string]int64
+func (p *Patent) SetClaims(claims ClaimSet) error {
+	if err := claims.Validate(); err != nil {
+		return err
+	}
+	p.Claims = claims
+	p.updateTimestamp()
+	p.addEvent(NewPatentClaimsUpdatedEvent(p))
+	return nil
 }
 
-// PatentSearchCriteria (alias for SearchQuery to fix service.go error if needed, or just rename in service.go)
-type PatentSearchCriteria = SearchQuery
-type PatentSearchResult = SearchResult
+// Query methods
 
-// ClaimCount returns the total number of claims.
+func (p *Patent) IsActive() bool {
+	return p.Status.IsActive()
+}
+
+func (p *Patent) IsGranted() bool {
+	return p.Status == PatentStatusGranted
+}
+
+func (p *Patent) RemainingLife() float64 {
+	return p.Dates.RemainingLifeYears()
+}
+
+func (p *Patent) HasMolecule(moleculeID string) bool {
+	for _, id := range p.MoleculeIDs {
+		if id == moleculeID {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *Patent) ClaimCount() int {
 	return len(p.Claims)
 }
 
-// GetPrimaryTechDomain returns the primary technology domain for the patent.
-func (p *Patent) GetPrimaryTechDomain() string {
-	if len(p.KeyIPTechCodes) > 0 {
-		return p.KeyIPTechCodes[0]
-	}
-	if len(p.IPCCodes) > 0 {
-		return p.IPCCodes[0]
-	}
-	return ""
-}
-
-// GetValueScore returns the value score from metadata, or 0 if not available.
-func (p *Patent) GetValueScore() float64 {
-	if p.Metadata != nil {
-		if score, ok := p.Metadata["value_score"].(float64); ok {
-			return score
-		}
-	}
-	return 0.0
-}
-
-// GetFilingDate returns the filing date of the patent.
-func (p *Patent) GetFilingDate() *time.Time {
-	if p.Dates.FilingDate != nil {
-		return p.Dates.FilingDate
-	}
-	return p.FilingDate
-}
-
-// GetLegalStatus returns the status as a string.
-func (p *Patent) GetLegalStatus() string {
-	return p.Status.String()
-}
-
-// GetAssignee returns the assignee name.
-func (p *Patent) GetAssignee() string {
-	return p.AssigneeName
-}
-
-// GetMoleculeIDs returns the list of associated molecule IDs.
-func (p *Patent) GetMoleculeIDs() []string {
-	return p.MoleculeIDs
-}
-
-// GetID returns the patent ID as a string.
-func (p *Patent) GetID() string {
-	return p.ID.String()
-}
-
-// GetPatentNumber returns the patent number.
-func (p *Patent) GetPatentNumber() string {
-	return p.PatentNumber
-}
-
-// AnalyzeClaims builds a ClaimTree structure from the patent's claims.
-func (p *Patent) AnalyzeClaims() *ClaimTree {
-	if len(p.Claims) == 0 {
-		return &ClaimTree{
-			Roots:    []*ClaimNode{},
-			AllNodes: []*ClaimNode{},
-		}
-	}
-
-	// Build a map of claim number to node
-	nodeMap := make(map[int]*ClaimNode)
-	allNodes := make([]*ClaimNode, 0, len(p.Claims))
-
-	for _, claim := range p.Claims {
-		node := &ClaimNode{
-			Claim:    claim,
-			Children: []*ClaimNode{},
-		}
-		nodeMap[claim.Number] = node
-		allNodes = append(allNodes, node)
-	}
-
-	// Build parent-child relationships
-	roots := make([]*ClaimNode, 0)
-	for _, node := range allNodes {
-		if node.Claim.Type == ClaimTypeIndependent || len(node.Claim.DependsOn) == 0 {
-			roots = append(roots, node)
-		} else {
-			for _, depNum := range node.Claim.DependsOn {
-				if parent, ok := nodeMap[depNum]; ok {
-					parent.Children = append(parent.Children, node)
-				}
-			}
-		}
-	}
-
-	return &ClaimTree{
-		Roots:    roots,
-		AllNodes: allNodes,
-	}
+func (p *Patent) IndependentClaimCount() int {
+	return len(p.Claims.IndependentClaims())
 }
 
 //Personal.AI order the ending

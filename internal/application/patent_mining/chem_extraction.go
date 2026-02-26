@@ -397,13 +397,21 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 
 		// Associate molecule with patent if patent_id is provided.
 		if req.PatentID != "" && entity.MoleculeID != "" {
-			if assocErr := s.patentRepo.AssociateMolecule(ctx, req.PatentID, entity.MoleculeID); assocErr != nil {
-				s.logger.Warn("failed to associate molecule with patent",
+			pat, getErr := s.patentRepo.FindByID(ctx, req.PatentID)
+			if getErr == nil && pat != nil {
+				if addErr := pat.AddMolecule(entity.MoleculeID); addErr == nil {
+					if saveErr := s.patentRepo.Save(ctx, pat); saveErr != nil {
+						s.logger.Warn("failed to save patent association",
+							logging.String("patent_id", req.PatentID),
+							logging.Error(saveErr),
+						)
+					}
+				}
+			} else {
+				s.logger.Warn("failed to find patent for association",
 					logging.String("patent_id", req.PatentID),
-					logging.String("molecule_id", entity.MoleculeID),
-					logging.Error(assocErr),
+					logging.Error(getErr),
 				)
-				// Non-fatal: extraction still succeeds.
 			}
 		}
 

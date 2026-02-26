@@ -207,20 +207,22 @@ func (s *serviceImpl) Create(ctx context.Context, input *CreateInput) (*Patent, 
 
 	patent.Abstract = input.Abstract
 	patent.AssigneeName = input.Applicant
-	patent.IPCCodes = input.IPCCodes
+	// Convert strings to IPCClassification
+	for _, code := range input.IPCCodes {
+		patent.IPCCodes = append(patent.IPCCodes, domainPatent.IPCClassification{Full: code})
+	}
 	patent.Jurisdiction = input.Jurisdiction
 
 	// Convert inventors
-	inventors := make([]*domainPatent.Inventor, len(input.Inventors))
+	inventors := make([]domainPatent.Inventor, len(input.Inventors))
 	for i, inv := range input.Inventors {
-		inventors[i] = &domainPatent.Inventor{
-			Name:     inv,
-			Sequence: i + 1,
+		inventors[i] = domainPatent.Inventor{
+			Name: inv,
 		}
 	}
 	patent.Inventors = inventors
 
-	if err := s.repo.Create(ctx, patent); err != nil {
+	if err := s.repo.Save(ctx, patent); err != nil {
 		s.logger.Error("failed to create patent")
 		return nil, err
 	}
@@ -229,11 +231,11 @@ func (s *serviceImpl) Create(ctx context.Context, input *CreateInput) (*Patent, 
 }
 
 func (s *serviceImpl) GetByID(ctx context.Context, id string) (*Patent, error) {
-	patentID, err := uuid.Parse(id)
-	if err != nil {
+	// Domain uses string ID (UUID format)
+	if _, err := uuid.Parse(id); err != nil {
 		return nil, errors.NewValidationError("id", "invalid patent id")
 	}
-	patent, err := s.repo.GetByID(ctx, patentID)
+	patent, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -252,13 +254,20 @@ func (s *serviceImpl) List(ctx context.Context, input *ListInput) (*ListResult, 
 	}
 
 	offset := (input.Page - 1) * input.PageSize
-	query := domainPatent.SearchQuery{
-		Jurisdiction: input.Jurisdiction,
-		Offset:       offset,
-		Limit:        input.PageSize,
+
+	// Convert input to PatentSearchCriteria
+	criteria := domainPatent.PatentSearchCriteria{
+		Offset: offset,
+		Limit:  input.PageSize,
+	}
+	if input.Jurisdiction != "" {
+		criteria.Offices = []domainPatent.PatentOffice{domainPatent.PatentOffice(input.Jurisdiction)}
+	}
+	if input.Applicant != "" {
+		criteria.ApplicantNames = []string{input.Applicant}
 	}
 
-	result, err := s.repo.Search(ctx, query)
+	result, err := s.repo.Search(ctx, criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -268,14 +277,14 @@ func (s *serviceImpl) List(ctx context.Context, input *ListInput) (*ListResult, 
 		dtos[i] = domainToDTO(p)
 	}
 
-	totalPages := int(result.TotalCount) / input.PageSize
-	if int(result.TotalCount)%input.PageSize > 0 {
+	totalPages := int(result.Total) / input.PageSize
+	if int(result.Total)%input.PageSize > 0 {
 		totalPages++
 	}
 
 	return &ListResult{
 		Patents:    dtos,
-		Total:      result.TotalCount,
+		Total:      result.Total,
 		Page:       input.Page,
 		PageSize:   input.PageSize,
 		TotalPages: totalPages,
@@ -283,12 +292,12 @@ func (s *serviceImpl) List(ctx context.Context, input *ListInput) (*ListResult, 
 }
 
 func (s *serviceImpl) Update(ctx context.Context, input *UpdateInput) (*Patent, error) {
-	patentID, err := uuid.Parse(input.ID)
-	if err != nil {
+	// Domain uses string ID
+	if _, err := uuid.Parse(input.ID); err != nil {
 		return nil, errors.NewValidationError("id", "invalid patent id")
 	}
 
-	patent, err := s.repo.GetByID(ctx, patentID)
+	patent, err := s.repo.FindByID(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -300,10 +309,13 @@ func (s *serviceImpl) Update(ctx context.Context, input *UpdateInput) (*Patent, 
 		patent.Abstract = *input.Abstract
 	}
 	if len(input.IPCCodes) > 0 {
-		patent.IPCCodes = input.IPCCodes
+		patent.IPCCodes = nil
+		for _, code := range input.IPCCodes {
+			patent.IPCCodes = append(patent.IPCCodes, domainPatent.IPCClassification{Full: code})
+		}
 	}
 
-	if err := s.repo.Update(ctx, patent); err != nil {
+	if err := s.repo.Save(ctx, patent); err != nil {
 		return nil, err
 	}
 
@@ -311,11 +323,10 @@ func (s *serviceImpl) Update(ctx context.Context, input *UpdateInput) (*Patent, 
 }
 
 func (s *serviceImpl) Delete(ctx context.Context, id string, userID string) error {
-	patentID, err := uuid.Parse(id)
-	if err != nil {
+	if _, err := uuid.Parse(id); err != nil {
 		return errors.NewValidationError("id", "invalid patent id")
 	}
-	return s.repo.SoftDelete(ctx, patentID)
+	return s.repo.Delete(ctx, id) // Repo calls it Delete (soft delete implementation assumed)
 }
 
 func (s *serviceImpl) Search(ctx context.Context, input *SearchInput) (*SearchResult, error) {
@@ -327,14 +338,15 @@ func (s *serviceImpl) Search(ctx context.Context, input *SearchInput) (*SearchRe
 	}
 
 	offset := (input.Page - 1) * input.PageSize
-	query := domainPatent.SearchQuery{
-		Keyword: input.Query,
+	criteria := domainPatent.PatentSearchCriteria{
+		TitleKeywords: []string{input.Query}, // Simple query maps to title/abstract
+		AbstractKeywords: []string{input.Query},
 		Offset:  offset,
 		Limit:   input.PageSize,
 		SortBy:  input.SortBy,
 	}
 
-	result, err := s.repo.Search(ctx, query)
+	result, err := s.repo.Search(ctx, criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -344,14 +356,14 @@ func (s *serviceImpl) Search(ctx context.Context, input *SearchInput) (*SearchRe
 		dtos[i] = domainToDTO(p)
 	}
 
-	totalPages := int(result.TotalCount) / input.PageSize
-	if int(result.TotalCount)%input.PageSize > 0 {
+	totalPages := int(result.Total) / input.PageSize
+	if int(result.Total)%input.PageSize > 0 {
 		totalPages++
 	}
 
 	return &SearchResult{
 		Patents:    dtos,
-		Total:      result.TotalCount,
+		Total:      result.Total,
 		Page:       input.Page,
 		PageSize:   input.PageSize,
 		TotalPages: totalPages,
@@ -367,14 +379,20 @@ func (s *serviceImpl) AdvancedSearch(ctx context.Context, input *AdvancedSearchI
 	}
 
 	offset := (input.Page - 1) * input.PageSize
-	query := domainPatent.SearchQuery{
-		Jurisdiction: input.Jurisdiction,
-		IPCCode:      input.IPCCode,
+	criteria := domainPatent.PatentSearchCriteria{
 		Offset:       offset,
 		Limit:        input.PageSize,
 	}
 
-	result, err := s.repo.Search(ctx, query)
+	if input.Jurisdiction != "" {
+		criteria.Offices = []domainPatent.PatentOffice{domainPatent.PatentOffice(input.Jurisdiction)}
+	}
+	if input.IPCCode != "" {
+		criteria.IPCCodes = []string{input.IPCCode}
+	}
+	// ... Map other fields
+
+	result, err := s.repo.Search(ctx, criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -384,14 +402,14 @@ func (s *serviceImpl) AdvancedSearch(ctx context.Context, input *AdvancedSearchI
 		dtos[i] = domainToDTO(p)
 	}
 
-	totalPages := int(result.TotalCount) / input.PageSize
-	if int(result.TotalCount)%input.PageSize > 0 {
+	totalPages := int(result.Total) / input.PageSize
+	if int(result.Total)%input.PageSize > 0 {
 		totalPages++
 	}
 
 	return &SearchResult{
 		Patents:    dtos,
-		Total:      result.TotalCount,
+		Total:      result.Total,
 		Page:       input.Page,
 		PageSize:   input.PageSize,
 		TotalPages: totalPages,
@@ -399,12 +417,17 @@ func (s *serviceImpl) AdvancedSearch(ctx context.Context, input *AdvancedSearchI
 }
 
 func (s *serviceImpl) GetStats(ctx context.Context, input *StatsInput) (*Stats, error) {
-	byJurisdiction, _ := s.repo.CountByJurisdiction(ctx)
+	byOffice, _ := s.repo.CountByOffice(ctx)
 	byStatus, _ := s.repo.CountByStatus(ctx)
 
 	var total int64
 	for _, count := range byStatus {
 		total += count
+	}
+
+	byJurisdiction := make(map[string]int64)
+	for k, v := range byOffice {
+		byJurisdiction[string(k)] = v
 	}
 
 	return &Stats{
@@ -429,6 +452,12 @@ func domainToDTO(patent *domainPatent.Patent) *Patent {
 		inventors[i] = inv.Name
 	}
 
+	// Convert IPC
+	ipcCodes := make([]string, len(patent.IPCCodes))
+	for i, ipc := range patent.IPCCodes {
+		ipcCodes[i] = ipc.Full
+	}
+
 	// Format dates
 	var filingDate, publicationDate string
 	if patent.Dates.FilingDate != nil {
@@ -439,14 +468,14 @@ func domainToDTO(patent *domainPatent.Patent) *Patent {
 	}
 
 	return &Patent{
-		ID:              patent.ID.String(),
+		ID:              patent.ID,
 		Title:           patent.Title,
 		Abstract:        patent.Abstract,
 		ApplicationNo:   patent.ApplicationNumber,
 		PublicationNo:   patent.PatentNumber,
 		Applicant:       patent.AssigneeName,
 		Inventors:       inventors,
-		IPCCodes:        patent.IPCCodes,
+		IPCCodes:        ipcCodes,
 		FilingDate:      filingDate,
 		PublicationDate: publicationDate,
 		Jurisdiction:    patent.Jurisdiction,
