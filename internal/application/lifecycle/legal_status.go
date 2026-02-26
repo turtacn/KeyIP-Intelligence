@@ -1251,4 +1251,7 @@ func (s *legalStatusServiceImpl) ReconcileStatus(ctx context.Context, patentID s
 
 var _ LegalStatusService = (*legalStatusServiceImpl)(nil)
 
+// Service is an alias for LegalStatusService for backward compatibility with apiserver.
+type Service = LegalStatusService
+
 //Personal.AI order the ending

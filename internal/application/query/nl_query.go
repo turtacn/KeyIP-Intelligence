@@ -723,4 +723,7 @@ Language: %s
 Task: Generate a concise, professional answer summarizing the data results to answer the user's question. Use lists if appropriate.`, question, string(resBytes), lang)
 }
 
+// Service is an alias for NLQueryService for backward compatibility with apiserver.
+type Service = NLQueryService
+
 //Personal.AI order the ending

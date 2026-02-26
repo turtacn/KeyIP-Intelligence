@@ -45,6 +45,16 @@ var (
 	BuildDate = "unknown"
 )
 
+// BuildInfo holds version information injected at build time.
+type BuildInfo struct {
+	Version   string
+	Commit    string
+	BuildDate string
+}
+
+// Command is an alias for cobra.Command for backward compatibility.
+type Command = cobra.Command
+
 // cliContextKey is the context key for CLIContext.
 type cliContextKey struct{}
 
@@ -122,7 +132,7 @@ func persistentPreRun(cmd *cobra.Command, opts *RootOptions) error {
 
 	apiClient, err := initClient(cfg, opts)
 	if err != nil {
-		logger.Warn("API client initialization failed, some commands may not work", "error", err)
+		logger.Warn("API client initialization failed, some commands may not work", logging.Err(err))
 	}
 
 	cliCtx := &CLIContext{
@@ -165,20 +175,29 @@ func initConfig(opts *RootOptions) (*config.Config, error) {
 
 	// No config file found; use defaults.
 	fmt.Fprintln(os.Stderr, "Warning: no config file found, using defaults")
-	return config.DefaultConfig(), nil
+	return config.NewDefaultConfig(), nil
 }
 
 // initLogger creates a logger configured for CLI usage (output to stderr).
 func initLogger(cfg *config.Config, opts *RootOptions) (logging.Logger, error) {
-	level := opts.LogLevel
-	if opts.Verbose && level == "info" {
-		level = "debug"
+	level := logging.LevelInfo
+	switch strings.ToLower(opts.LogLevel) {
+	case "debug":
+		level = logging.LevelDebug
+	case "warn":
+		level = logging.LevelWarn
+	case "error":
+		level = logging.LevelError
+	}
+	if opts.Verbose {
+		level = logging.LevelDebug
 	}
 
-	logCfg := logging.Config{
-		Level:  level,
-		Format: "text",
-		Output: "stderr",
+	logCfg := logging.LogConfig{
+		Level:            level,
+		Format:           "console",
+		OutputPaths:      []string{"stderr"},
+		ErrorOutputPaths: []string{"stderr"},
 	}
 
 	return logging.NewLogger(logCfg)
@@ -188,28 +207,27 @@ func initLogger(cfg *config.Config, opts *RootOptions) (logging.Logger, error) {
 func initClient(cfg *config.Config, opts *RootOptions) (*client.Client, error) {
 	addr := opts.ServerAddr
 	if addr == "" {
-		addr = cfg.Server.Address
+		// Use HTTP config from server settings
+		addr = fmt.Sprintf("http://%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
 	}
-	if addr == "" {
+	if addr == "" || addr == "http://:" {
 		addr = "http://localhost:8080"
 	}
 
-	return client.New(
-		client.WithBaseURL(addr),
-		client.WithTimeout(opts.Timeout),
-	)
+	// NewClient requires baseURL and apiKey; use empty apiKey for now (CLI may use token auth later)
+	return client.NewClient(addr, "", client.WithTimeout(opts.Timeout))
 }
 
 // GetCLIContext extracts CLIContext from a cobra command's context.
 func GetCLIContext(cmd *cobra.Command) (*CLIContext, error) {
 	ctx := cmd.Context()
 	if ctx == nil {
-		return nil, errors.NewValidationError("command context is nil")
+		return nil, errors.NewValidationError("context", "command context is nil")
 	}
 
 	cliCtx, ok := ctx.Value(cliContextKey{}).(*CLIContext)
 	if !ok || cliCtx == nil {
-		return nil, errors.NewValidationError("CLIContext not found in command context")
+		return nil, errors.NewValidationError("context", "CLIContext not found in command context")
 	}
 
 	return cliCtx, nil

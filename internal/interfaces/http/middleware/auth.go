@@ -278,5 +278,11 @@ func writeUnauthorized(w http.ResponseWriter, message string) {
 	w.Write([]byte(`{"error":{"code":"UNAUTHORIZED","message":"` + message + `"}}`))
 }
 
+// Handler returns the primary authentication middleware handler function.
+// This is an alias for Authenticate() for router compatibility.
+func (m *AuthMiddleware) Handler(next http.Handler) http.Handler {
+	return m.Authenticate()(next)
+}
+
 //Personal.AI order the ending
 

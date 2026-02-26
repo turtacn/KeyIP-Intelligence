@@ -338,4 +338,22 @@ func (c *MinIOClient) GeneratePresignedPutURL(ctx context.Context, bucketName, o
 	return u.String(), nil
 }
 
+// Type aliases for backward compatibility with apiserver/worker
+
+// Client is an alias for MinIOClient for backward compatibility.
+type Client = MinIOClient
+
+// DocumentRepository is an alias for ObjectStorageRepository for backward compatibility.
+type DocumentRepository = ObjectStorageRepository
+
+// NewDocumentRepository creates a new document repository with the given client.
+func NewDocumentRepository(client *MinIOClient, logger logging.Logger) ObjectStorageRepository {
+	return NewMinIORepository(client, logger)
+}
+
+// NewObjectStorageRepository is an alias for NewMinIORepository for backward compatibility.
+func NewObjectStorageRepository(client *MinIOClient, logger logging.Logger) ObjectStorageRepository {
+	return NewMinIORepository(client, logger)
+}
+
 //Personal.AI order the ending

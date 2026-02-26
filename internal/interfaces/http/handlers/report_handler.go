@@ -583,4 +583,41 @@ func writeReportAppError(w http.ResponseWriter, err error) {
 	}
 }
 
+// Router-compatible aliases for ReportHandler
+
+// List is an alias for ListReports.
+func (h *ReportHandler) List(w http.ResponseWriter, r *http.Request) {
+	h.ListReports(w, r)
+}
+
+// Get is an alias for GetReportStatus.
+func (h *ReportHandler) Get(w http.ResponseWriter, r *http.Request) {
+	h.GetReportStatus(w, r)
+}
+
+// Delete is an alias for DeleteReport.
+func (h *ReportHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	h.DeleteReport(w, r)
+}
+
+// Download is an alias for DownloadReport.
+func (h *ReportHandler) Download(w http.ResponseWriter, r *http.Request) {
+	h.DownloadReport(w, r)
+}
+
+// Generate handles report generation (alias for GenerateFTOReport).
+func (h *ReportHandler) Generate(w http.ResponseWriter, r *http.Request) {
+	h.GenerateFTOReport(w, r)
+}
+
+// ListTemplates handles template listing (placeholder).
+func (h *ReportHandler) ListTemplates(w http.ResponseWriter, r *http.Request) {
+	writeReportJSON(w, http.StatusNotImplemented, map[string]string{"message": "list templates not yet implemented"})
+}
+
+// GetTemplate handles template retrieval (placeholder).
+func (h *ReportHandler) GetTemplate(w http.ResponseWriter, r *http.Request) {
+	writeReportJSON(w, http.StatusNotImplemented, map[string]string{"message": "get template not yet implemented"})
+}
+
 //Personal.AI order the ending

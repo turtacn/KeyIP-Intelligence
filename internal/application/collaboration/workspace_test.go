@@ -705,11 +705,7 @@ func TestRemoveMember_Success(t *testing.T) {
 		},
 	}
 	svc := newTestWorkspaceAppService(nil, wsRepo, nil)
-	err := svc.RemoveMember(context.Background(), &RemoveMemberRequest{
-		WorkspaceID: "ws-1",
-		UserID:      "user-to-remove",
-		RemovedBy:   "admin-1",
-	})
+	err := svc.RemoveMember(context.Background(), "ws-1", "user-to-remove", "admin-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -722,21 +718,17 @@ func TestRemoveMember_CannotRemoveOwner(t *testing.T) {
 		},
 	}
 	svc := newTestWorkspaceAppService(nil, wsRepo, nil)
-	err := svc.RemoveMember(context.Background(), &RemoveMemberRequest{
-		WorkspaceID: "ws-1",
-		UserID:      "owner-1",
-		RemovedBy:   "admin-1",
-	})
+	err := svc.RemoveMember(context.Background(), "ws-1", "owner-1", "admin-1")
 	if err == nil {
 		t.Fatal("expected error when removing owner")
 	}
 }
 
-func TestRemoveMember_NilRequest(t *testing.T) {
+func TestRemoveMember_EmptyWorkspaceID(t *testing.T) {
 	svc := newTestWorkspaceAppService(nil, nil, nil)
-	err := svc.RemoveMember(context.Background(), nil)
+	err := svc.RemoveMember(context.Background(), "", "user-1", "admin-1")
 	if err == nil {
-		t.Fatal("expected error for nil request")
+		t.Fatal("expected error for empty workspace ID")
 	}
 }
 
@@ -747,11 +739,7 @@ func TestRemoveMember_WorkspaceNotFound(t *testing.T) {
 		},
 	}
 	svc := newTestWorkspaceAppService(nil, wsRepo, nil)
-	err := svc.RemoveMember(context.Background(), &RemoveMemberRequest{
-		WorkspaceID: "ws-missing",
-		UserID:      "user-1",
-		RemovedBy:   "admin-1",
-	})
+	err := svc.RemoveMember(context.Background(), "ws-missing", "user-1", "admin-1")
 	if err == nil {
 		t.Fatal("expected not found error")
 	}

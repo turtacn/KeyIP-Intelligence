@@ -288,4 +288,41 @@ func (h *MoleculeHandler) CalculateProperties(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, result)
 }
 
+// Router-compatible aliases for standard CRUD operations
+
+// List is an alias for ListMolecules.
+func (h *MoleculeHandler) List(w http.ResponseWriter, r *http.Request) {
+	h.ListMolecules(w, r)
+}
+
+// Create is an alias for CreateMolecule.
+func (h *MoleculeHandler) Create(w http.ResponseWriter, r *http.Request) {
+	h.CreateMolecule(w, r)
+}
+
+// Get is an alias for GetMolecule.
+func (h *MoleculeHandler) Get(w http.ResponseWriter, r *http.Request) {
+	h.GetMolecule(w, r)
+}
+
+// Update is an alias for UpdateMolecule.
+func (h *MoleculeHandler) Update(w http.ResponseWriter, r *http.Request) {
+	h.UpdateMolecule(w, r)
+}
+
+// Delete is an alias for DeleteMolecule.
+func (h *MoleculeHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	h.DeleteMolecule(w, r)
+}
+
+// SearchSimilar is an alias for SearchBySimilarity.
+func (h *MoleculeHandler) SearchSimilar(w http.ResponseWriter, r *http.Request) {
+	h.SearchBySimilarity(w, r)
+}
+
+// PredictProperties is an alias for CalculateProperties.
+func (h *MoleculeHandler) PredictProperties(w http.ResponseWriter, r *http.Request) {
+	h.CalculateProperties(w, r)
+}
+
 //Personal.AI order the ending

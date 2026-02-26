@@ -19,6 +19,7 @@
 package middleware
 
 import (
+	"context"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"net/http"
 	"net/http/httptest"
@@ -34,30 +35,34 @@ type captureLogger struct {
 	mock.Mock
 	lastLevel string
 	lastMsg   string
-	lastArgs  []interface{}
+	lastFields []logging.Field
 }
 
-func (l *captureLogger) Debug(msg string, keysAndValues ...interface{}) {
+func (l *captureLogger) Debug(msg string, fields ...logging.Field) {
 	l.lastLevel = "debug"
 	l.lastMsg = msg
-	l.lastArgs = keysAndValues
+	l.lastFields = fields
 }
-func (l *captureLogger) Info(msg string, keysAndValues ...interface{}) {
+func (l *captureLogger) Info(msg string, fields ...logging.Field) {
 	l.lastLevel = "info"
 	l.lastMsg = msg
-	l.lastArgs = keysAndValues
+	l.lastFields = fields
 }
-func (l *captureLogger) Warn(msg string, keysAndValues ...interface{}) {
+func (l *captureLogger) Warn(msg string, fields ...logging.Field) {
 	l.lastLevel = "warn"
 	l.lastMsg = msg
-	l.lastArgs = keysAndValues
+	l.lastFields = fields
 }
-func (l *captureLogger) Error(msg string, keysAndValues ...interface{}) {
+func (l *captureLogger) Error(msg string, fields ...logging.Field) {
 	l.lastLevel = "error"
 	l.lastMsg = msg
-	l.lastArgs = keysAndValues
+	l.lastFields = fields
 }
-func (l *captureLogger) With(keysAndValues ...interface{}) logging.Logger { return l }
+func (l *captureLogger) With(fields ...logging.Field) logging.Logger { return l }
+func (l *captureLogger) WithContext(ctx context.Context) logging.Logger { return l }
+func (l *captureLogger) WithError(err error) logging.Logger { return l }
+func (l *captureLogger) Fatal(msg string, fields ...logging.Field) { l.lastLevel = "fatal"; l.lastMsg = msg; l.lastFields = fields }
+func (l *captureLogger) Sync() error { return nil }
 
 func TestRequestLogging_BasicRequest(t *testing.T) {
 	logger := &captureLogger{}
@@ -78,11 +83,11 @@ func TestRequestLogging_BasicRequest(t *testing.T) {
 	assert.Contains(t, logger.lastMsg, "HTTP request completed")
 
 	// Verify fields contain expected keys
-	args := logger.lastArgs
+	args := logger.lastFields
 	argMap := argsToMap(args)
 	assert.Equal(t, "GET", argMap["method"])
 	assert.Equal(t, "/api/v1/patents", argMap["path"])
-	assert.Equal(t, 200, argMap["status"])
+	assert.Equal(t, int64(200), argMap["status"])
 	assert.Equal(t, "req-123", argMap["request_id"])
 }
 
@@ -99,8 +104,8 @@ func TestRequestLogging_StatusCapture(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/v1/patents", nil)
 	handler.ServeHTTP(w, r)
 
-	argMap := argsToMap(logger.lastArgs)
-	assert.Equal(t, 201, argMap["status"])
+	argMap := argsToMap(logger.lastFields)
+	assert.Equal(t, int64(201), argMap["status"])
 }
 
 func TestRequestLogging_BytesCapture(t *testing.T) {
@@ -117,7 +122,7 @@ func TestRequestLogging_BytesCapture(t *testing.T) {
 	r := httptest.NewRequest("GET", "/test", nil)
 	handler.ServeHTTP(w, r)
 
-	argMap := argsToMap(logger.lastArgs)
+	argMap := argsToMap(logger.lastFields)
 	assert.Equal(t, int64(len(body)), argMap["bytes"])
 }
 
@@ -205,7 +210,7 @@ func TestRequestLogging_RequestID(t *testing.T) {
 	r.Header.Set("X-Request-ID", "unique-req-456")
 	handler.ServeHTTP(w, r)
 
-	argMap := argsToMap(logger.lastArgs)
+	argMap := argsToMap(logger.lastFields)
 	assert.Equal(t, "unique-req-456", argMap["request_id"])
 }
 
@@ -253,12 +258,22 @@ func TestDefaultLoggingConfig(t *testing.T) {
 	assert.Equal(t, 1024, config.MaxBodyLogSize)
 }
 
-// argsToMap converts structured log key-value pairs to a map for easy assertion.
-func argsToMap(args []interface{}) map[string]interface{} {
+// argsToMap converts logging.Field slice to a map for easy assertion.
+// It extracts values from zap.Field based on their Type.
+func argsToMap(fields []logging.Field) map[string]interface{} {
 	m := make(map[string]interface{})
-	for i := 0; i+1 < len(args); i += 2 {
-		if key, ok := args[i].(string); ok {
-			m[key] = args[i+1]
+	for _, f := range fields {
+		// zapcore.Field stores values differently based on Type
+		// String types use String field, integers use Integer field, others use Interface
+		switch {
+		case f.String != "":
+			m[f.Key] = f.String
+		case f.Integer != 0:
+			m[f.Key] = f.Integer // keep as int64
+		case f.Interface != nil:
+			m[f.Key] = f.Interface
+		default:
+			m[f.Key] = f.String // fallback for empty strings
 		}
 	}
 	return m

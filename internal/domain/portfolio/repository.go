@@ -57,4 +57,7 @@ type PortfolioRepository interface {
 	WithTx(ctx context.Context, fn func(PortfolioRepository) error) error
 }
 
+// Repository is an alias for PortfolioRepository for backward compatibility with apiserver.
+type Repository = PortfolioRepository
+
 //Personal.AI order the ending

@@ -276,4 +276,21 @@ func writeTenantError(w http.ResponseWriter, statusCode int, code errors.ErrorCo
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
+// TenantMiddleware wraps tenant middleware for use with router configuration.
+type TenantMiddleware struct {
+	handler func(http.Handler) http.Handler
+}
+
+// NewTenantMiddlewareWrapper creates a new tenant middleware with the given config.
+func NewTenantMiddlewareWrapper(cfg TenantConfig, logger logging.Logger) *TenantMiddleware {
+	return &TenantMiddleware{
+		handler: NewTenantMiddleware(cfg, logger),
+	}
+}
+
+// Handler returns the middleware handler function.
+func (m *TenantMiddleware) Handler(next http.Handler) http.Handler {
+	return m.handler(next)
+}
+
 //Personal.AI order the ending

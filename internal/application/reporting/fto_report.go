@@ -609,4 +609,36 @@ func (s *ftoReportServiceImpl) DeleteReport(ctx context.Context, reportID string
 	s.logger.Info(ctx, "Deleted FTO report", "reportID", reportID)
 	return nil
 }
+// ============================================================================
+// FTO Quick Check Types (for gRPC services)
+// ============================================================================
+
+// FTOQuickCheckRequest represents a quick FTO check request.
+type FTOQuickCheckRequest struct {
+	TargetSmiles   string `json:"target_smiles"`
+	Jurisdiction   string `json:"jurisdiction"`
+	IncludeExpired bool   `json:"include_expired"`
+}
+
+// FTOQuickCheckResult represents the result of a quick FTO check.
+type FTOQuickCheckResult struct {
+	CanOperate       bool               `json:"can_operate"`
+	RiskLevel        string             `json:"risk_level"`
+	Confidence       float64            `json:"confidence"`
+	BlockingPatents  []*BlockingPatent  `json:"blocking_patents"`
+	Recommendation   string             `json:"recommendation"`
+	CheckedAt        time.Time          `json:"checked_at"`
+}
+
+// BlockingPatent represents a patent that may block operation.
+type BlockingPatent struct {
+	PatentNumber  string    `json:"patent_number"`
+	Title         string    `json:"title"`
+	RiskLevel     string    `json:"risk_level"`
+	Similarity    float64   `json:"similarity"`
+	ExpiryDate    time.Time `json:"expiry_date"`
+	LegalStatus   string    `json:"legal_status"`
+	MatchedClaims []int32   `json:"matched_claims"`
+}
+
 //Personal.AI order the ending

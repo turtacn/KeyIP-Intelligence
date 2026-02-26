@@ -231,12 +231,12 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	s.logger.Info("server starting",
-		"protocol", protocol,
-		"address", s.actualAddr,
-		"readTimeout", s.config.ReadTimeout.String(),
-		"writeTimeout", s.config.WriteTimeout.String(),
-		"idleTimeout", s.config.IdleTimeout.String(),
-		"shutdownTimeout", s.config.ShutdownTimeout.String(),
+		logging.String("protocol", protocol),
+		logging.String("address", s.actualAddr),
+		logging.String("readTimeout", s.config.ReadTimeout.String()),
+		logging.String("writeTimeout", s.config.WriteTimeout.String()),
+		logging.String("idleTimeout", s.config.IdleTimeout.String()),
+		logging.String("shutdownTimeout", s.config.ShutdownTimeout.String()),
 	)
 
 	// Channel to capture the serve error from the goroutine.
@@ -289,14 +289,14 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	defer cancel()
 
 	s.logger.Info("shutting down server",
-		"timeout", s.config.ShutdownTimeout.String(),
+		logging.String("timeout", s.config.ShutdownTimeout.String()),
 	)
 
 	err := s.httpServer.Shutdown(shutdownCtx)
 	s.started.Store(false)
 
 	if err != nil {
-		s.logger.Error("server shutdown error", "error", err)
+		s.logger.Error("server shutdown error", logging.String("error", err.Error()))
 		return fmt.Errorf("server shutdown: %w", err)
 	}
 

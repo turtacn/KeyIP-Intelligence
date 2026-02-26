@@ -698,4 +698,7 @@ type ReportResult struct {
 	Status      string    `json:"status"`
 }
 
+// Service is an alias for FTOReportService for backward compatibility with apiserver.
+type Service = FTOReportService
+
 //Personal.AI order the ending

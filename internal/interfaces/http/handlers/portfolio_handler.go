@@ -237,4 +237,56 @@ func (h *PortfolioHandler) GetAnalysis(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, analysis)
 }
 
+// Router-compatible aliases
+
+// List is an alias for ListPortfolios.
+func (h *PortfolioHandler) List(w http.ResponseWriter, r *http.Request) {
+	h.ListPortfolios(w, r)
+}
+
+// Create is an alias for CreatePortfolio.
+func (h *PortfolioHandler) Create(w http.ResponseWriter, r *http.Request) {
+	h.CreatePortfolio(w, r)
+}
+
+// Get is an alias for GetPortfolio.
+func (h *PortfolioHandler) Get(w http.ResponseWriter, r *http.Request) {
+	h.GetPortfolio(w, r)
+}
+
+// Update is an alias for UpdatePortfolio.
+func (h *PortfolioHandler) Update(w http.ResponseWriter, r *http.Request) {
+	h.UpdatePortfolio(w, r)
+}
+
+// Delete is an alias for DeletePortfolio.
+func (h *PortfolioHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	h.DeletePortfolio(w, r)
+}
+
+// GetValuation handles portfolio valuation retrieval (placeholder).
+func (h *PortfolioHandler) GetValuation(w http.ResponseWriter, r *http.Request) {
+	h.GetAnalysis(w, r)
+}
+
+// RunValuation triggers portfolio valuation (placeholder).
+func (h *PortfolioHandler) RunValuation(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "valuation not yet implemented"})
+}
+
+// GetGapAnalysis handles gap analysis retrieval (placeholder).
+func (h *PortfolioHandler) GetGapAnalysis(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "gap analysis not yet implemented"})
+}
+
+// RunGapAnalysis triggers gap analysis (placeholder).
+func (h *PortfolioHandler) RunGapAnalysis(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "gap analysis not yet implemented"})
+}
+
+// Optimize handles portfolio optimization (placeholder).
+func (h *PortfolioHandler) Optimize(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "optimization not yet implemented"})
+}
+
 //Personal.AI order the ending

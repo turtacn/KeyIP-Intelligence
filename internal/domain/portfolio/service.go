@@ -336,4 +336,9 @@ func (s *portfolioServiceImpl) GetOverlapAnalysis(ctx context.Context, portfolio
 	}, nil
 }
 
+// NewService creates a new PortfolioService with a logger (ignores logger for backward compatibility).
+func NewService(repo PortfolioRepository, logger interface{}) PortfolioService {
+	return NewPortfolioService(repo)
+}
+
 //Personal.AI order the ending

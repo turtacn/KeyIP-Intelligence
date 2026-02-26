@@ -90,4 +90,11 @@ func ApplyCollabOptions(opts ...CollaborationQueryOption) CollaborationQueryOpti
 	return options
 }
 
+// Repository is an aggregate repository for collaboration domain.
+// Used by apiserver for backward compatibility.
+type Repository struct {
+	Workspace WorkspaceRepository
+	Member    MemberRepository
+}
+
 //Personal.AI order the ending

@@ -13,7 +13,6 @@ import (
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
 // MockValuationService is a mock implementation of ValuationService
@@ -21,20 +20,20 @@ type MockValuationService struct {
 	mock.Mock
 }
 
-func (m *MockValuationService) Assess(ctx context.Context, req *portfolio.ValuationRequest) (*portfolio.ValuationResult, error) {
+func (m *MockValuationService) Assess(ctx context.Context, req *portfolio.ValuationRequest) (*portfolio.CLIValuationResult, error) {
 	args := m.Called(ctx, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*portfolio.ValuationResult), args.Error(1)
+	return args.Get(0).(*portfolio.CLIValuationResult), args.Error(1)
 }
 
-func (m *MockValuationService) AssessPortfolio(ctx context.Context, req *portfolio.PortfolioAssessRequest) (*portfolio.PortfolioAssessResult, error) {
+func (m *MockValuationService) AssessPortfolio(ctx context.Context, req *portfolio.PortfolioAssessRequest) (*portfolio.CLIPortfolioAssessResult, error) {
 	args := m.Called(ctx, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*portfolio.PortfolioAssessResult), args.Error(1)
+	return args.Get(0).(*portfolio.CLIPortfolioAssessResult), args.Error(1)
 }
 
 // MockLogger is a mock implementation of Logger
@@ -154,8 +153,8 @@ func TestIsValidOutputFormat(t *testing.T) {
 }
 
 func TestFormatTableOutput(t *testing.T) {
-	result := &portfolio.ValuationResult{
-		Items: []*patent.ValuationItem{
+	result := &portfolio.CLIValuationResult{
+		Items: []*portfolio.CLIValuationItem{
 			{
 				PatentNumber:    "CN115123456",
 				OverallScore:    85.5,
@@ -166,7 +165,7 @@ func TestFormatTableOutput(t *testing.T) {
 			},
 		},
 		AverageScore: 85.5,
-		HighRiskPatents: []*patent.HighRiskPatent{
+		HighRiskPatents: []*portfolio.HighRiskInfo{
 			{
 				PatentNumber: "CN115123456",
 				RiskReason:   "Expiring soon",
@@ -184,8 +183,8 @@ func TestFormatTableOutput(t *testing.T) {
 }
 
 func TestFormatCSVOutput(t *testing.T) {
-	result := &portfolio.ValuationResult{
-		Items: []*patent.ValuationItem{
+	result := &portfolio.CLIValuationResult{
+		Items: []*portfolio.CLIValuationItem{
 			{
 				PatentNumber:    "CN115123456",
 				OverallScore:    85.5,
@@ -252,13 +251,13 @@ func TestWriteOutput_File(t *testing.T) {
 func TestHasHighRiskItems(t *testing.T) {
 	tests := []struct {
 		name     string
-		result   *portfolio.ValuationResult
+		result   *portfolio.CLIValuationResult
 		expected bool
 	}{
 		{
 			name: "With high risk",
-			result: &portfolio.ValuationResult{
-				HighRiskPatents: []*patent.HighRiskPatent{
+			result: &portfolio.CLIValuationResult{
+				HighRiskPatents: []*portfolio.HighRiskInfo{
 					{PatentNumber: "CN115123456"},
 				},
 			},
@@ -266,8 +265,8 @@ func TestHasHighRiskItems(t *testing.T) {
 		},
 		{
 			name: "No high risk",
-			result: &portfolio.ValuationResult{
-				HighRiskPatents: []*patent.HighRiskPatent{},
+			result: &portfolio.CLIValuationResult{
+				HighRiskPatents: []*portfolio.HighRiskInfo{},
 			},
 			expected: false,
 		},
@@ -284,12 +283,12 @@ func TestHasHighRiskItems(t *testing.T) {
 func TestIsHighRiskItem(t *testing.T) {
 	tests := []struct {
 		name     string
-		item     *patent.ValuationItem
+		item     *portfolio.CLIValuationItem
 		expected bool
 	}{
 		{
 			name: "Low overall score",
-			item: &patent.ValuationItem{
+			item: &portfolio.CLIValuationItem{
 				OverallScore:    35.0,
 				LegalScore:      50.0,
 				CommercialScore: 40.0,
@@ -298,7 +297,7 @@ func TestIsHighRiskItem(t *testing.T) {
 		},
 		{
 			name: "Low legal score",
-			item: &patent.ValuationItem{
+			item: &portfolio.CLIValuationItem{
 				OverallScore:    60.0,
 				LegalScore:      25.0,
 				CommercialScore: 50.0,
@@ -307,7 +306,7 @@ func TestIsHighRiskItem(t *testing.T) {
 		},
 		{
 			name: "Low commercial score",
-			item: &patent.ValuationItem{
+			item: &portfolio.CLIValuationItem{
 				OverallScore:    60.0,
 				LegalScore:      50.0,
 				CommercialScore: 20.0,
@@ -316,7 +315,7 @@ func TestIsHighRiskItem(t *testing.T) {
 		},
 		{
 			name: "All scores acceptable",
-			item: &patent.ValuationItem{
+			item: &portfolio.CLIValuationItem{
 				OverallScore:    70.0,
 				LegalScore:      65.0,
 				CommercialScore: 60.0,
@@ -334,8 +333,8 @@ func TestIsHighRiskItem(t *testing.T) {
 }
 
 func TestFormatAssessOutput_UnknownFormat(t *testing.T) {
-	result := &portfolio.ValuationResult{
-		Items: []*patent.ValuationItem{},
+	result := &portfolio.CLIValuationResult{
+		Items: []*portfolio.CLIValuationItem{},
 	}
 
 	_, err := formatAssessOutput(result, "xml")
@@ -346,27 +345,27 @@ func TestFormatAssessOutput_UnknownFormat(t *testing.T) {
 func TestHasHighRiskPortfolioItems(t *testing.T) {
 	tests := []struct {
 		name     string
-		result   *portfolio.PortfolioAssessResult
+		result   *portfolio.CLIPortfolioAssessResult
 		expected bool
 	}{
 		{
 			name: "High risk level",
-			result: &portfolio.PortfolioAssessResult{
-				RiskLevel: common.RiskHigh,
+			result: &portfolio.CLIPortfolioAssessResult{
+				RiskLevel: string(common.RiskHigh),
 			},
 			expected: true,
 		},
 		{
 			name: "Critical risk level",
-			result: &portfolio.PortfolioAssessResult{
-				RiskLevel: common.RiskCritical,
+			result: &portfolio.CLIPortfolioAssessResult{
+				RiskLevel: string(common.RiskCritical),
 			},
 			expected: true,
 		},
 		{
 			name: "Medium risk level",
-			result: &portfolio.PortfolioAssessResult{
-				RiskLevel: common.RiskMedium,
+			result: &portfolio.CLIPortfolioAssessResult{
+				RiskLevel: string(common.RiskMedium),
 			},
 			expected: false,
 		},

@@ -139,6 +139,7 @@ type WorkspaceAppService interface {
 	ListByUser(ctx context.Context, userID string, pagination commontypes.Pagination) ([]*WorkspaceResponse, int, error)
 	AddMember(ctx context.Context, req *AddMemberRequest) error
 	RemoveMemberRequest(ctx context.Context, req *RemoveMemberRequest) error
+	RemoveMember(ctx context.Context, workspaceID, memberID, userID string) error
 	ListMembers(ctx context.Context, workspaceID string, pagination commontypes.Pagination) ([]*MemberResponse, int, error)
 }
 
@@ -572,6 +573,67 @@ func (s *workspaceAppServiceImpl) UpdateMemberRole(ctx context.Context, workspac
 		logging.String("member_id", memberID),
 		logging.String("role", role))
 	return nil
+}
+
+// Service is an alias for WorkspaceAppService for backward compatibility with apiserver.
+type Service = WorkspaceAppService
+
+// ---------------------------------------------------------------------------
+// Additional DTO types for API handlers
+// ---------------------------------------------------------------------------
+
+// CreateWorkspaceInput represents the input for creating a workspace.
+type CreateWorkspaceInput struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	OwnerID     string `json:"owner_id"`
+}
+
+// UpdateWorkspaceInput represents the input for updating a workspace.
+type UpdateWorkspaceInput struct {
+	ID          string `json:"id"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	UserID      string `json:"user_id"`
+}
+
+// WorkspaceOutput represents the output for workspace operations.
+type WorkspaceOutput struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	OwnerID     string `json:"owner_id"`
+	CreatedAt   string `json:"created_at,omitempty"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
+}
+
+// ListWorkspacesOutput represents the output for listing workspaces.
+type ListWorkspacesOutput struct {
+	Workspaces []WorkspaceOutput `json:"workspaces"`
+	Total      int               `json:"total"`
+	Page       int               `json:"page"`
+	PageSize   int               `json:"page_size"`
+}
+
+// MemberOutput represents the output for member operations.
+type MemberOutput struct {
+	UserID   string `json:"user_id"`
+	Role     string `json:"role"`
+	JoinedAt string `json:"joined_at,omitempty"`
+}
+
+// SharedDocumentOutput represents the output for shared document operations.
+type SharedDocumentOutput struct {
+	ID         string `json:"id"`
+	DocumentID string `json:"document_id"`
+	SharedBy   string `json:"shared_by"`
+	SharedAt   string `json:"shared_at,omitempty"`
+}
+
+// ListSharedDocumentsOutput represents the output for listing shared documents.
+type ListSharedDocumentsOutput struct {
+	Documents []SharedDocumentOutput `json:"documents"`
+	Total     int                    `json:"total"`
 }
 
 //Personal.AI order the ending

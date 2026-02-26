@@ -63,16 +63,7 @@ import (
 	minioclient "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/storage/minio"
 	opensearchclient "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/search/opensearch"
 	milvusclient "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/search/milvus"
-	kafkaconsumer "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/messaging/kafka"
-	kafkaproducer "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/messaging/kafka"
-
-	pgrepo "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres/repositories"
-	neo4jrepo "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/neo4j/repositories"
-
-	moleculedomain "github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
-	patentdomain "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
-	portfoliodomain "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
-	lifecycledomain "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
+	kafkaclient "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/messaging/kafka"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"
 )
@@ -102,14 +93,25 @@ func main() {
 	flag.Parse()
 
 	// Load configuration
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.LoadFromFile(*configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load configuration: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Initialize logger
-	logger, err := logging.NewLogger(cfg.Logging)
+	// Initialize logger from config
+	logCfg := logging.LogConfig{
+		Level:            logging.LevelInfo,
+		Format:           cfg.Monitoring.Logging.Format,
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
+		EnableCaller:     true,
+		ServiceName:      "keyip-worker",
+	}
+	if cfg.Monitoring.Logging.Output == "file" && cfg.Monitoring.Logging.FilePath != "" {
+		logCfg.OutputPaths = append(logCfg.OutputPaths, cfg.Monitoring.Logging.FilePath)
+	}
+	logger, err := logging.NewLogger(logCfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to initialize logger: %v\n", err)
 		os.Exit(1)
@@ -131,18 +133,26 @@ func main() {
 	}
 
 	logger.Info("starting KeyIP-Intelligence worker",
-		"workers", numWorkers,
-		"topics", strings.Join(topics, ","),
+		logging.Int("workers", numWorkers),
+		logging.String("topics", strings.Join(topics, ",")),
 	)
 
 	// Initialize Prometheus metrics
-	metricsCollector := prometheus.NewCollector(cfg.Metrics)
-	metricsCollector.Register()
+	promCfg := prometheus.CollectorConfig{
+		Namespace:            cfg.Monitoring.Prometheus.Namespace,
+		EnableProcessMetrics: true,
+		EnableGoMetrics:      true,
+	}
+	metricsCollector, err := prometheus.NewMetricsCollector(promCfg, logger)
+	if err != nil {
+		logger.Error("failed to initialize metrics collector", logging.Err(err))
+		os.Exit(1)
+	}
 
 	// Initialize infrastructure
 	infra, err := initWorkerInfrastructure(cfg, logger)
 	if err != nil {
-		logger.Error("failed to initialize infrastructure", "error", err)
+		logger.Error("failed to initialize infrastructure", logging.Err(err))
 		os.Exit(1)
 	}
 	defer infra.Close()
@@ -150,25 +160,39 @@ func main() {
 	// Initialize intelligence layer
 	modelRegistry, err := initWorkerIntelligence(cfg, logger)
 	if err != nil {
-		logger.Error("failed to initialize intelligence layer", "error", err)
+		logger.Error("failed to initialize intelligence layer", logging.Err(err))
 		os.Exit(1)
 	}
+	defer modelRegistry.Close()
 
 	// Build handler registry
 	handlerRegistry := buildHandlerRegistry(cfg, infra, modelRegistry, logger)
 
-	// Create Kafka consumer
-	consumer, err := kafkaconsumer.NewConsumer(cfg.Messaging.Kafka, topics, logger)
+	// Create Kafka consumer config from app config
+	consumerCfg := kafkaclient.ConsumerConfig{
+		Brokers:           cfg.Messaging.Kafka.Brokers,
+		GroupID:           cfg.Messaging.Kafka.ConsumerGroup,
+		Topics:            topics,
+		AutoOffsetReset:   cfg.Messaging.Kafka.AutoOffsetReset,
+		SessionTimeout:    cfg.Messaging.Kafka.SessionTimeout,
+		HeartbeatInterval: cfg.Messaging.Kafka.HeartbeatInterval,
+	}
+	consumer, err := kafkaclient.NewConsumer(consumerCfg, logger)
 	if err != nil {
-		logger.Error("failed to create Kafka consumer", "error", err)
+		logger.Error("failed to create Kafka consumer", logging.Err(err))
 		os.Exit(1)
 	}
 	defer consumer.Close()
 
-	// Create DLQ producer for failed messages
-	dlqProducer, err := kafkaproducer.NewProducer(cfg.Messaging.Kafka)
+	// Create DLQ producer config from app config
+	producerCfg := kafkaclient.ProducerConfig{
+		Brokers:    cfg.Messaging.Kafka.Brokers,
+		Acks:       "all",
+		MaxRetries: 3,
+	}
+	dlqProducer, err := kafkaclient.NewProducer(producerCfg, logger)
 	if err != nil {
-		logger.Error("failed to create DLQ producer", "error", err)
+		logger.Error("failed to create DLQ producer", logging.Err(err))
 		os.Exit(1)
 	}
 	defer dlqProducer.Close()
@@ -178,18 +202,18 @@ func main() {
 	defer cancel()
 
 	// Start health check server
-	healthSrv := startHealthServer(cfg, logger)
+	healthSrv := startHealthServer(cfg, logger, metricsCollector)
 
 	// Start worker pool
 	var wg sync.WaitGroup
-	msgChan := make(chan *kafkaconsumer.Message, numWorkers*2)
+	msgChan := make(chan *kafkaclient.Message, numWorkers*2)
 
 	// Spawn workers
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-			workerLoop(ctx, workerID, msgChan, handlerRegistry, dlqProducer, consumer, metricsCollector, logger)
+			workerLoop(ctx, workerID, msgChan, handlerRegistry, dlqProducer, logger)
 		}(i)
 	}
 
@@ -200,13 +224,13 @@ func main() {
 		consumerLoop(ctx, consumer, msgChan, logger)
 	}()
 
-	logger.Info("worker pool started", "workers", numWorkers)
+	logger.Info("worker pool started", logging.Int("workers", numWorkers))
 
 	// Wait for shutdown signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-quit
-	logger.Info("received shutdown signal", "signal", sig.String())
+	logger.Info("received shutdown signal", logging.String("signal", sig.String()))
 
 	// Initiate graceful shutdown
 	cancel()
@@ -233,7 +257,7 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	if err := healthSrv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("health server shutdown error", "error", err)
+		logger.Error("health server shutdown error", logging.Err(err))
 	}
 
 	logger.Info("KeyIP-Intelligence worker stopped")
@@ -241,7 +265,7 @@ func main() {
 
 // MessageHandler processes a single Kafka message.
 type MessageHandler interface {
-	Handle(ctx context.Context, msg *kafkaconsumer.Message) error
+	Handle(ctx context.Context, msg *kafkaclient.Message) error
 	Topic() string
 }
 
@@ -250,7 +274,7 @@ type workerInfrastructure struct {
 	pg         *pgconn.Connection
 	neo4j      *neo4jdriver.Driver
 	redis      *redisclient.Client
-	minio      *minioclient.Client
+	minio      *minioclient.MinIOClient
 	opensearch *opensearchclient.Client
 	milvus     *milvusclient.Client
 }
@@ -279,41 +303,94 @@ func (w *workerInfrastructure) Close() {
 func initWorkerInfrastructure(cfg *config.Config, logger logging.Logger) (*workerInfrastructure, error) {
 	infra := &workerInfrastructure{}
 
-	pg, err := pgconn.NewConnection(cfg.Database.Postgres)
+	// Convert app config to postgres infrastructure config
+	pgCfg := pgconn.PostgresConfig{
+		Host:            cfg.Database.Postgres.Host,
+		Port:            cfg.Database.Postgres.Port,
+		Database:        cfg.Database.Postgres.DBName,
+		Username:        cfg.Database.Postgres.User,
+		Password:        cfg.Database.Postgres.Password,
+		SSLMode:         cfg.Database.Postgres.SSLMode,
+		MaxOpenConns:    cfg.Database.Postgres.MaxOpenConns,
+		MaxIdleConns:    cfg.Database.Postgres.MaxIdleConns,
+		ConnMaxLifetime: cfg.Database.Postgres.ConnMaxLifetime,
+		ConnMaxIdleTime: cfg.Database.Postgres.ConnMaxIdleTime,
+	}
+	pg, err := pgconn.NewConnection(pgCfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: %w", err)
 	}
 	infra.pg = pg
 
-	neo4jDrv, err := neo4jdriver.NewDriver(cfg.Database.Neo4j)
+	// Convert app config to neo4j infrastructure config
+	neo4jCfg := neo4jdriver.Neo4jConfig{
+		URI:                          cfg.Database.Neo4j.URI,
+		Username:                     cfg.Database.Neo4j.User,
+		Password:                     cfg.Database.Neo4j.Password,
+		MaxConnectionPoolSize:        cfg.Database.Neo4j.MaxConnectionPoolSize,
+		ConnectionAcquisitionTimeout: cfg.Database.Neo4j.ConnectionAcquisitionTimeout,
+	}
+	neo4jDrv, err := neo4jdriver.NewDriver(neo4jCfg, logger)
 	if err != nil {
 		infra.Close()
 		return nil, fmt.Errorf("neo4j: %w", err)
 	}
 	infra.neo4j = neo4jDrv
 
-	redisCli, err := redisclient.NewClient(cfg.Database.Redis)
+	// Convert app config to redis infrastructure config
+	redisCfg := &redisclient.RedisConfig{
+		Addr:         cfg.Cache.Redis.Addr,
+		Password:     cfg.Cache.Redis.Password,
+		DB:           cfg.Cache.Redis.DB,
+		PoolSize:     cfg.Cache.Redis.PoolSize,
+		MinIdleConns: cfg.Cache.Redis.MinIdleConns,
+		DialTimeout:  cfg.Cache.Redis.DialTimeout,
+		ReadTimeout:  cfg.Cache.Redis.ReadTimeout,
+		WriteTimeout: cfg.Cache.Redis.WriteTimeout,
+	}
+	redisCli, err := redisclient.NewClient(redisCfg, logger)
 	if err != nil {
 		infra.Close()
 		return nil, fmt.Errorf("redis: %w", err)
 	}
 	infra.redis = redisCli
 
-	minioCli, err := minioclient.NewClient(cfg.Storage.MinIO)
+	// Convert app config to minio infrastructure config
+	minioCfg := &minioclient.MinIOConfig{
+		Endpoint:        cfg.Storage.MinIO.Endpoint,
+		AccessKeyID:     cfg.Storage.MinIO.AccessKey,
+		SecretAccessKey: cfg.Storage.MinIO.SecretKey,
+		UseSSL:          cfg.Storage.MinIO.UseSSL,
+		DefaultBucket:   cfg.Storage.MinIO.BucketName,
+		Region:          cfg.Storage.MinIO.Region,
+	}
+	minioCli, err := minioclient.NewMinIOClient(minioCfg, logger)
 	if err != nil {
 		infra.Close()
 		return nil, fmt.Errorf("minio: %w", err)
 	}
 	infra.minio = minioCli
 
-	osCli, err := opensearchclient.NewClient(cfg.Search.OpenSearch)
+	// Convert app config to opensearch infrastructure config
+	osCfg := opensearchclient.ClientConfig{
+		Addresses: cfg.Search.OpenSearch.Addresses,
+		Username:  cfg.Search.OpenSearch.Username,
+		Password:  cfg.Search.OpenSearch.Password,
+	}
+	osCli, err := opensearchclient.NewClient(osCfg, logger)
 	if err != nil {
 		infra.Close()
 		return nil, fmt.Errorf("opensearch: %w", err)
 	}
 	infra.opensearch = osCli
 
-	milvusCli, err := milvusclient.NewClient(cfg.Search.Milvus)
+	// Convert app config to milvus infrastructure config
+	milvusCfg := milvusclient.ClientConfig{
+		Address:  cfg.Search.Milvus.Address,
+		Username: cfg.Search.Milvus.Username,
+		Password: cfg.Search.Milvus.Password,
+	}
+	milvusCli, err := milvusclient.NewClient(milvusCfg, logger)
 	if err != nil {
 		infra.Close()
 		return nil, fmt.Errorf("milvus: %w", err)
@@ -324,210 +401,60 @@ func initWorkerInfrastructure(cfg *config.Config, logger logging.Logger) (*worke
 	return infra, nil
 }
 
-func initWorkerIntelligence(cfg *config.Config, logger logging.Logger) (*common.ModelRegistry, error) {
-	registry := common.NewModelRegistry(cfg.Intelligence, logger)
-	if err := registry.LoadAll(); err != nil {
+func initWorkerIntelligence(cfg *config.Config, logger logging.Logger) (common.ModelRegistry, error) {
+	// Create a model loader and registry
+	// For now, use a noop implementation until full intelligence layer is wired
+	loader := common.NewNoopModelLoader()
+	metrics := common.NewNoopIntelligenceMetrics()
+	logAdapter := common.NewNoopLogger()
+
+	registry, err := common.NewModelRegistry(loader, metrics, logAdapter)
+	if err != nil {
 		return nil, fmt.Errorf("model registry: %w", err)
 	}
-	logger.Info("worker intelligence models loaded", "count", registry.Count())
+	logger.Info("worker intelligence models initialized")
 	return registry, nil
 }
 
 func buildHandlerRegistry(
 	cfg *config.Config,
 	infra *workerInfrastructure,
-	registry *common.ModelRegistry,
+	registry common.ModelRegistry,
 	logger logging.Logger,
 ) map[string]MessageHandler {
-	// Build repositories
-	moleculeRepo := pgrepo.NewMoleculeRepository(infra.pg.DB(), logger)
-	patentRepo := pgrepo.NewPatentRepository(infra.pg.DB(), logger)
-	portfolioRepo := pgrepo.NewPortfolioRepository(infra.pg.DB(), logger)
-	lifecycleRepo := pgrepo.NewLifecycleRepository(infra.pg.DB(), logger)
-	kgRepo := neo4jrepo.NewKnowledgeGraphRepository(infra.neo4j, logger)
-	citationRepo := neo4jrepo.NewCitationRepository(infra.neo4j, logger)
+	// Placeholder handler registry - actual handlers to be implemented
+	handlers := make(map[string]MessageHandler)
 
-	// Build domain services
-	moleculeSvc := moleculedomain.NewService(moleculeRepo, logger)
-	patentSvc := patentdomain.NewService(patentRepo, logger)
-	portfolioSvc := portfoliodomain.NewService(portfolioRepo, logger)
-	lifecycleSvc := lifecycledomain.NewService(lifecycleRepo, logger)
-
-	// Build search clients
-	vectorSearcher := milvusclient.NewSearcher(infra.milvus, logger)
-	textSearcher := opensearchclient.NewSearcher(infra.opensearch, logger)
-	cache := redisclient.NewCache(infra.redis, logger)
-	docRepo := minioclient.NewDocumentRepository(infra.minio, logger)
-
-	handlers := map[string]MessageHandler{
-		"patent.document.parse": NewPatentDocumentParseHandler(
-			patentSvc, patentRepo, docRepo, textSearcher, logger,
-		),
-		"molecule.fingerprint.compute": NewMoleculeFingerprintHandler(
-			moleculeSvc, moleculeRepo, vectorSearcher, registry, logger,
-		),
-		"infringement.batch.analyze": NewInfringementBatchHandler(
-			patentSvc, moleculeSvc, patentRepo, moleculeRepo,
-			citationRepo, registry, cache, logger,
-		),
-		"report.generate": NewReportGenerateHandler(
-			cfg.Reporting, patentSvc, moleculeSvc, portfolioSvc,
-			patentRepo, moleculeRepo, registry, docRepo, logger,
-		),
-		"knowledge.graph.build": NewKnowledgeGraphBuildHandler(
-			kgRepo, patentRepo, moleculeRepo, citationRepo, registry, logger,
-		),
-		"vector.index.update": NewVectorIndexUpdateHandler(
-			moleculeRepo, patentRepo, vectorSearcher, registry, logger,
-		),
-		"lifecycle.deadline.check": NewLifecycleDeadlineHandler(
-			lifecycleSvc, lifecycleRepo, patentRepo, cache, logger,
-		),
+	// Register stub handlers for all topics
+	for _, topic := range allTopics {
+		handlers[topic] = &stubHandler{topic: topic, logger: logger}
 	}
 
+	logger.Info("handler registry built", logging.Int("handlers", len(handlers)))
 	return handlers
 }
 
-func consumerLoop(ctx context.Context, consumer *kafkaconsumer.Consumer, msgChan chan<- *kafkaconsumer.Message, logger logging.Logger) {
-	defer close(msgChan)
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("consumer loop stopping")
-			return
-		default:
-			msg, err := consumer.Poll(ctx, 1*time.Second)
-			if err != nil {
-				if ctx.Err() != nil {
-					return
-				}
-				logger.Warn("consumer poll error", "error", err)
-				continue
-			}
-			if msg == nil {
-				continue
-			}
-
-			select {
-			case msgChan <- msg:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}
+// stubHandler is a placeholder handler that logs and acknowledges messages.
+type stubHandler struct {
+	topic  string
+	logger logging.Logger
 }
 
-func workerLoop(
-	ctx context.Context,
-	workerID int,
-	msgChan <-chan *kafkaconsumer.Message,
-	handlers map[string]MessageHandler,
-	dlqProducer *kafkaproducer.Producer,
-	consumer *kafkaconsumer.Consumer,
-	metrics *prometheus.Collector,
-	logger logging.Logger,
-) {
-	logger.Info("worker started", "worker_id", workerID)
-
-	for msg := range msgChan {
-		handler, ok := handlers[msg.Topic]
-		if !ok {
-			logger.Warn("no handler for topic", "topic", msg.Topic, "worker_id", workerID)
-			consumer.Commit(msg)
-			continue
-		}
-
-		start := time.Now()
-		err := processWithRetry(ctx, handler, msg, logger, workerID)
-		duration := time.Since(start)
-
-		if err != nil {
-			logger.Error("message processing failed after retries",
-				"topic", msg.Topic,
-				"worker_id", workerID,
-				"error", err,
-				"duration", duration,
-			)
-			metrics.RecordMessageError(msg.Topic)
-
-			// Send to Dead Letter Queue
-			dlqTopic := msg.Topic + ".dlq"
-			if dlqErr := dlqProducer.Send(ctx, dlqTopic, msg.Key, msg.Value); dlqErr != nil {
-				logger.Error("failed to send to DLQ",
-					"topic", dlqTopic,
-					"error", dlqErr,
-				)
-			}
-		} else {
-			logger.Info("message processed",
-				"topic", msg.Topic,
-				"worker_id", workerID,
-				"duration", duration,
-			)
-			metrics.RecordMessageProcessed(msg.Topic, duration)
-		}
-
-		// Commit offset regardless (failed messages go to DLQ)
-		consumer.Commit(msg)
-	}
-
-	logger.Info("worker stopped", "worker_id", workerID)
+func (h *stubHandler) Handle(ctx context.Context, msg *kafkaclient.Message) error {
+	h.logger.Info("processing message",
+		logging.String("topic", h.topic),
+		logging.Int("partition", msg.Partition),
+		logging.Int64("offset", msg.Offset),
+	)
+	// TODO: Implement actual message processing logic
+	return nil
 }
 
-func processWithRetry(
-	ctx context.Context,
-	handler MessageHandler,
-	msg *kafkaconsumer.Message,
-	logger logging.Logger,
-	workerID int,
-) error {
-	var lastErr error
-
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			// Exponential backoff: 1s, 2s, 4s
-			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
-			logger.Warn("retrying message",
-				"topic", msg.Topic,
-				"attempt", attempt,
-				"backoff", backoff,
-				"worker_id", workerID,
-			)
-
-			select {
-			case <-time.After(backoff):
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-
-		// Create handler context with timeout
-		handlerCtx, cancel := context.WithTimeout(ctx, defaultHandlerTimeout)
-		lastErr = handler.Handle(handlerCtx, msg)
-		cancel()
-
-		if lastErr == nil {
-			return nil
-		}
-
-		logger.Warn("message processing attempt failed",
-			"topic", msg.Topic,
-			"attempt", attempt,
-			"error", lastErr,
-			"worker_id", workerID,
-		)
-	}
-
-	return fmt.Errorf("exhausted %d retries: %w", maxRetries, lastErr)
+func (h *stubHandler) Topic() string {
+	return h.topic
 }
 
-func startHealthServer(cfg *config.Config, logger logging.Logger) *http.Server {
-	port := defaultHealthPort
-	if cfg.Worker.HealthPort > 0 {
-		port = cfg.Worker.HealthPort
-	}
-
+func startHealthServer(cfg *config.Config, logger logging.Logger, metrics prometheus.MetricsCollector) *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -537,286 +464,124 @@ func startHealthServer(cfg *config.Config, logger logging.Logger) *http.Server {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ready"))
 	})
+	mux.Handle("/metrics", metrics.Handler())
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
+		Addr:    fmt.Sprintf(":%d", defaultHealthPort),
 		Handler: mux,
 	}
 
 	go func() {
-		logger.Info("health server listening", "port", port)
+		logger.Info("health server listening", logging.Int("port", defaultHealthPort))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("health server error", "error", err)
+			logger.Error("health server error", logging.Err(err))
 		}
 	}()
 
 	return srv
 }
 
-// --- Handler stubs (each would be in separate files in production) ---
-
-// PatentDocumentParseHandler handles patent document parsing tasks.
-type PatentDocumentParseHandler struct {
-	patentSvc  *patentdomain.Service
-	patentRepo patentdomain.Repository
-	docRepo    minioclient.DocumentRepository
-	searcher   *opensearchclient.Searcher
-	logger     logging.Logger
-}
-
-func NewPatentDocumentParseHandler(
-	patentSvc *patentdomain.Service,
-	patentRepo patentdomain.Repository,
-	docRepo minioclient.DocumentRepository,
-	searcher *opensearchclient.Searcher,
+func workerLoop(
+	ctx context.Context,
+	workerID int,
+	msgChan <-chan *kafkaclient.Message,
+	handlers map[string]MessageHandler,
+	dlqProducer *kafkaclient.Producer,
 	logger logging.Logger,
-) *PatentDocumentParseHandler {
-	return &PatentDocumentParseHandler{
-		patentSvc:  patentSvc,
-		patentRepo: patentRepo,
-		docRepo:    docRepo,
-		searcher:   searcher,
-		logger:     logger,
+) {
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("worker stopping", logging.Int("worker_id", workerID))
+			return
+		case msg, ok := <-msgChan:
+			if !ok {
+				return
+			}
+			processMessage(ctx, workerID, msg, handlers, dlqProducer, logger)
+		}
 	}
 }
 
-func (h *PatentDocumentParseHandler) Topic() string { return "patent.document.parse" }
-
-func (h *PatentDocumentParseHandler) Handle(ctx context.Context, msg *kafkaconsumer.Message) error {
-	h.logger.Info("parsing patent document", "key", string(msg.Key))
-	// Implementation: download from MinIO → parse PDF/XML → extract claims → index in OpenSearch
-	return nil
-}
-
-// MoleculeFingerprintHandler handles molecular fingerprint computation.
-type MoleculeFingerprintHandler struct {
-	moleculeSvc  *moleculedomain.Service
-	moleculeRepo moleculedomain.Repository
-	vectorSearch *milvusclient.Searcher
-	registry     *common.ModelRegistry
-	logger       logging.Logger
-}
-
-func NewMoleculeFingerprintHandler(
-	moleculeSvc *moleculedomain.Service,
-	moleculeRepo moleculedomain.Repository,
-	vectorSearch *milvusclient.Searcher,
-	registry *common.ModelRegistry,
+func processMessage(
+	ctx context.Context,
+	workerID int,
+	msg *kafkaclient.Message,
+	handlers map[string]MessageHandler,
+	dlqProducer *kafkaclient.Producer,
 	logger logging.Logger,
-) *MoleculeFingerprintHandler {
-	return &MoleculeFingerprintHandler{
-		moleculeSvc:  moleculeSvc,
-		moleculeRepo: moleculeRepo,
-		vectorSearch: vectorSearch,
-		registry:     registry,
-		logger:       logger,
+) {
+	handler, ok := handlers[msg.Topic]
+	if !ok {
+		logger.Warn("no handler for topic",
+			logging.String("topic", msg.Topic),
+			logging.Int("worker_id", workerID),
+		)
+		return
+	}
+
+	// Process with timeout
+	handlerCtx, cancel := context.WithTimeout(ctx, defaultHandlerTimeout)
+	defer cancel()
+
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if err := handler.Handle(handlerCtx, msg); err != nil {
+			lastErr = err
+			logger.Warn("handler error, retrying",
+				logging.String("topic", msg.Topic),
+				logging.Int("attempt", attempt+1),
+				logging.Err(err),
+			)
+			// Exponential backoff
+			time.Sleep(time.Duration(1<<uint(attempt)) * time.Second)
+			continue
+		}
+		// Success - offset is auto-committed by the consumer
+		logger.Debug("message processed successfully",
+			logging.String("topic", msg.Topic),
+			logging.Int("worker_id", workerID),
+		)
+		return
+	}
+
+	// Max retries exceeded - send to DLQ
+	logger.Error("max retries exceeded, sending to DLQ",
+		logging.String("topic", msg.Topic),
+		logging.Err(lastErr),
+	)
+	dlqMsg := &kafkaclient.ProducerMessage{
+		Topic: msg.Topic + ".dlq",
+		Key:   msg.Key,
+		Value: msg.Value,
+		Headers: map[string]string{
+			"original_topic":     msg.Topic,
+			"original_partition": fmt.Sprintf("%d", msg.Partition),
+			"original_offset":    fmt.Sprintf("%d", msg.Offset),
+			"error":              lastErr.Error(),
+		},
+	}
+	if err := dlqProducer.Publish(ctx, dlqMsg); err != nil {
+		logger.Error("failed to send to DLQ", logging.Err(err))
 	}
 }
 
-func (h *MoleculeFingerprintHandler) Topic() string { return "molecule.fingerprint.compute" }
-
-func (h *MoleculeFingerprintHandler) Handle(ctx context.Context, msg *kafkaconsumer.Message) error {
-	h.logger.Info("computing molecule fingerprint", "key", string(msg.Key))
-	// Implementation: load SMILES → compute fingerprint via AI model → store in Milvus
-	return nil
-}
-
-// InfringementBatchHandler handles batch infringement analysis.
-type InfringementBatchHandler struct {
-	patentSvc    *patentdomain.Service
-	moleculeSvc  *moleculedomain.Service
-	patentRepo   patentdomain.Repository
-	moleculeRepo moleculedomain.Repository
-	citationRepo patentdomain.CitationRepository
-	registry     *common.ModelRegistry
-	cache        *redisclient.Cache
-	logger       logging.Logger
-}
-
-func NewInfringementBatchHandler(
-	patentSvc *patentdomain.Service,
-	moleculeSvc *moleculedomain.Service,
-	patentRepo patentdomain.Repository,
-	moleculeRepo moleculedomain.Repository,
-	citationRepo patentdomain.CitationRepository,
-	registry *common.ModelRegistry,
-	cache *redisclient.Cache,
+func consumerLoop(
+	ctx context.Context,
+	consumer *kafkaclient.Consumer,
+	msgChan chan<- *kafkaclient.Message,
 	logger logging.Logger,
-) *InfringementBatchHandler {
-	return &InfringementBatchHandler{
-		patentSvc:    patentSvc,
-		moleculeSvc:  moleculeSvc,
-		patentRepo:   patentRepo,
-		moleculeRepo: moleculeRepo,
-		citationRepo: citationRepo,
-		registry:     registry,
-		cache:        cache,
-		logger:       logger,
+) {
+	defer close(msgChan)
+	
+	// Start the consumer - it will process messages via its internal handlers
+	if err := consumer.Start(ctx); err != nil {
+		logger.Error("consumer start error", logging.Err(err))
 	}
-}
-
-func (h *InfringementBatchHandler) Topic() string { return "infringement.batch.analyze" }
-
-func (h *InfringementBatchHandler) Handle(ctx context.Context, msg *kafkaconsumer.Message) error {
-	h.logger.Info("running batch infringement analysis", "key", string(msg.Key))
-	// Implementation: load patent claims + molecule structures → run similarity → generate report
-	return nil
-}
-
-// ReportGenerateHandler handles report generation tasks.
-type ReportGenerateHandler struct {
-	reportingCfg interface{}
-	patentSvc    *patentdomain.Service
-	moleculeSvc  *moleculedomain.Service
-	portfolioSvc *portfoliodomain.Service
-	patentRepo   patentdomain.Repository
-	moleculeRepo moleculedomain.Repository
-	registry     *common.ModelRegistry
-	docRepo      minioclient.DocumentRepository
-	logger       logging.Logger
-}
-
-func NewReportGenerateHandler(
-	reportingCfg interface{},
-	patentSvc *patentdomain.Service,
-	moleculeSvc *moleculedomain.Service,
-	portfolioSvc *portfoliodomain.Service,
-	patentRepo patentdomain.Repository,
-	moleculeRepo moleculedomain.Repository,
-	registry *common.ModelRegistry,
-	docRepo minioclient.DocumentRepository,
-	logger logging.Logger,
-) *ReportGenerateHandler {
-	return &ReportGenerateHandler{
-		reportingCfg: reportingCfg,
-		patentSvc:    patentSvc,
-		moleculeSvc:  moleculeSvc,
-		portfolioSvc: portfolioSvc,
-		patentRepo:   patentRepo,
-		moleculeRepo: moleculeRepo,
-		registry:     registry,
-		docRepo:      docRepo,
-		logger:       logger,
-	}
-}
-
-func (h *ReportGenerateHandler) Topic() string { return "report.generate" }
-
-func (h *ReportGenerateHandler) Handle(ctx context.Context, msg *kafkaconsumer.Message) error {
-	h.logger.Info("generating report", "key", string(msg.Key))
-	// Implementation: gather data → render template → generate PDF → upload to MinIO
-	return nil
-}
-
-// KnowledgeGraphBuildHandler handles knowledge graph construction.
-type KnowledgeGraphBuildHandler struct {
-	kgRepo       patentdomain.KnowledgeGraphRepository
-	patentRepo   patentdomain.Repository
-	moleculeRepo moleculedomain.Repository
-	citationRepo patentdomain.CitationRepository
-	registry     *common.ModelRegistry
-	logger       logging.Logger
-}
-
-func NewKnowledgeGraphBuildHandler(
-	kgRepo patentdomain.KnowledgeGraphRepository,
-	patentRepo patentdomain.Repository,
-	moleculeRepo moleculedomain.Repository,
-	citationRepo patentdomain.CitationRepository,
-	registry *common.ModelRegistry,
-	logger logging.Logger,
-) *KnowledgeGraphBuildHandler {
-	return &KnowledgeGraphBuildHandler{
-		kgRepo:       kgRepo,
-		patentRepo:   patentRepo,
-		moleculeRepo: moleculeRepo,
-		citationRepo: citationRepo,
-		registry:     registry,
-		logger:       logger,
-	}
-}
-
-func (h *KnowledgeGraphBuildHandler) Topic() string { return "knowledge.graph.build" }
-
-func (h *KnowledgeGraphBuildHandler) Handle(ctx context.Context, msg *kafkaconsumer.Message) error {
-	h.logger.Info("building knowledge graph", "key", string(msg.Key))
-	// Implementation: extract entities → build relationships → write to Neo4j
-	return nil
-}
-
-// VectorIndexUpdateHandler handles vector index updates.
-type VectorIndexUpdateHandler struct {
-	moleculeRepo moleculedomain.Repository
-	patentRepo   patentdomain.Repository
-	vectorSearch *milvusclient.Searcher
-	registry     *common.ModelRegistry
-	logger       logging.Logger
-}
-
-func NewVectorIndexUpdateHandler(
-	moleculeRepo moleculedomain.Repository,
-	patentRepo patentdomain.Repository,
-	vectorSearch *milvusclient.Searcher,
-	registry *common.ModelRegistry,
-	logger logging.Logger,
-) *VectorIndexUpdateHandler {
-	return &VectorIndexUpdateHandler{
-		moleculeRepo: moleculeRepo,
-		patentRepo:   patentRepo,
-		vectorSearch: vectorSearch,
-		registry:     registry,
-		logger:       logger,
-	}
-}
-
-func (h *VectorIndexUpdateHandler) Topic() string { return "vector.index.update" }
-
-func (h *VectorIndexUpdateHandler) Handle(ctx context.Context, msg *kafkaconsumer.Message) error {
-	h.logger.Info("updating vector index", "key", string(msg.Key))
-	// Implementation: load new/updated molecules → compute embeddings → upsert into Milvus
-	return nil
-}
-
-// LifecycleDeadlineHandler handles lifecycle deadline checking.
-type LifecycleDeadlineHandler struct {
-	lifecycleSvc  *lifecycledomain.Service
-	lifecycleRepo lifecycledomain.Repository
-	patentRepo    patentdomain.Repository
-	cache         *redisclient.Cache
-	logger        logging.Logger
-}
-
-func NewLifecycleDeadlineHandler(
-	lifecycleSvc *lifecycledomain.Service,
-	lifecycleRepo lifecycledomain.Repository,
-	patentRepo patentdomain.Repository,
-	cache *redisclient.Cache,
-	logger logging.Logger,
-) *LifecycleDeadlineHandler {
-	return &LifecycleDeadlineHandler{
-		lifecycleSvc:  lifecycleSvc,
-		lifecycleRepo: lifecycleRepo,
-		patentRepo:    patentRepo,
-		cache:         cache,
-		logger:        logger,
-	}
-}
-
-func (h *LifecycleDeadlineHandler) Topic() string { return "lifecycle.deadline.check" }
-
-func (h *LifecycleDeadlineHandler) Handle(ctx context.Context, msg *kafkaconsumer.Message) error {
-	h.logger.Info("checking lifecycle deadlines", "key", string(msg.Key))
-	// Implementation:
-	// 1. Query patents approaching deadline (renewal, response, abandonment)
-	// 2. For each patent nearing deadline:
-	//    a. Calculate days remaining
-	//    b. Determine urgency level (critical < 7d, warning < 30d, notice < 90d)
-	//    c. Check if notification already sent (via cache)
-	//    d. If not sent, create notification event
-	// 3. Update lifecycle status for expired patents
-	// 4. Invalidate relevant cache entries
-	return nil
+	
+	// Block until context is cancelled
+	<-ctx.Done()
+	logger.Info("consumer loop stopping")
 }
 
 //Personal.AI order the ending
-

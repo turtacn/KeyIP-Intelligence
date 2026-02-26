@@ -1152,3 +1152,25 @@ func (r *modelRegistry) cleanupExpiredABTests() {
 	})
 }
 
+// noopModelLoader is a no-op implementation of ModelLoader for testing and initialization.
+type noopModelLoader struct{}
+
+// NewNoopModelLoader creates a no-op model loader.
+func NewNoopModelLoader() ModelLoader {
+	return &noopModelLoader{}
+}
+
+func (l *noopModelLoader) Load(ctx context.Context, artifactPath string) (interface{}, error) {
+	return struct{}{}, nil
+}
+
+func (l *noopModelLoader) Unload(ctx context.Context, modelHandle interface{}) error {
+	return nil
+}
+
+func (l *noopModelLoader) Validate(ctx context.Context, artifactPath string, checksum string) error {
+	return nil
+}
+
+//Personal.AI order the ending
+

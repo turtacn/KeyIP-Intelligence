@@ -445,4 +445,12 @@ func GenerateSlugWithSuffix(slug string) string {
 	return fmt.Sprintf("%s-%s", slug, string(b))
 }
 
+// Service is an alias for CollaborationService for backward compatibility with apiserver.
+type Service = CollaborationService
+
+// NewService creates a new CollaborationService with the given repository and logger.
+func NewService(repo *Repository, logger interface{}) CollaborationService {
+	return NewCollaborationService(repo.Workspace, repo.Member, NewPermissionPolicy())
+}
+
 //Personal.AI order the ending

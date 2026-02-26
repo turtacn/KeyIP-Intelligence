@@ -172,6 +172,8 @@ type SimilaritySearchService interface {
 	GetSearchHistory(ctx context.Context, userID string, limit int) ([]SearchHistoryEntry, error)
 	// Search provides a simplified similarity search for gRPC services
 	Search(ctx context.Context, query *SimilarityQuery) ([]SimilarityResult, error)
+	// SearchByText provides text-based patent search for CLI
+	SearchByText(ctx context.Context, req *PatentTextSearchRequest) ([]*CLIPatentSearchResult, error)
 }
 
 // ---------------------------------------------------------------------------
@@ -678,6 +680,92 @@ type SearchFacet struct {
 type FacetValue struct {
 	Value string `json:"value"`
 	Count int    `json:"count"`
+}
+
+// ---------------------------------------------------------------------------
+// CLI search types
+// ---------------------------------------------------------------------------
+
+// SimilaritySearchRequest is the request for CLI molecule similarity search.
+type SimilaritySearchRequest struct {
+	SMILES       string   `json:"smiles"`
+	InChI        string   `json:"inchi"`
+	Threshold    float64  `json:"threshold"`
+	Fingerprints []string `json:"fingerprints"`
+	MaxResults   int      `json:"max_results"`
+	Offices      []string `json:"offices"`
+	IncludeRisk  bool     `json:"include_risk"`
+	Context      context.Context
+}
+
+// PatentTextSearchRequest is the request for CLI patent text search.
+type PatentTextSearchRequest struct {
+	Query      string     `json:"query"`
+	IPC        string     `json:"ipc"`
+	CPC        string     `json:"cpc"`
+	DateFrom   *time.Time `json:"date_from"`
+	DateTo     *time.Time `json:"date_to"`
+	Offices    []string   `json:"offices"`
+	MaxResults int        `json:"max_results"`
+	Sort       string     `json:"sort"`
+	Context    context.Context
+}
+
+// CLIMoleculeSearchResult represents a CLI-friendly molecule search result.
+type CLIMoleculeSearchResult struct {
+	PatentNumber string  `json:"patent_number"`
+	MoleculeName string  `json:"molecule_name"`
+	SMILES       string  `json:"smiles"`
+	Similarity   float64 `json:"similarity"`
+	RiskLevel    string  `json:"risk_level"`
+}
+
+// CLIPatentSearchResult represents a CLI-friendly patent search result.
+type CLIPatentSearchResult struct {
+	PatentNumber string    `json:"patent_number"`
+	Title        string    `json:"title"`
+	FilingDate   time.Time `json:"filing_date"`
+	IPC          string    `json:"ipc"`
+	Relevance    float64   `json:"relevance"`
+}
+
+// SearchByText implements text-based patent search for CLI.
+func (s *similaritySearchServiceImpl) SearchByText(ctx context.Context, req *PatentTextSearchRequest) ([]*CLIPatentSearchResult, error) {
+	if req.Query == "" {
+		return nil, apperrors.NewValidationError("query", "search query is required")
+	}
+
+	maxResults := req.MaxResults
+	if maxResults <= 0 {
+		maxResults = 50
+	}
+
+	hits, err := s.patentIndex.SearchByText(ctx, req.Query, maxResults)
+	if err != nil {
+		return nil, apperrors.WrapMsg(err, "text search failed")
+	}
+
+	results := make([]*CLIPatentSearchResult, 0, len(hits))
+	for _, hit := range hits {
+		results = append(results, &CLIPatentSearchResult{
+			PatentNumber: hit.PatentNum,
+			Title:        hit.Name,
+			FilingDate:   time.Now(), // Placeholder
+			IPC:          "",         // Would need to be fetched from patent details
+			Relevance:    hit.Score,
+		})
+	}
+
+	return results, nil
+}
+
+// Service is an alias for SimilaritySearchService for backward compatibility with apiserver.
+// The apiserver uses appmining.Service as the main patent mining service.
+type Service = SimilaritySearchService
+
+// NewService is an alias for NewSimilaritySearchService for backward compatibility.
+func NewService(deps SimilaritySearchDeps) Service {
+	return NewSimilaritySearchService(deps)
 }
 
 //Personal.AI order the ending

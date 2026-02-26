@@ -41,6 +41,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/prometheus"
 )
 
 // ---------------------------------------------------------------------------
@@ -48,9 +50,9 @@ import (
 // ---------------------------------------------------------------------------
 
 type logEntry struct {
-	level   string
-	msg     string
-	kvPairs []interface{}
+	level  string
+	msg    string
+	fields []logging.Field
 }
 
 type mockLogger struct {
@@ -62,18 +64,21 @@ func newMockLogger() *mockLogger {
 	return &mockLogger{}
 }
 
-func (m *mockLogger) record(level, msg string, kvPairs ...interface{}) {
+func (m *mockLogger) record(level, msg string, fields ...logging.Field) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.entries = append(m.entries, logEntry{level: level, msg: msg, kvPairs: kvPairs})
+	m.entries = append(m.entries, logEntry{level: level, msg: msg, fields: fields})
 }
 
-func (m *mockLogger) Info(msg string, kvPairs ...interface{})  { m.record("info", msg, kvPairs...) }
-func (m *mockLogger) Warn(msg string, kvPairs ...interface{})  { m.record("warn", msg, kvPairs...) }
-func (m *mockLogger) Error(msg string, kvPairs ...interface{}) { m.record("error", msg, kvPairs...) }
-func (m *mockLogger) Debug(msg string, kvPairs ...interface{}) { m.record("debug", msg, kvPairs...) }
-func (m *mockLogger) With(kvPairs ...interface{}) interface{}  { return m }
-func (m *mockLogger) Sync() error                              { return nil }
+func (m *mockLogger) Info(msg string, fields ...logging.Field)  { m.record("info", msg, fields...) }
+func (m *mockLogger) Warn(msg string, fields ...logging.Field)  { m.record("warn", msg, fields...) }
+func (m *mockLogger) Error(msg string, fields ...logging.Field) { m.record("error", msg, fields...) }
+func (m *mockLogger) Debug(msg string, fields ...logging.Field) { m.record("debug", msg, fields...) }
+func (m *mockLogger) Fatal(msg string, fields ...logging.Field) { m.record("fatal", msg, fields...) }
+func (m *mockLogger) With(fields ...logging.Field) logging.Logger    { return m }
+func (m *mockLogger) WithContext(ctx context.Context) logging.Logger { return m }
+func (m *mockLogger) WithError(err error) logging.Logger             { return m }
+func (m *mockLogger) Sync() error                                    { return nil }
 
 func (m *mockLogger) getEntries() []logEntry {
 	m.mu.Lock()
@@ -613,12 +618,12 @@ func TestLoggingUnaryInterceptor_NormalRequest(t *testing.T) {
 		if e.msg == "grpc request" {
 			found = true
 			// Check kv pairs contain method.
-			kvStr := fmt.Sprintf("%v", e.kvPairs)
+			kvStr := fmt.Sprintf("%v", e.fields)
 			if !strings.Contains(kvStr, "/test.Service/GetItem") {
-				t.Errorf("log entry missing method, kvPairs: %v", e.kvPairs)
+				t.Errorf("log entry missing method, kvPairs: %v", e.fields)
 			}
 			if !strings.Contains(kvStr, "duration_ms") {
-				t.Errorf("log entry missing duration_ms, kvPairs: %v", e.kvPairs)
+				t.Errorf("log entry missing duration_ms, kvPairs: %v", e.fields)
 			}
 			break
 		}
@@ -670,7 +675,7 @@ func TestLoggingUnaryInterceptor_ErrorResponse(t *testing.T) {
 	found := false
 	for _, e := range entries {
 		if e.msg == "grpc request" {
-			kvStr := fmt.Sprintf("%v", e.kvPairs)
+			kvStr := fmt.Sprintf("%v", e.fields)
 			if strings.Contains(kvStr, "NotFound") {
 				found = true
 			}
@@ -1355,7 +1360,7 @@ func TestRecoveryUnaryInterceptor_PanicWithInt(t *testing.T) {
 	entries := logger.getEntries()
 	found := false
 	for _, e := range entries {
-		kvStr := fmt.Sprintf("%v", e.kvPairs)
+		kvStr := fmt.Sprintf("%v", e.fields)
 		if strings.Contains(kvStr, "42") {
 			found = true
 			break
@@ -1433,12 +1438,12 @@ func TestLoggingStreamInterceptor_NormalStream(t *testing.T) {
 	entries := logger.getEntries()
 	for _, e := range entries {
 		if e.msg == "grpc stream" {
-			kvStr := fmt.Sprintf("%v", e.kvPairs)
+			kvStr := fmt.Sprintf("%v", e.fields)
 			if !strings.Contains(kvStr, "/test.Service/DataStream") {
-				t.Errorf("log missing method, kvPairs: %v", e.kvPairs)
+				t.Errorf("log missing method, kvPairs: %v", e.fields)
 			}
 			if !strings.Contains(kvStr, "duration_ms") {
-				t.Errorf("log missing duration_ms, kvPairs: %v", e.kvPairs)
+				t.Errorf("log missing duration_ms, kvPairs: %v", e.fields)
 			}
 			break
 		}
@@ -1464,7 +1469,7 @@ func TestLoggingStreamInterceptor_ErrorStream(t *testing.T) {
 	found := false
 	for _, e := range entries {
 		if e.msg == "grpc stream" {
-			kvStr := fmt.Sprintf("%v", e.kvPairs)
+			kvStr := fmt.Sprintf("%v", e.fields)
 			if strings.Contains(kvStr, "ResourceExhausted") {
 				found = true
 			}

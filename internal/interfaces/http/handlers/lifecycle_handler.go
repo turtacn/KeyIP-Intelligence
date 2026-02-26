@@ -298,4 +298,51 @@ func parseInt(s string) (int, error) {
 	return n, nil
 }
 
+// Router-compatible aliases
+
+// ListDeadlines is an alias for GetUpcomingDeadlines.
+func (h *LifecycleHandler) ListDeadlines(w http.ResponseWriter, r *http.Request) {
+	h.GetUpcomingDeadlines(w, r)
+}
+
+// ListUpcomingDeadlines is an alias for GetUpcomingDeadlines.
+func (h *LifecycleHandler) ListUpcomingDeadlines(w http.ResponseWriter, r *http.Request) {
+	h.GetUpcomingDeadlines(w, r)
+}
+
+// ListAnnuities handles annuities list (alias for ListFees).
+func (h *LifecycleHandler) ListAnnuities(w http.ResponseWriter, r *http.Request) {
+	h.ListFees(w, r)
+}
+
+// CalculateAnnuities handles annuity calculation (placeholder).
+func (h *LifecycleHandler) CalculateAnnuities(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "annuity calculation not yet implemented"})
+}
+
+// GetAnnuityBudget handles annuity budget retrieval (placeholder).
+func (h *LifecycleHandler) GetAnnuityBudget(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "annuity budget not yet implemented"})
+}
+
+// GetLegalStatus handles legal status retrieval (placeholder).
+func (h *LifecycleHandler) GetLegalStatus(w http.ResponseWriter, r *http.Request) {
+	h.GetLifecycle(w, r)
+}
+
+// SyncLegalStatus handles legal status sync (placeholder).
+func (h *LifecycleHandler) SyncLegalStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "legal status sync not yet implemented"})
+}
+
+// GetCalendar handles calendar retrieval (alias for GetTimeline).
+func (h *LifecycleHandler) GetCalendar(w http.ResponseWriter, r *http.Request) {
+	h.GetTimeline(w, r)
+}
+
+// ExportCalendar handles calendar export (placeholder).
+func (h *LifecycleHandler) ExportCalendar(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "calendar export not yet implemented"})
+}
+
 //Personal.AI order the ending

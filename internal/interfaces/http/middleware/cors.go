@@ -177,4 +177,21 @@ func CORS(config CORSConfig) func(http.Handler) http.Handler {
 	}
 }
 
+// CORSMiddleware wraps CORS middleware for use with router configuration.
+type CORSMiddleware struct {
+	handler func(http.Handler) http.Handler
+}
+
+// NewCORSMiddleware creates a new CORS middleware with the given config.
+func NewCORSMiddleware(config CORSConfig) *CORSMiddleware {
+	return &CORSMiddleware{
+		handler: CORS(config),
+	}
+}
+
+// Handler returns the middleware handler function.
+func (m *CORSMiddleware) Handler(next http.Handler) http.Handler {
+	return m.handler(next)
+}
+
 //Personal.AI order the ending

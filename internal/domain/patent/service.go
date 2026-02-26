@@ -202,4 +202,14 @@ func (s *PatentService) GetPatentsByMoleculeID(ctx context.Context, moleculeID s
 	return s.patentRepo.FindByMoleculeID(ctx, moleculeID)
 }
 
+// Type aliases for backward compatibility
+
+// Service is an alias for PatentService for backward compatibility with apiserver.
+type Service = PatentService
+
+// NewService creates a new patent service. Alias for NewPatentService.
+func NewService(repo PatentRepository, logger logging.Logger) *PatentService {
+	return NewPatentService(repo, nil, nil, logger)
+}
+
 //Personal.AI order the ending

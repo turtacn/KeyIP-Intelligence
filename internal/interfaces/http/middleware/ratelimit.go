@@ -304,4 +304,21 @@ func CompositeKeyFunc(r *http.Request) string {
 	return string(parts)
 }
 
+// RateLimitMiddleware wraps rate limiting middleware for use with router configuration.
+type RateLimitMiddleware struct {
+	handler func(http.Handler) http.Handler
+}
+
+// NewRateLimitMiddleware creates a new rate limit middleware with the given limiter and config.
+func NewRateLimitMiddleware(limiter RateLimiter, config RateLimitConfig) *RateLimitMiddleware {
+	return &RateLimitMiddleware{
+		handler: RateLimit(limiter, config),
+	}
+}
+
+// Handler returns the middleware handler function.
+func (m *RateLimitMiddleware) Handler(next http.Handler) http.Handler {
+	return m.handler(next)
+}
+
 //Personal.AI order the ending

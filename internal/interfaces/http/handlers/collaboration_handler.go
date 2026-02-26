@@ -480,4 +480,43 @@ func writeAppError(w http.ResponseWriter, err error) {
 	}
 }
 
+// Router-compatible aliases for CollaborationHandler
+
+// ListWorkspaces is an alias for the existing ListWorkspaces.
+// No change needed as method already exists.
+
+// GetWorkspace is an alias for the existing GetWorkspace.
+// No change needed as method already exists.
+
+// UpdateWorkspace is an alias for the existing UpdateWorkspace.
+// No change needed as method already exists.
+
+// DeleteWorkspace is an alias for the existing DeleteWorkspace.
+// No change needed as method already exists.
+
+// ListMembers handles member listing (placeholder).
+func (h *CollaborationHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "list members not yet implemented"})
+}
+
+// AddMember is an alias for InviteMember.
+func (h *CollaborationHandler) AddMember(w http.ResponseWriter, r *http.Request) {
+	h.InviteMember(w, r)
+}
+
+// CreateShareLink handles share link creation (alias for ShareDocument).
+func (h *CollaborationHandler) CreateShareLink(w http.ResponseWriter, r *http.Request) {
+	h.ShareDocument(w, r)
+}
+
+// GetSharedResource handles shared resource retrieval (placeholder).
+func (h *CollaborationHandler) GetSharedResource(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "get shared resource not yet implemented"})
+}
+
+// RevokeShareLink handles share link revocation (placeholder).
+func (h *CollaborationHandler) RevokeShareLink(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "revoke share link not yet implemented"})
+}
+
 //Personal.AI order the ending

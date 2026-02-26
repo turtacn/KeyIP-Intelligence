@@ -177,4 +177,21 @@ func RequestLogging(logger logging.Logger, config LoggingConfig) func(http.Handl
 	}
 }
 
+// LoggingMiddleware wraps request logging middleware for use with router configuration.
+type LoggingMiddleware struct {
+	handler func(http.Handler) http.Handler
+}
+
+// NewLoggingMiddleware creates a new logging middleware with the given config.
+func NewLoggingMiddleware(logger logging.Logger, config LoggingConfig) *LoggingMiddleware {
+	return &LoggingMiddleware{
+		handler: RequestLogging(logger, config),
+	}
+}
+
+// Handler returns the middleware handler function.
+func (m *LoggingMiddleware) Handler(next http.Handler) http.Handler {
+	return m.handler(next)
+}
+
 //Personal.AI order the ending

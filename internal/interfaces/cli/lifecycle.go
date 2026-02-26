@@ -16,7 +16,6 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/lifecycle"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 var (

@@ -293,4 +293,56 @@ func (h *PatentHandler) GetPatentStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, stats)
 }
 
+// Router-compatible aliases for standard CRUD operations
+
+// List is an alias for ListPatents.
+func (h *PatentHandler) List(w http.ResponseWriter, r *http.Request) {
+	h.ListPatents(w, r)
+}
+
+// Create is an alias for CreatePatent.
+func (h *PatentHandler) Create(w http.ResponseWriter, r *http.Request) {
+	h.CreatePatent(w, r)
+}
+
+// Get is an alias for GetPatent.
+func (h *PatentHandler) Get(w http.ResponseWriter, r *http.Request) {
+	h.GetPatent(w, r)
+}
+
+// Update is an alias for UpdatePatent.
+func (h *PatentHandler) Update(w http.ResponseWriter, r *http.Request) {
+	h.UpdatePatent(w, r)
+}
+
+// Delete is an alias for DeletePatent.
+func (h *PatentHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	h.DeletePatent(w, r)
+}
+
+// Search is an alias for SearchPatents.
+func (h *PatentHandler) Search(w http.ResponseWriter, r *http.Request) {
+	h.SearchPatents(w, r)
+}
+
+// AnalyzeClaims handles claims analysis (placeholder for router).
+func (h *PatentHandler) AnalyzeClaims(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "claims analysis not yet implemented"})
+}
+
+// GetFamily handles patent family retrieval (placeholder for router).
+func (h *PatentHandler) GetFamily(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "patent family not yet implemented"})
+}
+
+// GetCitationNetwork handles citation network retrieval (placeholder for router).
+func (h *PatentHandler) GetCitationNetwork(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "citation network not yet implemented"})
+}
+
+// CheckFTO handles FTO check (placeholder for router).
+func (h *PatentHandler) CheckFTO(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "FTO check not yet implemented"})
+}
+
 //Personal.AI order the ending

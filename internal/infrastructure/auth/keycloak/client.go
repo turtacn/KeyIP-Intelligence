@@ -724,4 +724,26 @@ func (c *keycloakClient) doWithRetry(req *http.Request) (*http.Response, error) 
 	return nil, err
 }
 
+// Type aliases for backward compatibility with apiserver/worker
+
+// Client is an alias for keycloakClient implementing AuthProvider interface.
+type Client struct {
+	*keycloakClient
+}
+
+// NewClient creates a new Keycloak client with the given configuration.
+// Uses a no-op logger by default for backward compatibility.
+func NewClient(cfg *KeycloakConfig) (*Client, error) {
+	if cfg == nil {
+		return nil, errors.Wrap(ErrInvalidConfig, errors.ErrCodeValidation, "config is nil")
+	}
+	// Use a no-op logger for backward compatibility
+	noopLogger := logging.NewNopLogger()
+	kc, err := NewKeycloakClient(*cfg, noopLogger)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{keycloakClient: kc.(*keycloakClient)}, nil
+}
+
 //Personal.AI order the ending

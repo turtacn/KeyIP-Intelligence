@@ -566,6 +566,9 @@ type CLIValuationRequest struct {
 	Context       context.Context `json:"-"`
 }
 
+// ValuationRequest is an alias for CLIValuationRequest (for CLI test compatibility).
+type ValuationRequest = CLIValuationRequest
+
 // CLIValuationResult is the CLI-compatible response for patent assessment.
 type CLIValuationResult struct {
 	Items           []*CLIValuationItem `json:"items"`
@@ -633,6 +636,9 @@ type ValuationService interface {
 
 	// AssessPortfolioCLI performs portfolio assessment for CLI usage.
 	AssessPortfolioCLI(ctx context.Context, req *CLIPortfolioAssessRequest) (*CLIPortfolioAssessResult, error)
+
+	// AssessPortfolio performs batch assessment of a patent portfolio (alias for AssessPortfolioFull).
+	AssessPortfolio(ctx context.Context, req *PortfolioAssessmentRequest) (*PortfolioAssessmentResponse, error)
 
 	// AssessPortfolioFull performs batch assessment of a patent portfolio with aggregation.
 	AssessPortfolioFull(ctx context.Context, req *PortfolioAssessmentRequest) (*PortfolioAssessmentResponse, error)
@@ -988,6 +994,11 @@ func (s *valuationServiceImpl) AssessPortfolioCLI(ctx context.Context, req *CLIP
 // ---------------------------------------------------------------------------
 // AssessPortfolioFull
 // ---------------------------------------------------------------------------
+
+// AssessPortfolio is an alias for AssessPortfolioFull.
+func (s *valuationServiceImpl) AssessPortfolio(ctx context.Context, req *PortfolioAssessmentRequest) (*PortfolioAssessmentResponse, error) {
+	return s.AssessPortfolioFull(ctx, req)
+}
 
 func (s *valuationServiceImpl) AssessPortfolioFull(ctx context.Context, req *PortfolioAssessmentRequest) (*PortfolioAssessmentResponse, error) {
 	start := time.Now()

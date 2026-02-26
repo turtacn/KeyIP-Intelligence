@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -15,9 +14,6 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 )
 
 var (
@@ -93,10 +89,10 @@ func NewSearchCmd(
 func runSearchMolecule(ctx context.Context, service patent_mining.SimilaritySearchService, logger logging.Logger) error {
 	// Validate mutually exclusive flags
 	if searchSMILES == "" && searchInChI == "" {
-		return errors.New("either --smiles or --inchi must be provided")
+		return errors.NewMsg("either --smiles or --inchi must be provided")
 	}
 	if searchSMILES != "" && searchInChI != "" {
-		return errors.New("--smiles and --inchi are mutually exclusive, provide only one")
+		return errors.NewMsg("--smiles and --inchi are mutually exclusive, provide only one")
 	}
 
 	// Validate threshold range
@@ -116,33 +112,29 @@ func runSearchMolecule(ctx context.Context, service patent_mining.SimilaritySear
 	}
 
 	// Parse offices
-	offices := parseOffices(searchOffices)
+	_ = parseOffices(searchOffices)
 
 	logger.Info("Starting molecule similarity search",
-		"smiles", searchSMILES,
-		"inchi", searchInChI,
-		"threshold", searchThreshold,
-		"fingerprints", fingerprints,
-		"max_results", searchMaxResults,
-		"include_risk", searchIncludeRisk)
+		logging.String("smiles", searchSMILES),
+		logging.String("inchi", searchInChI),
+		logging.Float64("threshold", searchThreshold),
+		logging.Int("max_results", searchMaxResults),
+		logging.Bool("include_risk", searchIncludeRisk))
 
-	// Build search request
-	req := &patent_mining.SimilaritySearchRequest{
-		SMILES:        searchSMILES,
-		InChI:         searchInChI,
-		Threshold:     searchThreshold,
-		Fingerprints:  fingerprints,
-		MaxResults:    searchMaxResults,
-		Offices:       offices,
-		IncludeRisk:   searchIncludeRisk,
-		Context:       ctx,
+	// Build search query for the service
+	query := &patent_mining.SimilarityQuery{
+		SMILES:          searchSMILES,
+		InChI:           searchInChI,
+		Threshold:       searchThreshold,
+		FingerprintType: strings.Join(fingerprints, ","),
+		MaxResults:      searchMaxResults,
 	}
 
 	// Execute search
-	results, err := service.Search(ctx, req)
+	results, err := service.Search(ctx, query)
 	if err != nil {
-		logger.Error("Molecule search failed", "error", err)
-		return errors.Wrap(err, "molecule similarity search failed")
+		logger.Error("Molecule search failed", logging.String("error", err.Error()))
+		return errors.WrapMsg(err, "molecule similarity search failed")
 	}
 
 	// Check empty results
@@ -153,15 +145,15 @@ func runSearchMolecule(ctx context.Context, service patent_mining.SimilaritySear
 	}
 
 	// Format output
-	output, err := formatMoleculeResults(results, searchOutput)
+	output, err := formatSimilarityResults(results, searchOutput)
 	if err != nil {
-		return errors.Wrap(err, "failed to format results")
+		return errors.WrapMsg(err, "failed to format results")
 	}
 
 	fmt.Print(output)
 
 	logger.Info("Molecule search completed",
-		"results_count", len(results))
+		logging.Int("results_count", len(results)))
 
 	return nil
 }
@@ -197,22 +189,22 @@ func runSearchPatent(ctx context.Context, service patent_mining.SimilaritySearch
 
 	// Validate date range logic
 	if dateFrom != nil && dateTo != nil && dateFrom.After(*dateTo) {
-		return errors.New("date-from cannot be later than date-to")
+		return errors.NewMsg("date-from cannot be later than date-to")
 	}
 
 	// Parse offices
 	offices := parseOffices(searchOffices)
 
 	logger.Info("Starting patent text search",
-		"query", searchQuery,
-		"ipc", searchIPC,
-		"cpc", searchCPC,
-		"date_range", fmt.Sprintf("%v to %v", dateFrom, dateTo),
-		"max_results", searchMaxResults,
-		"sort", searchSort)
+		logging.String("query", searchQuery),
+		logging.String("ipc", searchIPC),
+		logging.String("cpc", searchCPC),
+		logging.String("date_range", fmt.Sprintf("%v to %v", dateFrom, dateTo)),
+		logging.Int("max_results", searchMaxResults),
+		logging.String("sort", searchSort))
 
 	// Build search request
-	req := &patent_mining.PatentSearchRequest{
+	req := &patent_mining.PatentTextSearchRequest{
 		Query:      searchQuery,
 		IPC:        searchIPC,
 		CPC:        searchCPC,
@@ -227,8 +219,8 @@ func runSearchPatent(ctx context.Context, service patent_mining.SimilaritySearch
 	// Execute search
 	results, err := service.SearchByText(ctx, req)
 	if err != nil {
-		logger.Error("Patent search failed", "error", err)
-		return errors.Wrap(err, "patent text search failed")
+		logger.Error("Patent search failed", logging.String("error", err.Error()))
+		return errors.WrapMsg(err, "patent text search failed")
 	}
 
 	// Check empty results
@@ -239,25 +231,25 @@ func runSearchPatent(ctx context.Context, service patent_mining.SimilaritySearch
 	}
 
 	// Format output
-	output, err := formatPatentResults(results, searchOutput)
+	output, err := formatCLIPatentResults(results, searchOutput)
 	if err != nil {
-		return errors.Wrap(err, "failed to format results")
+		return errors.WrapMsg(err, "failed to format results")
 	}
 
 	fmt.Print(output)
 
 	logger.Info("Patent search completed",
-		"results_count", len(results))
+		logging.Int("results_count", len(results)))
 
 	return nil
 }
 
 func parseFingerprints(input string) ([]string, error) {
 	validFingerprints := map[string]bool{
-		"morgan":       true,
-		"topological":  true,
-		"maccs":        true,
-		"gnn":          true,
+		"morgan":      true,
+		"topological": true,
+		"maccs":       true,
+		"gnn":         true,
 	}
 
 	parts := strings.Split(input, ",")
@@ -275,7 +267,7 @@ func parseFingerprints(input string) ([]string, error) {
 	}
 
 	if len(result) == 0 {
-		return nil, errors.New("at least one valid fingerprint type required")
+		return nil, errors.NewMsg("at least one valid fingerprint type required")
 	}
 
 	return result, nil
@@ -299,7 +291,7 @@ func parseOffices(input string) []string {
 	return result
 }
 
-func formatMoleculeResults(results []*patent_mining.MoleculeSearchResult, format string) (string, error) {
+func formatSimilarityResults(results []patent_mining.SimilarityResult, format string) (string, error) {
 	if format == "json" {
 		data, err := json.MarshalIndent(results, "", "  ")
 		if err != nil {
@@ -313,24 +305,24 @@ func formatMoleculeResults(results []*patent_mining.MoleculeSearchResult, format
 	buf.WriteString("\n=== Molecule Similarity Search Results ===\n\n")
 
 	table := tablewriter.NewWriter(&buf)
-	headers := []string{"Rank", "Similarity", "Patent", "Molecule Name", "SMILES"}
-	if searchIncludeRisk {
-		headers = append(headers, "Risk Level")
-	}
-	table.SetHeader(headers)
-	table.SetBorder(true)
-	table.SetAutoWrapText(false)
+	table.Header([]string{"Rank", "Similarity", "ID", "Name", "SMILES", "Method"})
 
 	for i, result := range results {
+		moleculeName := ""
+		moleculeSMILES := ""
+		moleculeID := ""
+		if result.Molecule != nil {
+			moleculeName = result.Molecule.Name
+			moleculeSMILES = result.Molecule.SMILES
+			moleculeID = result.Molecule.ID
+		}
 		row := []string{
 			fmt.Sprintf("%d", i+1),
 			fmt.Sprintf("%.2f%%", result.Similarity*100),
-			result.PatentNumber,
-			truncateString(result.MoleculeName, 30),
-			truncateString(result.SMILES, 40),
-		}
-		if searchIncludeRisk {
-			row = append(row, colorizeRiskLevel(result.RiskLevel))
+			truncateString(moleculeID, 20),
+			truncateString(moleculeName, 30),
+			truncateString(moleculeSMILES, 40),
+			result.Method,
 		}
 		table.Append(row)
 	}
@@ -343,7 +335,7 @@ func formatMoleculeResults(results []*patent_mining.MoleculeSearchResult, format
 	return buf.String(), nil
 }
 
-func formatPatentResults(results []*patent_mining.PatentSearchResult, format string) (string, error) {
+func formatCLIPatentResults(results []*patent_mining.CLIPatentSearchResult, format string) (string, error) {
 	if format == "json" {
 		data, err := json.MarshalIndent(results, "", "  ")
 		if err != nil {
@@ -357,9 +349,7 @@ func formatPatentResults(results []*patent_mining.PatentSearchResult, format str
 	buf.WriteString("\n=== Patent Text Search Results ===\n\n")
 
 	table := tablewriter.NewWriter(&buf)
-	table.SetHeader([]string{"Rank", "Relevance", "Patent", "Title", "Filing Date", "IPC"})
-	table.SetBorder(true)
-	table.SetAutoWrapText(false)
+	table.Header([]string{"Rank", "Relevance", "Patent", "Title", "Filing Date", "IPC"})
 
 	for i, result := range results {
 		relevanceStr := fmt.Sprintf("%.2f%%", result.Relevance*100)

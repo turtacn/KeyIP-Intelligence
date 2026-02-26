@@ -2,9 +2,70 @@ package patent
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+// SearchFilter defines search criteria for patents (used by gRPC services).
+type SearchFilter struct {
+	Query         string
+	IPCClasses    []string
+	CPCClasses    []string
+	PatentOffices []string
+	DateFrom      time.Time
+	DateTo        time.Time
+	PageSize      int
+	PageToken     string
+	SortBy        string
+	SortOrder     string
+}
+
+// PatentFamily represents a group of related patents.
+type PatentFamily struct {
+	FamilyID string
+	Members  []*FamilyMember
+}
+
+// FamilyMember represents a member of a patent family.
+type FamilyMember struct {
+	PatentNumber     string
+	PatentOffice     string
+	ApplicationDate  time.Time
+	PublicationDate  time.Time
+	LegalStatus      string
+	IsRepresentative bool
+}
+
+// CitationNetworkQuery defines parameters for citation network queries.
+type CitationNetworkQuery struct {
+	PatentNumber  string
+	Depth         int32
+	IncludeCiting bool
+	IncludeCited  bool
+}
+
+// CitationNetwork represents a patent citation network.
+type CitationNetwork struct {
+	Nodes       []*CitationNode
+	Edges       []*CitationEdge
+	IsTruncated bool
+}
+
+// CitationNode represents a node in a citation network.
+type CitationNode struct {
+	PatentNumber string
+	Title        string
+	IsRoot       bool
+	Level        int
+}
+
+// CitationEdge represents an edge in a citation network.
+type CitationEdge struct {
+	FromPatent string
+	ToPatent   string
+	EdgeType   string
+}
 
 // PatentRepository defines the persistence contract for patent domain.
 type PatentRepository interface {
@@ -64,5 +125,35 @@ type PatentRepository interface {
 
 // Repository alias for PatentRepository
 type Repository = PatentRepository
+
+// CitationRepository handles patent citation relationships.
+type CitationRepository interface {
+	// GetCitations returns citations for a patent
+	GetCitations(ctx context.Context, patentID string) ([]string, error)
+	// AddCitation adds a citation relationship
+	AddCitation(ctx context.Context, patentID, citedPatentID string) error
+	// GetCitedBy returns patents citing the given patent
+	GetCitedBy(ctx context.Context, patentID string) ([]string, error)
+}
+
+// FamilyRepository handles patent family relationships.
+type FamilyRepository interface {
+	// GetFamilyMembers returns family members for a patent
+	GetFamilyMembers(ctx context.Context, patentID string) ([]string, error)
+	// AddFamilyMember adds a family relationship
+	AddFamilyMember(ctx context.Context, patentID, familyPatentID string) error
+	// GetFamilyID returns the family ID for a patent
+	GetFamilyID(ctx context.Context, patentID string) (string, error)
+}
+
+// KnowledgeGraphRepository handles patent knowledge graph operations.
+type KnowledgeGraphRepository interface {
+	// GetRelatedPatents returns related patents based on knowledge graph
+	GetRelatedPatents(ctx context.Context, patentID string, depth int) ([]string, error)
+	// GetTechnologyClusters returns technology clusters
+	GetTechnologyClusters(ctx context.Context, domain string) ([]string, error)
+	// FindPath finds shortest path between two patents
+	FindPath(ctx context.Context, fromPatentID, toPatentID string) ([]string, error)
+}
 
 //Personal.AI order the ending

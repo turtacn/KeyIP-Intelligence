@@ -39,6 +39,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 )
 
 // --- Mock implementations ---
@@ -71,16 +72,20 @@ type mockMiddlewareLogger struct {
 	mock.Mock
 }
 
-func (m *mockMiddlewareLogger) Debug(msg string, keysAndValues ...interface{}) {}
-func (m *mockMiddlewareLogger) Info(msg string, keysAndValues ...interface{})  {}
-func (m *mockMiddlewareLogger) Warn(msg string, keysAndValues ...interface{})  {}
-func (m *mockMiddlewareLogger) Error(msg string, keysAndValues ...interface{}) {
-	m.Called(msg, keysAndValues)
+func (m *mockMiddlewareLogger) Debug(msg string, fields ...logging.Field) {}
+func (m *mockMiddlewareLogger) Info(msg string, fields ...logging.Field)  {}
+func (m *mockMiddlewareLogger) Warn(msg string, fields ...logging.Field)  {}
+func (m *mockMiddlewareLogger) Error(msg string, fields ...logging.Field) {
+	m.Called(msg, fields)
 }
-func (m *mockMiddlewareLogger) With(keysAndValues ...interface{}) logging.Logger { return m }
+func (m *mockMiddlewareLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockMiddlewareLogger) WithContext(ctx context.Context) logging.Logger { return m }
+func (m *mockMiddlewareLogger) WithError(err error) logging.Logger { return m }
+func (m *mockMiddlewareLogger) Fatal(msg string, fields ...logging.Field) {}
+func (m *mockMiddlewareLogger) Sync() error { return nil }
 
-// We need the logging import for the mock
-import "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+
+
 
 // testHandler is a simple handler that records whether it was called.
 func testHandler(called *bool) http.Handler {

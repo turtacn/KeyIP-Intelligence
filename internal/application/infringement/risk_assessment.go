@@ -2299,4 +2299,7 @@ var (
 	_ = sync.Mutex{}
 )
 
+// Service is an alias for RiskAssessmentService for backward compatibility with apiserver.
+type Service = RiskAssessmentService
+
 //Personal.AI order the ending

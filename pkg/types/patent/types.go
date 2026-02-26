@@ -688,4 +688,13 @@ type ValuationItem struct {
 	Factors         map[string]float64 `json:"factors,omitempty"`
 }
 
+// HighRiskPatent represents a patent identified as high risk in portfolio assessment.
+type HighRiskPatent struct {
+	PatentID     string  `json:"patent_id,omitempty"`
+	PatentNumber string  `json:"patent_number"`
+	RiskReason   string  `json:"risk_reason"`
+	RiskLevel    string  `json:"risk_level,omitempty"`
+	RiskScore    float64 `json:"risk_score,omitempty"`
+}
+
 //Personal.AI order the ending

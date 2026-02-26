@@ -72,4 +72,47 @@ type Service interface {
 	FetchRemoteStatus(ctx context.Context, patentID string) (*RemoteStatusResult, error)
 }
 
+// Repository is an alias for LifecycleRepository for backward compatibility with apiserver.
+type Repository = LifecycleRepository
+
+// lifecycleServiceImpl implements the Service interface.
+type lifecycleServiceImpl struct {
+	repo LifecycleRepository
+}
+
+// NewService creates a new lifecycle Service.
+func NewService(repo LifecycleRepository, logger interface{}) Service {
+	return &lifecycleServiceImpl{repo: repo}
+}
+
+// CalculateAnnuityFee calculates the annuity fee for a patent.
+func (s *lifecycleServiceImpl) CalculateAnnuityFee(ctx context.Context, patentID string, jurisdiction Jurisdiction, asOf time.Time) (*AnnuityCalcResult, error) {
+	// Placeholder implementation
+	return &AnnuityCalcResult{
+		Fee:            0,
+		YearNumber:     1,
+		DueDate:        asOf,
+		GracePeriodEnd: asOf.AddDate(0, 6, 0),
+		Status:         "pending",
+	}, nil
+}
+
+// GetAnnuitySchedule returns the annuity schedule for a patent.
+func (s *lifecycleServiceImpl) GetAnnuitySchedule(ctx context.Context, patentID string, jurisdiction Jurisdiction, start, end time.Time) ([]ScheduleEntry, error) {
+	// Placeholder implementation
+	return nil, nil
+}
+
+// FetchRemoteStatus fetches the remote status of a patent.
+func (s *lifecycleServiceImpl) FetchRemoteStatus(ctx context.Context, patentID string) (*RemoteStatusResult, error) {
+	// Placeholder implementation
+	return &RemoteStatusResult{
+		Status:        "unknown",
+		EffectiveDate: time.Now(),
+		NextAction:    "",
+		Source:        "",
+		Jurisdiction:  "",
+	}, nil
+}
+
 //Personal.AI order the ending
