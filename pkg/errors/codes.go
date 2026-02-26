@@ -30,6 +30,11 @@ const (
 	ErrCodeExternalService    ErrorCode = "COMMON_014"
 	ErrCodeFeatureDisabled    ErrorCode = "COMMON_015"
 	ErrCodeNotImplemented     ErrorCode = "COMMON_016"
+	ErrCodeInvalidInput       ErrorCode = "COMMON_017"
+	ErrCodeStateChange        ErrorCode = "COMMON_018"
+	ErrCodeEntityNotFound     ErrorCode = "COMMON_019"
+	ErrCodeOptimisticLock     ErrorCode = "COMMON_020"
+	ErrCodeInvalidOperation   ErrorCode = "COMMON_021"
 )
 
 // Aliases for backward compatibility
@@ -168,6 +173,11 @@ var ErrorCodeHTTPStatus = map[ErrorCode]int{
 	ErrCodeCacheError:         http.StatusInternalServerError,
 	ErrCodeExternalService:    http.StatusInternalServerError,
 	ErrCodeFeatureDisabled:    http.StatusForbidden,
+	ErrCodeInvalidInput:       http.StatusBadRequest,
+	ErrCodeStateChange:        http.StatusConflict,
+	ErrCodeEntityNotFound:     http.StatusNotFound,
+	ErrCodeOptimisticLock:     http.StatusConflict,
+	ErrCodeInvalidOperation:   http.StatusBadRequest,
 
 	ErrCodeMoleculeInvalidSMILES:      http.StatusBadRequest,
 	ErrCodeMoleculeInvalidInChI:       http.StatusBadRequest,
@@ -250,6 +260,11 @@ var ErrorCodeMessage = map[ErrorCode]string{
 	ErrCodeCacheError:         "cache error",
 	ErrCodeExternalService:    "external service error",
 	ErrCodeFeatureDisabled:    "feature disabled",
+	ErrCodeInvalidInput:       "invalid input",
+	ErrCodeStateChange:        "invalid state transition",
+	ErrCodeEntityNotFound:     "entity not found",
+	ErrCodeOptimisticLock:     "optimistic lock failure",
+	ErrCodeInvalidOperation:   "invalid operation",
 
 	ErrCodeMoleculeInvalidSMILES:      "invalid SMILES format",
 	ErrCodeMoleculeInvalidInChI:       "invalid InChI format",

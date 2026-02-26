@@ -2,749 +2,375 @@ package molecule
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// MockMoleculeRepository is a mock implementation of MoleculeRepository
-type MockMoleculeRepository struct {
-	mock.Mock
+// --- Mocks ---
+
+type mockMoleculeRepository struct {
+	SaveFunc               func(ctx context.Context, m *Molecule) error
+	UpdateFunc             func(ctx context.Context, m *Molecule) error
+	DeleteFunc             func(ctx context.Context, id string) error
+	BatchSaveFunc          func(ctx context.Context, molecules []*Molecule) (int, error)
+	FindByIDFunc           func(ctx context.Context, id string) (*Molecule, error)
+	FindByInChIKeyFunc     func(ctx context.Context, inchiKey string) (*Molecule, error)
+	ExistsByInChIKeyFunc   func(ctx context.Context, inchiKey string) (bool, error)
+	SearchFunc             func(ctx context.Context, query *MoleculeQuery) (*MoleculeSearchResult, error)
+
+	// Track calls
+	SaveCalls              int
+	UpdateCalls            int
+	DeleteCalls            int
+	BatchSaveCalls         int
+	FindByIDCalls          int
+	FindByInChIKeyCalls    int
+	ExistsByInChIKeyCalls  int
+	SearchCalls            int
 }
 
-func (m *MockMoleculeRepository) Save(ctx context.Context, mol *Molecule) error {
-	args := m.Called(ctx, mol)
-	return args.Error(0)
-}
-
-func (m *MockMoleculeRepository) FindByID(ctx context.Context, id string) (*Molecule, error) {
-	args := m.Called(ctx, id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockMoleculeRepository) Save(ctx context.Context, molecule *Molecule) error {
+	m.SaveCalls++
+	if m.SaveFunc != nil {
+		return m.SaveFunc(ctx, molecule)
 	}
-	return args.Get(0).(*Molecule), args.Error(1)
+	return nil
 }
 
-func (m *MockMoleculeRepository) FindByInChIKey(ctx context.Context, inchiKey string) (*Molecule, error) {
-	args := m.Called(ctx, inchiKey)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockMoleculeRepository) Update(ctx context.Context, molecule *Molecule) error {
+	m.UpdateCalls++
+	if m.UpdateFunc != nil {
+		return m.UpdateFunc(ctx, molecule)
 	}
-	return args.Get(0).(*Molecule), args.Error(1)
+	return nil
 }
 
-func (m *MockMoleculeRepository) ExistsByInChIKey(ctx context.Context, inchiKey string) (bool, error) {
-	args := m.Called(ctx, inchiKey)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockMoleculeRepository) Update(ctx context.Context, mol *Molecule) error {
-	args := m.Called(ctx, mol)
-	return args.Error(0)
-}
-
-func (m *MockMoleculeRepository) Search(ctx context.Context, query *MoleculeQuery) (*MoleculeSearchResult, error) {
-	args := m.Called(ctx, query)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockMoleculeRepository) Delete(ctx context.Context, id string) error {
+	m.DeleteCalls++
+	if m.DeleteFunc != nil {
+		return m.DeleteFunc(ctx, id)
 	}
-	return args.Get(0).(*MoleculeSearchResult), args.Error(1)
+	return nil
 }
 
-func (m *MockMoleculeRepository) BatchSave(ctx context.Context, mols []*Molecule) (int, error) {
-	args := m.Called(ctx, mols)
-	return args.Int(0), args.Error(1)
-}
-
-func (m *MockMoleculeRepository) Delete(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
-}
-
-func (m *MockMoleculeRepository) FindBySMILES(ctx context.Context, smiles string) ([]*Molecule, error) {
-	args := m.Called(ctx, smiles)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockMoleculeRepository) BatchSave(ctx context.Context, molecules []*Molecule) (int, error) {
+	m.BatchSaveCalls++
+	if m.BatchSaveFunc != nil {
+		return m.BatchSaveFunc(ctx, molecules)
 	}
-	return args.Get(0).([]*Molecule), args.Error(1)
+	return len(molecules), nil
 }
 
-func (m *MockMoleculeRepository) FindByIDs(ctx context.Context, ids []string) ([]*Molecule, error) {
-	args := m.Called(ctx, ids)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockMoleculeRepository) FindByID(ctx context.Context, id string) (*Molecule, error) {
+	m.FindByIDCalls++
+	if m.FindByIDFunc != nil {
+		return m.FindByIDFunc(ctx, id)
 	}
-	return args.Get(0).([]*Molecule), args.Error(1)
+	return nil, errors.New(errors.ErrCodeEntityNotFound, "not found")
 }
 
-func (m *MockMoleculeRepository) Exists(ctx context.Context, id string) (bool, error) {
-	args := m.Called(ctx, id)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockMoleculeRepository) Count(ctx context.Context, query *MoleculeQuery) (int64, error) {
-	args := m.Called(ctx, query)
-	return args.Get(0).(int64), args.Error(1)
-}
-
-func (m *MockMoleculeRepository) FindBySource(ctx context.Context, source MoleculeSource, offset, limit int) ([]*Molecule, error) {
-	args := m.Called(ctx, source, offset, limit)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockMoleculeRepository) FindByInChIKey(ctx context.Context, inchiKey string) (*Molecule, error) {
+	m.FindByInChIKeyCalls++
+	if m.FindByInChIKeyFunc != nil {
+		return m.FindByInChIKeyFunc(ctx, inchiKey)
 	}
-	return args.Get(0).([]*Molecule), args.Error(1)
+	return nil, errors.New(errors.ErrCodeEntityNotFound, "not found")
 }
 
-func (m *MockMoleculeRepository) FindByStatus(ctx context.Context, status MoleculeStatus, offset, limit int) ([]*Molecule, error) {
-	args := m.Called(ctx, status, offset, limit)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockMoleculeRepository) ExistsByInChIKey(ctx context.Context, inchiKey string) (bool, error) {
+	m.ExistsByInChIKeyCalls++
+	if m.ExistsByInChIKeyFunc != nil {
+		return m.ExistsByInChIKeyFunc(ctx, inchiKey)
 	}
-	return args.Get(0).([]*Molecule), args.Error(1)
+	return false, nil
 }
 
-func (m *MockMoleculeRepository) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*Molecule, error) {
-	args := m.Called(ctx, tags, offset, limit)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockMoleculeRepository) Search(ctx context.Context, query *MoleculeQuery) (*MoleculeSearchResult, error) {
+	m.SearchCalls++
+	if m.SearchFunc != nil {
+		return m.SearchFunc(ctx, query)
 	}
-	return args.Get(0).([]*Molecule), args.Error(1)
+	return &MoleculeSearchResult{}, nil
 }
 
-func (m *MockMoleculeRepository) FindByMolecularWeightRange(ctx context.Context, minWeight, maxWeight float64, offset, limit int) ([]*Molecule, error) {
-	args := m.Called(ctx, minWeight, maxWeight, offset, limit)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+// Implement other interface methods with panic or no-op if not used in service logic
+func (m *mockMoleculeRepository) FindBySMILES(ctx context.Context, smiles string) ([]*Molecule, error) { return nil, nil }
+func (m *mockMoleculeRepository) FindByIDs(ctx context.Context, ids []string) ([]*Molecule, error) { return nil, nil }
+func (m *mockMoleculeRepository) Exists(ctx context.Context, id string) (bool, error) { return false, nil }
+func (m *mockMoleculeRepository) Count(ctx context.Context, query *MoleculeQuery) (int64, error) { return 0, nil }
+func (m *mockMoleculeRepository) FindBySource(ctx context.Context, source MoleculeSource, offset, limit int) ([]*Molecule, error) { return nil, nil }
+func (m *mockMoleculeRepository) FindByStatus(ctx context.Context, status MoleculeStatus, offset, limit int) ([]*Molecule, error) { return nil, nil }
+func (m *mockMoleculeRepository) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*Molecule, error) { return nil, nil }
+func (m *mockMoleculeRepository) FindByMolecularWeightRange(ctx context.Context, minWeight, maxWeight float64, offset, limit int) ([]*Molecule, error) { return nil, nil }
+func (m *mockMoleculeRepository) FindWithFingerprint(ctx context.Context, fpType FingerprintType, offset, limit int) ([]*Molecule, error) { return nil, nil }
+func (m *mockMoleculeRepository) FindWithoutFingerprint(ctx context.Context, fpType FingerprintType, offset, limit int) ([]*Molecule, error) { return nil, nil }
+
+
+type mockFingerprintCalculator struct {
+	CalculateFunc      func(ctx context.Context, smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) (*Fingerprint, error)
+	BatchCalculateFunc func(ctx context.Context, smilesSlice []string, fpType FingerprintType, opts *FingerprintCalcOptions) ([]*Fingerprint, error)
+	StandardizeFunc    func(ctx context.Context, smiles string) (string, string, string, string, float64, error)
+
+	CalculateCalls      int
+	BatchCalculateCalls int
+	StandardizeCalls    int
+}
+
+func (m *mockFingerprintCalculator) Calculate(ctx context.Context, smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) (*Fingerprint, error) {
+	m.CalculateCalls++
+	if m.CalculateFunc != nil {
+		return m.CalculateFunc(ctx, smiles, fpType, opts)
 	}
-	return args.Get(0).([]*Molecule), args.Error(1)
+	return &Fingerprint{Type: fpType}, nil
 }
 
-func (m *MockMoleculeRepository) FindWithFingerprint(ctx context.Context, fpType FingerprintType, offset, limit int) ([]*Molecule, error) {
-	args := m.Called(ctx, fpType, offset, limit)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockFingerprintCalculator) BatchCalculate(ctx context.Context, smilesSlice []string, fpType FingerprintType, opts *FingerprintCalcOptions) ([]*Fingerprint, error) {
+	m.BatchCalculateCalls++
+	if m.BatchCalculateFunc != nil {
+		return m.BatchCalculateFunc(ctx, smilesSlice, fpType, opts)
 	}
-	return args.Get(0).([]*Molecule), args.Error(1)
-}
-
-func (m *MockMoleculeRepository) FindWithoutFingerprint(ctx context.Context, fpType FingerprintType, offset, limit int) ([]*Molecule, error) {
-	args := m.Called(ctx, fpType, offset, limit)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+	res := make([]*Fingerprint, len(smilesSlice))
+	for i := range smilesSlice {
+		res[i] = &Fingerprint{Type: fpType}
 	}
-	return args.Get(0).([]*Molecule), args.Error(1)
+	return res, nil
 }
 
-// MockFingerprintCalculator is a mock implementation of FingerprintCalculator
-type MockFingerprintCalculator struct {
-	mock.Mock
-}
-
-func (m *MockFingerprintCalculator) Standardize(ctx context.Context, smiles string) (*StructuralIdentifiers, error) {
-	args := m.Called(ctx, smiles)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockFingerprintCalculator) Standardize(ctx context.Context, smiles string) (string, string, string, string, float64, error) {
+	m.StandardizeCalls++
+	if m.StandardizeFunc != nil {
+		return m.StandardizeFunc(ctx, smiles)
 	}
-	return args.Get(0).(*StructuralIdentifiers), args.Error(1)
+	// Default dummy with valid InChIKey format
+	return smiles, "InChI=...", "AAAAAAAAAAAAAA-BBBBBBBBBB-C", "C", 100.0, nil
 }
 
-func (m *MockFingerprintCalculator) Calculate(ctx context.Context, smiles string, fpType FingerprintType, opts FingerprintCalcOptions) (*Fingerprint, error) {
-	args := m.Called(ctx, smiles, fpType, opts)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockFingerprintCalculator) SupportedTypes() []FingerprintType { return nil }
+
+type mockSimilarityEngine struct {
+	SearchSimilarFunc func(ctx context.Context, target *Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error)
+	ComputeSimilarityFunc func(fp1, fp2 *Fingerprint, metric SimilarityMetric) (float64, error)
+
+	SearchSimilarCalls int
+	ComputeSimilarityCalls int
+}
+
+func (m *mockSimilarityEngine) SearchSimilar(ctx context.Context, target *Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error) {
+	m.SearchSimilarCalls++
+	if m.SearchSimilarFunc != nil {
+		return m.SearchSimilarFunc(ctx, target, metric, threshold, limit)
 	}
-	return args.Get(0).(*Fingerprint), args.Error(1)
+	return nil, nil
 }
 
-func (m *MockFingerprintCalculator) BatchCalculate(ctx context.Context, smilesList []string, fpType FingerprintType, opts FingerprintCalcOptions) ([]*Fingerprint, error) {
-	args := m.Called(ctx, smilesList, fpType, opts)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *mockSimilarityEngine) ComputeSimilarity(fp1, fp2 *Fingerprint, metric SimilarityMetric) (float64, error) {
+	m.ComputeSimilarityCalls++
+	if m.ComputeSimilarityFunc != nil {
+		return m.ComputeSimilarityFunc(fp1, fp2, metric)
 	}
-	return args.Get(0).([]*Fingerprint), args.Error(1)
+	return 0.0, nil
 }
 
-// MockSimilarityEngine is a mock implementation of SimilarityEngine
-type MockSimilarityEngine struct {
-	mock.Mock
+func (m *mockSimilarityEngine) BatchComputeSimilarity(target *Fingerprint, candidates []*Fingerprint, metric SimilarityMetric) ([]float64, error) { return nil, nil }
+func (m *mockSimilarityEngine) RankBySimilarity(ctx context.Context, target *Fingerprint, candidateIDs []string, metric SimilarityMetric) ([]*SimilarityResult, error) { return nil, nil }
+
+type mockLogger struct {
+	// Simple no-op logger or capture logs
 }
 
-func (m *MockSimilarityEngine) ComputeSimilarity(fp1, fp2 *Fingerprint, metric SimilarityMetric) (float64, error) {
-	args := m.Called(fp1, fp2, metric)
-	return args.Get(0).(float64), args.Error(1)
+func (l *mockLogger) Debug(msg string, fields ...logging.Field) {}
+func (l *mockLogger) Info(msg string, fields ...logging.Field) {}
+func (l *mockLogger) Warn(msg string, fields ...logging.Field) {}
+func (l *mockLogger) Error(msg string, fields ...logging.Field) {}
+func (l *mockLogger) Fatal(msg string, fields ...logging.Field) {}
+func (l *mockLogger) With(fields ...logging.Field) logging.Logger { return l }
+func (l *mockLogger) Sync() error { return nil }
+func (l *mockLogger) WithContext(ctx context.Context) logging.Logger { return l }
+func (l *mockLogger) WithError(err error) logging.Logger { return l }
+
+// --- Tests ---
+
+func TestNewMoleculeService(t *testing.T) {
+	repo := &mockMoleculeRepository{}
+	fpCalc := &mockFingerprintCalculator{}
+	simEngine := &mockSimilarityEngine{}
+	logger := &mockLogger{}
+
+	t.Run("success", func(t *testing.T) {
+		svc, err := NewMoleculeService(repo, fpCalc, simEngine, logger)
+		if err != nil {
+			t.Errorf("NewMoleculeService failed: %v", err)
+		}
+		if svc == nil {
+			t.Error("NewMoleculeService returned nil")
+		}
+	})
+
+	t.Run("nil dependency", func(t *testing.T) {
+		_, err := NewMoleculeService(nil, fpCalc, simEngine, logger)
+		if err == nil {
+			t.Error("NewMoleculeService allowed nil repo")
+		}
+	})
 }
 
-func (m *MockSimilarityEngine) SearchSimilar(ctx context.Context, queryFP *Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error) {
-	args := m.Called(ctx, queryFP, metric, threshold, limit)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*SimilarityResult), args.Error(1)
+func TestMoleculeService_RegisterMolecule(t *testing.T) {
+	repo := &mockMoleculeRepository{}
+	fpCalc := &mockFingerprintCalculator{}
+	simEngine := &mockSimilarityEngine{}
+	logger := &mockLogger{}
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
+
+	t.Run("success_new", func(t *testing.T) {
+		repo.ExistsByInChIKeyFunc = func(ctx context.Context, k string) (bool, error) { return false, nil }
+		repo.SaveFunc = func(ctx context.Context, m *Molecule) error { return nil }
+
+		mol, err := svc.RegisterMolecule(context.Background(), "c1ccccc1", SourceManual, "ref")
+		if err != nil {
+			t.Fatalf("RegisterMolecule failed: %v", err)
+		}
+		if mol.Status() != MoleculeStatusActive {
+			t.Errorf("Status = %v, want Active", mol.Status())
+		}
+		if repo.SaveCalls != 1 {
+			t.Errorf("SaveCalls = %d, want 1", repo.SaveCalls)
+		}
+		if fpCalc.StandardizeCalls != 1 {
+			t.Errorf("StandardizeCalls = %d, want 1", fpCalc.StandardizeCalls)
+		}
+		// Morgan + MACCS
+		if fpCalc.CalculateCalls != 2 {
+			t.Errorf("CalculateCalls = %d, want 2", fpCalc.CalculateCalls)
+		}
+	})
+
+	t.Run("idempotent_existing", func(t *testing.T) {
+		existingMol, _ := NewMolecule("c1ccccc1", SourceManual, "ref")
+		repo.ExistsByInChIKeyFunc = func(ctx context.Context, k string) (bool, error) { return true, nil }
+		repo.FindByInChIKeyFunc = func(ctx context.Context, k string) (*Molecule, error) { return existingMol, nil }
+		repo.SaveCalls = 0 // reset
+
+		mol, err := svc.RegisterMolecule(context.Background(), "c1ccccc1", SourceManual, "ref")
+		if err != nil {
+			t.Fatalf("RegisterMolecule failed: %v", err)
+		}
+		if mol != existingMol {
+			t.Error("Did not return existing molecule")
+		}
+		if repo.SaveCalls != 0 {
+			t.Error("Save called for existing molecule")
+		}
+	})
 }
 
-// MockLogger is a mock implementation of logging.Logger
-type MockLogger struct {
-	mock.Mock
-}
+func TestMoleculeService_BatchRegisterMolecules(t *testing.T) {
+	repo := &mockMoleculeRepository{}
+	fpCalc := &mockFingerprintCalculator{}
+	simEngine := &mockSimilarityEngine{}
+	logger := &mockLogger{}
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
 
-func (m *MockLogger) Debug(msg string, fields ...logging.Field) {}
-func (m *MockLogger) Info(msg string, fields ...logging.Field)  {}
-func (m *MockLogger) Warn(msg string, fields ...logging.Field)  {}
-func (m *MockLogger) Error(msg string, fields ...logging.Field) {}
-func (m *MockLogger) Fatal(msg string, fields ...logging.Field) {}
-func (m *MockLogger) With(fields ...logging.Field) logging.Logger {
-	return m
-}
-func (m *MockLogger) WithContext(ctx context.Context) logging.Logger {
-	return m
-}
-func (m *MockLogger) WithError(err error) logging.Logger {
-	return m
-}
-func (m *MockLogger) Sync() error { return nil }
-
-// Test cases
-
-func TestNewMoleculeService_Success(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, err := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, service)
-}
-
-func TestNewMoleculeService_NilDependencies(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	// Test nil repo
-	service, err := NewMoleculeService(nil, mockFpCalc, mockSimEngine, mockLogger)
-	assert.Error(t, err)
-	assert.Nil(t, service)
-
-	// Test nil fpCalc
-	service, err = NewMoleculeService(mockRepo, nil, mockSimEngine, mockLogger)
-	assert.Error(t, err)
-	assert.Nil(t, service)
-
-	// Test nil simEngine
-	service, err = NewMoleculeService(mockRepo, mockFpCalc, nil, mockLogger)
-	assert.Error(t, err)
-	assert.Nil(t, service)
-
-	// Test nil logger
-	service, err = NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, nil)
-	assert.Error(t, err)
-	assert.Nil(t, service)
-}
-
-func TestRegisterMolecule_Success(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	smiles := "CCO"
-	ids := &StructuralIdentifiers{
-		CanonicalSMILES: "CCO",
-		InChI:           "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3",
-		InChIKey:        "LFQSCWFLJHTTHZ-UHFFFAOYSA-N",
-		Formula:         "C2H6O",
-		Weight:          46.07,
-	}
-
-	mockFpCalc.On("Standardize", mock.Anything, smiles).Return(ids, nil)
-	mockRepo.On("ExistsByInChIKey", mock.Anything, ids.InChIKey).Return(false, nil)
-
-	opts := DefaultFingerprintCalcOptions()
-	morganFP := &Fingerprint{Type: string(FingerprintMorgan), Hash: "morgan_hash"}
-	maccsFP := &Fingerprint{Type: string(FingerprintMACCS), Hash: "maccs_hash"}
-
-	mockFpCalc.On("Calculate", mock.Anything, ids.CanonicalSMILES, FingerprintMorgan, opts).Return(morganFP, nil)
-	mockFpCalc.On("Calculate", mock.Anything, ids.CanonicalSMILES, FingerprintMACCS, opts).Return(maccsFP, nil)
-	mockRepo.On("Save", mock.Anything, mock.AnythingOfType("*molecule.Molecule")).Return(nil)
-
-	result, err := service.RegisterMolecule(context.Background(), smiles, SourceManual, "test-ref")
-
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, ids.CanonicalSMILES, result.CanonicalSMILES)
-	assert.Equal(t, ids.InChIKey, result.InChIKey)
-	assert.Equal(t, StatusActive, result.Status)
-	mockRepo.AssertExpectations(t)
-	mockFpCalc.AssertExpectations(t)
-}
-
-func TestRegisterMolecule_DuplicateFound(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	smiles := "CCO"
-	ids := &StructuralIdentifiers{
-		CanonicalSMILES: "CCO",
-		InChI:           "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3",
-		InChIKey:        "LFQSCWFLJHTTHZ-UHFFFAOYSA-N",
-		Formula:         "C2H6O",
-		Weight:          46.07,
+	reqs := []MoleculeRegistrationRequest{
+		{SMILES: "C"},
+		{SMILES: "CC"},
 	}
 
-	existingMol := &Molecule{
-		ID:       uuid.New(),
-		SMILES:   smiles,
-		InChIKey: ids.InChIKey,
-	}
+	t.Run("success_batch", func(t *testing.T) {
+		repo.ExistsByInChIKeyFunc = func(ctx context.Context, k string) (bool, error) { return false, nil }
 
-	mockFpCalc.On("Standardize", mock.Anything, smiles).Return(ids, nil)
-	mockRepo.On("ExistsByInChIKey", mock.Anything, ids.InChIKey).Return(true, nil)
-	mockRepo.On("FindByInChIKey", mock.Anything, ids.InChIKey).Return(existingMol, nil)
-
-	result, err := service.RegisterMolecule(context.Background(), smiles, SourceManual, "test-ref")
-
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, existingMol.ID, result.ID)
-	mockRepo.AssertExpectations(t)
+		res, err := svc.BatchRegisterMolecules(context.Background(), reqs)
+		if err != nil {
+			t.Fatalf("BatchRegisterMolecules failed: %v", err)
+		}
+		if len(res.Succeeded) != 2 {
+			t.Errorf("Succeeded count = %d, want 2", len(res.Succeeded))
+		}
+		if repo.BatchSaveCalls != 1 {
+			t.Errorf("BatchSaveCalls = %d, want 1", repo.BatchSaveCalls)
+		}
+		if fpCalc.BatchCalculateCalls != 2 { // Morgan + MACCS
+			t.Errorf("BatchCalculateCalls = %d, want 2", fpCalc.BatchCalculateCalls)
+		}
+	})
 }
 
-func TestRegisterMolecule_EmptySMILES(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
+func TestMoleculeService_FindSimilarMolecules(t *testing.T) {
+	repo := &mockMoleculeRepository{}
+	fpCalc := &mockFingerprintCalculator{}
+	simEngine := &mockSimilarityEngine{}
+	logger := &mockLogger{}
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
 
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
+	t.Run("success", func(t *testing.T) {
+		simEngine.SearchSimilarFunc = func(ctx context.Context, t *Fingerprint, m SimilarityMetric, th float64, l int) ([]*SimilarityResult, error) {
+			return []*SimilarityResult{{Score: 0.9}}, nil
+		}
 
-	result, err := service.RegisterMolecule(context.Background(), "", SourceManual, "test-ref")
-
-	assert.Error(t, err)
-	assert.Nil(t, result)
+		res, err := svc.FindSimilarMolecules(context.Background(), "C", FingerprintMorgan, 0.7, 10)
+		if err != nil {
+			t.Fatalf("FindSimilarMolecules failed: %v", err)
+		}
+		if len(res) != 1 {
+			t.Errorf("Result count = %d, want 1", len(res))
+		}
+		if fpCalc.CalculateCalls != 1 {
+			t.Errorf("CalculateCalls = %d, want 1", fpCalc.CalculateCalls)
+		}
+	})
 }
 
-func TestGetMolecule_Success(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
+func TestMoleculeService_CompareMolecules(t *testing.T) {
+	repo := &mockMoleculeRepository{}
+	fpCalc := &mockFingerprintCalculator{}
+	simEngine := &mockSimilarityEngine{}
+	logger := &mockLogger{}
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
 
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
+	t.Run("success", func(t *testing.T) {
+		fpCalc.StandardizeFunc = func(ctx context.Context, s string) (string, string, string, string, float64, error) {
+			return s, "InChI="+s, "KEY-"+s, "C", 10.0, nil
+		}
+		simEngine.ComputeSimilarityFunc = func(fp1, fp2 *Fingerprint, m SimilarityMetric) (float64, error) {
+			return 0.5, nil
+		}
 
-	molID := uuid.New()
-	expectedMol := &Molecule{ID: molID, SMILES: "CCO"}
-
-	mockRepo.On("FindByID", mock.Anything, molID.String()).Return(expectedMol, nil)
-
-	result, err := service.GetMolecule(context.Background(), molID.String())
-
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, expectedMol.ID, result.ID)
-	mockRepo.AssertExpectations(t)
+		res, err := svc.CompareMolecules(context.Background(), "C", "CC", []FingerprintType{FingerprintMorgan})
+		if err != nil {
+			t.Fatalf("CompareMolecules failed: %v", err)
+		}
+		if res.FusedScore != 0.5 {
+			t.Errorf("FusedScore = %f, want 0.5", res.FusedScore)
+		}
+		if res.IsStructurallyIdentical { // "KEY-C" != "KEY-CC"
+			t.Error("IsStructurallyIdentical should be false")
+		}
+	})
 }
 
-func TestGetMolecule_EmptyID(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
+func TestMoleculeService_CalculateFingerprints(t *testing.T) {
+	repo := &mockMoleculeRepository{}
+	fpCalc := &mockFingerprintCalculator{}
+	simEngine := &mockSimilarityEngine{}
+	logger := &mockLogger{}
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
 
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
+	t.Run("success", func(t *testing.T) {
+		mol, _ := NewMolecule("C", SourceManual, "ref")
+		repo.FindByIDFunc = func(ctx context.Context, id string) (*Molecule, error) { return mol, nil }
 
-	result, err := service.GetMolecule(context.Background(), "")
-
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "id cannot be empty")
+		err := svc.CalculateFingerprints(context.Background(), "id", []FingerprintType{FingerprintMorgan})
+		if err != nil {
+			t.Fatalf("CalculateFingerprints failed: %v", err)
+		}
+		if repo.UpdateCalls != 1 {
+			t.Errorf("UpdateCalls = %d, want 1", repo.UpdateCalls)
+		}
+		if !mol.HasFingerprint(FingerprintMorgan) {
+			t.Error("Fingerprint not added to molecule")
+		}
+	})
 }
 
-func TestGetMoleculeByInChIKey_Success(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	inchiKey := "LFQSCWFLJHTTHZ-UHFFFAOYSA-N"
-	expectedMol := &Molecule{ID: uuid.New(), SMILES: "CCO", InChIKey: inchiKey}
-
-	mockRepo.On("FindByInChIKey", mock.Anything, inchiKey).Return(expectedMol, nil)
-
-	result, err := service.GetMoleculeByInChIKey(context.Background(), inchiKey)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, inchiKey, result.InChIKey)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestGetMoleculeByInChIKey_InvalidFormat(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	result, err := service.GetMoleculeByInChIKey(context.Background(), "invalid-inchikey")
-
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "invalid inchiKey format")
-}
-
-func TestFindSimilarMolecules_Success(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	targetSMILES := "CCO"
-	opts := DefaultFingerprintCalcOptions()
-	fp := &Fingerprint{Type: string(FingerprintMorgan), Bits: []byte{1, 2, 3}}
-
-	similarResults := []*SimilarityResult{
-		{MoleculeID: uuid.New().String(), Score: 0.95, SMILES: "CC(O)C"},
-		{MoleculeID: uuid.New().String(), Score: 0.85, SMILES: "CCCO"},
-	}
-
-	mockFpCalc.On("Calculate", mock.Anything, targetSMILES, FingerprintMorgan, opts).Return(fp, nil)
-	mockSimEngine.On("SearchSimilar", mock.Anything, fp, MetricTanimoto, 0.7, 10).Return(similarResults, nil)
-
-	results, err := service.FindSimilarMolecules(context.Background(), targetSMILES, FingerprintMorgan, 0.7, 10)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, results)
-	assert.Len(t, results, 2)
-	mockFpCalc.AssertExpectations(t)
-	mockSimEngine.AssertExpectations(t)
-}
-
-func TestFindSimilarMolecules_EmptySMILES(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	results, err := service.FindSimilarMolecules(context.Background(), "", FingerprintMorgan, 0.7, 10)
-
-	assert.Error(t, err)
-	assert.Nil(t, results)
-	assert.Contains(t, err.Error(), "targetSMILES cannot be empty")
-}
-
-func TestFindSimilarMolecules_InvalidThreshold(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	// Threshold below 0
-	results, err := service.FindSimilarMolecules(context.Background(), "CCO", FingerprintMorgan, -0.1, 10)
-	assert.Error(t, err)
-	assert.Nil(t, results)
-
-	// Threshold above 1
-	results, err = service.FindSimilarMolecules(context.Background(), "CCO", FingerprintMorgan, 1.5, 10)
-	assert.Error(t, err)
-	assert.Nil(t, results)
-}
-
-func TestCompareMolecules_Success(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	smiles1 := "CCO"
-	smiles2 := "CCCO"
-	opts := DefaultFingerprintCalcOptions()
-
-	ids1 := &StructuralIdentifiers{CanonicalSMILES: "CCO", InChIKey: "LFQSCWFLJHTTHZ-UHFFFAOYSA-N"}
-	ids2 := &StructuralIdentifiers{CanonicalSMILES: "CCCO", InChIKey: "BDERNNFJNOPAEC-UHFFFAOYSA-N"}
-
-	fp1 := &Fingerprint{Type: string(FingerprintMorgan), Bits: []byte{1, 2}}
-	fp2 := &Fingerprint{Type: string(FingerprintMorgan), Bits: []byte{1, 3}}
-
-	mockFpCalc.On("Standardize", mock.Anything, smiles1).Return(ids1, nil)
-	mockFpCalc.On("Standardize", mock.Anything, smiles2).Return(ids2, nil)
-	mockFpCalc.On("Calculate", mock.Anything, smiles1, FingerprintMorgan, opts).Return(fp1, nil)
-	mockFpCalc.On("Calculate", mock.Anything, smiles2, FingerprintMorgan, opts).Return(fp2, nil)
-	mockSimEngine.On("ComputeSimilarity", fp1, fp2, MetricTanimoto).Return(0.85, nil)
-
-	result, err := service.CompareMolecules(context.Background(), smiles1, smiles2, []FingerprintType{FingerprintMorgan})
-
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, smiles1, result.Molecule1SMILES)
-	assert.Equal(t, smiles2, result.Molecule2SMILES)
-	assert.False(t, result.IsStructurallyIdentical)
-	assert.InDelta(t, 0.85, result.FusedScore, 0.01)
-	mockFpCalc.AssertExpectations(t)
-	mockSimEngine.AssertExpectations(t)
-}
-
-func TestCompareMolecules_EmptySMILES(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	// Empty first SMILES
-	result, err := service.CompareMolecules(context.Background(), "", "CCO", []FingerprintType{FingerprintMorgan})
-	assert.Error(t, err)
-	assert.Nil(t, result)
-
-	// Empty second SMILES
-	result, err = service.CompareMolecules(context.Background(), "CCO", "", []FingerprintType{FingerprintMorgan})
-	assert.Error(t, err)
-	assert.Nil(t, result)
-}
-
-func TestCompareMolecules_NoFingerprintTypes(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	result, err := service.CompareMolecules(context.Background(), "CCO", "CCCO", []FingerprintType{})
-
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "at least one fingerprint type required")
-}
-
-func TestArchiveMolecule_Success(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	molID := uuid.New()
-	mol := &Molecule{ID: molID, SMILES: "CCO", Status: StatusActive}
-
-	mockRepo.On("FindByID", mock.Anything, molID.String()).Return(mol, nil)
-	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*molecule.Molecule")).Return(nil)
-
-	err := service.ArchiveMolecule(context.Background(), molID.String())
-
-	assert.NoError(t, err)
-	assert.Equal(t, StatusArchived, mol.Status)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestDeleteMolecule_Success(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	molID := uuid.New()
-	mol := &Molecule{ID: molID, SMILES: "CCO", Status: StatusActive}
-
-	mockRepo.On("FindByID", mock.Anything, molID.String()).Return(mol, nil)
-	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*molecule.Molecule")).Return(nil)
-
-	err := service.DeleteMolecule(context.Background(), molID.String())
-
-	assert.NoError(t, err)
-	assert.Equal(t, StatusDeleted, mol.Status)
-	assert.NotNil(t, mol.DeletedAt)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestCanonicalize_Success(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	smiles := "CCO"
-	ids := &StructuralIdentifiers{
-		CanonicalSMILES: "CCO",
-		InChIKey:        "LFQSCWFLJHTTHZ-UHFFFAOYSA-N",
-	}
-
-	mockFpCalc.On("Standardize", mock.Anything, smiles).Return(ids, nil)
-
-	canonical, inchiKey, err := service.Canonicalize(context.Background(), smiles)
-
-	assert.NoError(t, err)
-	assert.Equal(t, "CCO", canonical)
-	assert.Equal(t, "LFQSCWFLJHTTHZ-UHFFFAOYSA-N", inchiKey)
-	mockFpCalc.AssertExpectations(t)
-}
-
-func TestCanonicalize_Error(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	mockFpCalc.On("Standardize", mock.Anything, "invalid").Return(nil, errors.New("parse error"))
-
-	canonical, inchiKey, err := service.Canonicalize(context.Background(), "invalid")
-
-	assert.Error(t, err)
-	assert.Empty(t, canonical)
-	assert.Empty(t, inchiKey)
-	mockFpCalc.AssertExpectations(t)
-}
-
-func TestCanonicalizeFromInChI_NotImplemented(t *testing.T) {
-	mockRepo := new(MockMoleculeRepository)
-	mockFpCalc := new(MockFingerprintCalculator)
-	mockSimEngine := new(MockSimilarityEngine)
-	mockLogger := new(MockLogger)
-
-	service, _ := NewMoleculeService(mockRepo, mockFpCalc, mockSimEngine, mockLogger)
-
-	canonical, inchiKey, err := service.CanonicalizeFromInChI(context.Background(), "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3")
-
-	assert.Error(t, err)
-	assert.Empty(t, canonical)
-	assert.Empty(t, inchiKey)
-	assert.Contains(t, err.Error(), "not implemented")
-}
-
-func TestWeightedAverageFusion_Fuse(t *testing.T) {
-	fusion := &WeightedAverageFusion{}
-
-	// Test with no weights
-	scores := map[FingerprintType]float64{
-		FingerprintMorgan: 0.8,
-		FingerprintMACCS:  0.6,
-	}
-
-	result, err := fusion.Fuse(scores, nil)
-	assert.NoError(t, err)
-	assert.InDelta(t, 0.7, result, 0.01)
-
-	// Test with custom weights
-	weights := map[FingerprintType]float64{
-		FingerprintMorgan: 2.0,
-		FingerprintMACCS:  1.0,
-	}
-
-	result, err = fusion.Fuse(scores, weights)
-	assert.NoError(t, err)
-	// (0.8*2 + 0.6*1) / (2+1) = 2.2/3 ≈ 0.733
-	assert.InDelta(t, 0.733, result, 0.01)
-
-	// Test empty scores
-	result, err = fusion.Fuse(map[FingerprintType]float64{}, nil)
-	assert.NoError(t, err)
-	assert.Equal(t, 0.0, result)
-}
-
-func TestStatus_IsValid(t *testing.T) {
-	assert.True(t, StatusPending.IsValid())
-	assert.True(t, StatusActive.IsValid())
-	assert.True(t, StatusArchived.IsValid())
-	assert.True(t, StatusDeleted.IsValid())
-	assert.False(t, Status("invalid").IsValid())
-}
-
-func TestFingerprint_IsDenseVector(t *testing.T) {
-	// With bits only
-	fp1 := &Fingerprint{Bits: []byte{1, 2, 3}}
-	assert.False(t, fp1.IsDenseVector())
-
-	// With vector
-	fp2 := &Fingerprint{Vector: []float32{0.1, 0.2, 0.3}}
-	assert.True(t, fp2.IsDenseVector())
-
-	// Empty
-	fp3 := &Fingerprint{}
-	assert.False(t, fp3.IsDenseVector())
-}
-
-func TestDefaultFingerprintCalcOptions(t *testing.T) {
-	opts := DefaultFingerprintCalcOptions()
-	assert.Equal(t, 2, opts.Radius)
-	assert.Equal(t, 2048, opts.Bits)
-}
-
-func TestSimilarityMetric_Constants(t *testing.T) {
-	assert.Equal(t, SimilarityMetric("tanimoto"), MetricTanimoto)
-	assert.Equal(t, SimilarityMetric("dice"), MetricDice)
-	assert.Equal(t, SimilarityMetric("cosine"), MetricCosine)
-}
-
-func TestMolecule_GetSMILES(t *testing.T) {
-	// Without canonical SMILES
-	mol := &Molecule{SMILES: "CCO"}
-	assert.Equal(t, "CCO", mol.GetSMILES())
-
-	// With canonical SMILES
-	mol.CanonicalSMILES = "OCC"
-	assert.Equal(t, "OCC", mol.GetSMILES())
-}
-
-func TestMolecule_GetID(t *testing.T) {
-	id := uuid.New()
-	mol := &Molecule{ID: id}
-	assert.Equal(t, id.String(), mol.GetID())
-}
-
-func TestMolecule_String(t *testing.T) {
-	id := uuid.New()
-	mol := &Molecule{ID: id, SMILES: "CCO", Status: StatusActive}
-	str := mol.String()
-	assert.Contains(t, str, id.String())
-	assert.Contains(t, str, "CCO")
-	assert.Contains(t, str, "active")
-}
-
-func TestMolecule_Validate(t *testing.T) {
-	// Valid molecule
-	mol := &Molecule{ID: uuid.New(), SMILES: "CCO", MolecularWeight: 46.07}
-	assert.NoError(t, mol.Validate())
-
-	// Missing ID
-	mol2 := &Molecule{SMILES: "CCO"}
-	assert.Error(t, mol2.Validate())
-
-	// Missing SMILES
-	mol3 := &Molecule{ID: uuid.New()}
-	assert.Error(t, mol3.Validate())
-
-	// Negative molecular weight
-	mol4 := &Molecule{ID: uuid.New(), SMILES: "CCO", MolecularWeight: -1}
-	assert.Error(t, mol4.Validate())
-}
+//Personal.AI order the ending

@@ -9,13 +9,13 @@ import (
 
 // MoleculeRepository defines the interface for molecular data persistence.
 type MoleculeRepository interface {
-	// Command methods
+	// Command methods (Write)
 	Save(ctx context.Context, molecule *Molecule) error
 	Update(ctx context.Context, molecule *Molecule) error
 	Delete(ctx context.Context, id string) error
 	BatchSave(ctx context.Context, molecules []*Molecule) (int, error)
 
-	// Query methods
+	// Query methods (Read)
 	FindByID(ctx context.Context, id string) (*Molecule, error)
 	FindByInChIKey(ctx context.Context, inchiKey string) (*Molecule, error)
 	FindBySMILES(ctx context.Context, smiles string) ([]*Molecule, error)
@@ -38,25 +38,25 @@ type MoleculeRepository interface {
 
 // MoleculeQuery defines criteria for searching molecules.
 type MoleculeQuery struct {
-	IDs                    []string
-	SMILES                 string
-	SMILESPattern          string
-	InChIKeys              []string
-	MolecularFormula       string
-	MinMolecularWeight     *float64
-	MaxMolecularWeight     *float64
-	Sources                []MoleculeSource
-	Statuses               []MoleculeStatus
-	Tags                   []string
-	HasFingerprintTypes    []FingerprintType
-	PropertyFilters        []PropertyFilter
-	CreatedAfter           *time.Time
-	CreatedBefore          *time.Time
-	Keyword                string
-	Offset                 int
-	Limit                  int
-	SortBy                 string
-	SortOrder              string
+	IDs                 []string
+	SMILES              string // Exact or partial? Usually exact or use Pattern
+	SMILESPattern       string // LIKE %pattern%
+	InChIKeys           []string
+	MolecularFormula    string
+	MinMolecularWeight  *float64
+	MaxMolecularWeight  *float64
+	Sources             []MoleculeSource
+	Statuses            []MoleculeStatus
+	Tags                []string
+	HasFingerprintTypes []FingerprintType
+	PropertyFilters     []PropertyFilter
+	CreatedAfter        *time.Time
+	CreatedBefore       *time.Time
+	Keyword             string // Fulltext search
+	Offset              int
+	Limit               int
+	SortBy              string
+	SortOrder           string
 }
 
 // PropertyFilter defines range criteria for molecular properties.
@@ -76,7 +76,7 @@ type MoleculeSearchResult struct {
 	HasMore   bool
 }
 
-// IsEmpty returns true if no molecules were found.
+// IsEmpty checks if the result is empty.
 func (r *MoleculeSearchResult) IsEmpty() bool {
 	return len(r.Molecules) == 0
 }
@@ -131,6 +131,13 @@ func (q *MoleculeQuery) Validate() error {
 		}
 	}
 
+	// Sources
+	for _, s := range q.Sources {
+		if !s.IsValid() {
+			return errors.New(errors.ErrCodeValidation, "invalid source in query")
+		}
+	}
+
 	// Property filters
 	for _, f := range q.PropertyFilters {
 		if f.Name == "" {
@@ -152,8 +159,5 @@ type MoleculeUnitOfWork interface {
 	Commit(ctx context.Context) error
 	Rollback(ctx context.Context) error
 }
-
-// Repository alias for MoleculeRepository to support external packages using simple name
-type Repository = MoleculeRepository
 
 //Personal.AI order the ending
