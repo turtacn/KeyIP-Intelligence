@@ -20,7 +20,8 @@ func TestApplyCollabOptions_WithPagination(t *testing.T) {
 }
 
 func TestApplyCollabOptions_LimitCap(t *testing.T) {
-	opts := ApplyCollabOptions(WithCollabPagination(0, 200))
+	opts := ApplyCollabOptions(WithCollabPagination(10, 200))
+	assert.Equal(t, 10, opts.Offset)
 	assert.Equal(t, 100, opts.Limit)
 }
 
@@ -43,12 +44,12 @@ func TestApplyCollabOptions_Combined(t *testing.T) {
 	opts := ApplyCollabOptions(
 		WithCollabPagination(5, 10),
 		WithActiveOnly(),
-		WithRoleFilter(RoleManager),
+		WithRoleFilter(RoleViewer),
 	)
 	assert.Equal(t, 5, opts.Offset)
 	assert.Equal(t, 10, opts.Limit)
 	assert.True(t, opts.ActiveOnly)
-	assert.Equal(t, RoleManager, opts.RoleFilter)
+	assert.Equal(t, RoleViewer, opts.RoleFilter)
 }
 
 //Personal.AI order the ending

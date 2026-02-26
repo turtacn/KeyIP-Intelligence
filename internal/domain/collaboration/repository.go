@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-// WorkspaceRepository defines the persistence interface for workspaces.
+// WorkspaceRepository defines persistence for workspaces.
 type WorkspaceRepository interface {
 	Save(ctx context.Context, workspace *Workspace) error
 	FindByID(ctx context.Context, id string) (*Workspace, error)
@@ -15,7 +15,7 @@ type WorkspaceRepository interface {
 	Count(ctx context.Context, ownerID string) (int64, error)
 }
 
-// MemberRepository defines the persistence interface for member permissions.
+// MemberRepository defines persistence for members.
 type MemberRepository interface {
 	Save(ctx context.Context, member *MemberPermission) error
 	FindByID(ctx context.Context, id string) (*MemberPermission, error)
@@ -28,7 +28,10 @@ type MemberRepository interface {
 	CountByRole(ctx context.Context, workspaceID string) (map[Role]int64, error)
 }
 
-// CollaborationQueryOptions defines filtering and pagination for collaboration queries.
+// CollaborationQueryOption is a functional option.
+type CollaborationQueryOption func(*CollaborationQueryOptions)
+
+// CollaborationQueryOptions encapsulates query parameters.
 type CollaborationQueryOptions struct {
 	Offset       int
 	Limit        int
@@ -37,25 +40,31 @@ type CollaborationQueryOptions struct {
 	RoleFilter   Role
 }
 
-// CollaborationQueryOption defines a functional option for collaboration queries.
-type CollaborationQueryOption func(*CollaborationQueryOptions)
-
-// WithCollabPagination sets pagination options.
+// WithCollabPagination sets pagination.
 func WithCollabPagination(offset, limit int) CollaborationQueryOption {
 	return func(o *CollaborationQueryOptions) {
+		if offset < 0 {
+			offset = 0
+		}
+		if limit < 1 {
+			limit = 20
+		}
+		if limit > 100 {
+			limit = 100
+		}
 		o.Offset = offset
 		o.Limit = limit
 	}
 }
 
-// WithActiveOnly filters for active members only.
+// WithActiveOnly filters by active status.
 func WithActiveOnly() CollaborationQueryOption {
 	return func(o *CollaborationQueryOptions) {
 		o.ActiveOnly = true
 	}
 }
 
-// WithAcceptedOnly filters for accepted members only.
+// WithAcceptedOnly filters by accepted status.
 func WithAcceptedOnly() CollaborationQueryOption {
 	return func(o *CollaborationQueryOptions) {
 		o.AcceptedOnly = true
@@ -69,32 +78,14 @@ func WithRoleFilter(role Role) CollaborationQueryOption {
 	}
 }
 
-// ApplyCollabOptions applies the given options and returns the final configuration.
+// ApplyCollabOptions applies options.
 func ApplyCollabOptions(opts ...CollaborationQueryOption) CollaborationQueryOptions {
-	options := CollaborationQueryOptions{
+	o := CollaborationQueryOptions{
 		Offset: 0,
 		Limit:  20,
 	}
 	for _, opt := range opts {
-		opt(&options)
+		opt(&o)
 	}
-	if options.Limit > 100 {
-		options.Limit = 100
-	}
-	if options.Limit <= 0 {
-		options.Limit = 20
-	}
-	if options.Offset < 0 {
-		options.Offset = 0
-	}
-	return options
+	return o
 }
-
-// Repository is an aggregate repository for collaboration domain.
-// Used by apiserver for backward compatibility.
-type Repository struct {
-	Workspace WorkspaceRepository
-	Member    MemberRepository
-}
-
-//Personal.AI order the ending
