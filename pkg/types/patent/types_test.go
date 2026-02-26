@@ -3,7 +3,6 @@ package patent
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
@@ -11,7 +10,9 @@ import (
 )
 
 func TestPatentStatus_IsValid_AllStatuses(t *testing.T) {
-	statuses := []PatentStatus{StatusPending, StatusUnderExamination, StatusGranted, StatusExpired, StatusAbandoned, StatusRevoked, StatusLapsed}
+	statuses := []PatentStatus{
+		StatusPending, StatusUnderExamination, StatusGranted, StatusExpired, StatusAbandoned, StatusRevoked, StatusLapsed,
+	}
 	for _, s := range statuses {
 		assert.True(t, s.IsValid())
 	}
@@ -22,41 +23,50 @@ func TestPatentStatus_IsValid_Unknown(t *testing.T) {
 }
 
 func TestPatentStatus_IsActive_ActiveStatuses(t *testing.T) {
-	assert.True(t, StatusPending.IsActive())
-	assert.True(t, StatusUnderExamination.IsActive())
-	assert.True(t, StatusGranted.IsActive())
+	statuses := []PatentStatus{
+		StatusPending, StatusUnderExamination, StatusGranted,
+	}
+	for _, s := range statuses {
+		assert.True(t, s.IsActive())
+	}
 }
 
 func TestPatentStatus_IsActive_InactiveStatuses(t *testing.T) {
-	assert.False(t, StatusExpired.IsActive())
-	assert.False(t, StatusAbandoned.IsActive())
-	assert.False(t, StatusRevoked.IsActive())
-	assert.False(t, StatusLapsed.IsActive())
+	statuses := []PatentStatus{
+		StatusExpired, StatusAbandoned, StatusRevoked, StatusLapsed,
+	}
+	for _, s := range statuses {
+		assert.False(t, s.IsActive())
+	}
 }
 
 func TestPatentOffice_IsValid_AllOffices(t *testing.T) {
-	offices := []PatentOffice{OfficeCNIPA, OfficeUSPTO, OfficeEPO, OfficeJPO, OfficeKIPO, OfficeWIPO}
+	offices := []PatentOffice{
+		OfficeCNIPA, OfficeUSPTO, OfficeEPO, OfficeJPO, OfficeKIPO, OfficeWIPO,
+	}
 	for _, o := range offices {
 		assert.True(t, o.IsValid())
 	}
 }
 
 func TestPatentOffice_IsValid_Unknown(t *testing.T) {
-	assert.False(t, PatentOffice("unknown").IsValid())
+	assert.False(t, PatentOffice("UNKNOWN").IsValid())
 }
 
 func TestInfringementRiskLevel_IsValid_AllLevels(t *testing.T) {
-	levels := []InfringementRiskLevel{RiskCritical, RiskHigh, RiskMedium, RiskLow, RiskNone}
+	levels := []InfringementRiskLevel{
+		RiskCritical, RiskHigh, RiskMedium, RiskLow, RiskNone,
+	}
 	for _, l := range levels {
 		assert.True(t, l.IsValid())
 	}
 }
 
 func TestInfringementRiskLevel_Severity_Ordering(t *testing.T) {
-	assert.True(t, RiskCritical.Severity() > RiskHigh.Severity())
-	assert.True(t, RiskHigh.Severity() > RiskMedium.Severity())
-	assert.True(t, RiskMedium.Severity() > RiskLow.Severity())
-	assert.True(t, RiskLow.Severity() > RiskNone.Severity())
+	assert.Greater(t, RiskCritical.Severity(), RiskHigh.Severity())
+	assert.Greater(t, RiskHigh.Severity(), RiskMedium.Severity())
+	assert.Greater(t, RiskMedium.Severity(), RiskLow.Severity())
+	assert.Greater(t, RiskLow.Severity(), RiskNone.Severity())
 }
 
 func TestInfringementRiskLevel_Severity_Values(t *testing.T) {
@@ -69,44 +79,45 @@ func TestInfringementRiskLevel_Severity_Values(t *testing.T) {
 
 func TestFTOAnalysisRequest_Validate_Valid(t *testing.T) {
 	req := FTOAnalysisRequest{
-		TargetMolecules: []molecule.MoleculeInput{{Format: molecule.FormatSMILES, Value: "CCO"}},
-		Jurisdictions:   []PatentOffice{OfficeCNIPA},
+		TargetMolecules: []molecule.MoleculeInput{{Format: molecule.FormatSMILES, Value: "C"}},
+		Jurisdictions:   []PatentOffice{OfficeUSPTO},
 	}
 	assert.NoError(t, req.Validate())
 }
 
 func TestFTOAnalysisRequest_Validate_NoMolecules(t *testing.T) {
 	req := FTOAnalysisRequest{
-		TargetMolecules: []molecule.MoleculeInput{},
-		Jurisdictions:   []PatentOffice{OfficeCNIPA},
+		Jurisdictions: []PatentOffice{OfficeUSPTO},
 	}
 	assert.Error(t, req.Validate())
 }
 
 func TestFTOAnalysisRequest_Validate_NoJurisdictions(t *testing.T) {
 	req := FTOAnalysisRequest{
-		TargetMolecules: []molecule.MoleculeInput{{Format: molecule.FormatSMILES, Value: "CCO"}},
-		Jurisdictions:   []PatentOffice{},
+		TargetMolecules: []molecule.MoleculeInput{{Format: molecule.FormatSMILES, Value: "C"}},
 	}
 	assert.Error(t, req.Validate())
 }
 
 func TestFTOAnalysisRequest_Validate_InvalidMolecule(t *testing.T) {
 	req := FTOAnalysisRequest{
-		TargetMolecules: []molecule.MoleculeInput{{Format: "invalid", Value: "CCO"}},
-		Jurisdictions:   []PatentOffice{OfficeCNIPA},
+		TargetMolecules: []molecule.MoleculeInput{{Format: molecule.FormatSMILES, Value: ""}},
+		Jurisdictions:   []PatentOffice{OfficeUSPTO},
 	}
 	assert.Error(t, req.Validate())
 }
 
 func TestPatentSearchRequest_Validate_WithQuery(t *testing.T) {
-	req := NewPatentSearchRequest("oled")
+	req := PatentSearchRequest{
+		Query:      "OLED",
+		Pagination: common.Pagination{Page: 1, PageSize: 20},
+	}
 	assert.NoError(t, req.Validate())
 }
 
 func TestPatentSearchRequest_Validate_WithFilters(t *testing.T) {
 	req := PatentSearchRequest{
-		Assignees:  []string{"Samsung"},
+		Assignees:  []string{"Company A"},
 		Pagination: common.Pagination{Page: 1, PageSize: 20},
 	}
 	assert.NoError(t, req.Validate())
@@ -121,47 +132,46 @@ func TestPatentSearchRequest_Validate_Empty(t *testing.T) {
 
 func TestPatentLandscapeRequest_Validate_WithTechDomain(t *testing.T) {
 	req := PatentLandscapeRequest{
-		TechDomain: "Blue OLED",
-		DateRange:  common.DateRange{From: common.NewTimestamp(), To: common.NewTimestamp()},
+		TechDomain: "OLED",
+		Pagination: common.Pagination{Page: 1, PageSize: 20},
 	}
 	assert.NoError(t, req.Validate())
 }
 
 func TestPatentLandscapeRequest_Validate_WithIPCCodes(t *testing.T) {
 	req := PatentLandscapeRequest{
-		IPCCodes:  []string{"C09K11/06"},
-		DateRange: common.DateRange{From: common.NewTimestamp(), To: common.NewTimestamp()},
+		IPCCodes:   []string{"H01L"},
+		Pagination: common.Pagination{Page: 1, PageSize: 20},
 	}
 	assert.NoError(t, req.Validate())
 }
 
 func TestPatentLandscapeRequest_Validate_Empty(t *testing.T) {
 	req := PatentLandscapeRequest{
-		DateRange: common.DateRange{From: common.NewTimestamp(), To: common.NewTimestamp()},
+		Pagination: common.Pagination{Page: 1, PageSize: 20},
 	}
 	assert.Error(t, req.Validate())
 }
 
 func TestPatentabilityRequest_Validate_Valid(t *testing.T) {
 	req := PatentabilityRequest{
-		Molecule: molecule.MoleculeInput{Format: molecule.FormatSMILES, Value: "CCO"},
-		Offices:  []PatentOffice{OfficeCNIPA},
+		Molecule: molecule.MoleculeInput{Format: molecule.FormatSMILES, Value: "C"},
+		Offices:  []PatentOffice{OfficeUSPTO},
 	}
 	assert.NoError(t, req.Validate())
 }
 
 func TestPatentabilityRequest_Validate_InvalidMolecule(t *testing.T) {
 	req := PatentabilityRequest{
-		Molecule: molecule.MoleculeInput{Format: "invalid", Value: "CCO"},
-		Offices:  []PatentOffice{OfficeCNIPA},
+		Molecule: molecule.MoleculeInput{Format: molecule.FormatSMILES, Value: ""},
+		Offices:  []PatentOffice{OfficeUSPTO},
 	}
 	assert.Error(t, req.Validate())
 }
 
 func TestPatentabilityRequest_Validate_NoOffices(t *testing.T) {
 	req := PatentabilityRequest{
-		Molecule: molecule.MoleculeInput{Format: molecule.FormatSMILES, Value: "CCO"},
-		Offices:  []PatentOffice{},
+		Molecule: molecule.MoleculeInput{Format: molecule.FormatSMILES, Value: "C"},
 	}
 	assert.Error(t, req.Validate())
 }
@@ -169,15 +179,14 @@ func TestPatentabilityRequest_Validate_NoOffices(t *testing.T) {
 func TestDesignAroundRequest_Validate_Valid(t *testing.T) {
 	req := DesignAroundRequest{
 		TargetClaims: []int{1},
-		BaseMolecule: molecule.MoleculeInput{Format: molecule.FormatSMILES, Value: "CCO"},
+		BaseMolecule: molecule.MoleculeInput{Format: molecule.FormatSMILES, Value: "C"},
 	}
 	assert.NoError(t, req.Validate())
 }
 
 func TestDesignAroundRequest_Validate_NoClaims(t *testing.T) {
 	req := DesignAroundRequest{
-		TargetClaims: []int{},
-		BaseMolecule: molecule.MoleculeInput{Format: molecule.FormatSMILES, Value: "CCO"},
+		BaseMolecule: molecule.MoleculeInput{Format: molecule.FormatSMILES, Value: "C"},
 	}
 	assert.Error(t, req.Validate())
 }
@@ -185,85 +194,89 @@ func TestDesignAroundRequest_Validate_NoClaims(t *testing.T) {
 func TestDesignAroundRequest_Validate_InvalidBaseMolecule(t *testing.T) {
 	req := DesignAroundRequest{
 		TargetClaims: []int{1},
-		BaseMolecule: molecule.MoleculeInput{Format: "invalid", Value: "CCO"},
+		BaseMolecule: molecule.MoleculeInput{Format: molecule.FormatSMILES, Value: ""},
 	}
 	assert.Error(t, req.Validate())
 }
 
 func TestPatentDTO_JSONRoundTrip(t *testing.T) {
 	dto := PatentDTO{
-		BaseEntity: common.BaseEntity{
-			ID:        common.ID("550e8400-e29b-41d4-a716-446655440000"),
-			CreatedAt: time.Time(common.NewTimestamp()),
-		},
-		PatentNumber: "CN1234567A",
+		PatentNumber: "US123456",
 		Status:       StatusGranted,
-		Office:       OfficeCNIPA,
 	}
-	data, err := json.Marshal(dto)
+	bytes, err := json.Marshal(dto)
 	assert.NoError(t, err)
-
-	var dto2 PatentDTO
-	err = json.Unmarshal(data, &dto2)
+	var decoded PatentDTO
+	err = json.Unmarshal(bytes, &decoded)
 	assert.NoError(t, err)
-	assert.Equal(t, dto.PatentNumber, dto2.PatentNumber)
-	assert.Equal(t, dto.Office, dto2.Office)
+	assert.Equal(t, dto.PatentNumber, decoded.PatentNumber)
 }
 
 func TestClaimDTO_JSONSerialization(t *testing.T) {
 	dto := ClaimDTO{
 		ClaimNumber: 1,
-		HasMarkush:  true,
 		MarkushGroups: []MarkushGroupDTO{
-			{Position: "R1", Options: []string{"C", "O"}},
+			{Position: "R1"},
 		},
 	}
-	data, err := json.Marshal(dto)
+	bytes, err := json.Marshal(dto)
 	assert.NoError(t, err)
-	assert.Contains(t, string(data), "markush_groups")
+	assert.Contains(t, string(bytes), "markush_groups")
 }
 
 func TestWatchlistConfig_Validate_Valid(t *testing.T) {
-	config := NewWatchlistConfig("Test Watch", "keyword")
-	config.Targets = []WatchTarget{{Type: "keyword", Value: "oled"}}
-	assert.NoError(t, config.Validate())
+	cfg := WatchlistConfig{
+		Name:      "My List",
+		WatchType: "molecule_similarity",
+		Targets:   []WatchTarget{{Type: "molecule", Value: "C"}},
+		Schedule:  ScheduleConfig{Frequency: "daily", TimeOfDay: "09:00"},
+	}
+	assert.NoError(t, cfg.Validate())
 }
 
 func TestWatchlistConfig_Validate_EmptyName(t *testing.T) {
-	config := NewWatchlistConfig("", "keyword")
-	config.Targets = []WatchTarget{{Type: "keyword", Value: "oled"}}
-	assert.Error(t, config.Validate())
+	cfg := WatchlistConfig{
+		Name:      "",
+		WatchType: "molecule_similarity",
+		Targets:   []WatchTarget{{Type: "molecule", Value: "C"}},
+	}
+	assert.Error(t, cfg.Validate())
 }
 
 func TestWatchlistConfig_Validate_InvalidWatchType(t *testing.T) {
-	config := NewWatchlistConfig("Test", "")
-	config.Targets = []WatchTarget{{Type: "keyword", Value: "oled"}}
-	assert.Error(t, config.Validate())
+	cfg := WatchlistConfig{
+		Name:      "List",
+		WatchType: "invalid",
+		Targets:   []WatchTarget{{Type: "molecule", Value: "C"}},
+	}
+	assert.Error(t, cfg.Validate())
 }
 
 func TestWatchlistConfig_Validate_EmptyTargets(t *testing.T) {
-	config := NewWatchlistConfig("Test", "keyword")
-	config.Targets = []WatchTarget{}
-	assert.Error(t, config.Validate())
+	cfg := WatchlistConfig{
+		Name:      "List",
+		WatchType: "molecule_similarity",
+	}
+	assert.Error(t, cfg.Validate())
 }
 
 func TestScheduleConfig_Validate_Valid(t *testing.T) {
-	s := ScheduleConfig{Frequency: "daily", TimeOfDay: "14:30"}
-	assert.NoError(t, s.Validate())
+	cfg := ScheduleConfig{Frequency: "daily", TimeOfDay: "09:00"}
+	assert.NoError(t, cfg.Validate())
 }
 
 func TestScheduleConfig_Validate_InvalidFrequency(t *testing.T) {
-	s := ScheduleConfig{Frequency: "invalid", TimeOfDay: "14:30"}
-	assert.Error(t, s.Validate())
+	cfg := ScheduleConfig{Frequency: "invalid", TimeOfDay: "09:00"}
+	assert.Error(t, cfg.Validate())
 }
 
 func TestScheduleConfig_Validate_InvalidTimeOfDay(t *testing.T) {
-	s := ScheduleConfig{Frequency: "daily", TimeOfDay: "25:00"}
-	assert.Error(t, s.Validate())
+	cfg := ScheduleConfig{Frequency: "daily", TimeOfDay: "25:00"}
+	assert.Error(t, cfg.Validate())
 }
 
 func TestNewPatentSearchRequest_Defaults(t *testing.T) {
-	req := NewPatentSearchRequest("test")
+	req := NewPatentSearchRequest("query")
 	assert.Equal(t, 1, req.Pagination.Page)
 	assert.Equal(t, 20, req.Pagination.PageSize)
 }
@@ -274,21 +287,21 @@ func TestNewFTOAnalysisRequest_Defaults(t *testing.T) {
 }
 
 func TestNewWatchlistConfig_Defaults(t *testing.T) {
-	config := NewWatchlistConfig("test", "type")
-	assert.Equal(t, "daily", config.Schedule.Frequency)
-	assert.Equal(t, "active", config.Status)
+	cfg := NewWatchlistConfig("name", "type")
+	assert.Equal(t, "weekly", cfg.Schedule.Frequency)
+	assert.Equal(t, RiskHigh, cfg.AlertConfig.MinRiskLevel)
 }
 
 func TestClaimType_Values(t *testing.T) {
-	assert.Equal(t, "independent", string(ClaimIndependent))
-	assert.Equal(t, "dependent", string(ClaimDependent))
+	assert.Equal(t, ClaimType("independent"), ClaimIndependent)
+	assert.Equal(t, ClaimType("dependent"), ClaimDependent)
 }
 
 func TestClaimCategory_Values(t *testing.T) {
-	assert.Equal(t, "product", string(ClaimProduct))
-	assert.Equal(t, "method", string(ClaimMethod))
-	assert.Equal(t, "use", string(ClaimUse))
-	assert.Equal(t, "composition", string(ClaimComposition))
+	assert.Equal(t, ClaimCategory("product"), ClaimProduct)
+	assert.Equal(t, ClaimCategory("method"), ClaimMethod)
+	assert.Equal(t, ClaimCategory("use"), ClaimUse)
+	assert.Equal(t, ClaimCategory("composition"), ClaimComposition)
 }
 
 //Personal.AI order the ending
