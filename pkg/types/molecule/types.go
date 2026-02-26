@@ -86,7 +86,7 @@ func (f FingerprintType) IsValid() bool {
 
 // MoleculeDTO represents a molecule with its properties and metadata.
 type MoleculeDTO struct {
-	common.BaseEntity
+	ID                common.ID              `json:"id"`
 	SMILES            string                 `json:"smiles"`
 	InChI             string                 `json:"inchi"`
 	InChIKey          string                 `json:"inchi_key"`
@@ -97,30 +97,36 @@ type MoleculeDTO struct {
 	NumHeavyAtoms     int                    `json:"num_heavy_atoms"`
 	NumRotatableBonds int                    `json:"num_rotatable_bonds"`
 	Name              string                 `json:"name,omitempty"`
-	Synonyms          []string               `json:"synonyms,omitempty"`
-	Type              MoleculeType           `json:"type"`
 	Source            string                 `json:"source"` // patent / experiment / literature / user_input
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
-	Properties        MolecularProperties    `json:"properties"`
-	Fingerprints      map[FingerprintType][]byte `json:"fingerprints,omitempty"`
-	SourcePatentIDs   []common.ID            `json:"source_patent_ids,omitempty"`
+	CreatedAt         common.Timestamp       `json:"created_at"`
+	UpdatedAt         common.Timestamp       `json:"updated_at"`
+
+	// Legacy fields to maintain compatibility
+	Synonyms        []string                   `json:"synonyms,omitempty"`
+	Type            MoleculeType               `json:"type,omitempty"`
+	Properties      MolecularProperties        `json:"properties,omitempty"`
+	Fingerprints    map[FingerprintType][]byte `json:"fingerprints,omitempty"`
+	SourcePatentIDs []common.ID                `json:"source_patent_ids,omitempty"`
+	TenantID        common.TenantID            `json:"tenant_id,omitempty"`
+	Version         int                        `json:"version"`
 }
 
 // FingerprintDTO represents a molecular fingerprint.
 type FingerprintDTO struct {
-	Type   FingerprintType `json:"type"`
-	Bits   []byte          `json:"bits"`
-	Radius int             `json:"radius,omitempty"` // for Morgan
-	NBits  int             `json:"nbits"`
-	Version string         `json:"version"`
+	Type    FingerprintType `json:"type"`
+	Bits    []byte          `json:"bits"`
+	Radius  int             `json:"radius,omitempty"` // for Morgan
+	NBits   int             `json:"nbits"`
+	Version string          `json:"version"`
 }
 
 // SimilarityResult represents a result from a similarity search.
 type SimilarityResult struct {
-	TargetMolecule       MoleculeDTO                `json:"target_molecule"`
+	TargetMolecule       MoleculeDTO                 `json:"target_molecule"`
 	Scores               map[FingerprintType]float64 `json:"scores"`
-	WeightedScore        float64                    `json:"weighted_score"`
-	StructuralComparison *StructuralDiff            `json:"structural_comparison,omitempty"`
+	WeightedScore        float64                     `json:"weighted_score"`
+	StructuralComparison *StructuralDiff             `json:"structural_comparison,omitempty"`
 }
 
 // StructuralDiff represents structural differences between two molecules.
@@ -131,9 +137,9 @@ type StructuralDiff struct {
 
 // SubstituentDiff represents a difference in a substituent.
 type SubstituentDiff struct {
-	Position    string `json:"position"`
-	QueryGroup  string `json:"query_group"`
-	TargetGroup string `json:"target_group"`
+	Position     string `json:"position"`
+	QueryGroup   string `json:"query_group"`
+	TargetGroup  string `json:"target_group"`
 	Significance string `json:"significance"` // low / moderate / high
 }
 
@@ -157,17 +163,17 @@ func (i MoleculeInput) Validate() error {
 
 // SimilaritySearchRequest carries parameters for a molecular similarity search.
 type SimilaritySearchRequest struct {
-	Molecule                  MoleculeInput          `json:"molecule"`
-	FingerprintTypes          []FingerprintType      `json:"fingerprint_types"`
-	Threshold                 float64                `json:"threshold"`
-	MaxResults                int                    `json:"max_results"`
-	PatentOffices             []string               `json:"patent_offices,omitempty"`
-	DateRange                 *common.DateRange      `json:"date_range,omitempty"`
-	AssigneesFilter           []string               `json:"assignees_filter,omitempty"`
-	TechDomains               []string               `json:"tech_domains,omitempty"`
-	IncludeClaimAnalysis      bool                   `json:"include_claim_analysis"`
-	IncludeInfringementRisk   bool                   `json:"include_infringement_risk"`
-	IncludeDesignAround       bool                   `json:"include_design_around"`
+	Molecule                MoleculeInput      `json:"molecule"`
+	FingerprintTypes        []FingerprintType  `json:"fingerprint_types"`
+	Threshold               float64            `json:"threshold"`
+	MaxResults              int                `json:"max_results"`
+	PatentOffices           []string           `json:"patent_offices,omitempty"`
+	DateRange               *common.DateRange  `json:"date_range,omitempty"`
+	AssigneesFilter         []string           `json:"assignees_filter,omitempty"`
+	TechDomains             []string           `json:"tech_domains,omitempty"`
+	IncludeClaimAnalysis    bool               `json:"include_claim_analysis"`
+	IncludeInfringementRisk bool               `json:"include_infringement_risk"`
+	IncludeDesignAround     bool               `json:"include_design_around"`
 }
 
 // Validate checks if the SimilaritySearchRequest is valid.
@@ -200,12 +206,12 @@ type MoleculeSearchResponse = common.PageResponse[MoleculeDTO]
 
 // SimilaritySearchResponse represents the result of a similarity search.
 type SimilaritySearchResponse struct {
-	QueryMolecule           MoleculeDTO       `json:"query_molecule"`
-	Results                 []SimilarityResult `json:"results"`
-	TotalSearched           int64             `json:"total_searched"`
-	TotalMoleculesCompared  int64             `json:"total_molecules_compared"`
-	SearchTimeMs            int64             `json:"search_time_ms"`
-	ModelVersions           map[string]string `json:"model_versions"`
+	QueryMolecule          MoleculeDTO        `json:"query_molecule"`
+	Results                []SimilarityResult `json:"results"`
+	TotalSearched          int64              `json:"total_searched"`
+	TotalMoleculesCompared int64              `json:"total_molecules_compared"`
+	SearchTimeMs           int64              `json:"search_time_ms"`
+	ModelVersions          map[string]string  `json:"model_versions"`
 }
 
 // MaterialProperty represents a physical or chemical property of a material.
@@ -217,30 +223,24 @@ type MaterialProperty struct {
 	Source        string  `json:"source"`
 }
 
-// MoleculeSource enums.
+// Constants and Enums
 const (
 	SourcePatent     = "patent"
 	SourceExperiment = "experiment"
 	SourceLiterature = "literature"
 	SourceUserInput  = "user_input"
-)
 
-// SignificanceLevel enums.
-const (
 	SignificanceLow      = "low"
 	SignificanceModerate = "moderate"
 	SignificanceHigh     = "high"
-)
 
-// Default weights for similarity calculations.
-const (
-	DefaultMorganWeight      = 0.30
-	DefaultRDKitWeight       = 0.20
-	DefaultAtomPairWeight    = 0.15
-	DefaultGNNWeight         = 0.35
+	DefaultMorganWeight        = 0.30
+	DefaultRDKitWeight         = 0.20
+	DefaultAtomPairWeight      = 0.15
+	DefaultGNNWeight           = 0.35
 	DefaultSimilarityThreshold = 0.65
-	DefaultMaxResults        = 50
-	MaxResultsLimit          = 500
+	DefaultMaxResults          = 50
+	MaxResultsLimit            = 500
 )
 
 // SimilarityLevel classifies a similarity score.

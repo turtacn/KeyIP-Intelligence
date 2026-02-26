@@ -118,11 +118,9 @@ func TestSimilaritySearchRequest_Validate_InvalidFingerprintType(t *testing.T) {
 
 func TestMoleculeDTO_JSONRoundTrip(t *testing.T) {
 	dto := MoleculeDTO{
-		BaseEntity: common.BaseEntity{
-			ID:        common.ID("550e8400-e29b-41d4-a716-446655440000"),
-			CreatedAt: time.Time(common.NewTimestamp()),
-		},
-		SMILES: "CCO",
+		ID:        common.ID("550e8400-e29b-41d4-a716-446655440000"),
+		CreatedAt: common.NewTimestamp(),
+		SMILES:    "CCO",
 	}
 	data, err := json.Marshal(dto)
 	assert.NoError(t, err)
@@ -132,6 +130,8 @@ func TestMoleculeDTO_JSONRoundTrip(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, dto.ID, dto2.ID)
 	assert.Equal(t, dto.SMILES, dto2.SMILES)
+	// Compare UnixMilli to avoid monotonic clock issues
+	assert.Equal(t, time.Time(dto.CreatedAt).UnixMilli(), time.Time(dto2.CreatedAt).UnixMilli())
 }
 
 func TestSimilarityResult_JSONRoundTrip(t *testing.T) {
@@ -191,5 +191,3 @@ func TestSignificanceLevel_Values(t *testing.T) {
 	assert.Equal(t, "moderate", SignificanceModerate)
 	assert.Equal(t, "high", SignificanceHigh)
 }
-
-//Personal.AI order the ending

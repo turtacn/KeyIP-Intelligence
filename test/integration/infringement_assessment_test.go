@@ -27,9 +27,7 @@ func TestInfringementAssessment_FullPipeline(t *testing.T) {
 		// flag literal infringement with high confidence.
 
 		queryMolecule := moleculeTypes.MoleculeDTO{
-			BaseEntity: common.BaseEntity{
-				ID: common.ID(NextTestID("mol")),
-			},
+			ID:               common.ID(NextTestID("mol")),
 			SMILES:           "c1ccc2c(c1)c1ccccc1n2-c1ccccc1",
 			InChIKey:         "UJOBWOGCFQCDNV-UHFFFAOYSA-N",
 			MolecularFormula: "C18H13N",
@@ -37,9 +35,7 @@ func TestInfringementAssessment_FullPipeline(t *testing.T) {
 		}
 
 		targetPatent := patentTypes.PatentDTO{
-			BaseEntity: common.BaseEntity{
-				ID: common.ID(NextTestID("pat")),
-			},
+			ID:              common.ID(NextTestID("pat")),
 			PatentNumber:    "CN115000001A",
 			Title:           "含氮杂环化合物及其在OLED中的应用",
 			Abstract:        "本发明公开了一种含氮杂环化合物，具有通式(I)所示结构...",
@@ -83,9 +79,7 @@ func TestInfringementAssessment_FullPipeline(t *testing.T) {
 		// but with a lower confidence than literal infringement.
 
 		queryMolecule := moleculeTypes.MoleculeDTO{
-			BaseEntity: common.BaseEntity{
-				ID: common.ID(NextTestID("mol")),
-			},
+			ID:               common.ID(NextTestID("mol")),
 			SMILES:           "c1ccc2c(c1)c1ccccc1o2",
 			InChIKey:         "BFNBIHQBYMNNAN-UHFFFAOYSA-N",
 			MolecularFormula: "C12H8O",
@@ -93,9 +87,7 @@ func TestInfringementAssessment_FullPipeline(t *testing.T) {
 		}
 
 		referenceMolecule := moleculeTypes.MoleculeDTO{
-			BaseEntity: common.BaseEntity{
-				ID: common.ID(NextTestID("mol")),
-			},
+			ID:               common.ID(NextTestID("mol")),
 			SMILES:           "c1ccc2c(c1)c1ccccc1[nH]2",
 			InChIKey:         "NIHNNTQXNPWCJQ-UHFFFAOYSA-N",
 			MolecularFormula: "C12H9N",
@@ -145,9 +137,7 @@ func TestInfringementAssessment_FullPipeline(t *testing.T) {
 		// from any patented compound. Risk should be very low.
 
 		queryMolecule := moleculeTypes.MoleculeDTO{
-			BaseEntity: common.BaseEntity{
-				ID: common.ID(NextTestID("mol")),
-			},
+			ID:               common.ID(NextTestID("mol")),
 			SMILES:           "CC(=O)OC1=CC=CC=C1C(=O)O",
 			InChIKey:         "BSYNRYMUTXBXSQ-UHFFFAOYSA-N",
 			MolecularFormula: "C9H8O4",
@@ -176,9 +166,7 @@ func TestInfringementAssessment_BatchScreening(t *testing.T) {
 		molecules := make([]moleculeTypes.MoleculeDTO, batchSize)
 		for i := 0; i < batchSize; i++ {
 			molecules[i] = moleculeTypes.MoleculeDTO{
-				BaseEntity: common.BaseEntity{
-					ID: common.ID(NextTestID("mol")),
-				},
+				ID:     common.ID(NextTestID("mol")),
 				SMILES: "C" + string(rune('A'+i)) + "=O", // placeholder SMILES
 			}
 		}

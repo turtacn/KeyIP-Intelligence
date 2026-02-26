@@ -192,10 +192,8 @@ func TestDesignAroundRequest_Validate_InvalidBaseMolecule(t *testing.T) {
 
 func TestPatentDTO_JSONRoundTrip(t *testing.T) {
 	dto := PatentDTO{
-		BaseEntity: common.BaseEntity{
-			ID:        common.ID("550e8400-e29b-41d4-a716-446655440000"),
-			CreatedAt: time.Time(common.NewTimestamp()),
-		},
+		ID:           common.ID("550e8400-e29b-41d4-a716-446655440000"),
+		CreatedAt:    common.NewTimestamp(),
 		PatentNumber: "CN1234567A",
 		Status:       StatusGranted,
 		Office:       OfficeCNIPA,
@@ -208,6 +206,8 @@ func TestPatentDTO_JSONRoundTrip(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, dto.PatentNumber, dto2.PatentNumber)
 	assert.Equal(t, dto.Office, dto2.Office)
+	// Compare UnixMilli
+	assert.Equal(t, time.Time(dto.CreatedAt).UnixMilli(), time.Time(dto2.CreatedAt).UnixMilli())
 }
 
 func TestClaimDTO_JSONSerialization(t *testing.T) {
@@ -226,6 +226,7 @@ func TestClaimDTO_JSONSerialization(t *testing.T) {
 func TestWatchlistConfig_Validate_Valid(t *testing.T) {
 	config := NewWatchlistConfig("Test Watch", "keyword")
 	config.Targets = []WatchTarget{{Type: "keyword", Value: "oled"}}
+	// Schedule is initialized by NewWatchlistConfig
 	assert.NoError(t, config.Validate())
 }
 
@@ -290,5 +291,3 @@ func TestClaimCategory_Values(t *testing.T) {
 	assert.Equal(t, "use", string(ClaimUse))
 	assert.Equal(t, "composition", string(ClaimComposition))
 }
-
-//Personal.AI order the ending
