@@ -11,6 +11,35 @@ import (
 // ID is a string alias for UUID v4.
 type ID string
 
+// UserID is a string alias for a user identifier.
+type UserID string
+
+// TenantID is a string alias for a tenant identifier.
+type TenantID string
+
+// Metadata is an open-ended key-value bag.
+type Metadata map[string]interface{}
+
+// Status represents the lifecycle state of a platform entity.
+type Status string
+
+const (
+	StatusActive   Status = "active"
+	StatusInactive Status = "inactive"
+	StatusPending  Status = "pending"
+	StatusArchived Status = "archived"
+	StatusDeleted  Status = "deleted"
+)
+
+// BaseEntity carries audit metadata for domain entities and DTOs.
+type BaseEntity struct {
+	ID        ID        `json:"id"`
+	TenantID  TenantID  `json:"tenant_id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Version   int       `json:"version"`
+}
+
 // Timestamp is a time.Time alias with custom JSON serialization.
 type Timestamp time.Time
 
@@ -40,6 +69,9 @@ type DateRange struct {
 	From Timestamp `json:"from"`
 	To   Timestamp `json:"to"`
 }
+
+// TimeRange is an alias for DateRange for backward compatibility.
+type TimeRange = DateRange
 
 // ErrorDetail provides structured error information for API responses.
 type ErrorDetail struct {
@@ -99,6 +131,63 @@ type ComponentHealth struct {
 	Status  HealthStatus  `json:"status"`
 	Latency time.Duration `json:"latency"`
 	Message string        `json:"message"`
+}
+
+// PaginationResult holds the pagination metadata for a response.
+type PaginationResult struct {
+	Page       int `json:"page"`
+	PageSize   int `json:"page_size"`
+	Total      int `json:"total"`
+	TotalPages int `json:"total_pages"`
+}
+
+// PaginatedResult is a generic wrapper for paginated data with pagination metadata.
+type PaginatedResult[T any] struct {
+	Items      []T              `json:"items"`
+	Pagination PaginationResult `json:"pagination"`
+}
+
+// PageResponse is a generic wrapper for paginated results (compatibility alias).
+type PageResponse[T any] struct {
+	Items      []T `json:"items"`
+	Total      int64 `json:"total"`
+	Page       int   `json:"page"`
+	PageSize   int   `json:"page_size"`
+	TotalPages int   `json:"total_pages"`
+}
+
+// DomainEvent represents a significant event in the domain.
+type DomainEvent interface {
+	EventID() string
+	OccurredAt() time.Time
+	AggregateID() string
+}
+
+// BaseEvent provides common fields for domain events.
+type BaseEvent struct {
+	ID        string    `json:"event_id"`
+	Timestamp time.Time `json:"occurred_at"`
+	AggID     string    `json:"aggregate_id"`
+}
+
+func NewBaseEvent(aggID string) BaseEvent {
+	return BaseEvent{
+		ID:        uuid.New().String(),
+		Timestamp: time.Now().UTC(),
+		AggID:     aggID,
+	}
+}
+
+func (e BaseEvent) EventID() string {
+	return e.ID
+}
+
+func (e BaseEvent) OccurredAt() time.Time {
+	return e.Timestamp
+}
+
+func (e BaseEvent) AggregateID() string {
+	return e.AggID
 }
 
 // Validate checks if the ID is a valid UUID v4.
@@ -181,6 +270,14 @@ func NewID() ID {
 	return ID(uuid.New().String())
 }
 
+// GenerateID generates a unique ID with an optional prefix.
+func GenerateID(prefix string) string {
+	if prefix == "" {
+		return uuid.New().String()
+	}
+	return fmt.Sprintf("%s-%s", prefix, uuid.New().String())
+}
+
 // NewTimestamp returns the current UTC time as a Timestamp.
 func NewTimestamp() Timestamp {
 	return Timestamp(time.Now().UTC())
@@ -216,5 +313,31 @@ func NewPaginatedResponse[T any](data T, pagination Pagination) APIResponse[T] {
 		Timestamp:  NewTimestamp(),
 	}
 }
+
+// Context keys for request context
+type ContextKey string
+
+const (
+	// ContextKeyUserID is the context key for user ID.
+	ContextKeyUserID ContextKey = "user_id"
+	// ContextKeyTenantID is the context key for tenant ID.
+	ContextKeyTenantID ContextKey = "tenant_id"
+	// ContextKeyRequestID is the context key for request ID.
+	ContextKeyRequestID ContextKey = "request_id"
+)
+
+// RiskLevel represents the risk assessment level.
+type RiskLevel string
+
+const (
+	// RiskLow indicates low risk.
+	RiskLow RiskLevel = "LOW"
+	// RiskMedium indicates medium risk.
+	RiskMedium RiskLevel = "MEDIUM"
+	// RiskHigh indicates high risk.
+	RiskHigh RiskLevel = "HIGH"
+	// RiskCritical indicates critical risk.
+	RiskCritical RiskLevel = "CRITICAL"
+)
 
 //Personal.AI order the ending

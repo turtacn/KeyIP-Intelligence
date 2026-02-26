@@ -29,6 +29,7 @@ const (
 	ErrCodeCacheError         ErrorCode = "COMMON_013"
 	ErrCodeExternalService    ErrorCode = "COMMON_014"
 	ErrCodeFeatureDisabled    ErrorCode = "COMMON_015"
+	ErrCodeNotImplemented     ErrorCode = "COMMON_016"
 )
 
 // Molecule Module Error Codes
@@ -135,6 +136,17 @@ const (
 	ErrCodeAIResourceExhausted    ErrorCode = "AI_005"
 )
 
+// Infrastructure Error Codes (mapped from old names)
+const (
+	CodeDBConnectionError = ErrCodeDatabaseError
+	CodeDatabaseError     = ErrCodeDatabaseError
+	CodeDBQueryError      = ErrCodeDatabaseError
+	CodeCacheError        = ErrCodeCacheError
+	CodeSearchError       = ErrCodeSimilaritySearchFailed
+	CodeMessageQueueError = ErrCodeInternal
+	CodeStorageError      = ErrCodeInternal
+)
+
 // ErrorCodeHTTPStatus maps ErrorCodes to HTTP status codes.
 var ErrorCodeHTTPStatus = map[ErrorCode]int{
 	ErrCodeInternal:           http.StatusInternalServerError,
@@ -180,6 +192,7 @@ var ErrorCodeHTTPStatus = map[ErrorCode]int{
 	ErrCodePatentFamilyNotFound:    http.StatusNotFound,
 	ErrCodePatentExpired:           http.StatusInternalServerError,
 	ErrCodePatentStatusInvalid:     http.StatusBadRequest,
+	ErrCodePortfolioNotFound:       http.StatusNotFound,
 
 	ErrCodeInfringementAnalysisFailed:    http.StatusInternalServerError,
 	ErrCodeInfringementDataInsufficient:  http.StatusInternalServerError,
@@ -213,6 +226,7 @@ var ErrorCodeHTTPStatus = map[ErrorCode]int{
 	ErrCodeAIModelVersionMismatch: http.StatusInternalServerError,
 	ErrCodeAIInputInvalid:         http.StatusBadRequest,
 	ErrCodeAIResourceExhausted:    http.StatusServiceUnavailable,
+	ErrCodeNotImplemented:         http.StatusNotImplemented,
 }
 
 // ErrorCodeMessage maps ErrorCodes to default messages.
@@ -260,6 +274,7 @@ var ErrorCodeMessage = map[ErrorCode]string{
 	ErrCodePatentFamilyNotFound:    "patent family not found",
 	ErrCodePatentExpired:           "patent has expired",
 	ErrCodePatentStatusInvalid:     "invalid patent status",
+	ErrCodePortfolioNotFound:       "portfolio not found",
 
 	ErrCodeInfringementAnalysisFailed:    "infringement analysis failed",
 	ErrCodeInfringementDataInsufficient:  "insufficient data for infringement analysis",
@@ -293,6 +308,7 @@ var ErrorCodeMessage = map[ErrorCode]string{
 	ErrCodeAIModelVersionMismatch: "AI model version mismatch",
 	ErrCodeAIInputInvalid:         "invalid input for AI model",
 	ErrCodeAIResourceExhausted:    "AI calculation resource exhausted",
+	ErrCodeNotImplemented:         "not implemented",
 }
 
 // HTTPStatusForCode returns the HTTP status code for an ErrorCode.

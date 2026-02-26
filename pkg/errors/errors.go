@@ -193,6 +193,25 @@ func Wrapf(err error, code ErrorCode, format string, args ...interface{}) *AppEr
 	return ae
 }
 
+// WrapMsg wraps an error with a message using ErrCodeInternal as default code.
+func WrapMsg(err error, message string) *AppError {
+	return Wrap(err, ErrCodeInternal, message)
+}
+
+// WrapMsgf wraps an error with a formatted message using ErrCodeInternal as default code.
+func WrapMsgf(err error, format string, args ...interface{}) *AppError {
+	return Wrapf(err, ErrCodeInternal, format, args...)
+}
+
+// NewMsg creates a new error with the given message using ErrCodeInternal as default code.
+func NewMsg(message string) *AppError {
+	return New(ErrCodeInternal, message)
+}
+
+func NewInvalidParameterError(message string) *AppError {
+	return New(ErrCodeBadRequest, message)
+}
+
 func FromCode(code ErrorCode) *AppError {
 	return newAppError(code, DefaultMessageForCode(code))
 }
@@ -265,7 +284,12 @@ func Unauthorized(message string) *AppError { return ErrUnauthorized(message) }
 func Forbidden(message string) *AppError    { return ErrForbidden(message) }
 func NotFound(message string) *AppError     { return New(ErrCodeNotFound, message) }
 func Conflict(message string) *AppError     { return New(ErrCodeConflict, message) }
+func InvalidState(message string) *AppError { return New(ErrCodeConflict, message) }
 func RateLimit(message string) *AppError    { return New(ErrCodeTooManyRequests, message) }
+
+func NewInvalidInputError(message string) *AppError {
+	return ErrBadRequest(message)
+}
 
 // Molecule module convenient factory functions
 
@@ -496,6 +520,10 @@ func NewInternal(format string, args ...interface{}) *AppError {
 
 func NewNotFound(format string, args ...interface{}) *AppError {
 	return Newf(ErrCodeNotFound, format, args...)
+}
+
+func NewNotImplemented(message string) *AppError {
+	return New(ErrCodeNotImplemented, message)
 }
 
 //Personal.AI order the ending

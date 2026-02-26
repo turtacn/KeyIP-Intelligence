@@ -133,6 +133,7 @@ type PatentDTO struct {
 	ExpiryDate        *common.Timestamp      `json:"expiry_date,omitempty"`
 	Status            PatentStatus           `json:"status"`
 	Office            PatentOffice           `json:"office"`
+	Jurisdiction      string                 `json:"jurisdiction,omitempty"` // For compatibility
 	IPCCodes          []string               `json:"ipc_codes"`
 	CPCCodes          []string               `json:"cpc_codes"`
 	FamilyID          string                 `json:"family_id"`

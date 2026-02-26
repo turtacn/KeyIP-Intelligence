@@ -197,6 +197,16 @@ const (
 	SignificanceHigh     SignificanceLevel = "high"
 )
 
+// SimilarityLevel defines the level of similarity between molecules.
+type SimilarityLevel string
+
+const (
+	SimilarityLow    SimilarityLevel = "low"
+	SimilarityMedium SimilarityLevel = "medium"
+	SimilarityHigh   SimilarityLevel = "high"
+	SimilarityNone   SimilarityLevel = "none"
+)
+
 // Default weights and thresholds.
 const (
 	DefaultMorganWeight       = 0.30
