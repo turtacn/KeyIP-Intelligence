@@ -2,7 +2,6 @@ package keycloak
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"sync"
 
@@ -10,47 +9,46 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-// Permission represents a fine-grained operation permission.
+// Permission represents a fine-grained permission.
 type Permission string
 
-// Constants for permissions
 const (
-	// Patent related
+	// Patent Data
 	PermPatentRead       Permission = "patent:read"
 	PermPatentWrite      Permission = "patent:write"
 	PermPatentDelete     Permission = "patent:delete"
 	PermPatentExport     Permission = "patent:export"
 	PermPatentBulkImport Permission = "patent:bulk_import"
 
-	// Analysis related
+	// Analysis Tasks
 	PermAnalysisCreate Permission = "analysis:create"
 	PermAnalysisRead   Permission = "analysis:read"
 	PermAnalysisCancel Permission = "analysis:cancel"
 	PermAnalysisExport Permission = "analysis:export"
 
-	// Graph related
+	// Graph
 	PermGraphRead  Permission = "graph:read"
 	PermGraphWrite Permission = "graph:write"
 	PermGraphAdmin Permission = "graph:admin"
 
-	// User related
+	// User Management
 	PermUserRead       Permission = "user:read"
 	PermUserWrite      Permission = "user:write"
 	PermUserDelete     Permission = "user:delete"
 	PermUserRoleAssign Permission = "user:role_assign"
 
-	// System related
+	// System
 	PermSystemConfig   Permission = "system:config"
 	PermSystemMonitor  Permission = "system:monitor"
 	PermSystemAuditLog Permission = "system:audit_log"
 
-	// Tenant related
+	// Tenant
 	PermTenantCreate Permission = "tenant:create"
 	PermTenantRead   Permission = "tenant:read"
 	PermTenantUpdate Permission = "tenant:update"
 	PermTenantDelete Permission = "tenant:delete"
 
-	// API related
+	// API
 	PermAPIKeyCreate  Permission = "api:key_create"
 	PermAPIKeyRevoke  Permission = "api:key_revoke"
 	PermAPIRateConfig Permission = "api:rate_config"
@@ -59,7 +57,6 @@ const (
 // Role represents a platform role.
 type Role string
 
-// Constants for roles
 const (
 	RoleSuperAdmin  Role = "super_admin"
 	RoleTenantAdmin Role = "tenant_admin"
@@ -73,7 +70,7 @@ const (
 // RolePermissionMapping maps roles to permissions.
 type RolePermissionMapping map[Role][]Permission
 
-// RBACEnforcer is the interface for RBAC enforcement.
+// RBACEnforcer defines the interface for RBAC enforcement.
 type RBACEnforcer interface {
 	HasPermission(ctx context.Context, permission Permission) bool
 	HasAllPermissions(ctx context.Context, permissions ...Permission) bool
@@ -83,17 +80,22 @@ type RBACEnforcer interface {
 	GetRoles(ctx context.Context) []Role
 	EnforcePermission(ctx context.Context, permission Permission) error
 	EnforceTenantAccess(ctx context.Context, targetTenantID string) error
+
+	RequirePermission(permission Permission) func(http.Handler) http.Handler
+	RequireAnyPermission(permissions ...Permission) func(http.Handler) http.Handler
+	RequireRole(role Role) func(http.Handler) http.Handler
+	RequireTenantAccess() func(http.Handler) http.Handler
+
 	UpdateMapping(mapping RolePermissionMapping)
 }
 
-// rbacEnforcer implementation.
 type rbacEnforcer struct {
 	rolePermissions RolePermissionMapping
 	logger          logging.Logger
 	mu              sync.RWMutex
 }
 
-// NewRBACEnforcer creates a new RBACEnforcer.
+// NewRBACEnforcer creates a new RBAC enforcer.
 func NewRBACEnforcer(mapping RolePermissionMapping, logger logging.Logger) RBACEnforcer {
 	if mapping == nil {
 		mapping = DefaultRolePermissionMapping()
@@ -104,50 +106,57 @@ func NewRBACEnforcer(mapping RolePermissionMapping, logger logging.Logger) RBACE
 	}
 }
 
-// DefaultRolePermissionMapping returns the default role-permission mapping.
+// DefaultRolePermissionMapping returns the default mapping.
 func DefaultRolePermissionMapping() RolePermissionMapping {
-	allPerms := []Permission{
+	mapping := make(RolePermissionMapping)
+
+	// Tenant Admin
+	mapping[RoleTenantAdmin] = []Permission{
 		PermPatentRead, PermPatentWrite, PermPatentDelete, PermPatentExport, PermPatentBulkImport,
 		PermAnalysisCreate, PermAnalysisRead, PermAnalysisCancel, PermAnalysisExport,
 		PermGraphRead, PermGraphWrite, PermGraphAdmin,
 		PermUserRead, PermUserWrite, PermUserDelete, PermUserRoleAssign,
-		PermSystemConfig, PermSystemMonitor, PermSystemAuditLog,
-		PermTenantCreate, PermTenantRead, PermTenantUpdate, PermTenantDelete,
+		PermTenantRead, PermTenantUpdate,
 		PermAPIKeyCreate, PermAPIKeyRevoke, PermAPIRateConfig,
 	}
 
-	return RolePermissionMapping{
-		RoleSuperAdmin: allPerms,
-		RoleTenantAdmin: []Permission{
-			PermPatentRead, PermPatentWrite, PermPatentDelete, PermPatentExport, PermPatentBulkImport,
-			PermAnalysisCreate, PermAnalysisRead, PermAnalysisCancel, PermAnalysisExport,
-			PermGraphRead, PermGraphWrite, PermGraphAdmin,
-			PermUserRead, PermUserWrite, PermUserDelete, PermUserRoleAssign,
-			PermSystemMonitor, PermSystemAuditLog,
-			PermTenantRead, PermTenantUpdate,
-			PermAPIKeyCreate, PermAPIKeyRevoke,
-		},
-		RoleAnalyst: []Permission{
-			PermPatentRead, PermPatentExport,
-			PermAnalysisCreate, PermAnalysisRead, PermAnalysisCancel, PermAnalysisExport,
-			PermGraphRead,
-		},
-		RoleResearcher: []Permission{
-			PermPatentRead,
-			PermAnalysisRead,
-			PermGraphRead,
-		},
-		RoleOperator: []Permission{
-			PermSystemMonitor, PermSystemAuditLog,
-			PermUserRead,
-		},
-		RoleViewer: []Permission{
-			PermPatentRead, PermAnalysisRead, PermGraphRead, PermUserRead, PermTenantRead,
-		},
-		RoleAPIUser: []Permission{
-			PermPatentRead, PermAnalysisRead, PermGraphRead,
-		},
+	// Analyst
+	mapping[RoleAnalyst] = []Permission{
+		PermPatentRead, PermPatentExport,
+		PermAnalysisCreate, PermAnalysisRead, PermAnalysisCancel, PermAnalysisExport,
+		PermGraphRead,
 	}
+
+	// Researcher
+	mapping[RoleResearcher] = []Permission{
+		PermPatentRead,
+		PermAnalysisRead,
+		PermGraphRead,
+	}
+
+	// Operator
+	mapping[RoleOperator] = []Permission{
+		PermSystemMonitor, PermSystemAuditLog,
+		PermUserRead,
+	}
+
+	// Viewer
+	mapping[RoleViewer] = []Permission{
+		PermPatentRead,
+		PermAnalysisRead,
+		PermGraphRead,
+		PermTenantRead,
+		PermUserRead,
+	}
+
+	// API User
+	mapping[RoleAPIUser] = []Permission{
+		PermPatentRead,
+		PermAnalysisRead,
+		PermGraphRead,
+	}
+
+	return mapping
 }
 
 func (e *rbacEnforcer) UpdateMapping(mapping RolePermissionMapping) {
@@ -156,22 +165,62 @@ func (e *rbacEnforcer) UpdateMapping(mapping RolePermissionMapping) {
 	e.rolePermissions = mapping
 }
 
-func (e *rbacEnforcer) getPermissionsForRole(role Role) []Permission {
+func (e *rbacEnforcer) HasPermission(ctx context.Context, permission Permission) bool {
+	roles := e.GetRoles(ctx)
+	if len(roles) == 0 {
+		return false
+	}
+
+	// Check for Super Admin
+	for _, r := range roles {
+		if r == RoleSuperAdmin {
+			return true
+		}
+	}
+
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.rolePermissions[role]
+
+	for _, r := range roles {
+		perms, ok := e.rolePermissions[r]
+		if !ok {
+			continue
+		}
+		for _, p := range perms {
+			if p == permission {
+				return true
+			}
+		}
+	}
+	return false
 }
 
-func (e *rbacEnforcer) GetRoles(ctx context.Context) []Role {
-	userRoles, ok := RolesFromContext(ctx)
-	if !ok {
-		return nil
+func (e *rbacEnforcer) HasAllPermissions(ctx context.Context, permissions ...Permission) bool {
+	for _, p := range permissions {
+		if !e.HasPermission(ctx, p) {
+			return false
+		}
 	}
-	var roles []Role
+	return true
+}
+
+func (e *rbacEnforcer) HasAnyPermission(ctx context.Context, permissions ...Permission) bool {
+	for _, p := range permissions {
+		if e.HasPermission(ctx, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *rbacEnforcer) HasRole(ctx context.Context, role Role) bool {
+	userRoles := e.GetRoles(ctx)
 	for _, r := range userRoles {
-		roles = append(roles, Role(r))
+		if r == role {
+			return true
+		}
 	}
-	return roles
+	return false
 }
 
 func (e *rbacEnforcer) GetPermissions(ctx context.Context) []Permission {
@@ -181,202 +230,129 @@ func (e *rbacEnforcer) GetPermissions(ctx context.Context) []Permission {
 	}
 
 	permMap := make(map[Permission]bool)
-	for _, role := range roles {
-		perms := e.getPermissionsForRole(role)
-		for _, p := range perms {
-			permMap[p] = true
-		}
-	}
 
-	var perms []Permission
-	for p := range permMap {
-		perms = append(perms, p)
-	}
-	return perms
-}
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 
-func (e *rbacEnforcer) HasPermission(ctx context.Context, permission Permission) bool {
-	if e.HasRole(ctx, RoleSuperAdmin) {
-		return true
-	}
-	userPerms := e.GetPermissions(ctx)
-	for _, p := range userPerms {
-		if p == permission {
-			return true
-		}
-	}
-	return false
-}
-
-func (e *rbacEnforcer) HasAllPermissions(ctx context.Context, permissions ...Permission) bool {
-	if len(permissions) == 0 {
-		return true
-	}
-	if e.HasRole(ctx, RoleSuperAdmin) {
-		return true
-	}
-	userPerms := e.GetPermissions(ctx)
-	userPermMap := make(map[Permission]bool)
-	for _, p := range userPerms {
-		userPermMap[p] = true
-	}
-
-	for _, p := range permissions {
-		if !userPermMap[p] {
-			return false
-		}
-	}
-	return true
-}
-
-func (e *rbacEnforcer) HasAnyPermission(ctx context.Context, permissions ...Permission) bool {
-	if len(permissions) == 0 {
-		return false
-	}
-	if e.HasRole(ctx, RoleSuperAdmin) {
-		return true
-	}
-	userPerms := e.GetPermissions(ctx)
-	userPermMap := make(map[Permission]bool)
-	for _, p := range userPerms {
-		userPermMap[p] = true
-	}
-
-	for _, p := range permissions {
-		if userPermMap[p] {
-			return true
-		}
-	}
-	return false
-}
-
-func (e *rbacEnforcer) HasRole(ctx context.Context, role Role) bool {
-	roles := e.GetRoles(ctx)
 	for _, r := range roles {
-		if r == role {
-			return true
+		// SuperAdmin gets everything in the map + extras?
+		// For simplicity, we only return explicitly mapped permissions.
+		// If SuperAdmin needs to show all, UI usually handles it by role check.
+
+		if perms, ok := e.rolePermissions[r]; ok {
+			for _, p := range perms {
+				permMap[p] = true
+			}
 		}
 	}
-	return false
+
+	var result []Permission
+	for p := range permMap {
+		result = append(result, p)
+	}
+	return result
+}
+
+func (e *rbacEnforcer) GetRoles(ctx context.Context) []Role {
+	rawRoles, ok := RolesFromContext(ctx)
+	if !ok {
+		return nil
+	}
+
+	var roles []Role
+	for _, r := range rawRoles {
+		roles = append(roles, Role(r))
+	}
+	return roles
 }
 
 func (e *rbacEnforcer) EnforcePermission(ctx context.Context, permission Permission) error {
 	if !e.HasPermission(ctx, permission) {
-		return ErrAccessDenied
+		return errors.ErrForbidden("access denied").WithDetail(string(permission))
 	}
 	return nil
 }
 
 func (e *rbacEnforcer) EnforceTenantAccess(ctx context.Context, targetTenantID string) error {
 	if targetTenantID == "" {
-		return errors.New(errors.ErrCodeValidation, "target tenant ID required")
+		return ErrInvalidConfig.WithInternalMessage("target tenant ID empty")
 	}
 
+	// Super Admin can access all tenants
 	if e.HasRole(ctx, RoleSuperAdmin) {
 		return nil
 	}
 
-	userTenantID, ok := TenantIDFromContext(ctx)
+	currentTenantID, ok := TenantIDFromContext(ctx)
 	if !ok {
 		return ErrNoAuthContext
 	}
 
-	if userTenantID != targetTenantID {
-		return ErrCrossTenantAccess
+	if currentTenantID != targetTenantID {
+		return errors.ErrForbidden("cross-tenant access denied").
+			WithDetails("current", currentTenantID).
+			WithDetails("target", targetTenantID)
 	}
+
 	return nil
 }
 
-// Errors
+// Middleware Factories
+
+func (e *rbacEnforcer) RequirePermission(permission Permission) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if err := e.EnforcePermission(r.Context(), permission); err != nil {
+				defaultAuthFailureHandler(w, r, err)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func (e *rbacEnforcer) RequireAnyPermission(permissions ...Permission) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !e.HasAnyPermission(r.Context(), permissions...) {
+				defaultAuthFailureHandler(w, r, ErrAccessDenied)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func (e *rbacEnforcer) RequireRole(role Role) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !e.HasRole(r.Context(), role) {
+				defaultAuthFailureHandler(w, r, ErrAccessDenied)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func (e *rbacEnforcer) RequireTenantAccess() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			targetTenantID := r.URL.Query().Get("tenant_id")
+			if targetTenantID != "" {
+				if err := e.EnforceTenantAccess(r.Context(), targetTenantID); err != nil {
+					defaultAuthFailureHandler(w, r, err)
+					return
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 var (
-	ErrAccessDenied      = errors.New(errors.ErrCodeForbidden, "access denied")
-	ErrCrossTenantAccess = errors.New(errors.ErrCodeForbidden, "cross-tenant access denied")
-	ErrNoAuthContext     = errors.New(errors.ErrCodeUnauthorized, "no authentication context")
+	ErrAccessDenied      = errors.ErrForbidden("access denied")
+	ErrCrossTenantAccess = errors.ErrForbidden("cross-tenant access denied")
+	ErrNoAuthContext     = errors.ErrUnauthorized("no authentication context")
 )
-
-// Middleware factories
-
-func RequirePermission(enforcer RBACEnforcer, permission Permission) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if err := enforcer.EnforcePermission(r.Context(), permission); err != nil {
-				handleRBACError(w, err)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-func RequireAnyPermission(enforcer RBACEnforcer, permissions ...Permission) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !enforcer.HasAnyPermission(r.Context(), permissions...) {
-				handleRBACError(w, ErrAccessDenied)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-func RequireRole(enforcer RBACEnforcer, role Role) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !enforcer.HasRole(r.Context(), role) {
-				handleRBACError(w, ErrAccessDenied)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-func RequireTenantAccess(enforcer RBACEnforcer) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Extract tenant_id from query or path?
-			// Usually routing framework handles path params. But here we assume standard http.Handler.
-			// So check query param or maybe context (if extracted by router earlier).
-			// Assuming "tenant_id" query param for simplicity or header X-Tenant-ID?
-			// Or maybe path param requires integration with router (like Chi/Gin).
-			// Standard http.Request doesn't have path params.
-			// We check query param "tenant_id".
-			tenantID := r.URL.Query().Get("tenant_id")
-			if tenantID == "" {
-				// If not in query, maybe we don't enforce?
-				// Or maybe it's implicitly the user's tenant?
-				// If operation is tenant-scoped but no tenant ID provided, what to do?
-				// Assume it's user's tenant? No, EnforceTenantAccess checks explicit target.
-				// If explicit target is missing, maybe it's fine (user acts on own tenant)?
-				// But if user tries to access /tenants/{id}/...
-				// Without router integration, this middleware is limited.
-				// We'll skip if no tenant_id found in query, assuming controller handles it.
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			if err := enforcer.EnforceTenantAccess(r.Context(), tenantID); err != nil {
-				handleRBACError(w, err)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-func handleRBACError(w http.ResponseWriter, err error) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusForbidden)
-	resp := map[string]string{
-		"code":    "FORBIDDEN",
-		"message": err.Error(),
-	}
-	if err == ErrNoAuthContext {
-		w.WriteHeader(http.StatusUnauthorized)
-		resp["code"] = "UNAUTHORIZED"
-	}
-	json.NewEncoder(w).Encode(resp)
-}
-
 //Personal.AI order the ending

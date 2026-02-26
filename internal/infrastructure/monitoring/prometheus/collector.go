@@ -11,7 +11,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 )
 
-// MetricsCollector is the interface for metrics collection.
+// MetricsCollector defines the interface for metrics collection.
 type MetricsCollector interface {
 	RegisterCounter(name, help string, labels ...string) CounterVec
 	RegisterGauge(name, help string, labels ...string) GaugeVec
@@ -22,25 +22,25 @@ type MetricsCollector interface {
 	Unregister(collector prometheus.Collector) bool
 }
 
-// CounterVec interface
+// CounterVec wraps prometheus.CounterVec.
 type CounterVec interface {
 	WithLabelValues(lvs ...string) Counter
 	With(labels map[string]string) Counter
 }
 
-// Counter interface
+// Counter wraps prometheus.Counter.
 type Counter interface {
 	Inc()
 	Add(delta float64)
 }
 
-// GaugeVec interface
+// GaugeVec wraps prometheus.GaugeVec.
 type GaugeVec interface {
 	WithLabelValues(lvs ...string) Gauge
 	With(labels map[string]string) Gauge
 }
 
-// Gauge interface
+// Gauge wraps prometheus.Gauge.
 type Gauge interface {
 	Set(value float64)
 	Inc()
@@ -49,38 +49,39 @@ type Gauge interface {
 	Sub(delta float64)
 }
 
-// HistogramVec interface
+// HistogramVec wraps prometheus.HistogramVec.
 type HistogramVec interface {
 	WithLabelValues(lvs ...string) Histogram
 	With(labels map[string]string) Histogram
 }
 
-// Histogram interface
+// Histogram wraps prometheus.Histogram.
 type Histogram interface {
 	Observe(value float64)
 }
 
-// SummaryVec interface
+// SummaryVec wraps prometheus.SummaryVec.
 type SummaryVec interface {
 	WithLabelValues(lvs ...string) Summary
 	With(labels map[string]string) Summary
 }
 
-// Summary interface
+// Summary wraps prometheus.Summary.
 type Summary interface {
 	Observe(value float64)
 }
 
-// CollectorConfig configuration for metrics collector.
+// CollectorConfig holds configuration for the collector.
 type CollectorConfig struct {
-	Namespace             string            `json:"namespace"`
-	Subsystem             string            `json:"subsystem"`
-	EnableProcessMetrics  bool              `json:"enable_process_metrics"`
-	EnableGoMetrics       bool              `json:"enable_go_metrics"`
-	DefaultHistogramBuckets []float64         `json:"default_histogram_buckets"`
-	ConstLabels           map[string]string `json:"const_labels"`
+	Namespace             string
+	Subsystem             string
+	EnableProcessMetrics  bool
+	EnableGoMetrics       bool
+	DefaultHistogramBuckets []float64
+	ConstLabels           map[string]string
 }
 
+// prometheusCollector implements MetricsCollector.
 type prometheusCollector struct {
 	registry          *prometheus.Registry
 	config            CollectorConfig
@@ -118,132 +119,6 @@ func NewMetricsCollector(cfg CollectorConfig, logger logging.Logger) (MetricsCol
 	}, nil
 }
 
-func (c *prometheusCollector) RegisterCounter(name, help string, labels ...string) CounterVec {
-	fqName := prometheus.BuildFQName(c.config.Namespace, c.config.Subsystem, name)
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if existing, ok := c.registeredMetrics[fqName]; ok {
-		if cv, ok := existing.(*prometheus.CounterVec); ok {
-			return &promCounterVec{cv}
-		}
-		c.logger.Error("Metric name conflict", logging.String("name", fqName))
-		return &noopCounterVec{}
-	}
-
-	vec := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:        fqName,
-		Help:        help,
-		ConstLabels: c.config.ConstLabels,
-	}, labels)
-
-	if err := c.registry.Register(vec); err != nil {
-		c.logger.Error("Failed to register counter", logging.String("name", fqName), logging.Err(err))
-		return &noopCounterVec{}
-	}
-
-	c.registeredMetrics[fqName] = vec
-	return &promCounterVec{vec}
-}
-
-func (c *prometheusCollector) RegisterGauge(name, help string, labels ...string) GaugeVec {
-	fqName := prometheus.BuildFQName(c.config.Namespace, c.config.Subsystem, name)
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if existing, ok := c.registeredMetrics[fqName]; ok {
-		if gv, ok := existing.(*prometheus.GaugeVec); ok {
-			return &promGaugeVec{gv}
-		}
-		c.logger.Error("Metric name conflict", logging.String("name", fqName))
-		return &noopGaugeVec{}
-	}
-
-	vec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name:        fqName,
-		Help:        help,
-		ConstLabels: c.config.ConstLabels,
-	}, labels)
-
-	if err := c.registry.Register(vec); err != nil {
-		c.logger.Error("Failed to register gauge", logging.String("name", fqName), logging.Err(err))
-		return &noopGaugeVec{}
-	}
-
-	c.registeredMetrics[fqName] = vec
-	return &promGaugeVec{vec}
-}
-
-func (c *prometheusCollector) RegisterHistogram(name, help string, buckets []float64, labels ...string) HistogramVec {
-	fqName := prometheus.BuildFQName(c.config.Namespace, c.config.Subsystem, name)
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if existing, ok := c.registeredMetrics[fqName]; ok {
-		if hv, ok := existing.(*prometheus.HistogramVec); ok {
-			return &promHistogramVec{hv}
-		}
-		c.logger.Error("Metric name conflict", logging.String("name", fqName))
-		return &noopHistogramVec{}
-	}
-
-	if buckets == nil {
-		buckets = c.config.DefaultHistogramBuckets
-	}
-
-	vec := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:        fqName,
-		Help:        help,
-		Buckets:     buckets,
-		ConstLabels: c.config.ConstLabels,
-	}, labels)
-
-	if err := c.registry.Register(vec); err != nil {
-		c.logger.Error("Failed to register histogram", logging.String("name", fqName), logging.Err(err))
-		return &noopHistogramVec{}
-	}
-
-	c.registeredMetrics[fqName] = vec
-	return &promHistogramVec{vec}
-}
-
-func (c *prometheusCollector) RegisterSummary(name, help string, objectives map[float64]float64, labels ...string) SummaryVec {
-	fqName := prometheus.BuildFQName(c.config.Namespace, c.config.Subsystem, name)
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if existing, ok := c.registeredMetrics[fqName]; ok {
-		if sv, ok := existing.(*prometheus.SummaryVec); ok {
-			return &promSummaryVec{sv}
-		}
-		c.logger.Error("Metric name conflict", logging.String("name", fqName))
-		return &noopSummaryVec{}
-	}
-
-	if objectives == nil {
-		objectives = map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
-	}
-
-	vec := prometheus.NewSummaryVec(prometheus.SummaryOpts{
-		Name:        fqName,
-		Help:        help,
-		Objectives:  objectives,
-		ConstLabels: c.config.ConstLabels,
-	}, labels)
-
-	if err := c.registry.Register(vec); err != nil {
-		c.logger.Error("Failed to register summary", logging.String("name", fqName), logging.Err(err))
-		return &noopSummaryVec{}
-	}
-
-	c.registeredMetrics[fqName] = vec
-	return &promSummaryVec{vec}
-}
-
 func (c *prometheusCollector) Handler() http.Handler {
 	return promhttp.HandlerFor(c.registry, promhttp.HandlerOpts{
 		EnableOpenMetrics: true,
@@ -258,160 +133,234 @@ func (c *prometheusCollector) Unregister(collector prometheus.Collector) bool {
 	return c.registry.Unregister(collector)
 }
 
+func (c *prometheusCollector) register(name string, newCollector prometheus.Collector) (prometheus.Collector, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	fullName := prometheus.BuildFQName(c.config.Namespace, c.config.Subsystem, name)
+	if existing, exists := c.registeredMetrics[fullName]; exists {
+		return existing, nil
+	}
+
+	if err := c.registry.Register(newCollector); err != nil {
+		return nil, err
+	}
+	c.registeredMetrics[fullName] = newCollector
+	return newCollector, nil
+}
+
+func (c *prometheusCollector) RegisterCounter(name, help string, labels ...string) CounterVec {
+	vec := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:   c.config.Namespace,
+		Subsystem:   c.config.Subsystem,
+		Name:        name,
+		Help:        help,
+		ConstLabels: c.config.ConstLabels,
+	}, labels)
+
+	registered, err := c.register(name, vec)
+	if err != nil {
+		c.logger.Error("failed to register counter", logging.String("name", name), logging.Error(err))
+		return &noopCounterVec{}
+	}
+	if v, ok := registered.(*prometheus.CounterVec); ok {
+		return &promCounterVec{vec: v}
+	}
+	c.logger.Warn("metric type mismatch", logging.String("name", name), logging.String("type", "counter"))
+	return &noopCounterVec{}
+}
+
+func (c *prometheusCollector) RegisterGauge(name, help string, labels ...string) GaugeVec {
+	vec := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace:   c.config.Namespace,
+		Subsystem:   c.config.Subsystem,
+		Name:        name,
+		Help:        help,
+		ConstLabels: c.config.ConstLabels,
+	}, labels)
+
+	registered, err := c.register(name, vec)
+	if err != nil {
+		c.logger.Error("failed to register gauge", logging.String("name", name), logging.Error(err))
+		return &noopGaugeVec{}
+	}
+	if v, ok := registered.(*prometheus.GaugeVec); ok {
+		return &promGaugeVec{vec: v}
+	}
+	c.logger.Warn("metric type mismatch", logging.String("name", name), logging.String("type", "gauge"))
+	return &noopGaugeVec{}
+}
+
+func (c *prometheusCollector) RegisterHistogram(name, help string, buckets []float64, labels ...string) HistogramVec {
+	if buckets == nil {
+		buckets = c.config.DefaultHistogramBuckets
+	}
+	vec := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace:   c.config.Namespace,
+		Subsystem:   c.config.Subsystem,
+		Name:        name,
+		Help:        help,
+		ConstLabels: c.config.ConstLabels,
+		Buckets:     buckets,
+	}, labels)
+
+	registered, err := c.register(name, vec)
+	if err != nil {
+		c.logger.Error("failed to register histogram", logging.String("name", name), logging.Error(err))
+		return &noopHistogramVec{}
+	}
+	if v, ok := registered.(*prometheus.HistogramVec); ok {
+		return &promHistogramVec{vec: v}
+	}
+	c.logger.Warn("metric type mismatch", logging.String("name", name), logging.String("type", "histogram"))
+	return &noopHistogramVec{}
+}
+
+func (c *prometheusCollector) RegisterSummary(name, help string, objectives map[float64]float64, labels ...string) SummaryVec {
+	if objectives == nil {
+		objectives = map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
+	}
+	vec := prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Namespace:   c.config.Namespace,
+		Subsystem:   c.config.Subsystem,
+		Name:        name,
+		Help:        help,
+		ConstLabels: c.config.ConstLabels,
+		Objectives:  objectives,
+	}, labels)
+
+	registered, err := c.register(name, vec)
+	if err != nil {
+		c.logger.Error("failed to register summary", logging.String("name", name), logging.Error(err))
+		return &noopSummaryVec{}
+	}
+	if v, ok := registered.(*prometheus.SummaryVec); ok {
+		return &promSummaryVec{vec: v}
+	}
+	c.logger.Warn("metric type mismatch", logging.String("name", name), logging.String("type", "summary"))
+	return &noopSummaryVec{}
+}
+
 // Wrappers
 
-type promCounterVec struct {
-	vec *prometheus.CounterVec
-}
+type promCounterVec struct{ vec *prometheus.CounterVec }
 
 func (v *promCounterVec) WithLabelValues(lvs ...string) Counter {
-	return &promCounter{v.vec.WithLabelValues(lvs...)}
+	return &promCounter{c: v.vec.WithLabelValues(lvs...)}
 }
-
 func (v *promCounterVec) With(labels map[string]string) Counter {
-	return &promCounter{v.vec.With(prometheus.Labels(labels))}
+	return &promCounter{c: v.vec.With(labels)}
 }
 
-type promCounter struct {
-	c prometheus.Counter
-}
+type promCounter struct{ c prometheus.Counter }
 
-func (c *promCounter) Inc() {
-	c.c.Inc()
-}
+func (c *promCounter) Inc()              { c.c.Inc() }
+func (c *promCounter) Add(delta float64) { c.c.Add(delta) }
 
-func (c *promCounter) Add(delta float64) {
-	c.c.Add(delta)
-}
-
-type promGaugeVec struct {
-	vec *prometheus.GaugeVec
-}
+type promGaugeVec struct{ vec *prometheus.GaugeVec }
 
 func (v *promGaugeVec) WithLabelValues(lvs ...string) Gauge {
-	return &promGauge{v.vec.WithLabelValues(lvs...)}
+	return &promGauge{g: v.vec.WithLabelValues(lvs...)}
 }
-
 func (v *promGaugeVec) With(labels map[string]string) Gauge {
-	return &promGauge{v.vec.With(prometheus.Labels(labels))}
+	return &promGauge{g: v.vec.With(labels)}
 }
 
-type promGauge struct {
-	g prometheus.Gauge
-}
+type promGauge struct{ g prometheus.Gauge }
 
-func (g *promGauge) Set(value float64) {
-	g.g.Set(value)
-}
+func (g *promGauge) Set(value float64)   { g.g.Set(value) }
+func (g *promGauge) Inc()                { g.g.Inc() }
+func (g *promGauge) Dec()                { g.g.Dec() }
+func (g *promGauge) Add(delta float64)   { g.g.Add(delta) }
+func (g *promGauge) Sub(delta float64)   { g.g.Sub(delta) }
 
-func (g *promGauge) Inc() {
-	g.g.Inc()
-}
-
-func (g *promGauge) Dec() {
-	g.g.Dec()
-}
-
-func (g *promGauge) Add(delta float64) {
-	g.g.Add(delta)
-}
-
-func (g *promGauge) Sub(delta float64) {
-	g.g.Sub(delta)
-}
-
-type promHistogramVec struct {
-	vec *prometheus.HistogramVec
-}
+type promHistogramVec struct{ vec *prometheus.HistogramVec }
 
 func (v *promHistogramVec) WithLabelValues(lvs ...string) Histogram {
-	return &promHistogram{v.vec.WithLabelValues(lvs...)}
+	return &promHistogram{h: v.vec.WithLabelValues(lvs...)}
 }
-
 func (v *promHistogramVec) With(labels map[string]string) Histogram {
-	return &promHistogram{v.vec.With(prometheus.Labels(labels))}
+	return &promHistogram{h: v.vec.With(labels)}
 }
 
-type promHistogram struct {
-	h prometheus.Observer
-}
+type promHistogram struct{ h prometheus.Observer }
 
-func (h *promHistogram) Observe(value float64) {
-	h.h.Observe(value)
-}
+func (h *promHistogram) Observe(value float64) { h.h.Observe(value) }
 
-type promSummaryVec struct {
-	vec *prometheus.SummaryVec
-}
+type promSummaryVec struct{ vec *prometheus.SummaryVec }
 
 func (v *promSummaryVec) WithLabelValues(lvs ...string) Summary {
-	return &promSummary{v.vec.WithLabelValues(lvs...)}
+	return &promSummary{s: v.vec.WithLabelValues(lvs...)}
 }
-
 func (v *promSummaryVec) With(labels map[string]string) Summary {
-	return &promSummary{v.vec.With(prometheus.Labels(labels))}
+	return &promSummary{s: v.vec.With(labels)}
 }
 
-type promSummary struct {
-	s prometheus.Observer
-}
+type promSummary struct{ s prometheus.Observer }
 
-func (s *promSummary) Observe(value float64) {
-	s.s.Observe(value)
-}
+func (s *promSummary) Observe(value float64) { s.s.Observe(value) }
 
-// No-ops
+// No-op implementations
 
 type noopCounterVec struct{}
-type noopCounter struct{}
 
 func (v *noopCounterVec) WithLabelValues(lvs ...string) Counter { return &noopCounter{} }
 func (v *noopCounterVec) With(labels map[string]string) Counter { return &noopCounter{} }
-func (c *noopCounter) Inc()                                     {}
-func (c *noopCounter) Add(delta float64)                        {}
+
+type noopCounter struct{}
+
+func (c *noopCounter) Inc()              {}
+func (c *noopCounter) Add(delta float64) {}
 
 type noopGaugeVec struct{}
-type noopGauge struct{}
 
 func (v *noopGaugeVec) WithLabelValues(lvs ...string) Gauge { return &noopGauge{} }
 func (v *noopGaugeVec) With(labels map[string]string) Gauge { return &noopGauge{} }
-func (g *noopGauge) Set(value float64)                      {}
-func (g *noopGauge) Inc()                                   {}
-func (g *noopGauge) Dec()                                   {}
-func (g *noopGauge) Add(delta float64)                      {}
-func (g *noopGauge) Sub(delta float64)                      {}
+
+type noopGauge struct{}
+
+func (g *noopGauge) Set(value float64)   {}
+func (g *noopGauge) Inc()                {}
+func (g *noopGauge) Dec()                {}
+func (g *noopGauge) Add(delta float64)   {}
+func (g *noopGauge) Sub(delta float64)   {}
 
 type noopHistogramVec struct{}
-type noopHistogram struct{}
 
 func (v *noopHistogramVec) WithLabelValues(lvs ...string) Histogram { return &noopHistogram{} }
 func (v *noopHistogramVec) With(labels map[string]string) Histogram { return &noopHistogram{} }
-func (h *noopHistogram) Observe(value float64)                      {}
+
+type noopHistogram struct{}
+
+func (h *noopHistogram) Observe(value float64) {}
 
 type noopSummaryVec struct{}
-type noopSummary struct{}
 
 func (v *noopSummaryVec) WithLabelValues(lvs ...string) Summary { return &noopSummary{} }
 func (v *noopSummaryVec) With(labels map[string]string) Summary { return &noopSummary{} }
-func (s *noopSummary) Observe(value float64)                    {}
 
-// Timer helper
+type noopSummary struct{}
+
+func (s *noopSummary) Observe(value float64) {}
+
+// Timer
 
 type Timer struct {
-	begin     time.Time
 	histogram Histogram
+	start     time.Time
 }
 
 func NewTimer(histogram Histogram) *Timer {
 	return &Timer{
-		begin:     time.Now(),
 		histogram: histogram,
+		start:     time.Now(),
 	}
 }
 
 func (t *Timer) ObserveDuration() {
-	d := time.Since(t.begin).Seconds()
-	t.histogram.Observe(d)
+	if t.histogram == nil {
+		return
+	}
+	t.histogram.Observe(time.Since(t.start).Seconds())
 }
-
 //Personal.AI order the ending
