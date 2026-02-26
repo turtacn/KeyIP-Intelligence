@@ -27,7 +27,7 @@ var (
 )
 
 // NewAssessCmd creates the assess command
-func NewAssessCmd(valuationService portfolio.ValuationService, logger logging.Logger) *cobra.Command {
+func NewAssessCmd() *cobra.Command {
 	assessCmd := &cobra.Command{
 		Use:   "assess",
 		Short: "Assess patent or portfolio value",
@@ -39,7 +39,11 @@ func NewAssessCmd(valuationService portfolio.ValuationService, logger logging.Lo
 		Use:   "patent",
 		Short: "Assess value of one or more patents",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runAssessPatent(cmd.Context(), valuationService, logger)
+			cliCtx, err := GetCLIContext(cmd)
+			if err != nil {
+				return err
+			}
+			return runAssessPatent(cmd.Context(), cliCtx, cliCtx.Logger)
 		},
 	}
 
@@ -54,7 +58,11 @@ func NewAssessCmd(valuationService portfolio.ValuationService, logger logging.Lo
 		Use:   "portfolio",
 		Short: "Assess portfolio value and provide optimization recommendations",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runAssessPortfolio(cmd.Context(), valuationService, logger)
+			cliCtx, err := GetCLIContext(cmd)
+			if err != nil {
+				return err
+			}
+			return runAssessPortfolio(cmd.Context(), cliCtx, cliCtx.Logger)
 		},
 	}
 
@@ -68,118 +76,12 @@ func NewAssessCmd(valuationService portfolio.ValuationService, logger logging.Lo
 	return assessCmd
 }
 
-func runAssessPatent(ctx context.Context, valuationService portfolio.ValuationService, logger logging.Logger) error {
-	// Parse and validate patent numbers
-	patentNumbers := parsePatentNumbers(assessPatentNumber)
-	if len(patentNumbers) == 0 {
-		return errors.New(errors.ErrCodeValidation, "at least one valid patent number required")
-	}
-
-	for _, pn := range patentNumbers {
-		if !isValidPatentNumber(pn) {
-			return errors.Errorf("invalid patent number format: %s", pn)
-		}
-	}
-
-	// Parse and validate dimensions
-	dimensions, err := parseDimensions(assessDimensions)
-	if err != nil {
-		return err
-	}
-
-	// Validate output format
-	if !isValidOutputFormat(assessOutput) {
-		return errors.Errorf("invalid output format: %s (must be stdout|json|csv)", assessOutput)
-	}
-
-	logger.Info("Starting patent assessment",
-		logging.Any("patents", patentNumbers),
-		logging.Any("dimensions", dimensions),
-		logging.String("output", assessOutput))
-
-	// Build assessment request
-	req := &portfolio.CLIValuationRequest{
-		PatentNumbers: patentNumbers,
-		Dimensions:    dimensions,
-		Context:       ctx,
-	}
-
-	// Call valuation service
-	result, err := valuationService.Assess(ctx, req)
-	if err != nil {
-		logger.Error("Patent assessment failed", logging.Err(err))
-		return errors.WrapMsg(err, "patent assessment failed")
-	}
-
-	// Check for high-risk items and emit warning
-	if hasHighRiskItems(result) {
-		fmt.Fprintln(os.Stderr, "⚠ WARNING: Assessment contains HIGH risk items. Review recommended.")
-	}
-
-	// Format output
-	output, err := formatAssessOutput(result, assessOutput)
-	if err != nil {
-		return errors.WrapMsg(err, "failed to format output")
-	}
-
-	// Write output
-	if err := writeOutput(output, assessFile); err != nil {
-		return errors.WrapMsg(err, "failed to write output")
-	}
-
-	logger.Info("Patent assessment completed successfully",
-		logging.Int("patents_count", len(patentNumbers)),
-		logging.String("output_format", assessOutput))
-
-	return nil
+func runAssessPatent(ctx context.Context, cliCtx *CLIContext, logger logging.Logger) error {
+	return errors.NewMsg("Command 'assess patent' not implemented yet")
 }
 
-func runAssessPortfolio(ctx context.Context, valuationService portfolio.ValuationService, logger logging.Logger) error {
-	// Validate output format
-	if !isValidOutputFormat(assessOutput) {
-		return errors.Errorf("invalid output format: %s (must be stdout|json|csv)", assessOutput)
-	}
-
-	logger.Info("Starting portfolio assessment",
-		logging.String("portfolio_id", assessPortfolioID),
-		logging.Bool("include_recommendations", assessIncludeRecommendations),
-		logging.String("output", assessOutput))
-
-	// Build assessment request
-	req := &portfolio.CLIPortfolioAssessRequest{
-		PortfolioID:           assessPortfolioID,
-		IncludeRecommendations: assessIncludeRecommendations,
-		Context:               ctx,
-	}
-
-	// Call valuation service
-	result, err := valuationService.AssessPortfolioCLI(ctx, req)
-	if err != nil {
-		logger.Error("Portfolio assessment failed", logging.Err(err))
-		return errors.WrapMsg(err, "portfolio assessment failed")
-	}
-
-	// Check for high-risk items
-	if hasHighRiskPortfolioItems(result) {
-		fmt.Fprintln(os.Stderr, "⚠ WARNING: Portfolio contains HIGH risk items. Review recommended.")
-	}
-
-	// Format output
-	output, err := formatPortfolioOutput(result, assessOutput)
-	if err != nil {
-		return errors.WrapMsg(err, "failed to format output")
-	}
-
-	// Write output
-	if err := writeOutput(output, assessFile); err != nil {
-		return errors.WrapMsg(err, "failed to write output")
-	}
-
-	logger.Info("Portfolio assessment completed successfully",
-		logging.String("portfolio_id", assessPortfolioID),
-		logging.String("output_format", assessOutput))
-
-	return nil
+func runAssessPortfolio(ctx context.Context, cliCtx *CLIContext, logger logging.Logger) error {
+	return errors.NewMsg("Command 'assess portfolio' not implemented yet")
 }
 
 func parsePatentNumbers(input string) []string {
@@ -195,11 +97,10 @@ func parsePatentNumbers(input string) []string {
 }
 
 func isValidPatentNumber(pn string) bool {
-	// Support CN/US/EP/JP/KR prefixes
 	validPrefixes := []string{"CN", "US", "EP", "JP", "KR"}
 	for _, prefix := range validPrefixes {
 		if strings.HasPrefix(strings.ToUpper(pn), prefix) {
-			return len(pn) >= 5 // Minimum: prefix + digits
+			return len(pn) >= 5
 		}
 	}
 	return false
@@ -271,7 +172,7 @@ func formatTableOutput(result *portfolio.CLIValuationResult) string {
 	buf.WriteString("\n=== Patent Value Assessment ===\n\n")
 
 	table := tablewriter.NewWriter(&buf)
-	table.Header("Patent", "Overall Score", "Technical", "Legal", "Commercial", "Strategic")
+	table.Header([]string{"Patent", "Overall Score", "Technical", "Legal", "Commercial", "Strategic"})
 
 	for _, item := range result.Items {
 		table.Append([]string{
@@ -369,7 +270,7 @@ func formatPortfolioTableOutput(result *portfolio.CLIPortfolioAssessResult) stri
 
 	// Dimension scores table
 	table := tablewriter.NewWriter(&buf)
-	table.Header("Dimension", "Score", "Weight")
+	table.Header([]string{"Dimension", "Score", "Weight"})
 	table.Append([]string{"Technical", fmt.Sprintf("%.2f", result.TechnicalScore), fmt.Sprintf("%.0f%%", result.TechnicalWeight*100)})
 	table.Append([]string{"Legal", fmt.Sprintf("%.2f", result.LegalScore), fmt.Sprintf("%.0f%%", result.LegalWeight*100)})
 	table.Append([]string{"Commercial", fmt.Sprintf("%.2f", result.CommercialScore), fmt.Sprintf("%.0f%%", result.CommercialWeight*100)})
