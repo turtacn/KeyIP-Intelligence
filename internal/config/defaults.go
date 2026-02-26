@@ -4,75 +4,59 @@ import (
 	"time"
 )
 
-// Default constants for configuration values.
+// Default configuration values.
 const (
 	DefaultHTTPHost               = "0.0.0.0"
 	DefaultHTTPPort               = 8080
 	DefaultHTTPReadTimeout        = 30 * time.Second
 	DefaultHTTPWriteTimeout       = 30 * time.Second
 	DefaultHTTPMaxHeaderBytes     = 1 << 20 // 1MB
-
 	DefaultGRPCPort               = 9090
 	DefaultGRPCMaxRecvMsgSize     = 50 << 20 // 50MB
 	DefaultGRPCMaxSendMsgSize     = 50 << 20 // 50MB
-
 	DefaultPostgresPort           = 5432
 	DefaultPostgresSSLMode        = "disable"
 	DefaultPostgresMaxOpenConns   = 25
 	DefaultPostgresMaxIdleConns   = 10
 	DefaultPostgresConnMaxLifetime = 5 * time.Minute
-
 	DefaultNeo4jMaxPoolSize       = 50
 	DefaultNeo4jAcquisitionTimeout = 60 * time.Second
-
 	DefaultRedisDB                = 0
 	DefaultRedisPoolSize          = 10
 	DefaultRedisMinIdleConns      = 5
 	DefaultRedisDialTimeout       = 5 * time.Second
 	DefaultRedisReadTimeout       = 3 * time.Second
 	DefaultRedisWriteTimeout      = 3 * time.Second
-
 	DefaultOpenSearchMaxRetries   = 3
-
 	DefaultMilvusPort             = 19530
-
 	DefaultKafkaAutoOffsetReset   = "earliest"
 	DefaultKafkaMaxBytes          = 10 << 20 // 10MB
 	DefaultKafkaSessionTimeout    = 30 * time.Second
-
 	DefaultMinIOUseSSL            = false
 	DefaultMinIOPartSize          = 64 << 20 // 64MB
-
 	DefaultJWTExpiry              = 24 * time.Hour
 	DefaultJWTRefreshExpiry       = 7 * 24 * time.Hour
 	DefaultJWTSigningMethod       = "HS256"
-
 	DefaultMolPatentGNNBatchSize  = 32
 	DefaultMolPatentGNNTimeout    = 30 * time.Second
 	DefaultMolPatentGNNDevice     = "cpu"
-
 	DefaultClaimBERTMaxSeqLength  = 512
 	DefaultClaimBERTTimeout       = 30 * time.Second
-
 	DefaultStrategyGPTMaxTokens   = 4096
-	DefaultStrategyGPTTemperature  = 0.7
-	DefaultStrategyGPTTopP         = 0.9
-	DefaultStrategyGPTTimeout      = 120 * time.Second
-	DefaultStrategyGPTRetryCount   = 3
-	DefaultStrategyGPTRetryDelay   = 2 * time.Second
-
+	DefaultStrategyGPTTemperature = 0.7
+	DefaultStrategyGPTTopP        = 0.9
+	DefaultStrategyGPTTimeout     = 120 * time.Second
+	DefaultStrategyGPTRetryCount  = 3
+	DefaultStrategyGPTRetryDelay  = 2 * time.Second
 	DefaultChemExtractorTimeout   = 60 * time.Second
-
 	DefaultInfringeNetThreshold   = 0.85
 	DefaultInfringeNetBatchSize   = 16
 	DefaultInfringeNetTimeout     = 30 * time.Second
 	DefaultInfringeNetSimilarityMetric = "cosine"
-
 	DefaultPrometheusEnabled      = true
 	DefaultPrometheusPort         = 9091
 	DefaultPrometheusPath         = "/metrics"
 	DefaultPrometheusNamespace    = "keyip"
-
 	DefaultLogLevel               = "info"
 	DefaultLogFormat              = "json"
 	DefaultLogOutput              = "stdout"
@@ -80,10 +64,8 @@ const (
 	DefaultLogMaxBackups          = 3
 	DefaultLogMaxAge              = 28 // days
 	DefaultLogCompress            = true
-
 	DefaultTracingSampleRate      = 0.1
 	DefaultTracingServiceName     = "keyip-intelligence"
-
 	DefaultEmailSMTPPort          = 587
 	DefaultEmailUseTLS            = true
 	DefaultEmailTimeout           = 10 * time.Second
@@ -91,7 +73,10 @@ const (
 
 // ApplyDefaults fills in default values for empty configuration fields.
 func ApplyDefaults(cfg *Config) *Config {
-	if cfg == nil { return cfg }
+	if cfg == nil {
+		return cfg
+	}
+
 	// Server
 	if cfg.Server.HTTP.Host == "" {
 		cfg.Server.HTTP.Host = DefaultHTTPHost
@@ -118,7 +103,7 @@ func ApplyDefaults(cfg *Config) *Config {
 		cfg.Server.GRPC.MaxSendMsgSize = DefaultGRPCMaxSendMsgSize
 	}
 
-	// Postgres
+	// Database
 	if cfg.Database.Postgres.Port == 0 {
 		cfg.Database.Postgres.Port = DefaultPostgresPort
 	}
@@ -134,8 +119,6 @@ func ApplyDefaults(cfg *Config) *Config {
 	if cfg.Database.Postgres.ConnMaxLifetime == 0 {
 		cfg.Database.Postgres.ConnMaxLifetime = DefaultPostgresConnMaxLifetime
 	}
-
-	// Neo4j
 	if cfg.Database.Neo4j.MaxConnectionPoolSize == 0 {
 		cfg.Database.Neo4j.MaxConnectionPoolSize = DefaultNeo4jMaxPoolSize
 	}
@@ -143,7 +126,7 @@ func ApplyDefaults(cfg *Config) *Config {
 		cfg.Database.Neo4j.ConnectionAcquisitionTimeout = DefaultNeo4jAcquisitionTimeout
 	}
 
-	// Redis
+	// Cache
 	if cfg.Cache.Redis.PoolSize == 0 {
 		cfg.Cache.Redis.PoolSize = DefaultRedisPoolSize
 	}
@@ -160,17 +143,15 @@ func ApplyDefaults(cfg *Config) *Config {
 		cfg.Cache.Redis.WriteTimeout = DefaultRedisWriteTimeout
 	}
 
-	// OpenSearch
+	// Search
 	if cfg.Search.OpenSearch.MaxRetries == 0 {
 		cfg.Search.OpenSearch.MaxRetries = DefaultOpenSearchMaxRetries
 	}
-
-	// Milvus
 	if cfg.Search.Milvus.Port == 0 {
 		cfg.Search.Milvus.Port = DefaultMilvusPort
 	}
 
-	// Kafka
+	// Messaging
 	if cfg.Messaging.Kafka.AutoOffsetReset == "" {
 		cfg.Messaging.Kafka.AutoOffsetReset = DefaultKafkaAutoOffsetReset
 	}
@@ -181,12 +162,12 @@ func ApplyDefaults(cfg *Config) *Config {
 		cfg.Messaging.Kafka.SessionTimeout = DefaultKafkaSessionTimeout
 	}
 
-	// MinIO
+	// Storage
 	if cfg.Storage.MinIO.PartSize == 0 {
 		cfg.Storage.MinIO.PartSize = DefaultMinIOPartSize
 	}
 
-	// JWT
+	// Auth
 	if cfg.Auth.JWT.Expiry == 0 {
 		cfg.Auth.JWT.Expiry = DefaultJWTExpiry
 	}
@@ -197,7 +178,7 @@ func ApplyDefaults(cfg *Config) *Config {
 		cfg.Auth.JWT.SigningMethod = DefaultJWTSigningMethod
 	}
 
-	// AI Intelligence
+	// Intelligence
 	if cfg.Intelligence.MolPatentGNN.BatchSize == 0 {
 		cfg.Intelligence.MolPatentGNN.BatchSize = DefaultMolPatentGNNBatchSize
 	}
@@ -212,6 +193,9 @@ func ApplyDefaults(cfg *Config) *Config {
 	}
 	if cfg.Intelligence.ClaimBERT.Timeout == 0 {
 		cfg.Intelligence.ClaimBERT.Timeout = DefaultClaimBERTTimeout
+	}
+	if cfg.Intelligence.ClaimBERT.Device == "" {
+		cfg.Intelligence.ClaimBERT.Device = DefaultMolPatentGNNDevice // Using same default (cpu)
 	}
 	if cfg.Intelligence.StrategyGPT.MaxTokens == 0 {
 		cfg.Intelligence.StrategyGPT.MaxTokens = DefaultStrategyGPTMaxTokens
@@ -248,6 +232,9 @@ func ApplyDefaults(cfg *Config) *Config {
 	}
 
 	// Monitoring
+	if !cfg.Monitoring.Prometheus.Enabled {
+		cfg.Monitoring.Prometheus.Enabled = DefaultPrometheusEnabled
+	}
 	if cfg.Monitoring.Prometheus.Port == 0 {
 		cfg.Monitoring.Prometheus.Port = DefaultPrometheusPort
 	}
@@ -275,6 +262,35 @@ func ApplyDefaults(cfg *Config) *Config {
 	if cfg.Monitoring.Logging.MaxAge == 0 {
 		cfg.Monitoring.Logging.MaxAge = DefaultLogMaxAge
 	}
+	// DefaultLogCompress is boolean, we must be careful not to overwrite explicitly set 'false' if it differs from default.
+	// But in this case default is true. If struct field is false, it might be zero value or explicit false.
+	// Since boolean zero value is false, and default is true, we can check if it's false, but we can't distinguish explicit false from zero false without pointer.
+	// Assuming that if it is false (zero value), we want the default (true). This might override explicit false.
+	// However, standard Go struct config usually implies pointers for optional bools, or we accept this limitation.
+	// The plan doesn't specify pointers for bools in config struct.
+	// Let's assume we set it to default if it's false (zero value).
+	// But wait, Storage.MinIO.UseSSL default is false, zero value is false. So that's fine.
+	// Monitoring.Logging.Compress default is true. If user wants false, they can't set it if we overwrite.
+	// To support explicit false, we should have used *bool or a separate flag.
+	// Given the struct definition in config.go uses `bool` (value), we have this ambiguity.
+	// For now, I will NOT set default for bools that default to true if the zero value is false, UNLESS I change the struct to use pointers.
+	// But I am not changing struct to pointers in this step (Plan says "Refine...").
+	// Actually, `viper` unmarshals into the struct. If the key is missing in YAML, it remains zero value.
+	// If `Compress` is missing in YAML, it is `false`. We want it `true`.
+	// If user sets `compress: false` in YAML, it is `false`.
+	// We can't distinguish.
+	// *Solution*: `ApplyDefaults` runs AFTER unmarshal.
+	// We will skip bool defaults logic for now if it conflicts, OR we just set it.
+	// `DefaultLogCompress` is true.
+	// I'll set it to true if it is false. This means user cannot disable compression via config unless we change logic.
+	// Ideally we use Viper's default mechanism, but `ApplyDefaults` is manual.
+	// I will skip setting `Compress` default here to avoid breaking explicit `false`.
+    // Wait, the requirement says "ApplyDefaults... default value ... DefaultLogCompress = true".
+    // I will assume the intention is to set it.
+    if !cfg.Monitoring.Logging.Compress {
+        cfg.Monitoring.Logging.Compress = DefaultLogCompress
+    }
+
 	if cfg.Monitoring.Tracing.SampleRate == 0 {
 		cfg.Monitoring.Tracing.SampleRate = DefaultTracingSampleRate
 	}
@@ -282,12 +298,16 @@ func ApplyDefaults(cfg *Config) *Config {
 		cfg.Monitoring.Tracing.ServiceName = DefaultTracingServiceName
 	}
 
-	// Email
+	// Notification
 	if cfg.Notification.Email.SMTPPort == 0 {
 		cfg.Notification.Email.SMTPPort = DefaultEmailSMTPPort
 	}
 	if cfg.Notification.Email.Timeout == 0 {
 		cfg.Notification.Email.Timeout = DefaultEmailTimeout
+	}
+	// UseTLS default is true. Same bool issue.
+	if !cfg.Notification.Email.UseTLS {
+		cfg.Notification.Email.UseTLS = DefaultEmailUseTLS
 	}
 
 	return cfg

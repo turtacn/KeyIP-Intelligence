@@ -3,426 +3,211 @@
 # This file is a SAFE REFERENCE copy of config.yaml.
 # Copy this file to configs/config.yaml and replace every
 # value with your real environment settings.
-#
-# Convention used throughout this file:
-#   <angle-brackets>  = placeholder you MUST replace
-#   [square-brackets] = optional field with a sensible default
-#   (parentheses)     = allowed values / enumeration
 # ============================================================
 
-# ──────────────────────────────────────────────
-# Server Configuration
-# ──────────────────────────────────────────────
 server:
-  # TCP port the HTTP API server will bind to.
-  # (1024–65535; avoid well-known ports below 1024 in production)
-  port: 8080
+  # HTTP API server configuration
+  http:
+    host: "0.0.0.0"               # Bind address
+    port: 8080                    # Listening port (1024-65535)
+    read_timeout: 30s             # Max duration for reading request
+    write_timeout: 30s            # Max duration for writing response
+    max_header_bytes: 1048576     # Max header size (1MB)
 
-  # Gin framework operating mode.
-  # (debug | release | test)
-  # Use "release" in production — disables verbose route logging.
-  mode: debug
+  # gRPC server configuration
+  grpc:
+    host: "0.0.0.0"
+    port: 9090
+    max_recv_msg_size: 52428800   # 50MB
+    max_send_msg_size: 52428800   # 50MB
 
-  # Maximum duration in seconds for reading an entire HTTP request,
-  # including the body. Prevents slow-client attacks.
-  read_timeout: 30
-
-  # Maximum duration in seconds for writing the HTTP response.
-  write_timeout: 30
-
-  # Maximum allowed request body size in bytes.
-  # Default 10 MB — increase only for bulk-upload endpoints.
-  max_body_size: 10485760   # 10 MB = 10 × 1024 × 1024
-
-  # Duration in seconds given to in-flight requests to complete
-  # after a SIGTERM is received before the server force-closes.
-  shutdown_timeout: 15
-
-# ──────────────────────────────────────────────
-# PostgreSQL Database Configuration
-# ──────────────────────────────────────────────
 database:
-  # Hostname or IP address of the PostgreSQL server.
-  # Example: "localhost", "db.internal", "10.0.1.5"
-  host: localhost
+  # PostgreSQL configuration
+  postgres:
+    host: "localhost"
+    port: 5432
+    user: "keyip_app"
+    password: "ExamplePassword!"  # Change this!
+    dbname: "keyip_intelligence"
+    sslmode: "disable"            # disable | require | verify-ca | verify-full
+    max_open_conns: 25
+    max_idle_conns: 10
+    conn_max_lifetime: 5m
+
+  # Neo4j Graph Database configuration
+  neo4j:
+    uri: "bolt://localhost:7687"
+    user: "neo4j"
+    password: "ExampleNeo4jPassword!" # Change this!
+    max_connection_pool_size: 50
+    connection_acquisition_timeout: 60s
+
+cache:
+  # Redis configuration
+  redis:
+    addr: "localhost:6379"
+    password: ""                  # Leave empty if no password
+    db: 0
+    pool_size: 20
+    min_idle_conns: 5
+    dial_timeout: 5s
+    read_timeout: 3s
+    write_timeout: 3s
+
+search:
+  # OpenSearch configuration
+  opensearch:
+    addresses:
+      - "http://localhost:9200"
+    username: "admin"
+    password: "ExampleOSPassword!" # Change this!
+    max_retries: 3
+    retry_on_status: [502, 503, 504]
+    compress_request_body: true
+
+  # Milvus Vector Database configuration
+  milvus:
+    address: "localhost"
+    port: 19530
+    username: ""
+    password: ""
+    connect_timeout: 10s
+    read_timeout: 10s
+
+messaging:
+  # Kafka configuration
+  kafka:
+    brokers:
+      - "localhost:9092"
+    consumer_group: "keyip-intelligence-group"
+    auto_offset_reset: "earliest"
+    max_bytes: 10485760           # 10MB
+    session_timeout: 30s
+    heartbeat_interval: 3s
+    rebalance_timeout: 60s
+
+storage:
+  # MinIO Object Storage configuration
+  minio:
+    endpoint: "localhost:9000"
+    access_key: "minioadmin"
+    secret_key: "minioadmin"      # Change this!
+    use_ssl: false
+    bucket_name: "keyip-documents"
+    region: "us-east-1"
+    part_size: 67108864           # 64MB
+
+auth:
+  # Keycloak configuration
+  keycloak:
+    base_url: "http://localhost:8180"
+    realm: "keyip"
+    client_id: "keyip-api"
+    client_secret: "ExampleClientSecret!" # Change this!
+    admin_user: "admin"
+    admin_password: "admin"       # Change this!
+    token_endpoint: "/realms/keyip/protocol/openid-connect/token"
+    userinfo_endpoint: "/realms/keyip/protocol/openid-connect/userinfo"
+
+  # JWT configuration
+  jwt:
+    secret: "ExampleJWTSecret!"   # Change this!
+    issuer: "keyip-api"
+    expiry: 24h
+    refresh_expiry: 168h          # 7 days
+    signing_method: "HS256"
 
-  # PostgreSQL listening port. Default: 5432
-  port: 5432
-
-  # Database user with DML + DDL rights (for migrations).
-  # Example: "keyip_app"
-  user: keyip_app
-
-  # Password for the database user above.
-  # Never commit a real password — use an env-var reference in config.yaml.
-  password: ExamplePassw0rd!
-
-  # Target database name created during initial setup.
-  # Example: "keyip_intelligence"
-  dbname: keyip_intelligence
-
-  # PostgreSQL SSL/TLS connection mode.
-  # (disable | require | verify-ca | verify-full)
-  # Use "verify-full" in production with a proper CA bundle.
-  sslmode: disable
-
-  # Maximum total open connections kept in the pgx connection pool.
-  # Rule of thumb: max_conns = (num_cpu_cores × 2) + effective_spindle_count
-  max_conns: 25
-
-  # Minimum idle connections held ready in the pool.
-  # Should be ≤ max_conns. 0 means no minimum.
-  min_conns: 5
-
-  # Maximum lifetime of a single connection in seconds.
-  # Recycling prevents stale connections after network resets.
-  max_conn_lifetime: 300
-
-  # Maximum idle time before a connection is closed and removed.
-  max_conn_idle_time: 60
-
-  # Relative path (from project root) to SQL migration files.
-  # Used by "make migrate-up" and internal migration runner.
-  migration_path: internal/infrastructure/database/postgres/migrations
-
-# ──────────────────────────────────────────────
-# Neo4j Graph Database Configuration
-# ──────────────────────────────────────────────
-neo4j:
-  # Bolt connection URI.
-  # Schemes: bolt:// (single), neo4j:// (cluster routing)
-  # Example: "bolt://localhost:7687"
-  #          "neo4j://neo4j.cluster.internal:7687"
-  uri: bolt://localhost:7687
-
-  # Neo4j user with read/write access to the target database.
-  user: neo4j
-
-  # Neo4j user password.
-  password: ExampleNeo4jPass!
-
-  # Maximum number of connections the driver may open concurrently.
-  # Tune based on Neo4j server core count and expected parallelism.
-  max_connection_pool_size: 50
-
-  # Seconds to wait when acquiring a connection from the pool.
-  connection_timeout: 30
-
-  # Name of the Neo4j database to operate on.
-  # Use "neo4j" (default database) or a named database in Enterprise.
-  database: neo4j
-
-# ──────────────────────────────────────────────
-# Redis Cache & Distributed-Lock Configuration
-# ──────────────────────────────────────────────
-redis:
-  # Redis server address in "host:port" format.
-  # Example standalone: "localhost:6379"
-  # Example Redis Sentinel: configure via REDIS_ADDR env var.
-  addr: localhost:6379
-
-  # Redis AUTH password. Leave empty ("") if AUTH is not enabled.
-  password: ""
-
-  # Logical Redis database index (0–15).
-  # Use a dedicated index per environment to avoid cross-pollution.
-  db: 0
-
-  # Number of socket connections in the client pool.
-  # Increase for high-throughput services.
-  pool_size: 20
-
-  # TCP dial timeout in seconds when opening a new connection.
-  dial_timeout: 5
-
-  # Deadline for reading a Redis reply. Prevents hangs on slow networks.
-  read_timeout: 3
-
-  # Deadline for writing a Redis command. Prevents hangs on slow networks.
-  write_timeout: 3
-
-  # Default TTL (seconds) applied when no explicit expiry is set.
-  # 3600 = 1 hour.  Set to 0 to disable automatic expiry by default.
-  default_ttl: 3600
-
-  # Namespace prefix prepended to every cache key.
-  # Allows multiple services to share the same Redis instance safely.
-  # Format: "keyip:"  →  actual key = "keyip:patent:abc123"
-  key_prefix: "keyip:"
-
-# ──────────────────────────────────────────────
-# Apache Kafka Message Bus Configuration
-# ──────────────────────────────────────────────
-kafka:
-  # List of Kafka bootstrap broker addresses ("host:port").
-  # Provide multiple entries for high-availability clusters.
-  brokers:
-    - localhost:9092
-    # - kafka-broker-2:9092
-    # - kafka-broker-3:9092
-
-  # Consumer group ID. All instances of this service share one group
-  # so that each message is processed exactly once across the cluster.
-  group_id: keyip-intelligence-consumer
-
-  # Request timeout for producer and consumer operations (milliseconds).
-  timeout_ms: 10000
-
-  # Number of automatic retries the producer will attempt on transient errors.
-  producer_retries: 3
-
-  # Producer batch size in bytes. Messages are buffered until this
-  # threshold or the linger duration is reached.
-  # 16384 = 16 KB; increase for higher throughput workloads.
-  batch_size: 16384
-
-  # When true the service will create missing topics at startup.
-  # Set false in production and manage topics via Kafka admin tooling.
-  auto_create_topics: true
-
-  # Replication factor for auto-created topics.
-  # Must be ≤ the number of available Kafka brokers.
-  replication_factor: 1
-
-  # Partition count for auto-created topics.
-  # More partitions = higher parallelism but more overhead.
-  num_partitions: 3
-
-# ──────────────────────────────────────────────
-# OpenSearch Full-Text Search Configuration
-# ──────────────────────────────────────────────
-opensearch:
-  # List of OpenSearch node HTTP(S) addresses.
-  # Include the scheme: "http://" or "https://"
-  addresses:
-    - http://localhost:9200
-    # - http://os-node-2:9200
-
-  # OpenSearch user with read/write/index-management permissions.
-  user: admin
-
-  # OpenSearch user password.
-  password: ExampleOSPass!
-
-  # Skip TLS certificate verification.
-  # MUST be false in production — set up a proper CA/cert chain instead.
-  insecure_skip_verify: true
-
-  # Number of documents sent per bulk index request.
-  # Tune to balance throughput vs. memory pressure.
-  bulk_batch_size: 500
-
-  # Number of hits returned per scroll page for deep-pagination queries.
-  scroll_size: 1000
-
-  # Prefix applied to all index names managed by this service.
-  # Example: "keyip_" → index "keyip_patents", "keyip_molecules"
-  index_prefix: keyip_
-
-# ──────────────────────────────────────────────
-# Milvus Vector Database Configuration
-# ──────────────────────────────────────────────
-milvus:
-  # Milvus standalone or proxy gRPC endpoint ("host:port").
-  # Example: "localhost:19530"
-  addr: localhost:19530
-
-  # Dimensionality of the molecule/patent embedding vectors produced
-  # by MolPatent-GNN. Must match the trained model output size exactly.
-  embedding_dim: 256
-
-  # Approximate nearest-neighbor index algorithm.
-  # (IVF_FLAT | IVF_SQ8 | HNSW)
-  # HNSW gives the best recall/latency trade-off for ≤10 M vectors.
-  index_type: HNSW
-
-  # HNSW M parameter — number of bi-directional edges per node.
-  # Higher M → better recall, more memory. Common range: 8–64.
-  hnsw_m: 16
-
-  # HNSW efConstruction — search width during index build.
-  # Higher value → better index quality, slower build. Range: 8–512.
-  hnsw_ef_construction: 200
-
-  # Default number of nearest neighbours to return per similarity query.
-  # Can be overridden per request. Typical values: 10–100.
-  default_top_k: 20
-
-  # Prefix for all Milvus collection names created by this service.
-  # Example: "keyip_" → collection "keyip_mol_embeddings"
-  collection_prefix: keyip_
-
-# ──────────────────────────────────────────────
-# MinIO Object Storage Configuration
-# ──────────────────────────────────────────────
-minio:
-  # MinIO server endpoint ("host:port").
-  # Example: "localhost:9000", "minio.internal:9000"
-  endpoint: localhost:9000
-
-  # MinIO access key (analogous to AWS Access Key ID).
-  access_key: minioadmin
-
-  # MinIO secret key (analogous to AWS Secret Access Key).
-  secret_key: ExampleMinioSecret!
-
-  # Default bucket where patent documents and generated reports are stored.
-  # The bucket is created automatically on first use if it does not exist.
-  bucket: keyip-documents
-
-  # Enable HTTPS/TLS when connecting to MinIO.
-  # Set true in production and provide valid TLS certificates.
-  use_ssl: false
-
-  # Lifetime (seconds) of presigned download/upload URLs.
-  # 3600 = 1 hour.  Maximum: 604800 (7 days) per MinIO policy.
-  presign_expiry: 3600
-
-# ──────────────────────────────────────────────
-# Keycloak Authentication & RBAC Configuration
-# ──────────────────────────────────────────────
-keycloak:
-  # Base URL of the Keycloak instance without trailing slash.
-  # Example: "http://localhost:8180", "https://auth.example.com"
-  base_url: http://localhost:8180
-
-  # Keycloak realm that houses the application users and roles.
-  # Example: "keyip", "master" (avoid master in production)
-  realm: keyip
-
-  # OAuth2 Client ID registered in the realm above.
-  client_id: keyip-api
-
-  # Client secret for confidential clients.
-  # Leave empty for public clients (PKCE flow).
-  client_secret: ExampleClientSecret!
-
-  # How long (seconds) the JWKS public-key cache is considered fresh
-  # before being refreshed from Keycloak's JWKS endpoint.
-  jwks_cache_ttl: 3600
-
-  # Expected value of the "aud" claim in incoming JWT tokens.
-  # Must match the audience configured in your Keycloak client.
-  audience: keyip-api
-
-# ──────────────────────────────────────────────
-# Background Worker Configuration
-# ──────────────────────────────────────────────
-worker:
-  # Worker operating mode.
-  # (kafka | cron | hybrid)
-  # "kafka"  — event-driven tasks from Kafka topics only.
-  # "cron"   — scheduled tasks only (no Kafka dependency).
-  # "hybrid" — both kafka and cron tasks active simultaneously.
-  mode: kafka
-
-  # Number of goroutines consuming and processing tasks in parallel.
-  # Higher values improve throughput but increase CPU / memory usage.
-  concurrency: 10
-
-  # Depth of the in-process task channel. Acts as a buffer between
-  # the Kafka consumer loop and the worker goroutine pool.
-  queue_depth: 100
-
-  # Interval (seconds) at which workers emit a liveness heartbeat log.
-  # Useful for detecting stuck workers in operational dashboards.
-  heartbeat_interval: 15
-
-  # Maximum number of times a failed task is retried before being
-  # moved to the dead-letter topic.
-  max_retries: 3
-
-  # Base backoff interval (milliseconds) between successive retries.
-  # Actual delay = retry_backoff_ms × 2^(attempt−1) (exponential).
-  retry_backoff_ms: 500
-
-# ──────────────────────────────────────────────
-# Structured Logging Configuration
-# ──────────────────────────────────────────────
-log:
-  # Minimum log severity to emit.
-  # (debug | info | warn | error | fatal)
-  # Use "info" in production; "debug" for local development only.
-  level: info
-
-  # Log line serialisation format.
-  # (json | console)
-  # "json"    — machine-parseable; required for log aggregation pipelines.
-  # "console" — human-readable with coloured level badges.
-  format: json
-
-  # Destination for log output.
-  # (stdout | stderr | /absolute/path/to/app.log)
-  # In containerised environments stdout is strongly preferred.
-  output: stdout
-
-  # Append the source file and line number to every log entry.
-  # Useful for debugging; adds ~5 % overhead — disable in hot paths.
-  enable_caller: true
-
-  # Attach a full stack trace to messages at "error" level and above.
-  # Disable in production unless actively debugging panics.
-  enable_stacktrace: false
-
-  # Log sampling: emit at most 1 "debug" message per N occurrences
-  # to prevent log storms in high-frequency code paths.
-  # 0 = disabled (emit all messages).
-  sampling_rate: 0
-
-# ──────────────────────────────────────────────
-# Intelligence / AI Model Configuration
-# ──────────────────────────────────────────────
 intelligence:
-  # gRPC address of the Triton Inference Server hosting ML models.
-  # Example: "localhost:8001"
-  triton_addr: localhost:8001
+  models_dir: "./models"
 
-  # Seconds to wait for a model inference RPC before timing out.
-  # Increase for large batches or complex models.
-  model_timeout: 30
+  # MolPatent-GNN Model
+  molpatent_gnn:
+    model_path: "molpatent_gnn.pt"
+    batch_size: 32
+    timeout: 30s
+    device: "cpu"                 # cpu | cuda
+    num_workers: 4
 
-  # Maximum number of molecules/claims sent in a single batched
-  # inference call. Larger batches improve GPU utilisation.
-  max_batch_size: 64
+  # ClaimBERT Model
+  claim_bert:
+    model_path: "claim_bert_v1"
+    max_seq_length: 512
+    timeout: 30s
+    device: "cpu"
+    vocab_path: "vocab.txt"
 
-  # Name under which MolPatent-GNN is registered in Triton.
-  # Must match the model repository directory name exactly.
-  molpatent_gnn_model: molpatent_gnn_v1
+  # StrategyGPT
+  strategy_gpt:
+    endpoint: "https://api.openai.com/v1"
+    api_key: "sk-ExampleKey!"     # Change this!
+    model_name: "gpt-4"
+    max_tokens: 4096
+    temperature: 0.7
+    top_p: 0.9
+    timeout: 120s
+    retry_count: 3
+    retry_delay: 2s
 
-  # Name under which ClaimBERT is registered in Triton.
-  claim_bert_model: claim_bert_v1
+  # ChemExtractor
+  chem_extractor:
+    ocr_endpoint: "http://localhost:8081/ocr"
+    ner_model_path: "chem_ner_v1"
+    image_preprocessing: true
+    supported_formats: ["png", "jpg", "pdf"]
+    timeout: 60s
 
-  # Name under which InfringeNet is registered in Triton.
-  infringe_net_model: infringe_net_v1
+  # InfringeNet
+  infringe_net:
+    model_path: "infringe_net.pt"
+    threshold: 0.85
+    batch_size: 16
+    timeout: 30s
+    similarity_metric: "cosine"
 
-  # Base URL for the OpenAI-compatible LLM API used by StrategyGPT.
-  # Can point to OpenAI, Azure OpenAI, or a self-hosted vLLM endpoint.
-  # Example: "https://api.openai.com/v1"
-  strategy_gpt_base_url: https://api.openai.com/v1
+monitoring:
+  # Prometheus metrics
+  prometheus:
+    enabled: true
+    port: 9091
+    path: "/metrics"
+    namespace: "keyip"
 
-  # API key authenticating requests to the StrategyGPT endpoint.
-  strategy_gpt_api_key: sk-ExampleKeyReplace
+  # Logging
+  logging:
+    level: "info"                 # debug | info | warn | error
+    format: "json"                # json | text
+    output: "stdout"              # stdout | file
+    file_path: "/var/log/keyip.log"
+    max_size: 100                 # MB
+    max_backups: 3
+    max_age: 28                   # days
+    compress: true
 
-  # Model identifier passed in the "model" field of each chat request.
-  # Examples: "gpt-4o", "gpt-4-turbo", "mistral-7b-instruct"
-  strategy_gpt_model: gpt-4o
+  # Distributed Tracing
+  tracing:
+    enabled: false
+    endpoint: "http://localhost:4317"
+    sample_rate: 0.1
+    service_name: "keyip-intelligence"
+    environment: "production"
 
-  # Number of documents retrieved from OpenSearch / Milvus and injected
-  # into the StrategyGPT prompt as retrieval-augmented context.
-  rag_top_k: 5
+notification:
+  # Email
+  email:
+    smtp_host: "smtp.example.com"
+    smtp_port: 587
+    username: "user@example.com"
+    password: "ExampleEmailPassword!" # Change this!
+    from: "noreply@keyip.com"
+    use_tls: true
+    timeout: 10s
 
-# ──────────────────────────────────────────────
-# Multi-Tenancy Configuration
-# ──────────────────────────────────────────────
-multitenancy:
-  # When true, the PostgreSQL row-level security (RLS) policy is
-  # enabled and every query is automatically scoped to the active tenant.
-  # Requires the "app.current_tenant_id" session variable to be set
-  # by the connection middleware before any DML statement executes.
-  enable_rls: true
+  # WeChat Work
+  wechat_work:
+    corp_id: "wwExampleCorpId"
+    agent_id: "1000002"
+    secret: "ExampleWeChatSecret!" # Change this!
+    token: "ExampleToken"
+    encoding_aes_key: "ExampleAESKey"
 
-  # Name of the HTTP request header that carries the tenant identifier.
-  # Must match the header injected by the API gateway / Keycloak token claim.
-  # Example header: "X-Tenant-ID: acme-corp"
-  tenant_header: X-Tenant-ID
-
+# //Personal.AI order the ending

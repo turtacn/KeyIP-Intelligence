@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
@@ -91,15 +92,26 @@ func Load(opts ...LoaderOption) (*Config, error) {
 		}
 	}
 
+	// Read config file
 	if err := v.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) {
+		if errors.As(err, &configFileNotFoundError) || os.IsNotExist(err) {
 			if options.configPath != "" {
 				return nil, fmt.Errorf("%w: %s", ErrConfigFileNotFound, options.configPath)
 			}
+			// If file not found but not explicitly required (no path set), we proceed with defaults/env
 		} else {
 			return nil, fmt.Errorf("%w: %v", ErrConfigParseError, err)
 		}
+	} else {
+		// If a file was successfully loaded, we inform the global viper instance about it
+		// so that WatchConfig can monitor the correct file.
+		viper.SetConfigFile(v.ConfigFileUsed())
+	}
+
+	// Apply overrides
+	for k, val := range options.overrides {
+		v.Set(k, val)
 	}
 
 	var cfg Config
@@ -134,8 +146,17 @@ func MustLoad(opts ...LoaderOption) *Config {
 }
 
 func WatchConfig(callback func(*Config)) error {
+	// Ensure the global viper instance is configured to watch
+	// It relies on Load having set the config file path via viper.SetConfigFile
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		cfg, err := Load()
+		// Reload configuration using the same file
+		// Note: We use LoadFromFile here to ensure we re-read the specific file
+		// that changed, if we know it.
+		// However, Load() logic is complex.
+		// A simpler approach for the callback is to re-load everything.
+		// But WatchConfig is triggered by global viper.
+		// We can just re-run Load with the file from the event.
+		cfg, err := LoadFromFile(e.Name)
 		if err == nil {
 			callback(cfg)
 		}

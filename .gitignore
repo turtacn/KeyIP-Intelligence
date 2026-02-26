@@ -17,10 +17,50 @@ vendor/
 # Go workspace file
 go.work
 
-# Frontend
+# IDE/Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Config and sensitive files
+configs/config.yaml
+.env
+.env.*
+*.pem
+*.key
+*.crt
+
+# Build and deployment artifacts
+dist/
+build/
+coverage.out
+coverage.html
+*.prof
+
+# AI Model files
+models/*.bin
+models/*.pt
+models/*.onnx
+models/*.safetensors
+
+# Frontend build artifacts
 web/node_modules/
 web/dist/
-web/coverage/
-.DS_Store
-verification/
-/trash/
+web/build/
+web/.next/
+
+# Data and Logs
+data/
+logs/
+*.log
+tmp/
+
+# Test artifacts
+test/testdata/generated/
+.testcache/
+
+# //Personal.AI order the ending

@@ -95,12 +95,12 @@ type SearchConfig struct {
 }
 
 type OpenSearchConfig struct {
-	Addresses             []string `mapstructure:"addresses" validate:"required,min=1"`
-	Username              string   `mapstructure:"username"`
-	Password              string   `mapstructure:"password"`
-	MaxRetries            int      `mapstructure:"max_retries"`
-	RetryOnStatus         []int    `mapstructure:"retry_on_status"`
-	CompressRequestBody   bool     `mapstructure:"compress_request_body"`
+	Addresses           []string `mapstructure:"addresses" validate:"required,min=1"`
+	Username            string   `mapstructure:"username"`
+	Password            string   `mapstructure:"password"`
+	MaxRetries          int      `mapstructure:"max_retries"`
+	RetryOnStatus       []int    `mapstructure:"retry_on_status"`
+	CompressRequestBody bool     `mapstructure:"compress_request_body"`
 }
 
 type MilvusConfig struct {
@@ -118,13 +118,13 @@ type MessagingConfig struct {
 }
 
 type KafkaConfig struct {
-	Brokers          []string      `mapstructure:"brokers" validate:"required,min=1"`
-	ConsumerGroup    string        `mapstructure:"consumer_group" validate:"required"`
-	AutoOffsetReset  string        `mapstructure:"auto_offset_reset"`
-	MaxBytes         int           `mapstructure:"max_bytes"`
-	SessionTimeout   time.Duration `mapstructure:"session_timeout"`
+	Brokers           []string      `mapstructure:"brokers" validate:"required,min=1"`
+	ConsumerGroup     string        `mapstructure:"consumer_group" validate:"required"`
+	AutoOffsetReset   string        `mapstructure:"auto_offset_reset"`
+	MaxBytes          int           `mapstructure:"max_bytes"`
+	SessionTimeout    time.Duration `mapstructure:"session_timeout"`
 	HeartbeatInterval time.Duration `mapstructure:"heartbeat_interval"`
-	RebalanceTimeout time.Duration `mapstructure:"rebalance_timeout"`
+	RebalanceTimeout  time.Duration `mapstructure:"rebalance_timeout"`
 }
 
 // StorageConfig holds object storage settings.
@@ -160,29 +160,29 @@ type KeycloakConfig struct {
 }
 
 type JWTConfig struct {
-	Secret         string        `mapstructure:"secret" validate:"required"`
-	Issuer         string        `mapstructure:"issuer" validate:"required"`
-	Expiry         time.Duration `mapstructure:"expiry" validate:"required"`
-	RefreshExpiry  time.Duration `mapstructure:"refresh_expiry"`
-	SigningMethod  string        `mapstructure:"signing_method"`
+	Secret        string        `mapstructure:"secret" validate:"required"`
+	Issuer        string        `mapstructure:"issuer" validate:"required"`
+	Expiry        time.Duration `mapstructure:"expiry" validate:"required"`
+	RefreshExpiry time.Duration `mapstructure:"refresh_expiry"`
+	SigningMethod string        `mapstructure:"signing_method"`
 }
 
 // IntelligenceConfig holds AI engine settings.
 type IntelligenceConfig struct {
-	ModelsDir     string             `mapstructure:"models_dir" validate:"required"`
-	MolPatentGNN  MolPatentGNNConfig `mapstructure:"molpatent_gnn"`
-	ClaimBERT     ClaimBERTConfig    `mapstructure:"claim_bert"`
-	StrategyGPT   StrategyGPTConfig  `mapstructure:"strategy_gpt"`
+	ModelsDir     string              `mapstructure:"models_dir" validate:"required"`
+	MolPatentGNN  MolPatentGNNConfig  `mapstructure:"molpatent_gnn"`
+	ClaimBERT     ClaimBERTConfig     `mapstructure:"claim_bert"`
+	StrategyGPT   StrategyGPTConfig   `mapstructure:"strategy_gpt"`
 	ChemExtractor ChemExtractorConfig `mapstructure:"chem_extractor"`
-	InfringeNet   InfringeNetConfig  `mapstructure:"infringe_net"`
+	InfringeNet   InfringeNetConfig   `mapstructure:"infringe_net"`
 }
 
 type MolPatentGNNConfig struct {
-	ModelPath string        `mapstructure:"model_path" validate:"required"`
-	BatchSize int           `mapstructure:"batch_size"`
-	Timeout   time.Duration `mapstructure:"timeout"`
-	Device    string        `mapstructure:"device" validate:"oneof=cpu cuda"`
-	NumWorkers int          `mapstructure:"num_workers"`
+	ModelPath  string        `mapstructure:"model_path" validate:"required"`
+	BatchSize  int           `mapstructure:"batch_size"`
+	Timeout    time.Duration `mapstructure:"timeout"`
+	Device     string        `mapstructure:"device" validate:"oneof=cpu cuda"`
+	NumWorkers int           `mapstructure:"num_workers"`
 }
 
 type ClaimBERTConfig struct {
@@ -206,11 +206,11 @@ type StrategyGPTConfig struct {
 }
 
 type ChemExtractorConfig struct {
-	OCREndpoint         string        `mapstructure:"ocr_endpoint" validate:"required,url"`
-	NERModelPath        string        `mapstructure:"ner_model_path" validate:"required"`
-	ImagePreprocessing  bool          `mapstructure:"image_preprocessing"`
-	SupportedFormats    []string      `mapstructure:"supported_formats"`
-	Timeout             time.Duration `mapstructure:"timeout"`
+	OCREndpoint        string        `mapstructure:"ocr_endpoint" validate:"required,url"`
+	NERModelPath       string        `mapstructure:"ner_model_path" validate:"required"`
+	ImagePreprocessing bool          `mapstructure:"image_preprocessing"`
+	SupportedFormats   []string      `mapstructure:"supported_formats"`
+	Timeout            time.Duration `mapstructure:"timeout"`
 }
 
 type InfringeNetConfig struct {
@@ -278,14 +278,6 @@ type WeChatWorkConfig struct {
 	EncodingAESKey string `mapstructure:"encoding_aes_key"`
 }
 
-// Versioning information injected at build time.
-var (
-	Version   = "dev"
-	CommitSHA = "unknown"
-	BuildTime = "unknown"
-	GoVersion = "unknown"
-)
-
 // Global configuration access.
 var (
 	globalConfig *Config
@@ -352,5 +344,13 @@ func (c *Config) KafkaBrokers() []string {
 func (c *Config) IsProduction() bool {
 	return c.Monitoring.Logging.Level != "debug"
 }
+
+// Versioning information injected at build time.
+var (
+	Version   = "dev"
+	CommitSHA = "unknown"
+	BuildTime = "unknown"
+	GoVersion = "unknown"
+)
 
 // //Personal.AI order the ending
