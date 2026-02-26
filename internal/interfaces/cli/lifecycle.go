@@ -225,49 +225,39 @@ func runLifecycleSyncStatus(ctx context.Context, legalStatusService lifecycle.Le
 	}
 
 	logger.Info("Starting legal status sync",
-		"patent_number", lifecyclePatentNumber,
-		"jurisdiction", lifecycleJurisdiction,
-		"dry_run", lifecycleDryRun)
+		logging.String("patent_number", lifecyclePatentNumber),
+		logging.String("jurisdiction", lifecycleJurisdiction),
+		logging.Bool("dry_run", lifecycleDryRun))
 
-	// Build sync request
-	req := &lifecycle.SyncStatusRequest{
-		PatentNumber:  lifecyclePatentNumber,
-		Jurisdictions: parseJurisdictions(lifecycleJurisdiction),
-		DryRun:        lifecycleDryRun,
-		Context:       ctx,
-	}
-
-	// Execute sync
-	result, err := legalStatusService.SyncFromOffice(ctx, req)
-	if err != nil {
-		logger.Error("Sync failed", "error", err)
-		return errors.WrapMsg(err, "sync operation failed")
-	}
-
-	// Output summary
-	fmt.Printf("\n=== Legal Status Sync Summary ===\n\n")
-	if lifecycleDryRun {
-		fmt.Println("🔍 DRY RUN MODE - No changes applied")
-	}
-	fmt.Printf("Total processed: %d\n", result.TotalProcessed)
-	fmt.Printf("✓ New records: %d\n", result.NewRecords)
-	fmt.Printf("↻ Updated records: %d\n", result.UpdatedRecords)
-	fmt.Printf("✗ Failed: %d\n", result.FailedCount)
-
-	if len(result.Errors) > 0 {
-		fmt.Println("\nErrors:")
-		for _, errItem := range result.Errors {
-			fmt.Printf("  - %s: %s\n", errItem.PatentNumber, errItem.ErrorMessage)
+	// For single patent sync
+	if lifecyclePatentNumber != "" {
+		result, err := legalStatusService.SyncStatus(ctx, lifecyclePatentNumber)
+		if err != nil {
+			logger.Error("Sync failed", logging.Err(err))
+			return errors.WrapMsg(err, "sync operation failed")
 		}
+
+		// Output summary
+		fmt.Printf("\n=== Legal Status Sync Summary ===\n\n")
+		if lifecycleDryRun {
+			fmt.Println("🔍 DRY RUN MODE - No changes applied")
+		}
+		fmt.Printf("Patent: %s\n", result.PatentID)
+		fmt.Printf("Previous Status: %s\n", result.PreviousStatus)
+		fmt.Printf("Current Status: %s\n", result.CurrentStatus)
+		fmt.Printf("Changed: %v\n", result.Changed)
+		fmt.Printf("Synced At: %s\n", result.SyncedAt.Format(time.RFC3339))
+		fmt.Printf("Source: %s\n", result.Source)
+
+		logger.Info("Sync completed",
+			logging.String("patent_id", result.PatentID),
+			logging.Bool("changed", result.Changed))
+
+		return nil
 	}
 
-	logger.Info("Sync completed",
-		"total_processed", result.TotalProcessed,
-		"new_records", result.NewRecords,
-		"updated_records", result.UpdatedRecords,
-		"failed", result.FailedCount)
-
-	return nil
+	// For batch sync, we need patent IDs - return error if not provided
+	return errors.NewMsg("--patent-number is required for status sync")
 }
 
 func runLifecycleReminders(ctx context.Context, calendarService lifecycle.CalendarService, logger logging.Logger) error {
@@ -285,8 +275,8 @@ func runLifecycleReminders(ctx context.Context, calendarService lifecycle.Calend
 	}
 
 	logger.Info("Managing reminders",
-		"action", action,
-		"patent_number", lifecyclePatentNumber)
+		logging.String("action", action),
+		logging.String("patent_number", lifecyclePatentNumber))
 
 	switch action {
 	case "list":
@@ -301,26 +291,28 @@ func runLifecycleReminders(ctx context.Context, calendarService lifecycle.Calend
 }
 
 func listReminders(ctx context.Context, calendarService lifecycle.CalendarService, logger logging.Logger) error {
-	reminders, err := calendarService.ListReminders(ctx, lifecyclePatentNumber)
+	// Use GetUpcomingDeadlines to list events
+	events, err := calendarService.GetUpcomingDeadlines(ctx, lifecyclePatentNumber, lifecycleDaysAhead)
 	if err != nil {
 		return errors.WrapMsg(err, "failed to list reminders")
 	}
 
-	if len(reminders) == 0 {
-		fmt.Println("No reminders configured.")
+	if len(events) == 0 {
+		fmt.Println("No upcoming deadlines/reminders found.")
 		return nil
 	}
 
-	fmt.Printf("\n=== Configured Reminders ===\n\n")
+	fmt.Printf("\n=== Upcoming Deadlines ===\n\n")
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Patent", "Deadline Type", "Channels", "Advance Days"})
+	table.Header([]string{"ID", "Title", "Date", "Type", "Status"})
 
-	for _, r := range reminders {
+	for _, e := range events {
 		table.Append([]string{
-			r.PatentNumber,
-			r.DeadlineType,
-			strings.Join(r.Channels, ", "),
-			fmt.Sprintf("%v", r.AdvanceDays),
+			e.ID,
+			e.Title,
+			e.DueDate.Format("2006-01-02"),
+			string(e.EventType),
+			string(e.Status),
 		})
 	}
 
@@ -329,41 +321,43 @@ func listReminders(ctx context.Context, calendarService lifecycle.CalendarServic
 }
 
 func addReminder(ctx context.Context, calendarService lifecycle.CalendarService, logger logging.Logger) error {
-	channels := parseChannels(lifecycleChannels)
 	advanceDays := parseAdvanceDays(lifecycleAdvanceDays)
 
-	req := &lifecycle.AddReminderRequest{
-		PatentNumber: lifecyclePatentNumber,
-		Channels:     channels,
-		AdvanceDays:  advanceDays,
-		Context:      ctx,
+	// Use AddEvent to create a reminder event
+	req := &lifecycle.AddEventRequest{
+		PatentID:    lifecyclePatentNumber,
+		Title:       fmt.Sprintf("Reminder for %s", lifecyclePatentNumber),
+		EventType:   lifecycle.EventTypeCustomMilestone,
+		DueDate:     time.Now().AddDate(0, 0, advanceDays[0]), // Use first advance day
+		Description: fmt.Sprintf("Custom reminder with advance days: %v", advanceDays),
 	}
 
-	if err := calendarService.AddReminder(ctx, req); err != nil {
+	event, err := calendarService.AddEvent(ctx, req)
+	if err != nil {
 		return errors.WrapMsg(err, "failed to add reminder")
 	}
 
 	fmt.Printf("✓ Reminder added for patent %s\n", lifecyclePatentNumber)
-	fmt.Printf("  Channels: %s\n", strings.Join(channels, ", "))
-	fmt.Printf("  Advance days: %v\n", advanceDays)
+	fmt.Printf("  Event ID: %s\n", event.ID)
+	fmt.Printf("  Due Date: %s\n", event.DueDate.Format("2006-01-02"))
 
 	logger.Info("Reminder added",
-		"patent_number", lifecyclePatentNumber,
-		"channels", channels,
-		"advance_days", advanceDays)
+		logging.String("patent_number", lifecyclePatentNumber),
+		logging.String("event_id", event.ID))
 
 	return nil
 }
 
 func removeReminder(ctx context.Context, calendarService lifecycle.CalendarService, logger logging.Logger) error {
-	if err := calendarService.RemoveReminder(ctx, lifecyclePatentNumber); err != nil {
+	// Use DeleteEvent to remove the event
+	if err := calendarService.DeleteEvent(ctx, lifecyclePatentNumber); err != nil {
 		return errors.WrapMsg(err, "failed to remove reminder")
 	}
 
-	fmt.Printf("✓ Reminder removed for patent %s\n", lifecyclePatentNumber)
+	fmt.Printf("✓ Reminder removed for event %s\n", lifecyclePatentNumber)
 
 	logger.Info("Reminder removed",
-		"patent_number", lifecyclePatentNumber)
+		logging.String("event_id", lifecyclePatentNumber))
 
 	return nil
 }
@@ -430,12 +424,14 @@ func parseAdvanceDays(input string) []int {
 
 func sortDeadlinesByUrgency(deadlines []lifecycle.Deadline) {
 	sort.Slice(deadlines, func(i, j int) bool {
-		// Sort by urgency first (CRITICAL > WARNING > NORMAL)
+		// Sort by urgency first (CRITICAL > URGENT > NORMAL > FUTURE)
 		if deadlines[i].Urgency != deadlines[j].Urgency {
-			urgencyOrder := map[string]int{
-				"CRITICAL": 0,
-				"WARNING":  1,
-				"NORMAL":   2,
+			urgencyOrder := map[lifecycle.DeadlineUrgency]int{
+				lifecycle.UrgencyExpired:  0,
+				lifecycle.UrgencyCritical: 1,
+				lifecycle.UrgencyUrgent:   2,
+				lifecycle.UrgencyNormal:   3,
+				lifecycle.UrgencyFuture:   4,
 			}
 			return urgencyOrder[deadlines[i].Urgency] < urgencyOrder[deadlines[j].Urgency]
 		}
@@ -458,20 +454,20 @@ func formatDeadlineTable(deadlines []lifecycle.Deadline) string {
 	green := color.New(color.FgGreen).SprintFunc()
 
 	table := tablewriter.NewWriter(&buf)
-	table.Header("Urgency", "Patent", "Type", "Due Date", "Days Left", "Status")
+	table.Header([]string{"Urgency", "Patent", "Type", "Due Date", "Days Left"})
 
 	for _, d := range deadlines {
-		urgencyStr := d.Urgency
+		urgencyStr := string(d.Urgency)
 		switch d.Urgency {
-		case "CRITICAL":
-			urgencyStr = red(d.Urgency)
-		case "WARNING":
-			urgencyStr = yellow(d.Urgency)
-		case "NORMAL":
-			urgencyStr = green(d.Urgency)
+		case lifecycle.UrgencyExpired, lifecycle.UrgencyCritical:
+			urgencyStr = red(string(d.Urgency))
+		case lifecycle.UrgencyUrgent:
+			urgencyStr = yellow(string(d.Urgency))
+		case lifecycle.UrgencyNormal, lifecycle.UrgencyFuture:
+			urgencyStr = green(string(d.Urgency))
 		}
 
-		daysLeft := int(time.Until(d.DueDate).Hours() / 24)
+		daysLeft := d.DaysRemaining
 		daysLeftStr := fmt.Sprintf("%d", daysLeft)
 		if daysLeft < 0 {
 			daysLeftStr = red(fmt.Sprintf("%d (overdue)", daysLeft))
@@ -480,10 +476,9 @@ func formatDeadlineTable(deadlines []lifecycle.Deadline) string {
 		table.Append([]string{
 			urgencyStr,
 			d.PatentNumber,
-			d.DeadlineType,
+			string(d.DeadlineType),
 			d.DueDate.Format("2006-01-02"),
 			daysLeftStr,
-			d.Status,
 		})
 	}
 
@@ -492,7 +487,7 @@ func formatDeadlineTable(deadlines []lifecycle.Deadline) string {
 	// Summary
 	buf.WriteString(fmt.Sprintf("\nTotal deadlines: %d\n", len(deadlines)))
 
-	criticalCount := countByUrgency(deadlines, "CRITICAL")
+	criticalCount := countByUrgencyValue(deadlines, lifecycle.UrgencyCritical)
 	if criticalCount > 0 {
 		buf.WriteString(red(fmt.Sprintf("⚠ CRITICAL: %d deadlines require immediate attention\n", criticalCount)))
 	}
@@ -506,17 +501,15 @@ func formatAnnuityTable(details []*lifecycle.AnnuityDetail, currency string) str
 	buf.WriteString("\n=== Patent Annuity Fees ===\n\n")
 
 	table := tablewriter.NewWriter(&buf)
-	table.SetHeader([]string{"Year", "Due Date", "Fee Amount", "Late Fee", "Total", "Status"})
-	table.SetBorder(true)
+	table.Header([]string{"Year", "Patent", "Due Date", "Fee Amount", "Status"})
 
 	for _, d := range details {
 		table.Append([]string{
-			fmt.Sprintf("%d", d.Year),
+			fmt.Sprintf("%d", d.YearNumber),
+			d.PatentNumber,
 			d.DueDate.Format("2006-01-02"),
-			fmt.Sprintf("%s %.2f", currency, d.BaseFee),
-			fmt.Sprintf("%s %.2f", currency, d.LateFee),
-			fmt.Sprintf("%s %.2f", currency, d.TotalFee),
-			d.Status,
+			fmt.Sprintf("%s %.2f", d.BaseFee.Currency, d.BaseFee.Amount),
+			string(d.Status),
 		})
 	}
 
@@ -525,7 +518,7 @@ func formatAnnuityTable(details []*lifecycle.AnnuityDetail, currency string) str
 	return buf.String()
 }
 
-func countByUrgency(deadlines []*lifecycle.Deadline, urgency string) int {
+func countByUrgencyValue(deadlines []lifecycle.Deadline, urgency lifecycle.DeadlineUrgency) int {
 	count := 0
 	for _, d := range deadlines {
 		if d.Urgency == urgency {
