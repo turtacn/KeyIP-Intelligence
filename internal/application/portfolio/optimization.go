@@ -205,14 +205,15 @@ func (s *optimizationServiceImpl) Optimize(ctx context.Context, req *Optimizatio
 		return nil, errors.ErrNotFound("portfolio", req.PortfolioID)
 	}
 
-	patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
+	// Use PortfolioRepository to get patents
+	patentPtrs, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load patents")
 	}
 
 	// Convert []*Patent to []Patent
-	patentValues := make([]domainpatent.Patent, len(patents))
-	for i, p := range patents {
+	patentValues := make([]domainpatent.Patent, len(patentPtrs))
+	for i, p := range patentPtrs {
 		if p != nil {
 			patentValues[i] = *p
 		}
@@ -230,16 +231,16 @@ func (s *optimizationServiceImpl) Optimize(ctx context.Context, req *Optimizatio
 		pruneSet[pc.PatentID] = true
 	}
 
-	retainList := make([]string, 0, len(patents))
-	recommendations := make([]PatentRecommendation, 0, len(patents))
+	retainList := make([]string, 0, len(patentValues))
+	recommendations := make([]PatentRecommendation, 0, len(patentValues))
 	priority := 1
 
 	for _, sp := range scored {
-		if pruneSet[sp.patent.GetID()] {
+		if pruneSet[sp.patent.ID] {
 			recommendations = append(recommendations, PatentRecommendation{
-				PatentID:     sp.patent.GetID(),
-				PatentNumber: sp.patent.GetPatentNumber(),
-				TechDomain:   sp.patent.GetPrimaryTechDomain(),
+				PatentID:     sp.patent.ID,
+				PatentNumber: sp.patent.PatentNumber,
+				TechDomain:   getPrimaryTechDomain(&sp.patent),
 				Action:       "prune",
 				Reason:       sp.pruneReason,
 				ValueScore:   sp.valueScore,
@@ -248,11 +249,11 @@ func (s *optimizationServiceImpl) Optimize(ctx context.Context, req *Optimizatio
 			})
 			priority++
 		} else {
-			retainList = append(retainList, sp.patent.GetID())
+			retainList = append(retainList, sp.patent.ID)
 			recommendations = append(recommendations, PatentRecommendation{
-				PatentID:     sp.patent.GetID(),
-				PatentNumber: sp.patent.GetPatentNumber(),
-				TechDomain:   sp.patent.GetPrimaryTechDomain(),
+				PatentID:     sp.patent.ID,
+				PatentNumber: sp.patent.PatentNumber,
+				TechDomain:   getPrimaryTechDomain(&sp.patent),
 				Action:       "retain",
 				Reason:       "Meets portfolio objectives",
 				ValueScore:   sp.valueScore,
@@ -273,7 +274,7 @@ func (s *optimizationServiceImpl) Optimize(ctx context.Context, req *Optimizatio
 	totalDomains := s.countUniqueDomains(patentValues)
 	retainDomains := 0
 	for _, sp := range scored {
-		if !pruneSet[sp.patent.GetID()] {
+		if !pruneSet[sp.patent.ID] {
 			retainDomains++
 		}
 	}
@@ -284,7 +285,7 @@ func (s *optimizationServiceImpl) Optimize(ctx context.Context, req *Optimizatio
 	}
 
 	summary := OptSummary{
-		TotalPatents:     len(patents),
+		TotalPatents:     len(patentValues),
 		RetainCount:      len(retainList),
 		PruneCount:       len(pruneCandidates),
 		EstimatedSavings: totalSavings,
@@ -355,7 +356,7 @@ func (s *optimizationServiceImpl) EstimateCost(ctx context.Context, portfolioID 
 		return nil, errors.ErrNotFound("portfolio", portfolioID)
 	}
 
-	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
+	patentPtrs, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load patents")
 	}
@@ -363,27 +364,27 @@ func (s *optimizationServiceImpl) EstimateCost(ctx context.Context, portfolioID 
 	totalCost := 0.0
 	byDomain := make(map[string]float64)
 	byJurisd := make(map[string]float64)
-	entries := make([]PatentCostEntry, 0, len(patents))
+	entries := make([]PatentCostEntry, 0, len(patentPtrs))
 
-	for _, p := range patents {
+	for _, p := range patentPtrs {
 		cost := estimatePatentAnnualCost(*p)
 		totalCost += cost
 
-		domain := p.GetPrimaryTechDomain()
+		domain := getPrimaryTechDomain(p)
 		if domain == "" {
 			domain = "unclassified"
 		}
 		byDomain[domain] += cost
 
-		juris := extractJurisdiction(p.GetPatentNumber())
+		juris := extractJurisdiction(p.PatentNumber)
 		if juris == "" {
 			juris = "unknown"
 		}
 		byJurisd[juris] += cost
 
 		entries = append(entries, PatentCostEntry{
-			PatentID:     p.GetID(),
-			PatentNumber: p.GetPatentNumber(),
+			PatentID:     p.ID,
+			PatentNumber: p.PatentNumber,
 			AnnualCost:   cost,
 			TechDomain:   domain,
 		})
@@ -433,8 +434,8 @@ func (s *optimizationServiceImpl) scorePatents(
 
 	// Build domain frequency map for redundancy calculation.
 	domainFreq := make(map[string]int)
-	for _, p := range patents {
-		d := p.GetPrimaryTechDomain()
+	for i := range patents {
+		d := getPrimaryTechDomain(&patents[i])
 		if d != "" {
 			domainFreq[d]++
 		}
@@ -442,22 +443,23 @@ func (s *optimizationServiceImpl) scorePatents(
 
 	scored := make([]scoredPatent, 0, len(patents))
 
-	for _, p := range patents {
+	for i := range patents {
+		p := patents[i]
 		sp := scoredPatent{
 			patent:     p,
-			valueScore: p.GetValueScore(),
+			valueScore: getValueScore(&p),
 			annualCost: estimatePatentAnnualCost(p),
 		}
 
 		// Recency score [0, 1]: newer patents score higher.
-		filingDate := p.GetFilingDate()
+		filingDate := getFilingDate(&p)
 		if filingDate != nil && !filingDate.IsZero() {
 			ageYears := now.Sub(*filingDate).Hours() / (24 * 365.25)
 			sp.recency = math.Max(0, 1.0-ageYears/20.0)
 		}
 
 		// Redundancy score [0, 1]: higher if many patents in same domain.
-		domain := p.GetPrimaryTechDomain()
+		domain := getPrimaryTechDomain(&p)
 		if freq, ok := domainFreq[domain]; ok && freq > 1 {
 			sp.redundancy = 1.0 - 1.0/float64(freq)
 		}
@@ -521,7 +523,7 @@ func (s *optimizationServiceImpl) identifyPruneCandidates(scored []scoredPatent,
 	// Track how many patents remain per domain.
 	domainRemaining := make(map[string]int)
 	for _, sp := range scored {
-		d := sp.patent.GetPrimaryTechDomain()
+		d := getPrimaryTechDomain(&sp.patent)
 		if d != "" {
 			domainRemaining[d]++
 		}
@@ -539,7 +541,7 @@ func (s *optimizationServiceImpl) identifyPruneCandidates(scored []scoredPatent,
 			break
 		}
 
-		domain := sp.patent.GetPrimaryTechDomain()
+		domain := getPrimaryTechDomain(&sp.patent)
 
 		// Don't prune if it would eliminate a required domain.
 		if requiredDomains != nil {
@@ -562,8 +564,8 @@ func (s *optimizationServiceImpl) identifyPruneCandidates(scored []scoredPatent,
 		}
 
 		candidates = append(candidates, PruneCandidate{
-			PatentID:     sp.patent.GetID(),
-			PatentNumber: sp.patent.GetPatentNumber(),
+			PatentID:     sp.patent.ID,
+			PatentNumber: sp.patent.PatentNumber,
 			TechDomain:   domain,
 			AnnualCost:   sp.annualCost,
 			ValueScore:   sp.valueScore,
@@ -582,8 +584,8 @@ func (s *optimizationServiceImpl) identifyPruneCandidates(scored []scoredPatent,
 // countUniqueDomains counts unique tech domains across patents.
 func (s *optimizationServiceImpl) countUniqueDomains(patents []domainpatent.Patent) int {
 	seen := make(map[string]struct{})
-	for _, p := range patents {
-		d := p.GetPrimaryTechDomain()
+	for i := range patents {
+		d := getPrimaryTechDomain(&patents[i])
 		if d != "" {
 			seen[d] = struct{}{}
 		}
@@ -595,10 +597,10 @@ func (s *optimizationServiceImpl) countUniqueDomains(patents []domainpatent.Pate
 func (s *optimizationServiceImpl) countUniqueDomainsFromScored(scored []scoredPatent, pruneSet map[string]bool) int {
 	seen := make(map[string]struct{})
 	for _, sp := range scored {
-		if pruneSet[sp.patent.GetID()] {
+		if pruneSet[sp.patent.ID] {
 			continue
 		}
-		d := sp.patent.GetPrimaryTechDomain()
+		d := getPrimaryTechDomain(&sp.patent)
 		if d != "" {
 			seen[d] = struct{}{}
 		}
@@ -610,7 +612,7 @@ func (s *optimizationServiceImpl) countUniqueDomainsFromScored(scored []scoredPa
 func estimatePatentAnnualCost(p domainpatent.Patent) float64 {
 	baseCost := 2000.0
 
-	juris := extractJurisdiction(p.GetPatentNumber())
+	juris := extractJurisdiction(p.PatentNumber)
 	multipliers := map[string]float64{
 		"US": 1.0, "EP": 1.8, "CN": 0.6, "JP": 1.5,
 		"KR": 0.8, "IN": 0.4, "CA": 0.9, "AU": 0.7,
@@ -622,7 +624,7 @@ func estimatePatentAnnualCost(p domainpatent.Patent) float64 {
 
 	// Age-based escalation: maintenance fees increase over time.
 	ageFactor := 1.0
-	filingDate := p.GetFilingDate()
+	filingDate := getFilingDate(&p)
 	if filingDate != nil && !filingDate.IsZero() {
 		ageYears := time.Since(*filingDate).Hours() / (24 * 365.25)
 		if ageYears > 4 {

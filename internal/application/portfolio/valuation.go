@@ -1,3 +1,4 @@
+// Phase 10 - File 228 of 349
 // ---
 // 继续输出 228 `internal/application/portfolio/valuation.go` 要实现专利组合价值评估应用服务。
 //
@@ -766,12 +767,7 @@ func (s *valuationServiceImpl) AssessPatent(ctx context.Context, req *SinglePate
 	}
 
 	// 3. Fetch patent entity
-	patentUUID, err := uuid.Parse(req.PatentID)
-	if err != nil {
-		return nil, errors.Wrap(err, errors.ErrCodeValidation, "invalid patent ID")
-	}
-
-	pat, err := s.patentRepo.GetByID(ctx, patentUUID)
+	pat, err := s.patentRepo.FindByID(ctx, req.PatentID)
 	if err != nil {
 		s.logger.Error("failed to fetch patent for assessment",
 			logging.String("patent_id", req.PatentID),
@@ -1029,13 +1025,13 @@ func (s *valuationServiceImpl) AssessPortfolioFull(ctx context.Context, req *Por
 		}
 		
 		// Get patents from portfolio
-		patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
+		patentPtrs, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 		if err != nil {
 			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio patents")
 		}
-		patentIDs = make([]string, len(patents))
-		for i, p := range patents {
-			patentIDs[i] = p.GetID()
+		patentIDs = make([]string, len(patentPtrs))
+		for i, p := range patentPtrs {
+			patentIDs[i] = p.ID
 		}
 	}
 	if len(patentIDs) == 0 {
@@ -1419,7 +1415,7 @@ func (s *valuationServiceImpl) scoreDimension(ctx context.Context, pat *patent.P
 		aiScores, aiErr := s.aiScorer.ScorePatent(ctx, pat, dim)
 		if aiErr != nil {
 			s.logger.Warn("AI scorer unavailable, falling back to rule-based scoring",
-				logging.String("dimension", string(dim)), logging.String("patent_id", pat.ID.String()), logging.Err(aiErr))
+				logging.String("dimension", string(dim)), logging.String("patent_id", pat.ID), logging.Err(aiErr))
 		} else {
 			for k, v := range aiScores {
 				rawScores[k] = v
@@ -1665,10 +1661,10 @@ func (s *valuationServiceImpl) ruleLegalFactor(ctx context.Context, pat *patent.
 		if maxLife <= 0 {
 			maxLife = 20
 		}
-		if pat.FilingDate == nil || pat.FilingDate.IsZero() {
+		if pat.Dates.FilingDate == nil || pat.Dates.FilingDate.IsZero() {
 			return 50
 		}
-		elapsed := time.Since(*pat.FilingDate).Hours() / (24 * 365.25)
+		elapsed := time.Since(*pat.Dates.FilingDate).Hours() / (24 * 365.25)
 		remaining := float64(maxLife) - elapsed
 		if remaining < 0 {
 			remaining = 0
@@ -1788,10 +1784,10 @@ func (s *valuationServiceImpl) ruleStrategicFactor(ctx context.Context, pat *pat
 
 	case "technology_trajectory_alignment":
 		// Heuristic: recent filing date → more aligned with current tech trajectory
-		if pat.FilingDate == nil || pat.FilingDate.IsZero() {
+		if pat.Dates.FilingDate == nil || pat.Dates.FilingDate.IsZero() {
 			return 50
 		}
-		yearsAgo := time.Since(*pat.FilingDate).Hours() / (24 * 365.25)
+		yearsAgo := time.Since(*pat.Dates.FilingDate).Hours() / (24 * 365.25)
 		if yearsAgo <= 2 {
 			return 90
 		}
@@ -1830,15 +1826,15 @@ func (s *valuationServiceImpl) computeCitationImpact(ctx context.Context, pat *p
 		return 50 // neutral when citation data unavailable
 	}
 
-	fwd, err := s.citationRepo.CountForwardCitations(ctx, pat.ID.String())
+	fwd, err := s.citationRepo.CountForwardCitations(ctx, pat.ID)
 	if err != nil {
-		s.logger.Warn("failed to count forward citations", logging.String("patent_id", pat.ID.String()), logging.Err(err))
+		s.logger.Warn("failed to count forward citations", logging.String("patent_id", pat.ID), logging.Err(err))
 		return 50
 	}
 
 	domain := ""
 	if len(pat.IPCCodes) > 0 {
-		domain = pat.IPCCodes[0]
+		domain = pat.IPCCodes[0].Full
 	}
 
 	maxFwd, err := s.citationRepo.MaxForwardCitationsInDomain(ctx, domain)
@@ -2178,4 +2174,3 @@ func clampScore(v float64) float64 {
 var _ ValuationService = (*valuationServiceImpl)(nil)
 
 //Personal.AI order the ending
-

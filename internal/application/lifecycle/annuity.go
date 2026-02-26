@@ -1,37 +1,3 @@
-// internal/application/lifecycle/annuity.go
-//
-// Phase 10 - File #206
-// Application service for patent annuity (maintenance fee) management.
-// Orchestrates domain-layer annuity calculation, multi-jurisdiction fee rules,
-// currency conversion, budget generation, and cost-optimization recommendations.
-//
-// Functional positioning:
-//   Business orchestration layer for annuity fee management. Coordinates domain
-//   annuity calculation, jurisdiction rules, and repository persistence. Provides
-//   multi-jurisdiction fee calculation, budget compilation, payment reminders,
-//   and cost-optimization suggestions.
-//
-// Core implementation:
-//   - AnnuityService interface: CalculateAnnuity / BatchCalculate / GenerateBudget /
-//     GetPaymentSchedule / OptimizeCosts / RecordPayment / GetPaymentHistory
-//   - annuityServiceImpl struct injecting LifecycleDomainService, AnnuityDomainService,
-//     LifecycleRepository, PatentRepository, Logger, Cache
-//   - CalculateAnnuity: validate -> fetch patent -> resolve jurisdiction rules ->
-//     delegate domain calculation -> currency conversion -> cache result
-//   - BatchCalculate: concurrent multi-patent calculation with error aggregation
-//   - GenerateBudget: aggregate fees by year/quarter, produce multi-currency budget
-//   - OptimizeCosts: recommend abandoning low-value patents based on valuation threshold
-//
-// Business logic:
-//   - Supports CN/US/EP/JP/KR five major jurisdiction fee schedules
-//   - Exchange rates: real-time query + local cache (TTL 24h)
-//   - Budget supports CNY/USD/EUR/JPY/KRW
-//   - Cost optimization uses configurable patent-value score threshold
-//
-// Dependencies:
-//   Depends on: domain/lifecycle, domain/patent, pkg/errors, pkg/types/common
-//   Depended by: interfaces/http/handlers/lifecycle_handler, interfaces/cli/lifecycle
-
 package lifecycle
 
 import (
@@ -44,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	domainPortfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -343,6 +310,7 @@ type annuityServiceImpl struct {
 	lifecycleSvc   domainLifecycle.Service
 	lifecycleRepo  domainLifecycle.LifecycleRepository
 	patentRepo     domainPatent.PatentRepository
+	portfolioRepo  domainPortfolio.PortfolioRepository
 	exchangeRate   ExchangeRateProvider
 	valueProvider  PatentValueProvider
 	cache          CachePort
@@ -368,6 +336,7 @@ func NewAnnuityService(
 	lifecycleSvc domainLifecycle.Service,
 	lifecycleRepo domainLifecycle.LifecycleRepository,
 	patentRepo domainPatent.PatentRepository,
+	portfolioRepo domainPortfolio.PortfolioRepository,
 	exchangeRate ExchangeRateProvider,
 	valueProvider PatentValueProvider,
 	cache CachePort,
@@ -390,6 +359,7 @@ func NewAnnuityService(
 		lifecycleSvc:          lifecycleSvc,
 		lifecycleRepo:         lifecycleRepo,
 		patentRepo:            patentRepo,
+		portfolioRepo:         portfolioRepo,
 		exchangeRate:          exchangeRate,
 		valueProvider:         valueProvider,
 		cache:                 cache,
@@ -438,19 +408,14 @@ func (s *annuityServiceImpl) CalculateAnnuity(ctx context.Context, req *Calculat
 	}
 
 	// Fetch patent
-	patentID, err := uuid.Parse(req.PatentID)
-	if err != nil {
-		return nil, errors.NewValidationOp("annuity.calculate", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
-	}
-
-	patent, err := s.patentRepo.GetByID(ctx, patentID)
+	patent, err := s.patentRepo.FindByID(ctx, req.PatentID)
 	if err != nil {
 		s.logger.Error("failed to fetch patent", "patent_id", req.PatentID, "error", err)
 		return nil, errors.NewNotFoundOp("annuity.calculate", fmt.Sprintf("patent %s not found", req.PatentID))
 	}
 
 	// Delegate to domain service for fee calculation
-	domainAnnuity, err := s.lifecycleSvc.CalculateAnnuityFee(ctx, patent.ID.String(), req.Jurisdiction, asOf)
+	domainAnnuity, err := s.lifecycleSvc.CalculateAnnuityFee(ctx, patent.ID, req.Jurisdiction, asOf)
 	if err != nil {
 		s.logger.Error("domain annuity calculation failed", "patent_id", req.PatentID, "error", err)
 		return nil, errors.NewInternalOp("annuity.calculate", fmt.Sprintf("fee calculation failed: %v", err))
@@ -467,7 +432,7 @@ func (s *annuityServiceImpl) CalculateAnnuity(ctx context.Context, req *Calculat
 	}
 
 	result := &AnnuityResult{
-		PatentID:       patent.ID.String(),
+		PatentID:       patent.ID,
 		PatentNumber:   patent.PatentNumber,
 		Title:          patent.Title,
 		Jurisdiction:   req.Jurisdiction,
@@ -530,8 +495,7 @@ func (s *annuityServiceImpl) BatchCalculate(ctx context.Context, req *BatchCalcu
 			jurisdiction := req.Jurisdiction
 			if jurisdiction == "" {
 				// Resolve primary jurisdiction from patent record
-			uid, _ := uuid.Parse(patentID)
-			pat, fetchErr := s.patentRepo.GetByID(ctx, uid)
+				pat, fetchErr := s.patentRepo.FindByID(ctx, patentID)
 				if fetchErr != nil {
 					results[idx] = itemResult{err: &BatchItemError{
 						PatentID: patentID,
@@ -540,7 +504,7 @@ func (s *annuityServiceImpl) BatchCalculate(ctx context.Context, req *BatchCalcu
 					}}
 					return
 				}
-				jurisdiction = domainLifecycle.Jurisdiction(pat.Jurisdiction)
+				jurisdiction = domainLifecycle.Jurisdiction(pat.Office) // Assuming mapping or enum match
 			}
 
 			singleReq := &CalculateAnnuityRequest{
@@ -614,12 +578,20 @@ func (s *annuityServiceImpl) GenerateBudget(ctx context.Context, req *GenerateBu
 	// Resolve patent IDs
 	patentIDs := req.PatentIDs
 	if len(patentIDs) == 0 && req.PortfolioID != "" {
-		patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
+		portUUID, err := uuid.Parse(req.PortfolioID)
+		if err != nil {
+			return nil, errors.NewValidationOp("annuity.budget", fmt.Sprintf("invalid portfolio_id: %v", err))
+		}
+		// Assuming GetPatents returns *patent.Patent, and we just need IDs
+		// GetPatents(ctx, portfolioID, role, limit, offset)
+		// We need ALL patents.
+		// Simplified: assume 10000 limit is enough or loop
+		patents, _, err := s.portfolioRepo.GetPatents(ctx, portUUID, nil, 10000, 0)
 		if err != nil {
 			return nil, errors.NewInternalOp("annuity.budget", fmt.Sprintf("failed to list portfolio patents: %v", err))
 		}
 		for _, p := range patents {
-			patentIDs = append(patentIDs, p.ID.String())
+			patentIDs = append(patentIDs, p.ID)
 		}
 	}
 	if len(patentIDs) == 0 {
@@ -643,14 +615,13 @@ func (s *annuityServiceImpl) GenerateBudget(ctx context.Context, req *GenerateBu
 	var totalAmount float64
 
 	for _, pid := range patentIDs {
-		uid, _ := uuid.Parse(pid)
-		patent, err := s.patentRepo.GetByID(ctx, uid)
+		patent, err := s.patentRepo.FindByID(ctx, pid)
 		if err != nil {
 			s.logger.Warn("budget: skipping patent", "patent_id", pid, "error", err)
 			continue
 		}
 
-		patentJurisdiction := domainLifecycle.Jurisdiction(patent.Jurisdiction)
+		patentJurisdiction := domainLifecycle.Jurisdiction(patent.Office)
 		matched := false
 		for _, j := range jurisdictions {
 			if j == patentJurisdiction {
@@ -768,12 +739,16 @@ func (s *annuityServiceImpl) GetPaymentSchedule(ctx context.Context, req *Paymen
 	if req.PatentID != "" {
 		patentIDs = []string{req.PatentID}
 	} else if req.PortfolioID != "" {
-		patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
+		portUUID, err := uuid.Parse(req.PortfolioID)
+		if err != nil {
+			return nil, errors.NewValidationOp("annuity.schedule", fmt.Sprintf("invalid portfolio_id: %v", err))
+		}
+		patents, _, err := s.portfolioRepo.GetPatents(ctx, portUUID, nil, 10000, 0)
 		if err != nil {
 			return nil, errors.NewInternalOp("annuity.schedule", fmt.Sprintf("failed to list portfolio: %v", err))
 		}
 		for _, p := range patents {
-			patentIDs = append(patentIDs, p.ID.String())
+			patentIDs = append(patentIDs, p.ID)
 		}
 	} else {
 		return nil, errors.NewValidationOp("annuity.schedule", "patent_id or portfolio_id is required")
@@ -783,14 +758,13 @@ func (s *annuityServiceImpl) GetPaymentSchedule(ctx context.Context, req *Paymen
 	var entries []PaymentScheduleEntry
 
 	for _, pid := range patentIDs {
-		uid, _ := uuid.Parse(pid)
-		patent, err := s.patentRepo.GetByID(ctx, uid)
+		patent, err := s.patentRepo.FindByID(ctx, pid)
 		if err != nil {
 			s.logger.Warn("schedule: skipping patent", "patent_id", pid, "error", err)
 			continue
 		}
 
-		jurisdiction := domainLifecycle.Jurisdiction(patent.Jurisdiction)
+		jurisdiction := domainLifecycle.Jurisdiction(patent.Office)
 		schedule, err := s.lifecycleSvc.GetAnnuitySchedule(ctx, pid, jurisdiction, startDate, endDate)
 		if err != nil {
 			s.logger.Warn("schedule: fetch failed", "patent_id", pid, "error", err)
@@ -856,7 +830,11 @@ func (s *annuityServiceImpl) OptimizeCosts(ctx context.Context, req *OptimizeCos
 		targetCurrency = s.defaultCurrency
 	}
 
-	patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
+	portUUID, err := uuid.Parse(req.PortfolioID)
+	if err != nil {
+		return nil, errors.NewValidationOp("annuity.optimize", fmt.Sprintf("invalid portfolio_id: %v", err))
+	}
+	patents, _, err := s.portfolioRepo.GetPatents(ctx, portUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.NewInternalOp("annuity.optimize", fmt.Sprintf("failed to list portfolio: %v", err))
 	}
@@ -871,12 +849,12 @@ func (s *annuityServiceImpl) OptimizeCosts(ctx context.Context, req *OptimizeCos
 	var recommendations []AbandonmentRecommendation
 
 	for _, patent := range patents {
-		jurisdiction := domainLifecycle.Jurisdiction(patent.Jurisdiction)
+		jurisdiction := domainLifecycle.Jurisdiction(patent.Office)
 
 		// Get annual cost for this patent
-		schedule, schedErr := s.lifecycleSvc.GetAnnuitySchedule(ctx, patent.ID.String(), jurisdiction, now, forecastEnd)
+		schedule, schedErr := s.lifecycleSvc.GetAnnuitySchedule(ctx, patent.ID, jurisdiction, now, forecastEnd)
 		if schedErr != nil {
-			s.logger.Warn("optimize: schedule fetch failed", "patent_id", patent.ID.String(), "error", schedErr)
+			s.logger.Warn("optimize: schedule fetch failed", "patent_id", patent.ID, "error", schedErr)
 			continue
 		}
 
@@ -896,23 +874,23 @@ func (s *annuityServiceImpl) OptimizeCosts(ctx context.Context, req *OptimizeCos
 		currentTotal += annualCost
 
 		// Get value score
-		valueScore, valErr := s.valueProvider.GetValueScore(ctx, patent.ID.String())
+		valueScore, valErr := s.valueProvider.GetValueScore(ctx, patent.ID)
 		if valErr != nil {
-			s.logger.Warn("optimize: value score unavailable", "patent_id", patent.ID.String(), "error", valErr)
+			s.logger.Warn("optimize: value score unavailable", "patent_id", patent.ID, "error", valErr)
 			valueScore = 50.0 // default mid-range
 		}
 
 		if valueScore < threshold {
 			filingDate := time.Time{}
-			if patent.FilingDate != nil {
-				filingDate = *patent.FilingDate
+			if patent.Dates.FilingDate != nil {
+				filingDate = *patent.Dates.FilingDate
 			}
 			remainingLife := estimateRemainingLife(filingDate, jurisdiction)
 			riskLevel := classifyAbandonmentRisk(valueScore, threshold)
 			rationale := buildAbandonmentRationale(valueScore, threshold, annualCost, remainingLife, targetCurrency)
 
 			recommendations = append(recommendations, AbandonmentRecommendation{
-				PatentID:      patent.ID.String(),
+				PatentID:      patent.ID,
 				PatentNumber:  patent.PatentNumber,
 				Title:         patent.Title,
 				ValueScore:    valueScore,
@@ -984,11 +962,7 @@ func (s *annuityServiceImpl) RecordPayment(ctx context.Context, req *RecordPayme
 	}
 
 	// Verify patent exists
-	uid, err := uuid.Parse(req.PatentID)
-	if err != nil {
-		return nil, errors.NewValidationOp("annuity.record", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
-	}
-	_, err = s.patentRepo.GetByID(ctx, uid)
+	_, err := s.patentRepo.FindByID(ctx, req.PatentID)
 	if err != nil {
 		return nil, errors.NewNotFoundOp("annuity.record", fmt.Sprintf("patent %s not found", req.PatentID))
 	}

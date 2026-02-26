@@ -1584,8 +1584,13 @@ func (s *riskAssessmentServiceImpl) searchCandidatePatents(
 
 			for _, p := range patents {
 				filingDate := time.Time{}
-				if p.FilingDate != nil {
-					filingDate = *p.FilingDate
+				if p.Dates.FilingDate != nil {
+					filingDate = *p.Dates.FilingDate
+				}
+
+				var ipcCodes []string
+				for _, ipc := range p.IPCCodes {
+					ipcCodes = append(ipcCodes, ipc.Full)
 				}
 
 				candidates = append(candidates, candidatePatent{
@@ -1594,7 +1599,7 @@ func (s *riskAssessmentServiceImpl) searchCandidatePatents(
 					Assignee:     p.AssigneeName,
 					FilingDate:   filingDate,
 					LegalStatus:  string(p.Status),
-					IPCCodes:     p.IPCCodes,
+					IPCCodes:     ipcCodes,
 					Similarity: SimilarityScores{
 						GNN: m.Score,
 					},

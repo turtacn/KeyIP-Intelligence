@@ -1,20 +1,3 @@
-// internal/application/lifecycle/calendar.go
-//
-// Phase 10 - File #208
-// Application service for patent lifecycle calendar management.
-// Orchestrates deadline tracking, event scheduling, and calendar views
-// across multiple jurisdictions and patent portfolios.
-//
-// Functional positioning:
-//   Provides calendar-centric views of patent lifecycle events including
-//   annuity due dates, examination deadlines, response deadlines, renewal
-//   windows, and custom user-defined milestones. Supports iCal export,
-//   multi-timezone rendering, and configurable reminder policies.
-//
-// Dependencies:
-//   Depends on: domain/lifecycle, domain/patent, pkg/errors, pkg/types/common
-//   Depended by: interfaces/http/handlers/lifecycle_handler, interfaces/cli/lifecycle
-
 package lifecycle
 
 import (
@@ -26,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	domainPortfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -170,7 +154,8 @@ type CalendarService interface {
 type calendarServiceImpl struct {
 	lifecycleSvc  domainLifecycle.Service
 	lifecycleRepo domainLifecycle.LifecycleRepository
-	patentRepo    patentRepoPort
+	patentRepo    domainPatent.PatentRepository
+	portfolioRepo domainPortfolio.PortfolioRepository
 	cache         CachePort
 	logger        Logger
 	defaultTZ     string
@@ -185,7 +170,8 @@ type CalendarServiceConfig struct {
 func NewCalendarService(
 	lifecycleSvc domainLifecycle.Service,
 	lifecycleRepo domainLifecycle.LifecycleRepository,
-	patentRepo patentRepoPort,
+	patentRepo domainPatent.PatentRepository,
+	portfolioRepo domainPortfolio.PortfolioRepository,
 	cache CachePort,
 	logger Logger,
 	cfg CalendarServiceConfig,
@@ -198,6 +184,7 @@ func NewCalendarService(
 		lifecycleSvc:  lifecycleSvc,
 		lifecycleRepo: lifecycleRepo,
 		patentRepo:    patentRepo,
+		portfolioRepo: portfolioRepo,
 		cache:         cache,
 		logger:        logger,
 		defaultTZ:     tz,
@@ -229,18 +216,17 @@ func (s *calendarServiceImpl) GetCalendarView(ctx context.Context, req *Calendar
 	var allEvents []CalendarEvent
 
 	for _, pid := range patentIDs {
-		uid, err := uuid.Parse(pid)
-		if err != nil {
-			s.logger.Warn("calendar: skipping invalid patent_id", "patent_id", pid, "error", err)
-			continue
-		}
-		patent, fetchErr := s.patentRepo.GetByID(ctx, uid)
+		// Verify valid UUID if needed, or just assume string ID.
+		// Since patent.Patent.ID is string, but repo usually expects valid ID.
+		// However, in our system, IDs are UUID strings.
+
+		patent, fetchErr := s.patentRepo.FindByID(ctx, pid)
 		if fetchErr != nil {
 			s.logger.Warn("calendar: skipping patent", "patent_id", pid, "error", fetchErr)
 			continue
 		}
 
-		jurisdiction := domainLifecycle.Jurisdiction(patent.Jurisdiction)
+		jurisdiction := domainLifecycle.Jurisdiction(patent.Office)
 		if !s.jurisdictionMatch(jurisdiction, req.Jurisdictions) {
 			continue
 		}
@@ -318,12 +304,11 @@ func (s *calendarServiceImpl) AddEvent(ctx context.Context, req *AddEventRequest
 		return nil, errors.NewValidationOp("calendar.add", "due_date is required")
 	}
 
-	patentID, err := uuid.Parse(req.PatentID)
-	if err != nil {
+	if _, err := uuid.Parse(req.PatentID); err != nil {
 		return nil, errors.NewValidationOp("calendar.add", fmt.Sprintf("invalid patent_id: %s", req.PatentID))
 	}
 
-	patent, err := s.patentRepo.GetByID(ctx, patentID)
+	patent, err := s.patentRepo.FindByID(ctx, req.PatentID)
 	if err != nil {
 		return nil, errors.NewNotFoundOp("calendar.add", fmt.Sprintf("patent %s not found", req.PatentID))
 	}
@@ -349,7 +334,7 @@ func (s *calendarServiceImpl) AddEvent(ctx context.Context, req *AddEventRequest
 		Title:        req.Title,
 		Description:  req.Description,
 		EventType:    eventType,
-		Jurisdiction: domainLifecycle.Jurisdiction(patent.Jurisdiction),
+		Jurisdiction: domainLifecycle.Jurisdiction(patent.Office),
 		EventDate:    req.DueDate,
 		DueDate:      req.DueDate,
 		Timezone:     tz,
@@ -490,13 +475,20 @@ func (s *calendarServiceImpl) resolvePatentIDs(ctx context.Context, portfolioID 
 	if portfolioID == "" {
 		return nil, errors.NewValidationOp("calendar", "either portfolio_id or patent_ids is required")
 	}
-	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
+
+	portUUID, err := uuid.Parse(portfolioID)
+	if err != nil {
+		return nil, errors.NewValidationOp("calendar", fmt.Sprintf("invalid portfolio_id: %v", err))
+	}
+
+	patents, _, err := s.portfolioRepo.GetPatents(ctx, portUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, errors.NewInternalOp("calendar", fmt.Sprintf("failed to list portfolio patents: %v", err))
 	}
+
 	ids := make([]string, 0, len(patents))
 	for _, p := range patents {
-		ids = append(ids, p.ID.String())
+		ids = append(ids, p.ID)
 	}
 	return ids, nil
 }
@@ -536,10 +528,10 @@ func (s *calendarServiceImpl) generateEventsForPatent(
 	now := time.Now()
 
 	// Ensure filing date is available
-	if patent.FilingDate == nil {
+	if patent.Dates.FilingDate == nil {
 		return nil, errors.NewValidationOp("calendar", fmt.Sprintf("patent %s missing filing date", patent.PatentNumber))
 	}
-	filingDate := *patent.FilingDate
+	filingDate := *patent.Dates.FilingDate
 
 	// Generate annuity due events
 	maxYears := jurisdictionMaxLife(jurisdiction)
@@ -555,8 +547,8 @@ func (s *calendarServiceImpl) generateEventsForPatent(
 		priority := classifyDeadlinePriority(dueDate, now)
 
 		events = append(events, CalendarEvent{
-			ID:           fmt.Sprintf("ann-%s-%d", patent.ID.String(), year),
-			PatentID:     patent.ID.String(),
+			ID:           fmt.Sprintf("ann-%s-%d", patent.ID, year),
+			PatentID:     patent.ID,
 			PatentNumber: patent.PatentNumber,
 			Title:        fmt.Sprintf("Year %d Annuity Due - %s", year, patent.PatentNumber),
 			Description:  fmt.Sprintf("Annual maintenance fee year %d for patent %s in %s", year, patent.PatentNumber, jurisdiction),
@@ -583,8 +575,8 @@ func (s *calendarServiceImpl) generateEventsForPatent(
 		pctDeadline := filingDate.AddDate(0, 30, 0)
 		if !pctDeadline.Before(start) && !pctDeadline.After(end) {
 			events = append(events, CalendarEvent{
-				ID:           fmt.Sprintf("pct-%s", patent.ID.String()),
-				PatentID:     patent.ID.String(),
+				ID:           fmt.Sprintf("pct-%s", patent.ID),
+				PatentID:     patent.ID,
 				PatentNumber: patent.PatentNumber,
 				Title:        fmt.Sprintf("PCT National Phase Deadline - %s", patent.PatentNumber),
 				Description:  "30-month deadline for PCT national phase entry",
@@ -606,8 +598,8 @@ func (s *calendarServiceImpl) generateEventsForPatent(
 	parisDeadline := filingDate.AddDate(1, 0, 0)
 	if !parisDeadline.Before(start) && !parisDeadline.After(end) {
 		events = append(events, CalendarEvent{
-			ID:           fmt.Sprintf("paris-%s", patent.ID.String()),
-			PatentID:     patent.ID.String(),
+			ID:           fmt.Sprintf("paris-%s", patent.ID),
+			PatentID:     patent.ID,
 			PatentNumber: patent.PatentNumber,
 			Title:        fmt.Sprintf("Paris Convention Priority Deadline - %s", patent.PatentNumber),
 			Description:  "12-month priority deadline under Paris Convention",

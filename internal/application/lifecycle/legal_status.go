@@ -33,8 +33,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
@@ -433,6 +435,7 @@ type legalStatusServiceImpl struct {
 	lifecycleSvc  lifecycle.Service
 	lifecycleRepo lifecycle.LifecycleRepository
 	patentRepo    patent.PatentRepository
+	portfolioRepo domainportfolio.PortfolioRepository
 	publisher     EventPublisher
 	cache         CachePort
 	logger        Logger
@@ -446,6 +449,7 @@ func NewLegalStatusService(
 	lifecycleSvc lifecycle.Service,
 	lifecycleRepo lifecycle.LifecycleRepository,
 	patentRepo patent.PatentRepository,
+	portfolioRepo domainportfolio.PortfolioRepository,
 	publisher EventPublisher,
 	cache CachePort,
 	logger Logger,
@@ -460,6 +464,9 @@ func NewLegalStatusService(
 	}
 	if patentRepo == nil {
 		return nil, errors.NewInternalOp("legal_status.new", "patent repository must not be nil")
+	}
+	if portfolioRepo == nil {
+		return nil, errors.NewInternalOp("legal_status.new", "portfolio repository must not be nil")
 	}
 	if publisher == nil {
 		return nil, errors.NewInternalOp("legal_status.new", "event publisher must not be nil")
@@ -497,6 +504,7 @@ func NewLegalStatusService(
 		lifecycleSvc:  lifecycleSvc,
 		lifecycleRepo: lifecycleRepo,
 		patentRepo:    patentRepo,
+		portfolioRepo: portfolioRepo,
 		publisher:     publisher,
 		cache:         cache,
 		logger:        logger,
@@ -861,8 +869,13 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 
 	s.logger.Debug("detect_anomalies started", "portfolio_id", portfolioID)
 
-	// Load all patents in the portfolio.
-	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
+	portfolioUUID, err := uuid.Parse(portfolioID)
+	if err != nil {
+		return nil, errors.NewInvalidParameterError("invalid portfolio ID format")
+	}
+
+	// Load all patents in the portfolio using PortfolioRepository
+	patents, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, fmt.Errorf("list patents for portfolio %s: %w", portfolioID, err)
 	}
@@ -871,9 +884,9 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 	var anomalies []*StatusAnomaly
 
 	for _, p := range patents {
-		entity, err := s.lifecycleRepo.GetByPatentID(ctx, p.ID.String())
+		entity, err := s.lifecycleRepo.GetByPatentID(ctx, p.ID)
 		if err != nil {
-			s.logger.Warn("failed to get status for anomaly detection", "patent_id", p.ID.String(), "error", err)
+			s.logger.Warn("failed to get status for anomaly detection", "patent_id", p.ID, "error", err)
 			continue
 		}
 		if entity == nil {
@@ -887,10 +900,10 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 			prevCode, _ := MapJurisdictionStatus(entity.Jurisdiction, entity.PreviousStatus)
 			if prevCode == StatusGranted {
 				anomalies = append(anomalies, &StatusAnomaly{
-					PatentID:        p.ID.String(),
+					PatentID:        p.ID,
 					AnomalyType:     AnomalyUnexpectedLapse,
 					Severity:        SeverityCritical,
-					Description:     fmt.Sprintf("Patent %s lapsed unexpectedly from granted status", p.ID.String()),
+					Description:     fmt.Sprintf("Patent %s lapsed unexpectedly from granted status", p.ID),
 					DetectedAt:      now,
 					SuggestedAction: "Verify annuity payment status and contact patent office immediately",
 				})
@@ -902,19 +915,19 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 			daysUntilDeadline := entity.NextDeadline.Sub(now).Hours() / 24
 			if daysUntilDeadline <= 7 && daysUntilDeadline > 0 {
 				anomalies = append(anomalies, &StatusAnomaly{
-					PatentID:        p.ID.String(),
+					PatentID:        p.ID,
 					AnomalyType:     AnomalyMissedDeadline,
 					Severity:        SeverityHigh,
-					Description:     fmt.Sprintf("Patent %s has a deadline in %.0f days (%s) with no action recorded", p.ID.String(), daysUntilDeadline, entity.NextAction),
+					Description:     fmt.Sprintf("Patent %s has a deadline in %.0f days (%s) with no action recorded", p.ID, daysUntilDeadline, entity.NextAction),
 					DetectedAt:      now,
 					SuggestedAction: fmt.Sprintf("Take action on '%s' before %s", entity.NextAction, entity.NextDeadline.Format(time.RFC3339)),
 				})
 			} else if daysUntilDeadline <= 0 {
 				anomalies = append(anomalies, &StatusAnomaly{
-					PatentID:        p.ID.String(),
+					PatentID:        p.ID,
 					AnomalyType:     AnomalyMissedDeadline,
 					Severity:        SeverityCritical,
-					Description:     fmt.Sprintf("Patent %s has a past-due deadline: %s", p.ID.String(), entity.NextDeadline.Format(time.RFC3339)),
+					Description:     fmt.Sprintf("Patent %s has a past-due deadline: %s", p.ID, entity.NextDeadline.Format(time.RFC3339)),
 					DetectedAt:      now,
 					SuggestedAction: "Immediately assess whether late action or petition for revival is possible",
 				})
@@ -925,10 +938,10 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 		if entity.LastSyncAt != nil && entity.RemoteStatus != "" {
 			if entity.Status != entity.RemoteStatus && now.Sub(*entity.LastSyncAt).Hours() > 24 {
 				anomalies = append(anomalies, &StatusAnomaly{
-					PatentID:        p.ID.String(),
+					PatentID:        p.ID,
 					AnomalyType:     AnomalyStatusConflict,
 					Severity:        SeverityHigh,
-					Description:     fmt.Sprintf("Patent %s local status '%s' conflicts with remote '%s' for over 24 hours", p.ID.String(), entity.Status, entity.RemoteStatus),
+					Description:     fmt.Sprintf("Patent %s local status '%s' conflicts with remote '%s' for over 24 hours", p.ID, entity.Status, entity.RemoteStatus),
 					DetectedAt:      now,
 					SuggestedAction: "Run reconciliation to resolve the conflict",
 				})
@@ -938,10 +951,10 @@ func (s *legalStatusServiceImpl) DetectAnomalies(ctx context.Context, portfolioI
 		// Rule 4: SyncFailure — consecutive failures exceeding threshold.
 		if entity.ConsecutiveSyncFailures >= s.config.SyncFailureThreshold {
 			anomalies = append(anomalies, &StatusAnomaly{
-				PatentID:        p.ID.String(),
+				PatentID:        p.ID,
 				AnomalyType:     AnomalySyncFailure,
 				Severity:        SeverityMedium,
-				Description:     fmt.Sprintf("Patent %s has %d consecutive sync failures", p.ID.String(), entity.ConsecutiveSyncFailures),
+				Description:     fmt.Sprintf("Patent %s has %d consecutive sync failures", p.ID, entity.ConsecutiveSyncFailures),
 				DetectedAt:      now,
 				SuggestedAction: "Check network connectivity and patent office API availability",
 			})
@@ -1070,8 +1083,13 @@ func (s *legalStatusServiceImpl) GetStatusSummary(ctx context.Context, portfolio
 	}
 	s.metrics.IncCounter("legal_status_summary_cache_misses_total", map[string]string{"portfolio_id": portfolioID})
 
+	portfolioUUID, err := uuid.Parse(portfolioID)
+	if err != nil {
+		return nil, errors.NewInvalidParameterError("invalid portfolio ID format")
+	}
+
 	// 2. Load patents and aggregate.
-	patents, err := s.patentRepo.ListByPortfolio(ctx, portfolioID)
+	patents, _, err := s.portfolioRepo.GetPatents(ctx, portfolioUUID, nil, 10000, 0)
 	if err != nil {
 		return nil, fmt.Errorf("list patents for summary %s: %w", portfolioID, err)
 	}
@@ -1081,7 +1099,7 @@ func (s *legalStatusServiceImpl) GetStatusSummary(ctx context.Context, portfolio
 	var latestSync time.Time
 
 	for _, p := range patents {
-		entity, err := s.lifecycleRepo.GetByPatentID(ctx, p.ID.String())
+		entity, err := s.lifecycleRepo.GetByPatentID(ctx, p.ID)
 		if err != nil || entity == nil {
 			continue
 		}
