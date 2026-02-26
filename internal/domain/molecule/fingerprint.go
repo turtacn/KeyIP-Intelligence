@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -64,16 +65,20 @@ const (
 )
 
 // Fingerprint represents a molecular fingerprint used for similarity searching.
-// It is an immutable value object.
 type Fingerprint struct {
+	ID           uuid.UUID           `json:"id"`
+	MoleculeID   uuid.UUID           `json:"molecule_id"`
 	Type         FingerprintType     `json:"type"`
 	Encoding     FingerprintEncoding `json:"encoding"`
 	Bits         []byte              `json:"bits,omitempty"`   // For BitVector and CountVector
 	Vector       []float32           `json:"vector,omitempty"` // For DenseVector
 	NumBits      int                 `json:"num_bits"`         // Length in bits for BitVector, or dimension for DenseVector
 	Radius       int                 `json:"radius,omitempty"` // Only for Morgan/FCFP
+	Hash         string              `json:"fingerprint_hash,omitempty"`
+	Parameters   map[string]any      `json:"parameters,omitempty"`
 	ModelVersion string              `json:"model_version,omitempty"`
 	ComputedAt   time.Time           `json:"computed_at"`
+	CreatedAt    time.Time           `json:"created_at"` // Alias for ComputedAt or DB field
 }
 
 // NewBitFingerprint creates a new bit vector fingerprint.
@@ -81,7 +86,6 @@ func NewBitFingerprint(fpType FingerprintType, bits []byte, numBits int, radius 
 	if !fpType.IsValid() {
 		return nil, errors.New(errors.ErrCodeInvalidInput, "invalid fingerprint type")
 	}
-	// GNN is dense vector, not bit vector
 	if fpType == FingerprintGNN {
 		return nil, errors.New(errors.ErrCodeInvalidInput, "GNN fingerprint must use NewDenseFingerprint")
 	}
@@ -92,13 +96,11 @@ func NewBitFingerprint(fpType FingerprintType, bits []byte, numBits int, radius 
 	if numBits <= 0 {
 		return nil, errors.New(errors.ErrCodeInvalidInput, "numBits must be positive")
 	}
-	// Check if bits slice is large enough
 	expectedBytes := (numBits + 7) / 8
 	if len(bits) < expectedBytes {
 		return nil, errors.New(errors.ErrCodeInvalidInput, fmt.Sprintf("insufficient bits length: got %d bytes, need %d bytes for %d bits", len(bits), expectedBytes, numBits))
 	}
 
-	// Specific validation
 	if fpType == FingerprintMACCS {
 		if numBits != 166 {
 			return nil, errors.New(errors.ErrCodeInvalidInput, "MACCS fingerprint must have 166 bits")
@@ -111,25 +113,26 @@ func NewBitFingerprint(fpType FingerprintType, bits []byte, numBits int, radius 
 			return nil, errors.New(errors.ErrCodeInvalidInput, "radius must be between 1 and 6 for circular fingerprints")
 		}
 	} else {
-		// RDKit, AtomPair usually don't use radius in the same way or default to 0/specifics
 		if radius != 0 {
 			return nil, errors.New(errors.ErrCodeInvalidInput, "radius should be 0 for this fingerprint type")
 		}
 	}
 
+	now := time.Now().UTC()
 	return &Fingerprint{
+		ID:         uuid.New(),
 		Type:       fpType,
 		Encoding:   EncodingBitVector,
 		Bits:       bits,
 		NumBits:    numBits,
 		Radius:     radius,
-		ComputedAt: time.Now().UTC(),
+		ComputedAt: now,
+		CreatedAt:  now,
 	}, nil
 }
 
 // NewCountFingerprint creates a new count vector fingerprint.
 func NewCountFingerprint(fpType FingerprintType, bits []byte, numBits int, radius int) (*Fingerprint, error) {
-	// Validation similar to BitFingerprint but for CountVector
 	if !fpType.IsValid() {
 		return nil, errors.New(errors.ErrCodeInvalidInput, "invalid fingerprint type")
 	}
@@ -139,16 +142,17 @@ func NewCountFingerprint(fpType FingerprintType, bits []byte, numBits int, radiu
 	if numBits <= 0 {
 		return nil, errors.New(errors.ErrCodeInvalidInput, "numBits must be positive")
 	}
-	// For count vector, bits length depends on count size (e.g. uint32), so exact check is harder without knowing count width.
-	// We'll relax the check slightly or assume packed format.
 
+	now := time.Now().UTC()
 	return &Fingerprint{
+		ID:         uuid.New(),
 		Type:       fpType,
 		Encoding:   EncodingCountVector,
 		Bits:       bits,
 		NumBits:    numBits,
 		Radius:     radius,
-		ComputedAt: time.Now().UTC(),
+		ComputedAt: now,
+		CreatedAt:  now,
 	}, nil
 }
 
@@ -164,13 +168,16 @@ func NewDenseFingerprint(vector []float32, modelVersion string) (*Fingerprint, e
 		return nil, errors.New(errors.ErrCodeInvalidInput, "model version is required")
 	}
 
+	now := time.Now().UTC()
 	return &Fingerprint{
+		ID:           uuid.New(),
 		Type:         FingerprintGNN,
 		Encoding:     EncodingDenseVector,
 		Vector:       vector,
-		NumBits:      len(vector), // Using NumBits to store dimension for consistency
+		NumBits:      len(vector),
 		ModelVersion: modelVersion,
-		ComputedAt:   time.Now().UTC(),
+		ComputedAt:   now,
+		CreatedAt:    now,
 	}, nil
 }
 
@@ -216,10 +223,7 @@ func (f *Fingerprint) GetBit(index int) (bool, error) {
 	byteIndex := index / 8
 	bitIndex := uint(index % 8)
 	if byteIndex >= len(f.Bits) {
-		return false, nil // Implicitly 0 if byte slice is shorter than NumBits? Or strictly check?
-		// Spec says "valid bits slice length checked in constructor", so we can assume safety if we check len.
-		// However, strict bound check is safer.
-		return false, errors.New(errors.ErrCodeInvalidInput, "index out of range (byte slice)")
+		return false, nil
 	}
 	return (f.Bits[byteIndex] & (1 << bitIndex)) != 0, nil
 }
@@ -237,7 +241,6 @@ func (f *Fingerprint) Dimension() int {
 // ToFloat32Slice converts the fingerprint to a float32 slice.
 func (f *Fingerprint) ToFloat32Slice() []float32 {
 	if f.IsDenseVector() {
-		// Return copy
 		res := make([]float32, len(f.Vector))
 		copy(res, f.Vector)
 		return res
@@ -255,7 +258,7 @@ func (f *Fingerprint) ToFloat32Slice() []float32 {
 		}
 		return res
 	}
-	return nil // Count vector not supported yet
+	return nil
 }
 
 func (f *Fingerprint) String() string {
@@ -267,23 +270,6 @@ type FingerprintCalculator interface {
 	Calculate(ctx context.Context, smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) (*Fingerprint, error)
 	BatchCalculate(ctx context.Context, smilesSlice []string, fpType FingerprintType, opts *FingerprintCalcOptions) ([]*Fingerprint, error)
 	SupportedTypes() []FingerprintType
-	// Standardize is also required by current service.go logic, but spec didn't mention it in fingerprint.go spec explicitly
-	// but service.go uses `s.fpCalculator.Standardize`. Wait, `service.go` spec says:
-	// "2. 调用 fpCalculator.Calculate 计算 canonical SMILES"
-	// It implies fpCalculator might do standardization or expose it.
-	// Actually, `service.go` spec says: "2. Call fpCalculator.Calculate to compute canonical SMILES (using RDKit standardize)".
-	// This implies `Calculate` can return canonical SMILES? No, `Calculate` returns `*Fingerprint`.
-	// Ah, step 3 says: "Through canonical SMILES compute InChI and InChIKey".
-	// The `MoleculeService` spec says: "Call NewMolecule... Call fpCalculator.Calculate to compute canonical SMILES...".
-	// This part is confusing in spec. Usually standardization is separate.
-	// Looking at `internal/domain/molecule/interfaces.go` (legacy), it had `Standardize`.
-	// The new `MoleculeService` spec in prompt says:
-	// "2. Call fpCalculator.Calculate compute canonical SMILES (using RDKit standardization)"
-	// This might mean "Perform standardization".
-	// Maybe `FingerprintCalculator` has a method `Standardize`? Or is `CanonicalSMILES` considered a fingerprint? No.
-	// I will add `Standardize` to `FingerprintCalculator` interface as it logically belongs to the chemical calculation service, even if the name is FingerprintCalculator.
-	// Or maybe I should rename it to `ChemicalCalculator`? The spec says `fpCalculator FingerprintCalculator`.
-	// I will add `Standardize` to the interface.
 	Standardize(ctx context.Context, smiles string) (canonical string, inchi string, inchiKey string, formula string, weight float64, err error)
 }
 
@@ -341,7 +327,7 @@ func (s *WeightedAverageFusion) Fuse(scores map[FingerprintType]float64, weights
 	}
 
 	if totalWeight == 0 {
-		return 0, nil // Avoid division by zero
+		return 0, nil
 	}
 
 	result := totalScore / totalWeight
@@ -389,16 +375,6 @@ func PopCount(data []byte) int {
 	}
 	count := 0
 	for _, b := range data {
-		// Brian Kernighan's algorithm for single byte?
-		// Or just use bits.OnesCount8? But "std lib limit"? Go 1.22 has math/bits.
-		// Using pre-computed table or simple loop.
-		// Let's use a simple loop or math/bits if allowed. "Standard library" is allowed.
-		// But let's stick to the prompt implication of implementing it.
-		// math/bits.OnesCount8 is best.
-		// If strict "no external dependency", math/bits is standard lib.
-		// I'll implement lookup table for speed if I can't import math/bits easily or want to be explicit.
-		// But spec says "Use lookup table (256 items) or Brian Kernighan".
-		// I'll use a local implementation as requested.
 		x := int(b)
 		x = (x & 0x55) + ((x >> 1) & 0x55)
 		x = (x & 0x33) + ((x >> 2) & 0x33)

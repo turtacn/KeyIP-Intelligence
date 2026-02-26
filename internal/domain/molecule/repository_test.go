@@ -81,7 +81,7 @@ func TestMoleculeQuery_Validate(t *testing.T) {
 		{
 			name: "invalid_status",
 			query: MoleculeQuery{
-				Statuses: []MoleculeStatus{MoleculeStatus(99)},
+				Statuses: []MoleculeStatus{MoleculeStatus("invalid_status")},
 			},
 			wantErr: true,
 		},

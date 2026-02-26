@@ -90,7 +90,7 @@ func (s *MoleculeServiceServer) CreateMolecule(
 		for k, v := range req.Properties {
 			floatVal, err := strconv.ParseFloat(v, 64)
 			if err == nil {
-				_ = mol.AddProperty(&molecule.Property{Name: k, Value: floatVal})
+				_ = mol.AddProperty(&molecule.MolecularProperty{Name: k, Value: floatVal, Confidence: 1.0})
 			}
 		}
 	}
@@ -140,7 +140,7 @@ func (s *MoleculeServiceServer) UpdateMolecule(
 		for k, v := range req.Properties {
 			floatVal, err := strconv.ParseFloat(v, 64)
 			if err == nil {
-				_ = mol.AddProperty(&molecule.Property{Name: k, Value: floatVal})
+				_ = mol.AddProperty(&molecule.MolecularProperty{Name: k, Value: floatVal, Confidence: 1.0})
 			}
 		}
 	}
@@ -372,7 +372,7 @@ func domainToProto(mol *molecule.Molecule) *pb.Molecule {
 		Smiles:       mol.SMILES,
 		Inchi:        mol.InChI,
 		Name:         mol.Name,
-		MoleculeType: mol.Source,
+		MoleculeType: string(mol.Source),
 		OledLayer:    "",
 		Properties:   propsMap,
 		Metadata:     metaMap,

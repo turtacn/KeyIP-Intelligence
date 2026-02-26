@@ -36,6 +36,9 @@ type MoleculeRepository interface {
 	FindWithoutFingerprint(ctx context.Context, fpType FingerprintType, offset, limit int) ([]*Molecule, error)
 }
 
+// Repository alias for backward compatibility
+type Repository = MoleculeRepository
+
 // MoleculeQuery defines criteria for searching molecules.
 type MoleculeQuery struct {
 	IDs                 []string

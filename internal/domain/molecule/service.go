@@ -7,6 +7,32 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
+// MoleculeDomainService defines the interface for molecule domain operations.
+type MoleculeDomainService interface {
+	Canonicalize(ctx context.Context, smiles string) (string, string, error)
+	CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error)
+}
+
+// Service defines the application interface for molecule operations.
+type Service interface {
+	RegisterMolecule(ctx context.Context, smiles string, source MoleculeSource, sourceRef string) (*Molecule, error)
+	BatchRegisterMolecules(ctx context.Context, requests []MoleculeRegistrationRequest) (*BatchRegistrationResult, error)
+	GetMolecule(ctx context.Context, id string) (*Molecule, error)
+	GetMoleculeByInChIKey(ctx context.Context, inchiKey string) (*Molecule, error)
+	SearchMolecules(ctx context.Context, query *MoleculeQuery) (*MoleculeSearchResult, error)
+	CalculateFingerprints(ctx context.Context, moleculeID string, fpTypes []FingerprintType) error
+	FindSimilarMolecules(ctx context.Context, targetSMILES string, fpType FingerprintType, threshold float64, limit int) ([]*SimilarityResult, error)
+	CompareMolecules(ctx context.Context, smiles1, smiles2 string, fpTypes []FingerprintType) (*MoleculeComparisonResult, error)
+	ArchiveMolecule(ctx context.Context, id string) error
+	DeleteMolecule(ctx context.Context, id string) error
+	AddMoleculeProperties(ctx context.Context, moleculeID string, properties []*MolecularProperty) error
+	TagMolecule(ctx context.Context, moleculeID string, tags []string) error
+	CreateFromSMILES(ctx context.Context, smiles string, metadata map[string]string) (*Molecule, error)
+
+	// Embed DomainService methods as MoleculeService implements them
+	MoleculeDomainService
+}
+
 // MoleculeService coordinates molecule-related business operations.
 type MoleculeService struct {
 	repo             MoleculeRepository
@@ -30,20 +56,17 @@ func NewMoleculeService(repo MoleculeRepository, fpCalc FingerprintCalculator, s
 
 // RegisterMolecule handles the complete registration process for a new molecule.
 func (s *MoleculeService) RegisterMolecule(ctx context.Context, smiles string, source MoleculeSource, sourceRef string) (*Molecule, error) {
-	// 1. Create entity (Pending)
 	mol, err := NewMolecule(smiles, source, sourceRef)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. Standardize structure
 	canonical, inchi, inchiKey, formula, weight, err := s.fpCalculator.Standardize(ctx, smiles)
 	if err != nil {
 		s.logger.Error("Standardization failed", logging.String("smiles", smiles), logging.Error(err))
 		return nil, errors.Wrap(err, errors.ErrCodeMoleculeParsingFailed, "failed to standardize molecule")
 	}
 
-	// 3. Check for duplicates (Idempotency)
 	exists, err := s.repo.ExistsByInChIKey(ctx, inchiKey)
 	if err != nil {
 		return nil, err
@@ -57,15 +80,12 @@ func (s *MoleculeService) RegisterMolecule(ctx context.Context, smiles string, s
 		return existing, nil
 	}
 
-	// 4. Set structure identifiers
 	if err := mol.SetStructureIdentifiers(canonical, inchi, inchiKey, formula, weight); err != nil {
 		return nil, err
 	}
 
-	// 5. Calculate mandatory fingerprints
 	opts := DefaultFingerprintCalcOptions()
 
-	// Morgan
 	morgan, err := s.fpCalculator.Calculate(ctx, canonical, FingerprintMorgan, opts)
 	if err != nil {
 		s.logger.Warn("Failed to calculate Morgan fingerprint", logging.String("smiles", canonical), logging.Error(err))
@@ -73,7 +93,6 @@ func (s *MoleculeService) RegisterMolecule(ctx context.Context, smiles string, s
 		_ = mol.AddFingerprint(morgan)
 	}
 
-	// MACCS
 	maccs, err := s.fpCalculator.Calculate(ctx, canonical, FingerprintMACCS, opts)
 	if err != nil {
 		s.logger.Warn("Failed to calculate MACCS fingerprint", logging.String("smiles", canonical), logging.Error(err))
@@ -81,14 +100,43 @@ func (s *MoleculeService) RegisterMolecule(ctx context.Context, smiles string, s
 		_ = mol.AddFingerprint(maccs)
 	}
 
-	// 6. Activate
 	if err := mol.Activate(); err != nil {
 		return nil, err
 	}
 
-	// 7. Save
 	if err := s.repo.Save(ctx, mol); err != nil {
 		return nil, err
+	}
+
+	return mol, nil
+}
+
+// CreateFromSMILES creates a molecule from SMILES string with metadata, delegating to RegisterMolecule.
+// This provides backward compatibility with legacy service interface.
+func (s *MoleculeService) CreateFromSMILES(ctx context.Context, smiles string, metadata map[string]string) (*Molecule, error) {
+	source := SourceManual
+	sourceRef := "unknown"
+
+	if val, ok := metadata["source_document"]; ok && val != "" {
+		source = SourcePatent
+		sourceRef = val
+	} else if val, ok := metadata["extraction_id"]; ok && val != "" {
+		source = SourcePrediction
+		sourceRef = val
+	}
+
+	mol, err := s.RegisterMolecule(ctx, smiles, source, sourceRef)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(metadata) > 0 {
+		for k, v := range metadata {
+			mol.SetMetadata(k, v)
+		}
+		if err := s.repo.Update(ctx, mol); err != nil {
+			s.logger.Warn("failed to update molecule metadata", logging.Error(err))
+		}
 	}
 
 	return mol, nil
@@ -124,14 +172,6 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 		TotalProcessed: len(requests),
 	}
 
-	// Optimization: Standardize and check duplicates in batch?
-	// For simplicity and correctness first, we process iteratively but check duplicates efficiently if repo supports it.
-	// Since we need to standardize first to get InChIKey, we can standardize individually or batch if calculator supports it (it doesn't have BatchStandardize).
-	// Fingerprints supports BatchCalculate.
-
-	// Phase 1: Standardization and Dedup Check
-	// We'll process one by one for standardization as it's likely calling external service or simple RDKit wrapper.
-
 	type pendingMol struct {
 		mol       *Molecule
 		canonical string
@@ -141,48 +181,30 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 	var canonicals []string
 
 	for i, req := range requests {
-		// Create entity
 		mol, err := NewMolecule(req.SMILES, req.Source, req.SourceRef)
 		if err != nil {
 			result.Failed = append(result.Failed, BatchRegistrationError{i, req.SMILES, err})
 			continue
 		}
 
-		// Standardize
 		canonical, inchi, inchiKey, formula, weight, err := s.fpCalculator.Standardize(ctx, req.SMILES)
 		if err != nil {
 			result.Failed = append(result.Failed, BatchRegistrationError{i, req.SMILES, err})
 			continue
 		}
 
-		// Check duplicate
 		exists, err := s.repo.ExistsByInChIKey(ctx, inchiKey)
 		if err != nil {
 			result.Failed = append(result.Failed, BatchRegistrationError{i, req.SMILES, err})
 			continue
 		}
 		if exists {
-			// Fetch existing? Spec says "DuplicateCount increased".
-			// Should we return existing molecules in Succeeded? Spec says "Part success semantic... Existing molecules count into DuplicateCount not Failed".
-			// Spec "Return includes Success, Failed, DuplicateCount". Succeeded usually implies *newly* registered or successfully processed.
-			// But duplicate implies no action needed.
-			// If we want to return the molecule object, we need to fetch it.
-			// Let's assume we don't return duplicates in Succeeded list to save bandwidth/db calls unless requested,
-			// OR we assume Succeeded contains valid molecules regardless of whether they were just created or existed.
-			// Spec: "Succeeded []*Molecule". "DuplicateCount int".
-			// If we put duplicates in Succeeded, DuplicateCount is redundant or informational.
-			// Let's assume duplicates are NOT in Succeeded, just counted.
 			result.DuplicateCount++
-			// We could fetch it if needed, but for bulk ingest often we just want to know it's there.
-			// If user needs the ID, they might need it.
-			// Spec doesn't strictly say. I'll stick to counting.
 			continue
 		}
 
-		// Set identifiers
 		_ = mol.SetStructureIdentifiers(canonical, inchi, inchiKey, formula, weight)
 
-		// Add tags/props
 		for _, tag := range req.Tags { _ = mol.AddTag(tag) }
 		for _, prop := range req.Properties { _ = mol.AddProperty(prop) }
 
@@ -190,27 +212,19 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 		canonicals = append(canonicals, canonical)
 	}
 
-	// Phase 2: Batch Fingerprint Calculation
 	if len(toRegister) > 0 {
 		opts := DefaultFingerprintCalcOptions()
 
-		// Morgan
 		morgans, err := s.fpCalculator.BatchCalculate(ctx, canonicals, FingerprintMorgan, opts)
 		if err != nil {
-			// Fallback to individual or fail all?
 			s.logger.Error("Batch Morgan calculation failed", logging.Error(err))
-			// We can try individually or just fail this step (add without fingerprint)
-			// But Activate requires fingerprints? No, Validate doesn't check fingerprints presence explicitly, but Activate implies "ready".
-			// Spec for Activate: "InChIKey must be set". Doesn't strictly require fingerprints.
 		}
 
-		// MACCS
 		maccss, err := s.fpCalculator.BatchCalculate(ctx, canonicals, FingerprintMACCS, opts)
 		if err != nil {
 			s.logger.Error("Batch MACCS calculation failed", logging.Error(err))
 		}
 
-		// Phase 3: Assembly and Save
 		var batchToSave []*Molecule
 
 		for j, pm := range toRegister {
@@ -222,34 +236,22 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 			}
 
 			if err := pm.mol.Activate(); err != nil {
-				result.Failed = append(result.Failed, BatchRegistrationError{pm.index, pm.mol.SMILES(), err})
+				result.Failed = append(result.Failed, BatchRegistrationError{pm.index, pm.mol.SMILES, err})
 				continue
 			}
 
 			batchToSave = append(batchToSave, pm.mol)
 		}
 
-		// Batch Save
 		if len(batchToSave) > 0 {
 			count, err := s.repo.BatchSave(ctx, batchToSave)
 			if err != nil {
-				// If batch save fails, we don't know which ones failed exactly unless repo tells us.
-				// Spec says: "If any entity save fails, entire batch rolls back (transactional)".
-				// So all failed.
 				for range batchToSave {
-					// We need to map back to original index... slightly complex.
-					// For simplicity, we just add generic error or log it.
-					// We can iterate batchToSave and add to Failed.
-					// We don't have original index easily unless we stored it in struct.
-					// But we don't have easy way to map back `m` to `index`.
-					// Wait, we lost index association in `batchToSave`.
-					// Let's assume we can't report exact index for batch save failure easily without more complex logic.
-					// Just return error for the whole batch?
-					// Function returns `(*BatchRegistrationResult, error)`.
-					return result, errors.Wrap(err, errors.ErrCodeInternal, "batch save failed")
+					// All failed if batch save fails
 				}
+				return result, errors.Wrap(err, errors.ErrCodeInternal, "batch save failed")
 			}
-			result.Succeeded = append(result.Succeeded, batchToSave[:count]...) // Assuming count is all
+			result.Succeeded = append(result.Succeeded, batchToSave[:count]...)
 		}
 	}
 
@@ -266,7 +268,6 @@ func (s *MoleculeService) GetMolecule(ctx context.Context, id string) (*Molecule
 
 // GetMoleculeByInChIKey retrieves a molecule by InChIKey.
 func (s *MoleculeService) GetMoleculeByInChIKey(ctx context.Context, inchiKey string) (*Molecule, error) {
-	// Simple validation
 	if len(inchiKey) == 0 {
 		return nil, errors.New(errors.ErrCodeInvalidInput, "inchiKey cannot be empty")
 	}
@@ -294,22 +295,19 @@ func (s *MoleculeService) CalculateFingerprints(ctx context.Context, moleculeID 
 	opts := DefaultFingerprintCalcOptions()
 	updated := false
 
-	// Pre-fetch canonical smiles if needed? It's in mol.
-	smiles := mol.CanonicalSmiles()
+	smiles := mol.CanonicalSMILES
 	if smiles == "" {
-		smiles = mol.SMILES() // Fallback
+		smiles = mol.SMILES
 	}
 
 	for _, ft := range fpTypes {
 		if mol.HasFingerprint(ft) {
-			continue // Skip existing
+			continue
 		}
 
 		fp, err := s.fpCalculator.Calculate(ctx, smiles, ft, opts)
 		if err != nil {
 			s.logger.Error("Fingerprint calculation failed", logging.String("type", string(ft)), logging.Error(err))
-			// Continue with others? Spec says "If molecule has type, skip...".
-			// If calc fails, we skip it.
 			continue
 		}
 
@@ -332,22 +330,15 @@ func (s *MoleculeService) FindSimilarMolecules(ctx context.Context, targetSMILES
 		return nil, errors.New(errors.ErrCodeInvalidInput, "threshold must be between 0 and 1")
 	}
 	if limit <= 0 {
-		limit = 100 // Default
+		limit = 100
 	}
 
-	// 1. Calculate fingerprint for target
-	// First standardize to get best SMILES? Or just calculate on input?
-	// Spec says "1. Calculate target molecule fingerprint".
-	// Calculator usually handles standardization internally or we should do it.
-	// But `Calculate` takes SMILES.
-	// We'll trust calculator or standardized input.
 	opts := DefaultFingerprintCalcOptions()
 	fp, err := s.fpCalculator.Calculate(ctx, targetSMILES, fpType, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. Search
 	metric := MetricTanimoto
 	if fp.IsDenseVector() {
 		metric = MetricCosine
@@ -374,9 +365,6 @@ func (s *MoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2
 		return nil, errors.New(errors.ErrCodeInvalidInput, "at least one fingerprint type required")
 	}
 
-	// Standardize both to check identity
-	// We ignore errors here for standardization if strictly comparing structure based on fingerprints,
-	// but for "IsStructurallyIdentical" (InChIKey check) we need it.
 	_, _, key1, _, _, err1 := s.fpCalculator.Standardize(ctx, smiles1)
 	_, _, key2, _, _, err2 := s.fpCalculator.Standardize(ctx, smiles2)
 
@@ -471,4 +459,27 @@ func (s *MoleculeService) TagMolecule(ctx context.Context, moleculeID string, ta
 	}
 	return nil
 }
+
+// Canonicalize implements MoleculeDomainService.
+func (s *MoleculeService) Canonicalize(ctx context.Context, smiles string) (string, string, error) {
+	canonical, _, inchiKey, _, _, err := s.fpCalculator.Standardize(ctx, smiles)
+	if err != nil {
+		return "", "", err
+	}
+	return canonical, inchiKey, nil
+}
+
+// CanonicalizeFromInChI implements MoleculeDomainService.
+func (s *MoleculeService) CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error) {
+	canonical, _, inchiKey, _, _, err := s.fpCalculator.Standardize(ctx, inchi)
+	if err != nil {
+		return "", "", err
+	}
+	return canonical, inchiKey, nil
+}
+
+// Compile-time check
+var _ MoleculeDomainService = (*MoleculeService)(nil)
+var _ Service = (*MoleculeService)(nil)
+
 //Personal.AI order the ending

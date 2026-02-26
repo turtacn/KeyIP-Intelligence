@@ -675,6 +675,21 @@ func (m *mockMoleculeService) CreateFromSMILES(ctx context.Context, smiles strin
 	return nil, nil
 }
 
+func (m *mockMoleculeService) RegisterMolecule(ctx context.Context, smiles string, source domainmol.MoleculeSource, sourceRef string) (*domainmol.Molecule, error) { return nil, nil }
+func (m *mockMoleculeService) BatchRegisterMolecules(ctx context.Context, requests []domainmol.MoleculeRegistrationRequest) (*domainmol.BatchRegistrationResult, error) { return nil, nil }
+func (m *mockMoleculeService) GetMolecule(ctx context.Context, id string) (*domainmol.Molecule, error) { return nil, nil }
+func (m *mockMoleculeService) GetMoleculeByInChIKey(ctx context.Context, inchiKey string) (*domainmol.Molecule, error) { return nil, nil }
+func (m *mockMoleculeService) SearchMolecules(ctx context.Context, query *domainmol.MoleculeQuery) (*domainmol.MoleculeSearchResult, error) { return nil, nil }
+func (m *mockMoleculeService) CalculateFingerprints(ctx context.Context, moleculeID string, fpTypes []domainmol.FingerprintType) error { return nil }
+func (m *mockMoleculeService) FindSimilarMolecules(ctx context.Context, targetSMILES string, fpType domainmol.FingerprintType, threshold float64, limit int) ([]*domainmol.SimilarityResult, error) { return nil, nil }
+func (m *mockMoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2 string, fpTypes []domainmol.FingerprintType) (*domainmol.MoleculeComparisonResult, error) { return nil, nil }
+func (m *mockMoleculeService) ArchiveMolecule(ctx context.Context, id string) error { return nil }
+func (m *mockMoleculeService) DeleteMolecule(ctx context.Context, id string) error { return nil }
+func (m *mockMoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID string, properties []*domainmol.MolecularProperty) error { return nil }
+func (m *mockMoleculeService) TagMolecule(ctx context.Context, moleculeID string, tags []string) error { return nil }
+func (m *mockMoleculeService) Canonicalize(ctx context.Context, smiles string) (string, string, error) { return "", "", nil }
+func (m *mockMoleculeService) CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error) { return "", "", nil }
+
 var _ domainmol.Service = (*mockMoleculeService)(nil)
 
 // -----------------------------------------------------------------------

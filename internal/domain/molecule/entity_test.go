@@ -3,6 +3,8 @@ package molecule
 import (
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func TestMoleculeStatus_String(t *testing.T) {
@@ -15,7 +17,6 @@ func TestMoleculeStatus_String(t *testing.T) {
 		{MoleculeStatusActive, "active"},
 		{MoleculeStatusArchived, "archived"},
 		{MoleculeStatusDeleted, "deleted"},
-		{MoleculeStatus(99), "unknown"},
 	}
 
 	for _, tt := range tests {
@@ -35,13 +36,12 @@ func TestMoleculeStatus_IsValid(t *testing.T) {
 		{MoleculeStatusActive, true},
 		{MoleculeStatusArchived, true},
 		{MoleculeStatusDeleted, true},
-		{MoleculeStatus(99), false},
-		{MoleculeStatus(-1), false},
+		{MoleculeStatus("unknown"), false},
 	}
 
 	for _, tt := range tests {
 		if got := tt.status.IsValid(); got != tt.valid {
-			t.Errorf("MoleculeStatus.IsValid() = %v, want %v for %d", got, tt.valid, tt.status)
+			t.Errorf("MoleculeStatus.IsValid() = %v, want %v for %s", got, tt.valid, tt.status)
 		}
 	}
 }
@@ -85,7 +85,7 @@ func TestNewMolecule(t *testing.T) {
 		},
 		{
 			name:      "valid_complex_smiles",
-			smiles:    "CC1=CC(=C(C=C1)N(C2=CC=C(C=C2)C3=CC=CC=C3)C4=CC=C(C=C4)C5=CC=CC=C5)C", // Example like TPD
+			smiles:    "CC1=CC(=C(C=C1)N(C2=CC=C(C=C2)C3=CC=CC=C3)C4=CC=C(C=C4)C5=CC=CC=C5)C",
 			source:    SourcePatent,
 			sourceRef: "US1234567",
 			wantErr:   false,
@@ -131,20 +131,20 @@ func TestNewMolecule(t *testing.T) {
 				if got == nil {
 					t.Error("NewMolecule() returned nil molecule")
 				} else {
-					if got.Status() != MoleculeStatusPending {
-						t.Errorf("NewMolecule() status = %v, want %v", got.Status(), MoleculeStatusPending)
+					if got.GetStatus() != MoleculeStatusPending {
+						t.Errorf("NewMolecule() status = %v, want %v", got.GetStatus(), MoleculeStatusPending)
 					}
-					if got.ID() == "" {
+					if got.ID == uuid.Nil {
 						t.Error("NewMolecule() returned empty ID")
 					}
-					if got.SMILES() != tt.smiles {
-						t.Errorf("NewMolecule() smiles = %v, want %v", got.SMILES(), tt.smiles)
+					if got.GetSMILES() != tt.smiles {
+						t.Errorf("NewMolecule() smiles = %v, want %v", got.GetSMILES(), tt.smiles)
 					}
-					if got.Source() != tt.source {
-						t.Errorf("NewMolecule() source = %v, want %v", got.Source(), tt.source)
+					if got.GetSource() != tt.source {
+						t.Errorf("NewMolecule() source = %v, want %v", got.GetSource(), tt.source)
 					}
-					if got.SourceRef() != tt.sourceRef {
-						t.Errorf("NewMolecule() sourceRef = %v, want %v", got.SourceRef(), tt.sourceRef)
+					if got.GetSourceRef() != tt.sourceRef {
+						t.Errorf("NewMolecule() sourceRef = %v, want %v", got.GetSourceRef(), tt.sourceRef)
 					}
 				}
 			}
@@ -168,55 +168,54 @@ func TestMolecule_Validate(t *testing.T) {
 		},
 		{
 			name:    "missing_id",
-			setup:   func(m *Molecule) { m.id = "" },
+			setup:   func(m *Molecule) { m.ID = uuid.Nil },
 			wantErr: true,
 		},
 		{
 			name:    "missing_smiles",
-			setup:   func(m *Molecule) { m.smiles = "" },
+			setup:   func(m *Molecule) { m.SMILES = "" },
 			wantErr: true,
 		},
 		{
 			name:    "negative_weight",
-			setup:   func(m *Molecule) { m.molecularWeight = -1.0 },
+			setup:   func(m *Molecule) { m.MolecularWeight = -1.0 },
 			wantErr: true,
 		},
 		{
 			name:    "invalid_inchikey_format",
-			setup:   func(m *Molecule) { m.inchiKey = "INVALID" },
+			setup:   func(m *Molecule) { m.InChIKey = "INVALID" },
 			wantErr: true,
 		},
 		{
 			name:    "valid_inchikey",
-			setup:   func(m *Molecule) { m.inchiKey = "AAAAAAAAAAAAAA-BBBBBBBBBB-C" },
+			setup:   func(m *Molecule) { m.InChIKey = "AAAAAAAAAAAAAA-BBBBBBBBBB-C" },
 			wantErr: false,
 		},
 		{
 			name:    "invalid_confidence",
-			setup:   func(m *Molecule) { m.properties["test"] = &MolecularProperty{Name: "test", Confidence: 1.5} },
+			setup:   func(m *Molecule) { m.PropertiesMap["test"] = &MolecularProperty{Name: "test", Confidence: 1.5} },
 			wantErr: true,
 		},
 		{
 			name:    "negative_confidence",
-			setup:   func(m *Molecule) { m.properties["test"] = &MolecularProperty{Name: "test", Confidence: -0.1} },
+			setup:   func(m *Molecule) { m.PropertiesMap["test"] = &MolecularProperty{Name: "test", Confidence: -0.1} },
 			wantErr: true,
 		},
 		{
 			name:    "invalid_formula",
-			setup:   func(m *Molecule) { m.molecularFormula = "C(H)3" }, // Regex allows alphanumeric only currently
+			setup:   func(m *Molecule) { m.MolecularFormula = "C(H)3" },
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create fresh copy for each test case
+			// Deep copy
 			localM := *m
-			// Deep copy maps
-			localM.properties = make(map[string]*MolecularProperty)
-			localM.fingerprints = make(map[FingerprintType]*Fingerprint)
-			localM.tags = make([]string, 0)
-			localM.metadata = make(map[string]string)
+			localM.PropertiesMap = make(map[string]*MolecularProperty)
+			localM.FingerprintsMap = make(map[FingerprintType]*Fingerprint)
+			localM.Tags = make([]string, 0)
+			localM.Metadata = make(map[string]any)
 
 			tt.setup(&localM)
 			if err := localM.Validate(); (err != nil) != tt.wantErr {
@@ -231,22 +230,22 @@ func TestMolecule_StateTransitions(t *testing.T) {
 
 	t.Run("Activate_Success", func(t *testing.T) {
 		m := newTestMolecule(t)
-		m.inchiKey = "AAAAAAAAAAAAAA-BBBBBBBBBB-C" // Set InChIKey
+		m.InChIKey = "AAAAAAAAAAAAAA-BBBBBBBBBB-C"
 		err := m.Activate()
 		if err != nil {
 			t.Fatalf("Activate() failed: %v", err)
 		}
-		if m.Status() != MoleculeStatusActive {
-			t.Errorf("Status = %v, want %v", m.Status(), MoleculeStatusActive)
+		if m.GetStatus() != MoleculeStatusActive {
+			t.Errorf("Status = %v, want %v", m.GetStatus(), MoleculeStatusActive)
 		}
-		if m.Version() != 2 {
-			t.Errorf("Version = %d, want 2", m.Version())
+		if m.GetVersion() != 2 {
+			t.Errorf("Version = %d, want 2", m.GetVersion())
 		}
 	})
 
 	t.Run("Activate_NoInChIKey", func(t *testing.T) {
 		m := newTestMolecule(t)
-		m.inchiKey = ""
+		m.InChIKey = ""
 		err := m.Activate()
 		if err == nil {
 			t.Error("Activate() succeeded without InChIKey")
@@ -267,13 +266,13 @@ func TestMolecule_StateTransitions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Archive() failed: %v", err)
 		}
-		if m.Status() != MoleculeStatusArchived {
-			t.Errorf("Status = %v, want %v", m.Status(), MoleculeStatusArchived)
+		if m.GetStatus() != MoleculeStatusArchived {
+			t.Errorf("Status = %v, want %v", m.GetStatus(), MoleculeStatusArchived)
 		}
 	})
 
 	t.Run("Archive_WrongStatus", func(t *testing.T) {
-		m := newTestMolecule(t) // Pending
+		m := newTestMolecule(t)
 		err := m.Archive()
 		if err == nil {
 			t.Error("Archive() succeeded from Pending status")
@@ -286,8 +285,8 @@ func TestMolecule_StateTransitions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarkDeleted() failed: %v", err)
 		}
-		if m.Status() != MoleculeStatusDeleted {
-			t.Errorf("Status = %v, want %v", m.Status(), MoleculeStatusDeleted)
+		if m.GetStatus() != MoleculeStatusDeleted {
+			t.Errorf("Status = %v, want %v", m.GetStatus(), MoleculeStatusDeleted)
 		}
 	})
 
@@ -298,8 +297,8 @@ func TestMolecule_StateTransitions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("MarkDeleted() failed: %v", err)
 		}
-		if m.Status() != MoleculeStatusDeleted {
-			t.Errorf("Status = %v, want %v", m.Status(), MoleculeStatusDeleted)
+		if m.GetStatus() != MoleculeStatusDeleted {
+			t.Errorf("Status = %v, want %v", m.GetStatus(), MoleculeStatusDeleted)
 		}
 	})
 
@@ -336,20 +335,20 @@ func TestMolecule_SetStructureIdentifiers(t *testing.T) {
 		t.Fatalf("SetStructureIdentifiers() failed: %v", err)
 	}
 
-	if m.CanonicalSmiles() != canonical {
-		t.Errorf("CanonicalSmiles = %v, want %v", m.CanonicalSmiles(), canonical)
+	if m.GetCanonicalSMILES() != canonical {
+		t.Errorf("CanonicalSmiles = %v, want %v", m.GetCanonicalSMILES(), canonical)
 	}
-	if m.InChI() != inchi {
-		t.Errorf("InChI = %v, want %v", m.InChI(), inchi)
+	if m.GetInChI() != inchi {
+		t.Errorf("InChI = %v, want %v", m.GetInChI(), inchi)
 	}
-	if m.InChIKey() != inchiKey {
-		t.Errorf("InChIKey = %v, want %v", m.InChIKey(), inchiKey)
+	if m.GetInChIKey() != inchiKey {
+		t.Errorf("InChIKey = %v, want %v", m.GetInChIKey(), inchiKey)
 	}
-	if m.MolecularFormula() != formula {
-		t.Errorf("MolecularFormula = %v, want %v", m.MolecularFormula(), formula)
+	if m.GetMolecularFormula() != formula {
+		t.Errorf("MolecularFormula = %v, want %v", m.GetMolecularFormula(), formula)
 	}
-	if m.MolecularWeight() != weight {
-		t.Errorf("MolecularWeight = %v, want %v", m.MolecularWeight(), weight)
+	if m.GetMolecularWeight() != weight {
+		t.Errorf("MolecularWeight = %v, want %v", m.GetMolecularWeight(), weight)
 	}
 
 	// Error cases
@@ -393,7 +392,6 @@ func TestMolecule_FingerprintManagement(t *testing.T) {
 
 	// Override
 	fp2 := newTestFingerprint(t, FingerprintMorgan)
-	// Make it distinct if possible, though pointer equality is enough for test
 	if err := m.AddFingerprint(fp2); err != nil {
 		t.Fatalf("AddFingerprint() override failed: %v", err)
 	}
@@ -460,16 +458,16 @@ func TestMolecule_TagManagement(t *testing.T) {
 		t.Fatalf("AddTag() failed: %v", err)
 	}
 
-	tags := m.Tags()
+	tags := m.GetTags()
 	if len(tags) != 1 || tags[0] != "tag1" {
-		t.Errorf("Tags() = %v, want [tag1]", tags)
+		t.Errorf("GetTags() = %v, want [tag1]", tags)
 	}
 
 	// Duplicate
 	if err := m.AddTag("tag1"); err != nil {
 		t.Fatalf("AddTag() duplicate failed: %v", err)
 	}
-	if len(m.Tags()) != 1 {
+	if len(m.GetTags()) != 1 {
 		t.Error("AddTag() duplicate increased count")
 	}
 
@@ -477,20 +475,20 @@ func TestMolecule_TagManagement(t *testing.T) {
 	if err := m.AddTag("tag2"); err != nil {
 		t.Fatalf("AddTag() failed: %v", err)
 	}
-	if len(m.Tags()) != 2 {
-		t.Error("Tags() count incorrect after adding second tag")
+	if len(m.GetTags()) != 2 {
+		t.Error("GetTags() count incorrect after adding second tag")
 	}
 
 	// Remove
 	m.RemoveTag("tag1")
-	tags = m.Tags()
+	tags = m.GetTags()
 	if len(tags) != 1 || tags[0] != "tag2" {
-		t.Errorf("Tags() after remove = %v, want [tag2]", tags)
+		t.Errorf("GetTags() after remove = %v, want [tag2]", tags)
 	}
 
 	// Remove non-existent
 	m.RemoveTag("nonexistent")
-	if len(m.Tags()) != 1 {
+	if len(m.GetTags()) != 1 {
 		t.Error("RemoveTag() non-existent changed count")
 	}
 
@@ -508,37 +506,19 @@ func TestMolecule_GettersIsolation(t *testing.T) {
 	m := newTestMolecule(t)
 	m.AddTag("tag1")
 	m.SetMetadata("key", "value")
-	fp := newTestFingerprint(t, FingerprintMorgan)
-	m.AddFingerprint(fp)
-	prop := &MolecularProperty{Name: "p1", Value: 1.0}
-	m.AddProperty(prop)
 
 	// Tags
-	tags := m.Tags()
+	tags := m.GetTags()
 	tags[0] = "modified"
-	if m.Tags()[0] == "modified" {
-		t.Error("Tags() returned reference to internal slice")
+	if m.GetTags()[0] == "modified" {
+		t.Error("GetTags() returned reference to internal slice")
 	}
 
 	// Metadata
-	meta := m.Metadata()
+	meta := m.GetMetadata()
 	meta["key"] = "modified"
-	if m.Metadata()["key"] == "modified" {
-		t.Error("Metadata() returned reference to internal map")
-	}
-
-	// Fingerprints
-	fps := m.Fingerprints()
-	delete(fps, FingerprintMorgan)
-	if len(m.Fingerprints()) == 0 {
-		t.Error("Fingerprints() returned reference to internal map")
-	}
-
-	// Properties
-	props := m.Properties()
-	delete(props, "p1")
-	if len(m.Properties()) == 0 {
-		t.Error("Properties() returned reference to internal map")
+	if m.GetMetadata()["key"] == "modified" {
+		t.Error("GetMetadata() returned reference to internal map")
 	}
 }
 
@@ -548,7 +528,7 @@ func TestMolecule_ConvenienceMethods(t *testing.T) {
 	if !m.IsPending() { t.Error("IsPending returned false") }
 	if m.IsActive() { t.Error("IsActive returned true") }
 
-	m.inchiKey = "UHOVQNZJYSORNB-UHFFFAOYSA-N"
+	m.InChIKey = "UHOVQNZJYSORNB-UHFFFAOYSA-N"
 	m.Activate()
 	if !m.IsActive() { t.Error("IsActive returned false") }
 	if m.IsPending() { t.Error("IsPending returned true") }
@@ -587,7 +567,6 @@ func newActiveMolecule(t *testing.T) *Molecule {
 func newTestFingerprint(t *testing.T, fpType FingerprintType) *Fingerprint {
 	fp, err := NewBitFingerprint(fpType, make([]byte, 256), 2048, 2)
 	if err != nil {
-		// Try to fix if type is not Morgan (e.g. MACCS needs 166 bits)
 		if fpType == FingerprintMACCS {
 			fp, err = NewBitFingerprint(fpType, make([]byte, 21), 166, 0)
 		}

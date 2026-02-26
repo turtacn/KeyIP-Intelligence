@@ -231,8 +231,8 @@ func TestMoleculeService_RegisterMolecule(t *testing.T) {
 		if err != nil {
 			t.Fatalf("RegisterMolecule failed: %v", err)
 		}
-		if mol.Status() != MoleculeStatusActive {
-			t.Errorf("Status = %v, want Active", mol.Status())
+		if mol.Status != MoleculeStatusActive {
+			t.Errorf("Status = %v, want Active", mol.Status)
 		}
 		if repo.SaveCalls != 1 {
 			t.Errorf("SaveCalls = %d, want 1", repo.SaveCalls)

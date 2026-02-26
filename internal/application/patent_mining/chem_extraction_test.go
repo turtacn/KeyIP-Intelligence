@@ -60,6 +60,21 @@ func (m *MockMoleculeService) CreateFromSMILES(ctx context.Context, smiles strin
 	return &molecule.Molecule{ID: googleUUID("1")}, nil
 }
 
+func (m *MockMoleculeService) RegisterMolecule(ctx context.Context, smiles string, source molecule.MoleculeSource, sourceRef string) (*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeService) BatchRegisterMolecules(ctx context.Context, requests []molecule.MoleculeRegistrationRequest) (*molecule.BatchRegistrationResult, error) { return nil, nil }
+func (m *MockMoleculeService) GetMolecule(ctx context.Context, id string) (*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeService) GetMoleculeByInChIKey(ctx context.Context, inchiKey string) (*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeService) SearchMolecules(ctx context.Context, query *molecule.MoleculeQuery) (*molecule.MoleculeSearchResult, error) { return nil, nil }
+func (m *MockMoleculeService) CalculateFingerprints(ctx context.Context, moleculeID string, fpTypes []molecule.FingerprintType) error { return nil }
+func (m *MockMoleculeService) FindSimilarMolecules(ctx context.Context, targetSMILES string, fpType molecule.FingerprintType, threshold float64, limit int) ([]*molecule.SimilarityResult, error) { return nil, nil }
+func (m *MockMoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2 string, fpTypes []molecule.FingerprintType) (*molecule.MoleculeComparisonResult, error) { return nil, nil }
+func (m *MockMoleculeService) ArchiveMolecule(ctx context.Context, id string) error { return nil }
+func (m *MockMoleculeService) DeleteMolecule(ctx context.Context, id string) error { return nil }
+func (m *MockMoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID string, properties []*molecule.MolecularProperty) error { return nil }
+func (m *MockMoleculeService) TagMolecule(ctx context.Context, moleculeID string, tags []string) error { return nil }
+func (m *MockMoleculeService) Canonicalize(ctx context.Context, smiles string) (string, string, error) { return "", "", nil }
+func (m *MockMoleculeService) CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error) { return "", "", nil }
+
 // MockMoleculeRepo
 type MockMoleculeRepo struct {
 	FindByInChIKeyFunc func(ctx context.Context, inchiKey string) (*molecule.Molecule, error)
