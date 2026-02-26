@@ -79,13 +79,13 @@ func (h *LifecycleHandler) RegisterRoutes(mux *http.ServeMux) {
 func (h *LifecycleHandler) GetLifecycle(w http.ResponseWriter, r *http.Request) {
 	patentID := r.PathValue("patentId")
 	if patentID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("patentId", "patent id is required"))
 		return
 	}
 
 	lc, err := h.lifecycleSvc.GetLifecycle(r.Context(), patentID)
 	if err != nil {
-		h.logger.Error("failed to get lifecycle", "error", err, "patent_id", patentID)
+		h.logger.Error("failed to get lifecycle", logging.Err(err), logging.String("patent_id", patentID))
 		writeAppError(w, err)
 		return
 	}
@@ -97,33 +97,33 @@ func (h *LifecycleHandler) GetLifecycle(w http.ResponseWriter, r *http.Request) 
 func (h *LifecycleHandler) AdvancePhase(w http.ResponseWriter, r *http.Request) {
 	patentID := r.PathValue("patentId")
 	if patentID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("patentId", "patent id is required"))
 		return
 	}
 
 	var req AdvancePhaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
 		return
 	}
 
 	if req.TargetPhase == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("target_phase is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("target_phase", "target_phase is required"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 
 	input := &lifecycle.AdvancePhaseInput{
-		PatentID:    patentID,
-		TargetPhase: req.TargetPhase,
-		Notes:       req.Notes,
-		UserID:      userID,
+		PatentID: patentID,
+		NewPhase: req.TargetPhase,
+		Notes:    req.Notes,
+		UserID:   userID,
 	}
 
 	result, err := h.lifecycleSvc.AdvancePhase(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to advance phase", "error", err, "patent_id", patentID)
+		h.logger.Error("failed to advance phase", logging.Err(err), logging.String("patent_id", patentID))
 		writeAppError(w, err)
 		return
 	}
@@ -135,35 +135,33 @@ func (h *LifecycleHandler) AdvancePhase(w http.ResponseWriter, r *http.Request) 
 func (h *LifecycleHandler) AddMilestone(w http.ResponseWriter, r *http.Request) {
 	patentID := r.PathValue("patentId")
 	if patentID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("patentId", "patent id is required"))
 		return
 	}
 
 	var req AddMilestoneRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
 		return
 	}
 
 	if req.Title == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("title is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("title", "title is required"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 
 	input := &lifecycle.AddMilestoneInput{
-		PatentID:    patentID,
-		Title:       req.Title,
-		Description: req.Description,
-		Date:        req.Date,
-		Type:        req.Type,
-		UserID:      userID,
+		PatentID: patentID,
+		Type:     req.Type,
+		Notes:    req.Description,
+		UserID:   userID,
 	}
 
 	ms, err := h.lifecycleSvc.AddMilestone(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to add milestone", "error", err, "patent_id", patentID)
+		h.logger.Error("failed to add milestone", logging.Err(err), logging.String("patent_id", patentID))
 		writeAppError(w, err)
 		return
 	}
@@ -175,13 +173,13 @@ func (h *LifecycleHandler) AddMilestone(w http.ResponseWriter, r *http.Request) 
 func (h *LifecycleHandler) ListMilestones(w http.ResponseWriter, r *http.Request) {
 	patentID := r.PathValue("patentId")
 	if patentID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("patentId", "patent id is required"))
 		return
 	}
 
 	result, err := h.lifecycleSvc.ListMilestones(r.Context(), patentID)
 	if err != nil {
-		h.logger.Error("failed to list milestones", "error", err, "patent_id", patentID)
+		h.logger.Error("failed to list milestones", logging.Err(err), logging.String("patent_id", patentID))
 		writeAppError(w, err)
 		return
 	}
@@ -193,37 +191,34 @@ func (h *LifecycleHandler) ListMilestones(w http.ResponseWriter, r *http.Request
 func (h *LifecycleHandler) RecordFee(w http.ResponseWriter, r *http.Request) {
 	patentID := r.PathValue("patentId")
 	if patentID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("patentId", "patent id is required"))
 		return
 	}
 
 	var req RecordFeeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("invalid request body"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
 		return
 	}
 
 	if req.FeeType == "" || req.Amount <= 0 {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("fee_type and positive amount are required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("fee", "fee_type and positive amount are required"))
 		return
 	}
 
 	userID := getUserIDFromContext(r)
 
 	input := &lifecycle.RecordFeeInput{
-		PatentID:    patentID,
-		FeeType:     req.FeeType,
-		Amount:      req.Amount,
-		Currency:    req.Currency,
-		PaidDate:    req.PaidDate,
-		DueDate:     req.DueDate,
-		Description: req.Description,
-		UserID:      userID,
+		PatentID: patentID,
+		Type:     req.FeeType,
+		Amount:   req.Amount,
+		Currency: req.Currency,
+		UserID:   userID,
 	}
 
 	fee, err := h.lifecycleSvc.RecordFee(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to record fee", "error", err, "patent_id", patentID)
+		h.logger.Error("failed to record fee", logging.Err(err), logging.String("patent_id", patentID))
 		writeAppError(w, err)
 		return
 	}
@@ -235,13 +230,13 @@ func (h *LifecycleHandler) RecordFee(w http.ResponseWriter, r *http.Request) {
 func (h *LifecycleHandler) ListFees(w http.ResponseWriter, r *http.Request) {
 	patentID := r.PathValue("patentId")
 	if patentID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("patentId", "patent id is required"))
 		return
 	}
 
 	result, err := h.lifecycleSvc.ListFees(r.Context(), patentID)
 	if err != nil {
-		h.logger.Error("failed to list fees", "error", err, "patent_id", patentID)
+		h.logger.Error("failed to list fees", logging.Err(err), logging.String("patent_id", patentID))
 		writeAppError(w, err)
 		return
 	}
@@ -253,13 +248,13 @@ func (h *LifecycleHandler) ListFees(w http.ResponseWriter, r *http.Request) {
 func (h *LifecycleHandler) GetTimeline(w http.ResponseWriter, r *http.Request) {
 	patentID := r.PathValue("patentId")
 	if patentID == "" {
-		writeError(w, http.StatusBadRequest, errors.NewValidationError("patent id is required"))
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("patentId", "patent id is required"))
 		return
 	}
 
 	timeline, err := h.lifecycleSvc.GetTimeline(r.Context(), patentID)
 	if err != nil {
-		h.logger.Error("failed to get timeline", "error", err, "patent_id", patentID)
+		h.logger.Error("failed to get timeline", logging.Err(err), logging.String("patent_id", patentID))
 		writeAppError(w, err)
 		return
 	}
@@ -278,13 +273,12 @@ func (h *LifecycleHandler) GetUpcomingDeadlines(w http.ResponseWriter, r *http.R
 	}
 
 	input := &lifecycle.UpcomingDeadlinesInput{
-		UserID:    userID,
-		DaysAhead: daysAhead,
+		Days: daysAhead,
 	}
 
 	deadlines, err := h.lifecycleSvc.GetUpcomingDeadlines(r.Context(), input)
 	if err != nil {
-		h.logger.Error("failed to get upcoming deadlines", "error", err)
+		h.logger.Error("failed to get upcoming deadlines", logging.Err(err))
 		writeAppError(w, err)
 		return
 	}
@@ -297,7 +291,7 @@ func parseInt(s string) (int, error) {
 	var n int
 	for _, c := range s {
 		if c < '0' || c > '9' {
-			return 0, errors.NewValidationError("invalid integer")
+			return 0, errors.NewValidationError("value", "invalid integer")
 		}
 		n = n*10 + int(c-'0')
 	}
