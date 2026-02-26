@@ -1,379 +1,439 @@
+// Phase 13 - SDK Client (292/349)
+// File: pkg/client/client.go
+// Core SDK entry point for the KeyIP-Intelligence platform.
+// Encapsulates all HTTP communication: construction, signing, retry, timeout, error decoding.
+// Upper-layer sub-clients (Molecules, Patents, Lifecycle) only assemble request/response DTOs.
+
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"math/rand"
+	"net"
 	"net/http"
-	"net/http/httptest"
-	"testing"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/google/uuid"
 )
 
-func TestNewClient_Success(t *testing.T) {
-	client, err := NewClient("https://api.example.com", "test-api-key")
+// Version is the SDK semantic version.
+const Version = "0.1.0"
 
-	assert.NoError(t, err)
-	assert.NotNil(t, client)
-	assert.Equal(t, "https://api.example.com", client.baseURL)
-	assert.Equal(t, "test-api-key", client.apiKey)
+// ErrInvalidConfig is returned when client configuration is invalid.
+var ErrInvalidConfig = errors.New("keyip: invalid client configuration")
+
+// ---------------------------------------------------------------------------
+// Logger
+// ---------------------------------------------------------------------------
+
+// Logger defines the minimal logging interface consumed by the SDK.
+type Logger interface {
+	Debugf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
 }
 
-func TestNewClient_EmptyBaseURL(t *testing.T) {
-	client, err := NewClient("", "test-api-key")
+// noopLogger silently discards all log output.
+type noopLogger struct{}
 
-	assert.Error(t, err)
-	assert.Nil(t, client)
+func (noopLogger) Debugf(string, ...interface{}) {}
+func (noopLogger) Infof(string, ...interface{})  {}
+func (noopLogger) Errorf(string, ...interface{}) {}
+
+// ---------------------------------------------------------------------------
+// APIError
+// ---------------------------------------------------------------------------
+
+// APIError represents a structured error response from the KeyIP API.
+type APIError struct {
+	StatusCode int    `json:"status_code"`
+	Code       string `json:"code"`
+	Message    string `json:"message"`
+	RequestID  string `json:"request_id,omitempty"`
 }
 
-func TestNewClient_EmptyAPIKey(t *testing.T) {
-	client, err := NewClient("https://api.example.com", "")
-
-	assert.Error(t, err)
-	assert.Nil(t, client)
+// Error implements the error interface.
+// Format: keyip: <Code> (HTTP <StatusCode>): <Message> [request_id=<RequestID>]
+func (e *APIError) Error() string {
+	return fmt.Sprintf("keyip: %s (HTTP %d): %s [request_id=%s]",
+		e.Code, e.StatusCode, e.Message, e.RequestID)
 }
 
-func TestNewClient_InvalidScheme(t *testing.T) {
-	client, err := NewClient("ftp://api.example.com", "test-api-key")
+// IsNotFound returns true when the status code is 404.
+func (e *APIError) IsNotFound() bool { return e.StatusCode == http.StatusNotFound }
 
-	assert.Error(t, err)
-	assert.Nil(t, client)
+// IsUnauthorized returns true when the status code is 401.
+func (e *APIError) IsUnauthorized() bool { return e.StatusCode == http.StatusUnauthorized }
+
+// IsRateLimited returns true when the status code is 429.
+func (e *APIError) IsRateLimited() bool { return e.StatusCode == http.StatusTooManyRequests }
+
+// IsServerError returns true for 500, 502, 503, 504.
+func (e *APIError) IsServerError() bool {
+	switch e.StatusCode {
+	case http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	}
+	return false
 }
 
-func TestNewClient_TrimsTrailingSlash(t *testing.T) {
-	client, err := NewClient("https://api.example.com/", "test-api-key")
+// ---------------------------------------------------------------------------
+// APIResponse / ResponseMeta
+// ---------------------------------------------------------------------------
 
-	assert.NoError(t, err)
-	assert.Equal(t, "https://api.example.com", client.baseURL)
+// APIResponse is a generic envelope for successful API responses.
+type APIResponse[T any] struct {
+Data T             `json:"data"`
+Meta *ResponseMeta `json:"meta,omitempty"`
 }
 
-func TestNewClient_InvalidURL(t *testing.T) {
-	client, err := NewClient("://invalid-url", "test-api-key")
-
-	assert.Error(t, err)
-	assert.Nil(t, client)
+// ResponseMeta carries pagination metadata.
+type ResponseMeta struct {
+	Total    int64 `json:"total"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
+	HasMore  bool  `json:"has_more"`
 }
 
-func TestNewClient_WithOptions(t *testing.T) {
-	customHTTP := &http.Client{Timeout: 60 * time.Second}
-	logger := &testLogger{}
+// ---------------------------------------------------------------------------
+// Client
+// ---------------------------------------------------------------------------
 
-	client, err := NewClient(
-		"https://api.example.com",
-		"test-api-key",
-		WithHTTPClient(customHTTP),
-		WithLogger(logger),
-		WithRetryMax(5),
-		WithUserAgent("custom-agent/1.0"),
-	)
+// Client is the top-level SDK client. It is safe for concurrent use.
+type Client struct {
+	baseURL    string
+	httpClient *http.Client
+	apiKey     string
+	userAgent  string
+	logger     Logger
 
-	assert.NoError(t, err)
-	assert.NotNil(t, client)
-	assert.Equal(t, customHTTP, client.httpClient)
-	assert.Equal(t, logger, client.logger)
-	assert.Equal(t, 5, client.retryMax)
-	assert.Equal(t, "custom-agent/1.0", client.userAgent)
+	retryMax     int
+	retryWaitMin time.Duration
+	retryWaitMax time.Duration
+
+	moleculesOnce sync.Once
+	molecules     *MoleculesClient
+
+	patentsOnce sync.Once
+	patents     *PatentsClient
+
+	lifecycleOnce sync.Once
+	lifecycle     *LifecycleClient
 }
 
-func TestClient_Molecules(t *testing.T) {
-	client, _ := NewClient("https://api.example.com", "test-api-key")
-
-	molecules := client.Molecules()
-	assert.NotNil(t, molecules)
-
-	// Should return the same instance on multiple calls (thread-safe singleton)
-	molecules2 := client.Molecules()
-	assert.Same(t, molecules, molecules2)
-}
-
-func TestClient_Patents(t *testing.T) {
-	client, _ := NewClient("https://api.example.com", "test-api-key")
-
-	patents := client.Patents()
-	assert.NotNil(t, patents)
-
-	// Should return the same instance on multiple calls
-	patents2 := client.Patents()
-	assert.Same(t, patents, patents2)
-}
-
-func TestClient_Lifecycle(t *testing.T) {
-	client, _ := NewClient("https://api.example.com", "test-api-key")
-
-	lifecycle := client.Lifecycle()
-	assert.NotNil(t, lifecycle)
-
-	// Should return the same instance on multiple calls
-	lifecycle2 := client.Lifecycle()
-	assert.Same(t, lifecycle, lifecycle2)
-}
-
-func TestAPIError_Error(t *testing.T) {
-	err := &APIError{
-		StatusCode: 404,
-		Code:       "NOT_FOUND",
-		Message:    "Resource not found",
-		RequestID:  "req-123",
+// NewClient creates a new SDK client.
+//
+// baseURL must be a valid http/https URL. apiKey must be non-empty.
+// Optional behaviour can be customised via Option functions.
+func NewClient(baseURL string, apiKey string, opts ...Option) (*Client, error) {
+	if baseURL == "" {
+		return nil, fmt.Errorf("%w: baseURL is required", ErrInvalidConfig)
+	}
+	parsed, err := url.Parse(baseURL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return nil, fmt.Errorf("%w: baseURL must use http or https scheme, got %q", ErrInvalidConfig, baseURL)
+	}
+	if apiKey == "" {
+		return nil, fmt.Errorf("%w: apiKey is required", ErrInvalidConfig)
 	}
 
-	errorStr := err.Error()
-	assert.Contains(t, errorStr, "NOT_FOUND")
-	assert.Contains(t, errorStr, "404")
-	assert.Contains(t, errorStr, "Resource not found")
-	assert.Contains(t, errorStr, "req-123")
-}
-
-func TestAPIError_IsNotFound(t *testing.T) {
-	err := &APIError{StatusCode: 404}
-	assert.True(t, err.IsNotFound())
-
-	err2 := &APIError{StatusCode: 500}
-	assert.False(t, err2.IsNotFound())
-}
-
-func TestAPIError_IsUnauthorized(t *testing.T) {
-	err := &APIError{StatusCode: 401}
-	assert.True(t, err.IsUnauthorized())
-
-	err2 := &APIError{StatusCode: 403}
-	assert.False(t, err2.IsUnauthorized())
-}
-
-func TestAPIError_IsRateLimited(t *testing.T) {
-	err := &APIError{StatusCode: 429}
-	assert.True(t, err.IsRateLimited())
-
-	err2 := &APIError{StatusCode: 400}
-	assert.False(t, err2.IsRateLimited())
-}
-
-func TestAPIError_IsServerError(t *testing.T) {
-	testCases := []struct {
-		code     int
-		expected bool
-	}{
-		{500, true},
-		{502, true},
-		{503, true},
-		{599, true},
-		{400, false},
-		{404, false},
-		{600, false},
+	c := &Client{
+		baseURL:      strings.TrimRight(baseURL, "/"),
+		apiKey:       apiKey,
+		userAgent:    "keyip-go-sdk/" + Version,
+		httpClient:   &http.Client{Timeout: 30 * time.Second},
+		logger:       noopLogger{},
+		retryMax:     3,
+		retryWaitMin: 500 * time.Millisecond,
+		retryWaitMax: 5 * time.Second,
 	}
 
-	for _, tc := range testCases {
-		err := &APIError{StatusCode: tc.code}
-		assert.Equal(t, tc.expected, err.IsServerError(), "status code %d", tc.code)
-	}
-}
-
-func TestClient_do_Success(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer test-api-key", r.Header.Get("Authorization"))
-		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.NotEmpty(t, r.Header.Get("X-Request-ID"))
-
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	}))
-	defer server.Close()
-
-	client, _ := NewClient(server.URL, "test-api-key")
-
-	var result map[string]string
-	err := client.get(context.Background(), "/test", &result)
-
-	assert.NoError(t, err)
-	assert.Equal(t, "ok", result["status"])
-}
-
-func TestClient_do_HTTPError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"code":    "INVALID_REQUEST",
-			"message": "Bad request",
-		})
-	}))
-	defer server.Close()
-
-	client, _ := NewClient(server.URL, "test-api-key")
-
-	var result map[string]string
-	err := client.get(context.Background(), "/test", &result)
-
-	assert.Error(t, err)
-	apiErr, ok := err.(*APIError)
-	assert.True(t, ok)
-	assert.Equal(t, http.StatusBadRequest, apiErr.StatusCode)
-	assert.Equal(t, "INVALID_REQUEST", apiErr.Code)
-}
-
-func TestClient_do_WithBody(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]string
-		json.NewDecoder(r.Body).Decode(&body)
-		assert.Equal(t, "test-value", body["key"])
-
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"received": "ok"})
-	}))
-	defer server.Close()
-
-	client, _ := NewClient(server.URL, "test-api-key")
-
-	var result map[string]string
-	err := client.post(context.Background(), "/test", map[string]string{"key": "test-value"}, &result)
-
-	assert.NoError(t, err)
-	assert.Equal(t, "ok", result["received"])
-}
-
-func TestClient_do_PathPrefix(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/test", r.URL.Path)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	client, _ := NewClient(server.URL, "test-api-key")
-
-	// Path without leading slash should still work
-	err := client.get(context.Background(), "test", nil)
-	assert.NoError(t, err)
-}
-
-func TestClient_do_ContextCancelled(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(100 * time.Millisecond)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	client, _ := NewClient(server.URL, "test-api-key")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
-
-	err := client.get(ctx, "/test", nil)
-	assert.Error(t, err)
-}
-
-func TestClient_shouldRetry(t *testing.T) {
-	client, _ := NewClient("https://api.example.com", "test-api-key")
-
-	// Should retry on network error
-	assert.True(t, client.shouldRetry(nil, assert.AnError))
-
-	// Should retry on 5xx
-	resp500 := &http.Response{StatusCode: 500}
-	assert.True(t, client.shouldRetry(resp500, nil))
-
-	resp503 := &http.Response{StatusCode: 503}
-	assert.True(t, client.shouldRetry(resp503, nil))
-
-	// Should NOT retry on 4xx (except 429)
-	resp400 := &http.Response{StatusCode: 400}
-	assert.False(t, client.shouldRetry(resp400, nil))
-
-	resp404 := &http.Response{StatusCode: 404}
-	assert.False(t, client.shouldRetry(resp404, nil))
-}
-
-func TestClient_calculateBackoff(t *testing.T) {
-	client, _ := NewClient("https://api.example.com", "test-api-key", WithRetryWait(100*time.Millisecond, 1*time.Second))
-
-	// First attempt backoff
-	backoff1 := client.calculateBackoff(1)
-	assert.GreaterOrEqual(t, backoff1, 100*time.Millisecond)
-	assert.LessOrEqual(t, backoff1, 125*time.Millisecond) // With 25% jitter
-
-	// Second attempt backoff (should be larger)
-	backoff2 := client.calculateBackoff(2)
-	assert.GreaterOrEqual(t, backoff2, 200*time.Millisecond)
-
-	// Large attempt should be capped at max
-	backoffLarge := client.calculateBackoff(10)
-	assert.LessOrEqual(t, backoffLarge, 1250*time.Millisecond) // Max + 25% jitter
-}
-
-func TestClient_delete(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodDelete, r.Method)
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer server.Close()
-
-	client, _ := NewClient(server.URL, "test-api-key")
-
-	err := client.delete(context.Background(), "/resource/123")
-	assert.NoError(t, err)
-}
-
-func TestClient_put(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, http.MethodPut, r.Method)
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"updated": "true"})
-	}))
-	defer server.Close()
-
-	client, _ := NewClient(server.URL, "test-api-key")
-
-	var result map[string]string
-	err := client.put(context.Background(), "/resource/123", map[string]string{"name": "updated"}, &result)
-
-	assert.NoError(t, err)
-	assert.Equal(t, "true", result["updated"])
-}
-
-func TestNoopLogger(t *testing.T) {
-	// Should not panic or error
-	logger := &noopLogger{}
-	logger.Debugf("test %s", "debug")
-	logger.Infof("test %s", "info")
-	logger.Errorf("test %s", "error")
-}
-
-func TestResponseMeta(t *testing.T) {
-	meta := &ResponseMeta{
-		Total:    100,
-		Page:     2,
-		PageSize: 20,
-		HasMore:  true,
+	for _, opt := range opts {
+		opt(c)
 	}
 
-	assert.Equal(t, int64(100), meta.Total)
-	assert.Equal(t, 2, meta.Page)
-	assert.Equal(t, 20, meta.PageSize)
-	assert.True(t, meta.HasMore)
+	return c, nil
 }
 
-func TestVersion(t *testing.T) {
-	assert.NotEmpty(t, Version)
-	assert.Equal(t, "0.1.0", Version)
+// ---------------------------------------------------------------------------
+// Sub-client accessors (lazy, thread-safe via sync.Once)
+// ---------------------------------------------------------------------------
+
+// Molecules returns the molecule resource sub-client.
+func (c *Client) Molecules() *MoleculesClient {
+	c.moleculesOnce.Do(func() {
+		c.molecules = &MoleculesClient{client: c}
+	})
+	return c.molecules
 }
 
-func TestClient_do_RetryOnServerError(t *testing.T) {
-	attempts := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		attempts++
-		if attempts < 2 {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+// Patents returns the patent resource sub-client.
+func (c *Client) Patents() *PatentsClient {
+	c.patentsOnce.Do(func() {
+		c.patents = &PatentsClient{client: c}
+	})
+	return c.patents
+}
+
+// Lifecycle returns the lifecycle resource sub-client.
+func (c *Client) Lifecycle() *LifecycleClient {
+	c.lifecycleOnce.Do(func() {
+		c.lifecycle = &LifecycleClient{client: c}
+	})
+	return c.lifecycle
+}
+
+// ---------------------------------------------------------------------------
+// Convenience HTTP verbs (unexported, used by sub-clients)
+// ---------------------------------------------------------------------------
+
+func (c *Client) get(ctx context.Context, path string, result interface{}) error {
+	return c.do(ctx, http.MethodGet, path, nil, result)
+}
+
+func (c *Client) post(ctx context.Context, path string, body interface{}, result interface{}) error {
+	return c.do(ctx, http.MethodPost, path, body, result)
+}
+
+func (c *Client) put(ctx context.Context, path string, body interface{}, result interface{}) error {
+	return c.do(ctx, http.MethodPut, path, body, result)
+}
+
+func (c *Client) delete(ctx context.Context, path string) error {
+	return c.do(ctx, http.MethodDelete, path, nil, nil)
+}
+
+// ---------------------------------------------------------------------------
+// Core HTTP execution with retry
+// ---------------------------------------------------------------------------
+
+// do executes an HTTP request with automatic retry for transient failures.
+//
+// Retry policy:
+//   - 5xx (500/502/503/504): exponential back-off + jitter
+//   - 429: honour Retry-After header, then retry
+//   - net.Error (timeout, connection refused): exponential back-off + jitter
+//   - 4xx (except 429): no retry, return immediately
+//   - context cancellation / deadline: return immediately
+func (c *Client) do(ctx context.Context, method, path string, body interface{}, result interface{}) error {
+	// Normalise path — ensure leading slash.
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	fullURL := c.baseURL + path
+
+	// Pre-marshal body so it can be replayed across retries.
+	var bodyBytes []byte
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("keyip: failed to marshal request body: %w", err)
 		}
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	}))
-	defer server.Close()
+		bodyBytes = b
+	}
 
-	client, _ := NewClient(server.URL, "test-api-key", WithRetryMax(3), WithRetryWait(10*time.Millisecond, 50*time.Millisecond))
+	requestID := uuid.New().String()
+	maxAttempts := 1 + c.retryMax
+	var lastErr error
+	skipNextBackoff := false
 
-	var result map[string]string
-	err := client.get(context.Background(), "/test", &result)
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		// ---- back-off (skip on first attempt and after Retry-After wait) ----
+		if attempt > 0 && !skipNextBackoff {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			wait := c.backoff(attempt)
+			c.logger.Debugf("retry %d/%d backoff=%v path=%s", attempt, c.retryMax, wait, path)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(wait):
+			}
+		}
+		skipNextBackoff = false
 
-	assert.NoError(t, err)
-	assert.Equal(t, 2, attempts)
-	assert.Equal(t, "ok", result["status"])
+		// ---- build request ----
+		var reqBody io.Reader
+		if bodyBytes != nil {
+			reqBody = bytes.NewReader(bodyBytes)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, fullURL, reqBody)
+		if err != nil {
+			return fmt.Errorf("keyip: failed to create request: %w", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", c.userAgent)
+		req.Header.Set("X-Request-ID", requestID)
+
+		// ---- execute ----
+		start := time.Now()
+		resp, err := c.httpClient.Do(req)
+		elapsed := time.Since(start)
+
+		// ---- transport / network error ----
+		if err != nil {
+			lastErr = err
+			c.logger.Errorf("%s %s error=%v elapsed=%v", method, path, err, elapsed)
+
+			// Context errors are terminal — never retry.
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
+			// Network errors are retryable.
+			continue
+		}
+
+		// ---- read body & close immediately (safe for retry loops) ----
+		respBody, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		c.logger.Infof("%s %s status=%d elapsed=%v request_id=%s",
+			method, path, resp.StatusCode, elapsed, requestID)
+
+		if readErr != nil {
+			lastErr = fmt.Errorf("keyip: failed to read response body: %w", readErr)
+			continue
+		}
+
+		// ---- 429 Rate Limited ----
+		if resp.StatusCode == http.StatusTooManyRequests {
+			apiErr := c.buildAPIError(resp.StatusCode, respBody, requestID)
+			lastErr = apiErr
+
+			if ra := resp.Header.Get("Retry-After"); ra != "" {
+				if seconds, parseErr := strconv.Atoi(ra); parseErr == nil && seconds > 0 {
+					c.logger.Debugf("429 Retry-After=%ds path=%s", seconds, path)
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case <-time.After(time.Duration(seconds) * time.Second):
+					}
+					skipNextBackoff = true
+				}
+			}
+			continue
+		}
+
+		// ---- 5xx Server Error — retryable ----
+		if resp.StatusCode >= 500 {
+			lastErr = c.buildAPIError(resp.StatusCode, respBody, requestID)
+			continue
+		}
+
+		// ---- 4xx Client Error — terminal, no retry ----
+		if resp.StatusCode >= 400 {
+			return c.buildAPIError(resp.StatusCode, respBody, requestID)
+		}
+
+		// ---- 2xx / 3xx Success ----
+		if result != nil && len(respBody) > 0 {
+			if err := json.Unmarshal(respBody, result); err != nil {
+				return fmt.Errorf("keyip: failed to unmarshal response body: %w", err)
+			}
+		}
+		return nil
+	}
+
+	// All attempts exhausted.
+	return lastErr
 }
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+// buildAPIError parses a JSON error body into an APIError.
+func (c *Client) buildAPIError(statusCode int, body []byte, requestID string) *APIError {
+	apiErr := &APIError{
+		StatusCode: statusCode,
+		RequestID:  requestID,
+	}
+	if len(body) > 0 {
+		// Best-effort parse; fields that don't match are silently ignored.
+		_ = json.Unmarshal(body, apiErr)
+	}
+	// Ensure status code survives a potential overwrite from the JSON body.
+	apiErr.StatusCode = statusCode
+	if apiErr.RequestID == "" {
+		apiErr.RequestID = requestID
+	}
+	if apiErr.Code == "" {
+		apiErr.Code = http.StatusText(statusCode)
+	}
+	if apiErr.Message == "" {
+		apiErr.Message = fmt.Sprintf("HTTP %d", statusCode)
+	}
+	return apiErr
+}
+
+// backoff computes the wait duration for the given retry attempt using
+// exponential back-off with full jitter.
+//
+//	base = retryWaitMin * 2^(attempt-1)
+//	capped = min(base, retryWaitMax)
+//	sleep  = random in [0, capped)
+func (c *Client) backoff(attempt int) time.Duration {
+	base := c.retryWaitMin
+	for i := 1; i < attempt; i++ {
+		base *= 2
+		if base >= c.retryWaitMax {
+			base = c.retryWaitMax
+			break
+		}
+	}
+	if base <= 0 {
+		return c.retryWaitMin
+	}
+	// Full jitter: uniform random in [retryWaitMin, base].
+	jitter := time.Duration(rand.Int63n(int64(base)-int64(c.retryWaitMin)+1)) + c.retryWaitMin
+	return jitter
+}
+
+// isRetryableStatus returns true for HTTP status codes that warrant a retry.
+func isRetryableStatus(code int) bool {
+	switch code {
+	case http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout,
+		http.StatusTooManyRequests:
+		return true
+	}
+	return false
+}
+
+// isConnError performs a best-effort check for connection-level errors
+// that are not already covered by net.Error.
+func isConnError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return true
+	}
+	return false
+}
+
+//Personal.AI order the ending

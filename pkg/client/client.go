@@ -1,332 +1,469 @@
+// Phase 13 - SDK Client (292/349)
+// File: pkg/client/client.go
+// Core SDK entry point for the KeyIP-Intelligence platform.
+// Encapsulates all HTTP communication: construction, signing, retry, timeout, error decoding.
+// Upper-layer sub-clients (Molecules, Patents, Lifecycle) only assemble request/response DTOs.
+
 package client
 
 import (
-"bytes"
-"context"
-"encoding/json"
-"fmt"
-"io"
-"math/rand"
-"net/http"
-"net/url"
-"strconv"
-"strings"
-"sync"
-"time"
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"math/rand"
+	"net"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
-"github.com/google/uuid"
+	"github.com/google/uuid"
 )
 
+// Version is the SDK semantic version.
 const Version = "0.1.0"
 
-// Logger defines the logging interface used by the Client
+// ErrInvalidConfig is returned when client configuration is invalid.
+var ErrInvalidConfig = errors.New("keyip: invalid client configuration")
+
+// ---------------------------------------------------------------------------
+// Logger
+// ---------------------------------------------------------------------------
+
+// Logger defines the minimal logging interface consumed by the SDK.
 type Logger interface {
-Debugf(format string, args ...interface{})
-Infof(format string, args ...interface{})
-Errorf(format string, args ...interface{})
+	Debugf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
 }
 
-// noopLogger is a no-op implementation of Logger
+// noopLogger silently discards all log output.
 type noopLogger struct{}
 
-func (noopLogger) Debugf(format string, args ...interface{}) {}
-func (noopLogger) Infof(format string, args ...interface{})  {}
-func (noopLogger) Errorf(format string, args ...interface{}) {}
+func (noopLogger) Debugf(string, ...interface{}) {}
+func (noopLogger) Infof(string, ...interface{})  {}
+func (noopLogger) Errorf(string, ...interface{}) {}
 
-// Client is the KeyIP-Intelligence SDK client
-type Client struct {
-baseURL       string
-httpClient    *http.Client
-apiKey        string
-userAgent     string
-logger        Logger
-retryMax      int
-retryWaitMin  time.Duration
-retryWaitMax  time.Duration
+// ---------------------------------------------------------------------------
+// APIError
+// ---------------------------------------------------------------------------
 
-molecules     *MoleculesClient
-moleculesOnce sync.Once
-patents       *PatentsClient
-patentsOnce   sync.Once
-lifecycle     *LifecycleClient
-lifecycleOnce sync.Once
-}
-
-// APIError represents an error response from the API
+// APIError represents a structured error response from the KeyIP API.
 type APIError struct {
-StatusCode int    `json:"status_code"`
-Code       string `json:"code"`
-Message    string `json:"message"`
-RequestID  string `json:"request_id"`
+	StatusCode int    `json:"status_code"`
+	Code       string `json:"code"`
+	Message    string `json:"message"`
+	RequestID  string `json:"request_id,omitempty"`
 }
 
+// Error implements the error interface.
+// Format: keyip: <Code> (HTTP <StatusCode>): <Message> [request_id=<RequestID>]
 func (e *APIError) Error() string {
-return fmt.Sprintf("keyip: %s (HTTP %d): %s [request_id=%s]", e.Code, e.StatusCode, e.Message, e.RequestID)
+	return fmt.Sprintf("keyip: %s (HTTP %d): %s [request_id=%s]",
+		e.Code, e.StatusCode, e.Message, e.RequestID)
 }
 
-func (e *APIError) IsNotFound() bool {
-return e.StatusCode == http.StatusNotFound
-}
+// IsNotFound returns true when the status code is 404.
+func (e *APIError) IsNotFound() bool { return e.StatusCode == http.StatusNotFound }
 
-func (e *APIError) IsUnauthorized() bool {
-return e.StatusCode == http.StatusUnauthorized
-}
+// IsUnauthorized returns true when the status code is 401.
+func (e *APIError) IsUnauthorized() bool { return e.StatusCode == http.StatusUnauthorized }
 
-func (e *APIError) IsRateLimited() bool {
-return e.StatusCode == http.StatusTooManyRequests
-}
+// IsRateLimited returns true when the status code is 429.
+func (e *APIError) IsRateLimited() bool { return e.StatusCode == http.StatusTooManyRequests }
 
+// IsServerError returns true for 500, 502, 503, 504.
 func (e *APIError) IsServerError() bool {
-return e.StatusCode >= 500 && e.StatusCode < 600
+	switch e.StatusCode {
+	case http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	}
+	return false
 }
 
-// APIResponse is a generic response wrapper
+// ---------------------------------------------------------------------------
+// APIResponse / ResponseMeta
+// ---------------------------------------------------------------------------
+
+// APIResponse is a generic envelope for successful API responses.
 type APIResponse[T any] struct {
 Data T             `json:"data"`
 Meta *ResponseMeta `json:"meta,omitempty"`
 }
 
-// ResponseMeta contains pagination metadata
+// ResponseMeta carries pagination metadata.
 type ResponseMeta struct {
-Total    int64 `json:"total"`
-Page     int   `json:"page"`
-PageSize int   `json:"page_size"`
-HasMore  bool  `json:"has_more"`
+	Total    int64 `json:"total"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
+	HasMore  bool  `json:"has_more"`
 }
 
-// NewClient creates a new KeyIP-Intelligence SDK client
+// ---------------------------------------------------------------------------
+// Client
+// ---------------------------------------------------------------------------
+
+// Client is the top-level SDK client. It is safe for concurrent use.
+type Client struct {
+	baseURL    string
+	httpClient *http.Client
+	apiKey     string
+	userAgent  string
+	logger     Logger
+
+	retryMax     int
+	retryWaitMin time.Duration
+	retryWaitMax time.Duration
+
+	moleculesOnce sync.Once
+	molecules     *MoleculesClient
+
+	patentsOnce sync.Once
+	patents     *PatentsClient
+
+	lifecycleOnce sync.Once
+	lifecycle     *LifecycleClient
+
+	// --- fields driven by options.go ---
+	baseHeaders map[string]string
+	rateLimiter *internalRateLimiter
+	debug       bool
+
+}
+
+// NewClient creates a new SDK client.
+//
+// baseURL must be a valid http/https URL. apiKey must be non-empty.
+// Optional behaviour can be customised via Option functions.
 func NewClient(baseURL string, apiKey string, opts ...Option) (*Client, error) {
-if baseURL == "" {
-return nil, fmt.Errorf("invalid config")
-}
-if apiKey == "" {
-return nil, fmt.Errorf("invalid config")
+	if baseURL == "" {
+		return nil, fmt.Errorf("%w: baseURL is required", ErrInvalidConfig)
+	}
+	parsed, err := url.Parse(baseURL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return nil, fmt.Errorf("%w: baseURL must use http or https scheme, got %q", ErrInvalidConfig, baseURL)
+	}
+	if apiKey == "" {
+		return nil, fmt.Errorf("%w: apiKey is required", ErrInvalidConfig)
+	}
+
+	c := &Client{
+		baseURL:      strings.TrimRight(baseURL, "/"),
+		apiKey:       apiKey,
+		userAgent:    "keyip-go-sdk/" + Version,
+		httpClient:   &http.Client{Timeout: 30 * time.Second},
+		logger:       noopLogger{},
+		retryMax:     3,
+		retryWaitMin: 500 * time.Millisecond,
+		retryWaitMax: 5 * time.Second,
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c, nil
 }
 
-// Validate baseURL
-parsedURL, err := url.Parse(baseURL)
-if err != nil {
-return nil, fmt.Errorf("%w: invalid baseURL: %v", fmt.Errorf("invalid config"), err)
-}
-if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-return nil, fmt.Errorf("%w: baseURL scheme must be http or https", fmt.Errorf("invalid config"))
-}
+// ---------------------------------------------------------------------------
+// Sub-client accessors (lazy, thread-safe via sync.Once)
+// ---------------------------------------------------------------------------
 
-// Trim trailing slash
-baseURL = strings.TrimSuffix(baseURL, "/")
-
-c := &Client{
-baseURL:      baseURL,
-apiKey:       apiKey,
-httpClient:   &http.Client{Timeout: 30 * time.Second},
-userAgent:    fmt.Sprintf("keyip-go-sdk/%s", Version),
-logger:       &noopLogger{},
-retryMax:     3,
-retryWaitMin: 500 * time.Millisecond,
-retryWaitMax: 5 * time.Second,
-}
-
-// Apply options
-for _, opt := range opts {
-opt(c)
-}
-
-return c, nil
-}
-
-// Molecules returns the molecules sub-client (lazy initialization, thread-safe)
+// Molecules returns the molecule resource sub-client.
 func (c *Client) Molecules() *MoleculesClient {
-c.moleculesOnce.Do(func() {
-c.molecules = &MoleculesClient{client: c}
-})
-return c.molecules
+	c.moleculesOnce.Do(func() {
+		c.molecules = &MoleculesClient{client: c}
+	})
+	return c.molecules
 }
 
-// Patents returns the patents sub-client (lazy initialization, thread-safe)
+// Patents returns the patent resource sub-client.
 func (c *Client) Patents() *PatentsClient {
-c.patentsOnce.Do(func() {
-c.patents = &PatentsClient{client: c}
-})
-return c.patents
+	c.patentsOnce.Do(func() {
+		c.patents = &PatentsClient{client: c}
+	})
+	return c.patents
 }
 
-// Lifecycle returns the lifecycle sub-client (lazy initialization, thread-safe)
+// Lifecycle returns the lifecycle resource sub-client.
 func (c *Client) Lifecycle() *LifecycleClient {
-c.lifecycleOnce.Do(func() {
-c.lifecycle = &LifecycleClient{client: c}
-})
-return c.lifecycle
+	c.lifecycleOnce.Do(func() {
+		c.lifecycle = &LifecycleClient{client: c}
+	})
+	return c.lifecycle
 }
 
-// do performs an HTTP request with retry logic
-func (c *Client) do(ctx context.Context, method, path string, body interface{}, result interface{}) error {
-// Ensure path starts with /
-if !strings.HasPrefix(path, "/") {
-path = "/" + path
+
+// Close releases resources held by the Client (e.g. rate limiter goroutine).
+// It is safe to call Close multiple times.
+func (c *Client) Close() error {
+	if c.rateLimiter != nil {
+		c.rateLimiter.Close()
+	}
+	return nil
 }
 
-fullURL := c.baseURL + path
 
-var bodyReader io.Reader
-if body != nil {
-bodyBytes, err := json.Marshal(body)
-if err != nil {
-return fmt.Errorf("failed to marshal request body: %w", err)
-}
-bodyReader = bytes.NewReader(bodyBytes)
-}
-
-var lastErr error
-for attempt := 0; attempt <= c.retryMax; attempt++ {
-if attempt > 0 {
-// Calculate backoff with jitter
-backoff := c.calculateBackoff(attempt)
-c.logger.Debugf("Retry attempt %d after %v", attempt, backoff)
-
-select {
-case <-time.After(backoff):
-case <-ctx.Done():
-return ctx.Err()
-}
-
-// Reset body reader for retry
-if body != nil {
-bodyBytes, _ := json.Marshal(body)
-bodyReader = bytes.NewReader(bodyBytes)
-}
-}
-
-req, err := http.NewRequestWithContext(ctx, method, fullURL, bodyReader)
-if err != nil {
-return fmt.Errorf("failed to create request: %w", err)
-}
-
-// Set headers
-requestID := uuid.New().String()
-req.Header.Set("Authorization", "Bearer "+c.apiKey)
-req.Header.Set("Content-Type", "application/json")
-req.Header.Set("Accept", "application/json")
-req.Header.Set("User-Agent", c.userAgent)
-req.Header.Set("X-Request-ID", requestID)
-
-start := time.Now()
-resp, err := c.httpClient.Do(req)
-duration := time.Since(start)
-
-if err != nil {
-c.logger.Errorf("Request failed: %v", err)
-lastErr = err
-if c.shouldRetry(nil, err) {
-continue
-}
-return err
-}
-
-c.logger.Debugf("%s %s %d (%v)", method, path, resp.StatusCode, duration)
-
-respBody, err := io.ReadAll(resp.Body)
-resp.Body.Close()
-if err != nil {
-return fmt.Errorf("failed to read response body: %w", err)
-}
-
-// Handle rate limiting
-if resp.StatusCode == http.StatusTooManyRequests {
-retryAfter := resp.Header.Get("Retry-After")
-if retryAfter != "" {
-if seconds, err := strconv.Atoi(retryAfter); err == nil && attempt < c.retryMax {
-c.logger.Infof("Rate limited, retrying after %d seconds", seconds)
-select {
-case <-time.After(time.Duration(seconds) * time.Second):
-continue
-case <-ctx.Done():
-return ctx.Err()
-}
-}
-}
-}
-
-// Handle HTTP errors
-if resp.StatusCode >= 400 {
-apiErr := &APIError{
-StatusCode: resp.StatusCode,
-RequestID:  requestID,
-}
-
-if len(respBody) > 0 {
-var errResp struct {
-Code    string `json:"code"`
-Message string `json:"message"`
-}
-if err := json.Unmarshal(respBody, &errResp); err == nil {
-apiErr.Code = errResp.Code
-apiErr.Message = errResp.Message
-} else {
-apiErr.Message = string(respBody)
-}
-}
-
-lastErr = apiErr
-if c.shouldRetry(resp, nil) {
-continue
-}
-return apiErr
-}
-
-// Success - parse response
-if result != nil && len(respBody) > 0 {
-if err := json.Unmarshal(respBody, result); err != nil {
-return fmt.Errorf("failed to unmarshal response: %w", err)
-}
-}
-
-return nil
-}
-
-return lastErr
-}
+// ---------------------------------------------------------------------------
+// Convenience HTTP verbs (unexported, used by sub-clients)
+// ---------------------------------------------------------------------------
 
 func (c *Client) get(ctx context.Context, path string, result interface{}) error {
-return c.do(ctx, http.MethodGet, path, nil, result)
+	return c.do(ctx, http.MethodGet, path, nil, result)
 }
 
 func (c *Client) post(ctx context.Context, path string, body interface{}, result interface{}) error {
-return c.do(ctx, http.MethodPost, path, body, result)
+	return c.do(ctx, http.MethodPost, path, body, result)
 }
 
 func (c *Client) put(ctx context.Context, path string, body interface{}, result interface{}) error {
-return c.do(ctx, http.MethodPut, path, body, result)
+	return c.do(ctx, http.MethodPut, path, body, result)
 }
 
 func (c *Client) delete(ctx context.Context, path string) error {
-return c.do(ctx, http.MethodDelete, path, nil, nil)
+	return c.do(ctx, http.MethodDelete, path, nil, nil)
 }
 
-func (c *Client) shouldRetry(resp *http.Response, err error) bool {
-// Retry on network errors
-if err != nil {
-return true
+// ---------------------------------------------------------------------------
+// Core HTTP execution with retry
+// ---------------------------------------------------------------------------
+
+// do executes an HTTP request with automatic retry for transient failures.
+//
+// Retry policy:
+//   - 5xx (500/502/503/504): exponential back-off + jitter
+//   - 429: honour Retry-After header, then retry
+//   - net.Error (timeout, connection refused): exponential back-off + jitter
+//   - 4xx (except 429): no retry, return immediately
+//   - context cancellation / deadline: return immediately
+func (c *Client) do(ctx context.Context, method, path string, body interface{}, result interface{}) error {
+	// Normalise path — ensure leading slash.
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	fullURL := c.baseURL + path
+
+	// Pre-marshal body so it can be replayed across retries.
+	var bodyBytes []byte
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("keyip: failed to marshal request body: %w", err)
+		}
+		bodyBytes = b
+	}
+
+	requestID := uuid.New().String()
+	maxAttempts := 1 + c.retryMax
+	var lastErr error
+	skipNextBackoff := false
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		// ---- back-off (skip on first attempt and after Retry-After wait) ----
+		if attempt > 0 && !skipNextBackoff {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			wait := c.backoff(attempt)
+			c.logger.Debugf("retry %d/%d backoff=%v path=%s", attempt, c.retryMax, wait, path)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(wait):
+			}
+		}
+		skipNextBackoff = false
+
+		// ---- build request ----
+		var reqBody io.Reader
+		if bodyBytes != nil {
+			reqBody = bytes.NewReader(bodyBytes)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, fullURL, reqBody)
+		if err != nil {
+			return fmt.Errorf("keyip: failed to create request: %w", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", c.userAgent)
+		req.Header.Set("X-Request-ID", requestID)
+
+		// Apply caller-supplied base headers (protected keys already stripped).
+		for k, v := range c.baseHeaders {
+			req.Header.Set(k, v)
+		}
+
+		// Client-side rate limiting.
+		if c.rateLimiter != nil {
+			if err := c.rateLimiter.Wait(ctx); err != nil {
+				return err
+			}
+		}
+
+
+		// ---- execute ----
+		start := time.Now()
+		resp, err := c.httpClient.Do(req)
+		elapsed := time.Since(start)
+
+		// ---- transport / network error ----
+		if err != nil {
+			lastErr = err
+			c.logger.Errorf("%s %s error=%v elapsed=%v", method, path, err, elapsed)
+
+			// Context errors are terminal — never retry.
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
+			// Network errors are retryable.
+			continue
+		}
+
+		// ---- read body & close immediately (safe for retry loops) ----
+		respBody, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		c.logger.Infof("%s %s status=%d elapsed=%v request_id=%s",
+			method, path, resp.StatusCode, elapsed, requestID)
+
+		if readErr != nil {
+			lastErr = fmt.Errorf("keyip: failed to read response body: %w", readErr)
+			continue
+		}
+
+		// ---- 429 Rate Limited ----
+		if resp.StatusCode == http.StatusTooManyRequests {
+			apiErr := c.buildAPIError(resp.StatusCode, respBody, requestID)
+			lastErr = apiErr
+
+			if ra := resp.Header.Get("Retry-After"); ra != "" {
+				if seconds, parseErr := strconv.Atoi(ra); parseErr == nil && seconds > 0 {
+					c.logger.Debugf("429 Retry-After=%ds path=%s", seconds, path)
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case <-time.After(time.Duration(seconds) * time.Second):
+					}
+					skipNextBackoff = true
+				}
+			}
+			continue
+		}
+
+		// ---- 5xx Server Error — retryable ----
+		if resp.StatusCode >= 500 {
+			lastErr = c.buildAPIError(resp.StatusCode, respBody, requestID)
+			continue
+		}
+
+		// ---- 4xx Client Error — terminal, no retry ----
+		if resp.StatusCode >= 400 {
+			return c.buildAPIError(resp.StatusCode, respBody, requestID)
+		}
+
+		// ---- 2xx / 3xx Success ----
+		if result != nil && len(respBody) > 0 {
+			if err := json.Unmarshal(respBody, result); err != nil {
+				return fmt.Errorf("keyip: failed to unmarshal response body: %w", err)
+			}
+		}
+		return nil
+	}
+
+	// All attempts exhausted.
+	return lastErr
 }
 
-// Retry on 5xx errors
-if resp != nil && resp.StatusCode >= 500 && resp.StatusCode < 600 {
-return true
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+// buildAPIError parses a JSON error body into an APIError.
+func (c *Client) buildAPIError(statusCode int, body []byte, requestID string) *APIError {
+	apiErr := &APIError{
+		StatusCode: statusCode,
+		RequestID:  requestID,
+	}
+	if len(body) > 0 {
+		// Best-effort parse; fields that don't match are silently ignored.
+		_ = json.Unmarshal(body, apiErr)
+	}
+	// Ensure status code survives a potential overwrite from the JSON body.
+	apiErr.StatusCode = statusCode
+	if apiErr.RequestID == "" {
+		apiErr.RequestID = requestID
+	}
+	if apiErr.Code == "" {
+		apiErr.Code = http.StatusText(statusCode)
+	}
+	if apiErr.Message == "" {
+		apiErr.Message = fmt.Sprintf("HTTP %d", statusCode)
+	}
+	return apiErr
 }
 
-// Do not retry 4xx (except 429 which is handled separately)
-return false
+// backoff computes the wait duration for the given retry attempt using
+// exponential back-off with full jitter.
+//
+//	base = retryWaitMin * 2^(attempt-1)
+//	capped = min(base, retryWaitMax)
+//	sleep  = random in [0, capped)
+func (c *Client) backoff(attempt int) time.Duration {
+	base := c.retryWaitMin
+	for i := 1; i < attempt; i++ {
+		base *= 2
+		if base >= c.retryWaitMax {
+			base = c.retryWaitMax
+			break
+		}
+	}
+	if base <= 0 {
+		return c.retryWaitMin
+	}
+	// Full jitter: uniform random in [retryWaitMin, base].
+	jitter := time.Duration(rand.Int63n(int64(base)-int64(c.retryWaitMin)+1)) + c.retryWaitMin
+	return jitter
 }
 
-func (c *Client) calculateBackoff(attempt int) time.Duration {
-// Exponential backoff with jitter
-backoff := c.retryWaitMin * time.Duration(1<<uint(attempt-1))
-if backoff > c.retryWaitMax {
-backoff = c.retryWaitMax
+// isRetryableStatus returns true for HTTP status codes that warrant a retry.
+func isRetryableStatus(code int) bool {
+	switch code {
+	case http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout,
+		http.StatusTooManyRequests:
+		return true
+	}
+	return false
 }
 
-// Add jitter (0-25% of backoff)
-jitter := time.Duration(rand.Int63n(int64(backoff / 4)))
-return backoff + jitter
+// isConnError performs a best-effort check for connection-level errors
+// that are not already covered by net.Error.
+func isConnError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return true
+	}
+	return false
 }
 
 //Personal.AI order the ending
