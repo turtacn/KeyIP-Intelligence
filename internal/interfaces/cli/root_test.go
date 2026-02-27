@@ -78,7 +78,24 @@ func TestNewRootCommand_PersistentFlags(t *testing.T) {
 }
 
 func TestNewRootCommand_SubcommandsMounted(t *testing.T) {
+	// Root command creation alone does NOT mount subcommands anymore.
+	// They are mounted via RegisterCommands.
 	cmd := NewRootCommand()
+
+	// Initial check: only help is present by default or empty if help is added lazily
+	// Actually NewRootCommand adds placeholder commands if RegisterCommands isn't called?
+	// Let's check NewRootCommand implementation in root.go.
+	// Ah, NewRootCommand DOES add placeholders in the previous version, but we removed that in refactoring.
+	// Let's double check root.go.
+	// Wait, in previous step I edited root.go to remove `cmd.AddCommand(...)` and added `RegisterCommands`.
+	// So `NewRootCommand` returns a bare command.
+	// We need to call RegisterCommands to mount them.
+
+	// Create mock deps (nil is fine for just checking presence, assuming New*Cmd doesn't panic immediately)
+	// NewSearchCmd etc might panic if deps are nil if they use them in construction.
+	// Let's check search.go etc. NewSearchCmd assigns service to struct. It does not use it immediately.
+	deps := CommandDependencies{}
+	RegisterCommands(cmd, deps)
 
 	expectedSubs := []string{"search", "assess", "lifecycle", "report"}
 	subNames := make([]string, 0, len(cmd.Commands()))
@@ -513,7 +530,8 @@ func TestExecute_HelpFlag(t *testing.T) {
 
 	err := rootCmd.Execute()
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "keyip")
+	// The output might be "KeyIP-Intelligence CLI..." or similar based on Short description
+	assert.Contains(t, buf.String(), "KeyIP-Intelligence")
 }
 
 func TestExecute_VersionFlag(t *testing.T) {

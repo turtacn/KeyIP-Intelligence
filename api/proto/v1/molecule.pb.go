@@ -2,7 +2,7 @@
 // This is a stub file for compilation compatibility.
 // For production, generate from molecule.proto using protoc.
 
-package moleculev1
+package v1
 
 // Molecule represents a molecule message.
 type Molecule struct {
@@ -120,4 +120,69 @@ type PredictPropertiesResponse struct {
 	Confidence         float32 `json:"confidence,omitempty"`
 }
 
-//Personal.AI order the ending
+// SimilaritySearchRequest is the request for SimilaritySearch.
+type SimilaritySearchRequest struct {
+	Smiles          string  `json:"smiles,omitempty"`
+	Threshold       float64 `json:"threshold,omitempty"`
+	FingerprintType []string `json:"fingerprint_type,omitempty"`
+	MaxResults      int32   `json:"max_results,omitempty"`
+}
+
+// SimilaritySearchResult is one result item.
+type SimilarityResult struct {
+	Molecule   *Molecule `json:"molecule,omitempty"`
+	Similarity float64   `json:"similarity,omitempty"`
+	Method     string    `json:"method,omitempty"`
+}
+
+// SearchMetadata holds search metadata.
+type SearchMetadata struct {
+	TotalPatentsSearched uint64 `json:"total_patents_searched,omitempty"`
+	TotalMoleculesCompared uint64 `json:"total_molecules_compared,omitempty"`
+	SearchTimeMs uint32 `json:"search_time_ms,omitempty"`
+	ModelVersions map[string]string `json:"model_versions,omitempty"`
+}
+
+// SimilaritySearchResponse is the response for SimilaritySearch.
+type SimilaritySearchResponse struct {
+	QueryMolecule *Molecule `json:"query_molecule,omitempty"`
+	Results       []*SimilarityResult `json:"results,omitempty"`
+	Metadata      *SearchMetadata `json:"metadata,omitempty"`
+}
+
+// BatchSimilaritySearchRequest is the request for BatchSimilaritySearch.
+type BatchSimilaritySearchRequest struct {
+	Requests []*SimilaritySearchRequest `json:"requests,omitempty"`
+}
+
+// BatchSimilaritySearchItem is one streamed result for a single molecule
+// from a batch request.
+type BatchSimilaritySearchItem struct {
+	RequestIndex int32                   `json:"request_index,omitempty"`
+	Response     *SimilaritySearchResponse `json:"response,omitempty"`
+	Error        string                  `json:"error,omitempty"`
+}
+
+// AssessPatentabilityRequest is the request for AssessPatentability.
+type AssessPatentabilityRequest struct {
+	MoleculeId           string   `json:"molecule_id,omitempty"`
+	Jurisdictions        []string `json:"jurisdictions,omitempty"`
+	PriorArtCutoffDate   string   `json:"prior_art_cutoff_date,omitempty"`
+}
+
+// DimensionAssessment represents an assessment for a specific dimension.
+type DimensionAssessment struct {
+	Score           float64 `json:"score,omitempty"`
+	Assessment      string  `json:"assessment,omitempty"`
+	Reasoning       string  `json:"reasoning,omitempty"`
+}
+
+// AssessPatentabilityResponse is the response for AssessPatentability.
+type AssessPatentabilityResponse struct {
+	MoleculeId            string               `json:"molecule_id,omitempty"`
+	Novelty               *DimensionAssessment `json:"novelty,omitempty"`
+	InventiveStep         *DimensionAssessment `json:"inventive_step,omitempty"`
+	Utility               *DimensionAssessment `json:"utility,omitempty"`
+	OverallRecommendation string               `json:"overall_recommendation,omitempty"`
+	Confidence            float64              `json:"confidence,omitempty"`
+}

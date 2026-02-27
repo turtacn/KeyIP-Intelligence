@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/molecule/v1"
+	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"

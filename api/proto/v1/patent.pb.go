@@ -35,6 +35,61 @@ type GetPatentResponse struct {
 	Patent *Patent `json:"patent,omitempty"`
 }
 
+// ListPatentsRequest is the request for ListPatents.
+type ListPatentsRequest struct {
+	PageSize     int32  `json:"page_size,omitempty"`
+	PageToken    string `json:"page_token,omitempty"`
+	Assignee     string `json:"assignee,omitempty"`
+	IpcCode      string `json:"ipc_code,omitempty"`
+	LegalStatus  string `json:"legal_status,omitempty"` // Enum as string or int32? Using string for simplicity in stub
+	FilingDateFrom string `json:"filing_date_from,omitempty"`
+	FilingDateTo   string `json:"filing_date_to,omitempty"`
+	Office       string `json:"office,omitempty"`
+}
+
+// ListPatentsResponse is the response for ListPatents.
+type ListPatentsResponse struct {
+	Patents       []*Patent `json:"patents,omitempty"`
+	NextPageToken string    `json:"next_page_token,omitempty"`
+	TotalCount    int64     `json:"total_count,omitempty"`
+}
+
+// ImportPatentRequest is the request for ImportPatent.
+type ImportPatentRequest struct {
+	PatentNumber string `json:"patent_number,omitempty"`
+	Office       string `json:"office,omitempty"` // Enum as string
+	FullText     string `json:"full_text,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+}
+
+// ImportPatentResponse is the response for ImportPatent.
+type ImportPatentResponse struct {
+	Patent *Patent `json:"patent,omitempty"`
+	Created bool   `json:"created,omitempty"`
+}
+
+// UpdatePatentRequest is the request for UpdatePatent.
+type UpdatePatentRequest struct {
+	PatentId    string `json:"patent_id,omitempty"`
+	Title       string `json:"title,omitempty"`
+	Abstract    string `json:"abstract,omitempty"`
+	LegalStatus string `json:"legal_status,omitempty"` // Enum
+	Metadata    map[string]string `json:"metadata,omitempty"`
+}
+
+// UpdatePatentResponse is the response for UpdatePatent.
+type UpdatePatentResponse struct {
+	Patent *Patent `json:"patent,omitempty"`
+}
+
+// DeletePatentRequest is the request for DeletePatent.
+type DeletePatentRequest struct {
+	PatentId string `json:"patent_id,omitempty"`
+}
+
+// DeletePatentResponse is the response for DeletePatent.
+type DeletePatentResponse struct {}
+
 // SearchPatentsRequest is the request for SearchPatents.
 type SearchPatentsRequest struct {
 	Query               string   `json:"query,omitempty"`
@@ -56,22 +111,146 @@ type SearchPatentsResponse struct {
 	Patents       []*Patent `json:"patents,omitempty"`
 	NextPageToken string    `json:"next_page_token,omitempty"`
 	TotalCount    int64     `json:"total_count,omitempty"`
+	QueryTimeMs   uint32    `json:"query_time_ms,omitempty"`
+}
+
+// GetPatentClaimsRequest is the request for GetPatentClaims.
+type GetPatentClaimsRequest struct {
+	PatentId          string `json:"patent_id,omitempty"`
+	IncludeEmbeddings bool   `json:"include_embeddings,omitempty"`
+}
+
+// Claim represents a patent claim.
+type Claim struct {
+	Id                string   `json:"id,omitempty"`
+	PatentId          string   `json:"patent_id,omitempty"`
+	ClaimNumber       int32    `json:"claim_number,omitempty"` // From proto: uint32 -> int32 in go usually for proto
+	ClaimType         string   `json:"claim_type,omitempty"` // Enum
+	ClaimText         string   `json:"claim_text,omitempty"` // Mapped to Text in proto
+	IsIndependent     bool     `json:"is_independent,omitempty"` // Derived or mapped
+	DependsOn         []int32  `json:"depends_on,omitempty"`
+	DependentClaims   []*Claim `json:"dependent_claims,omitempty"`
+	TechnicalFeatures []string `json:"technical_features,omitempty"`
+	Embedding         string   `json:"embedding,omitempty"`
+}
+
+// GetPatentClaimsResponse is the response for GetPatentClaims.
+type GetPatentClaimsResponse struct {
+	PatentId string   `json:"patent_id,omitempty"`
+	Claims   []*Claim `json:"claims,omitempty"`
+}
+
+// ParseMarkushRequest is the request for ParseMarkush.
+type ParseMarkushRequest struct {
+	PatentId          string  `json:"patent_id,omitempty"`
+	ClaimNumbers      []uint32 `json:"claim_numbers,omitempty"`
+	EnumerateCoverage bool    `json:"enumerate_coverage,omitempty"`
+}
+
+// MarkushGroup represents a Markush group.
+type MarkushGroup struct {
+	ClaimId                string `json:"claim_id,omitempty"`
+	ScaffoldSmiles         string `json:"scaffold_smiles,omitempty"`
+	EstimatedCoverageCount int64  `json:"estimated_coverage_count,omitempty"`
+	FullyEnumerated        bool   `json:"fully_enumerated,omitempty"`
+}
+
+// ParseMarkushResponse is the response for ParseMarkush.
+type ParseMarkushResponse struct {
+	PatentId    string          `json:"patent_id,omitempty"`
+	Groups      []*MarkushGroup `json:"groups,omitempty"`
+	ParseTimeMs uint32          `json:"parse_time_ms,omitempty"`
+}
+
+// AssessInfringementRiskRequest is the request for AssessInfringementRisk.
+type AssessInfringementRiskRequest struct {
+	MoleculeSmiles                    string   `json:"molecule_smiles,omitempty"`
+	PatentId                          string   `json:"patent_id,omitempty"`
+	ClaimNumbers                      []uint32 `json:"claim_numbers,omitempty"`
+	IncludeProsecutionHistoryAnalysis bool     `json:"include_prosecution_history_analysis,omitempty"`
+}
+
+// InfringementClaimAnalysis represents infringement analysis for a claim.
+type InfringementClaimAnalysis struct {
+	ClaimNumber                       uint32  `json:"claim_number,omitempty"`
+	AllElementsLiterallyMet           bool    `json:"all_elements_literally_met,omitempty"`
+	LiteralInfringementProbability    float64 `json:"literal_infringement_probability,omitempty"`
+	EquivalentsProbability            float64 `json:"equivalents_probability,omitempty"`
+	ProsecutionHistoryEstoppelApplies bool    `json:"prosecution_history_estoppel_applies,omitempty"`
+	EstoppelExplanation               string  `json:"estoppel_explanation,omitempty"`
+}
+
+// AssessInfringementRiskResponse is the response for AssessInfringementRisk.
+type AssessInfringementRiskResponse struct {
+	MoleculeSmiles   string                       `json:"molecule_smiles,omitempty"`
+	PatentId         string                       `json:"patent_id,omitempty"`
+	ClaimAnalyses    []*InfringementClaimAnalysis `json:"claim_analyses,omitempty"`
+	OverallRiskLevel string                       `json:"overall_risk_level,omitempty"`
+	Confidence       float64                      `json:"confidence,omitempty"`
+	Recommendation   string                       `json:"recommendation,omitempty"`
+	AnalysisTimeMs   uint32                       `json:"analysis_time_ms,omitempty"`
+}
+
+// AssessPatentValueRequest is the request for AssessPatentValue.
+type AssessPatentValueRequest struct {
+	PatentId   string   `json:"patent_id,omitempty"`
+	Dimensions []string `json:"dimensions,omitempty"`
+}
+
+// ValueDimensionScore represents score for a dimension.
+type ValueDimensionScore struct {
+	Score       uint32            `json:"score,omitempty"`
+	Factors     map[string]uint32 `json:"factors,omitempty"`
+	Explanation string            `json:"explanation,omitempty"`
+}
+
+// Recommendation represents a recommendation.
+type Recommendation struct {
+	Action      string `json:"action,omitempty"` // Enum
+	Priority    string `json:"priority,omitempty"` // Enum
+	Description string `json:"description,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+}
+
+// AssessPatentValueResponse is the response for AssessPatentValue.
+type AssessPatentValueResponse struct {
+	PatentId        string               `json:"patent_id,omitempty"`
+	TechnicalValue  *ValueDimensionScore `json:"technical_value,omitempty"`
+	LegalValue      *ValueDimensionScore `json:"legal_value,omitempty"`
+	CommercialValue *ValueDimensionScore `json:"commercial_value,omitempty"`
+	StrategicValue  *ValueDimensionScore `json:"strategic_value,omitempty"`
+	OverallScore    uint32               `json:"overall_score,omitempty"`
+	OverallTier     string               `json:"overall_tier,omitempty"` // Enum
+	TierDescription string               `json:"tier_description,omitempty"`
+	Recommendations []*Recommendation    `json:"recommendations,omitempty"`
+	Confidence      float64              `json:"confidence,omitempty"`
+}
+
+// GetPatentFamilyRequest is the request for GetPatentFamily.
+type GetPatentFamilyRequest struct {
+	PatentNumber string `json:"patent_number,omitempty"`
+}
+
+// FamilyMember represents a patent family member.
+type FamilyMember struct {
+	PatentNumber     string `json:"patent_number,omitempty"`
+	PatentOffice     string `json:"patent_office,omitempty"`
+	ApplicationDate  int64  `json:"application_date,omitempty"`
+	PublicationDate  int64  `json:"publication_date,omitempty"`
+	LegalStatus      string `json:"legal_status,omitempty"`
+	IsRepresentative bool   `json:"is_representative,omitempty"`
+}
+
+// GetPatentFamilyResponse is the response for GetPatentFamily.
+type GetPatentFamilyResponse struct {
+	FamilyId      string          `json:"family_id,omitempty"`
+	FamilyMembers []*FamilyMember `json:"family_members,omitempty"`
+	TotalMembers  int32           `json:"total_members,omitempty"`
 }
 
 // AnalyzeClaimsRequest is the request for AnalyzeClaims.
 type AnalyzeClaimsRequest struct {
 	PatentNumber string `json:"patent_number,omitempty"`
-}
-
-// Claim represents a patent claim.
-type Claim struct {
-	ClaimNumber       int32    `json:"claim_number,omitempty"`
-	ClaimText         string   `json:"claim_text,omitempty"`
-	ClaimType         string   `json:"claim_type,omitempty"`
-	IsIndependent     bool     `json:"is_independent,omitempty"`
-	DependsOn         []int32  `json:"depends_on,omitempty"`
-	DependentClaims   []*Claim `json:"dependent_claims,omitempty"`
-	TechnicalFeatures []string `json:"technical_features,omitempty"`
 }
 
 // ClaimTree represents a claim tree structure.
@@ -119,28 +298,6 @@ type CheckFTOResponse struct {
 	CheckedAt       int64             `json:"checked_at,omitempty"`
 }
 
-// GetPatentFamilyRequest is the request for GetPatentFamily.
-type GetPatentFamilyRequest struct {
-	PatentNumber string `json:"patent_number,omitempty"`
-}
-
-// FamilyMember represents a patent family member.
-type FamilyMember struct {
-	PatentNumber     string `json:"patent_number,omitempty"`
-	PatentOffice     string `json:"patent_office,omitempty"`
-	ApplicationDate  int64  `json:"application_date,omitempty"`
-	PublicationDate  int64  `json:"publication_date,omitempty"`
-	LegalStatus      string `json:"legal_status,omitempty"`
-	IsRepresentative bool   `json:"is_representative,omitempty"`
-}
-
-// GetPatentFamilyResponse is the response for GetPatentFamily.
-type GetPatentFamilyResponse struct {
-	FamilyId      string          `json:"family_id,omitempty"`
-	FamilyMembers []*FamilyMember `json:"family_members,omitempty"`
-	TotalMembers  int32           `json:"total_members,omitempty"`
-}
-
 // GetCitationNetworkRequest is the request for GetCitationNetwork.
 type GetCitationNetworkRequest struct {
 	PatentNumber   string `json:"patent_number,omitempty"`
@@ -173,5 +330,3 @@ type GetCitationNetworkResponse struct {
 	TotalEdges  int32           `json:"total_edges,omitempty"`
 	IsTruncated bool            `json:"is_truncated,omitempty"`
 }
-
-//Personal.AI order the ending
