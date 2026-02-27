@@ -75,10 +75,12 @@ func (s *MoleculeServiceServer) CreateMolecule(
 	}
 
 	// Create domain entity
-	mol, err := molecule.NewMolecule(req.Smiles, source, req.Name)
+	// Note: NewMolecule 3rd argument is SourceReference, not Name
+	mol, err := molecule.NewMolecule(req.Smiles, source, "")
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+	mol.Name = req.Name
 
 	// Set additional fields via SetStructureIdentifiers if InChI is provided
 	if req.Inchi != "" {

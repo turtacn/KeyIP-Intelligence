@@ -32,12 +32,10 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/collaboration"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	pkgtypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // CollaborationHandler handles HTTP requests for collaboration workspace operations.
@@ -410,89 +408,7 @@ func isValidRole(role string) bool {
 	}
 }
 
-// getUserIDFromContext extracts user ID from request context (set by auth middleware).
-func getUserIDFromContext(r *http.Request) string {
-	if v := r.Context().Value(pkgtypes.ContextKeyUserID); v != nil {
-		if uid, ok := v.(string); ok {
-			return uid
-		}
-	}
-	return ""
-}
-
-// parsePagination extracts page and page_size from query parameters.
-func parsePagination(r *http.Request) (int, int) {
-	page := 1
-	pageSize := 20
-
-	if v := r.URL.Query().Get("page"); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 {
-			page = p
-		}
-	}
-	if v := r.URL.Query().Get("page_size"); v != "" {
-		if ps, err := strconv.Atoi(v); err == nil && ps > 0 && ps <= 100 {
-			pageSize = ps
-		}
-	}
-	return page, pageSize
-}
-
-// writeJSON writes a JSON response with the given status code.
-func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if data != nil {
-		_ = json.NewEncoder(w).Encode(data)
-	}
-}
-
-// ErrorResponse is the standard error response body.
-type ErrorResponse struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-// writeError writes a structured error response.
-func writeError(w http.ResponseWriter, statusCode int, err error) {
-	resp := ErrorResponse{
-		Code:    http.StatusText(statusCode),
-		Message: err.Error(),
-	}
-	writeJSON(w, statusCode, resp)
-}
-
-// writeAppError maps application-level errors to HTTP status codes.
-func writeAppError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.IsNotFound(err):
-		writeError(w, http.StatusNotFound, err)
-	case errors.IsValidation(err):
-		writeError(w, http.StatusBadRequest, err)
-	case errors.IsConflict(err):
-		writeError(w, http.StatusConflict, err)
-	case errors.IsUnauthorized(err):
-		writeError(w, http.StatusUnauthorized, err)
-	case errors.IsForbidden(err):
-		writeError(w, http.StatusForbidden, err)
-	default:
-		writeError(w, http.StatusInternalServerError, errors.New(errors.ErrCodeInternal, "internal server error"))
-	}
-}
-
 // Router-compatible aliases for CollaborationHandler
-
-// ListWorkspaces is an alias for the existing ListWorkspaces.
-// No change needed as method already exists.
-
-// GetWorkspace is an alias for the existing GetWorkspace.
-// No change needed as method already exists.
-
-// UpdateWorkspace is an alias for the existing UpdateWorkspace.
-// No change needed as method already exists.
-
-// DeleteWorkspace is an alias for the existing DeleteWorkspace.
-// No change needed as method already exists.
 
 // ListMembers handles member listing (placeholder).
 func (h *CollaborationHandler) ListMembers(w http.ResponseWriter, r *http.Request) {

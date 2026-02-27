@@ -222,6 +222,11 @@ func extractAPIKey(r *http.Request) string {
 	return r.URL.Query().Get("api_key")
 }
 
+// WithRequestID injects the request ID into the context.
+func WithRequestID(ctx context.Context, requestID string) context.Context {
+	return logging.WithRequestID(ctx, requestID)
+}
+
 // ContextGetClaims retrieves JWT claims from the request context.
 // Returns nil if no claims are present (anonymous or API key auth).
 func ContextGetClaims(ctx context.Context) *Claims {

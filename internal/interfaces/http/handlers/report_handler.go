@@ -543,11 +543,7 @@ func mapOutputFormat(format string) reporting.ExportFormat {
 
 // writeReportJSON writes a JSON response with the given status code.
 func writeReportJSON(w http.ResponseWriter, statusCode int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if data != nil {
-		_ = json.NewEncoder(w).Encode(data)
-	}
+	writeJSON(w, statusCode, data)
 }
 
 // ReportErrorResponse is the standard error response body for report handler.

@@ -1,11 +1,23 @@
+// Phase 11 - File 282: internal/interfaces/http/router.go
+// 实现 HTTP 路由层，替换 chi 为 net/http.ServeMux。
+//
+// 核心实现：
+//   - 使用 Go 1.22+ `net/http.ServeMux` 作为路由器。
+//   - 实现中间件链式调用机制 (`Chain` helper)。
+//   - 注册全局中间件（RequestID, Logging, CORS, RateLimit）。
+//   - 注册公共路由（/healthz, /readyz）。
+//   - 注册 API v1 路由，并应用认证（Auth）和租户（Tenant）中间件。
+//   - Metrics 路由注册。
+//
+// 强制约束：文件最后一行必须为 //Personal.AI order the ending
+
 package http
 
 import (
 	"net/http"
+	"strings"
 
-	"github.com/go-chi/chi/v5"
-	chimw "github.com/go-chi/chi/v5/middleware"
-
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/prometheus"
 	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/handlers"
@@ -36,196 +48,145 @@ type RouterConfig struct {
 	MetricsCollector prometheus.MetricsCollector
 }
 
-// NewRouter constructs the complete HTTP route tree from the given configuration.
-// It wires global middleware, public health endpoints, and authenticated API v1
-// resource groups into a single http.Handler suitable for use with http.Server.
+// MiddlewareFunc defines the standard middleware signature.
+type MiddlewareFunc func(http.Handler) http.Handler
+
+// Chain applies middlewares to a http.Handler.
+// The first middleware in the list is the outermost one (executed first).
+func Chain(h http.Handler, middlewares ...MiddlewareFunc) http.Handler {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		h = middlewares[i](h)
+	}
+	return h
+}
+
+// requestIDMiddleware generates a unique request ID if not present.
+func requestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqID := r.Header.Get("X-Request-ID")
+		if reqID == "" {
+			reqID = uuid.New().String()
+		}
+		w.Header().Set("X-Request-ID", reqID)
+		ctx := middleware.WithRequestID(r.Context(), reqID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// recoveryMiddleware recovers from panics and logs the error.
+func recoveryMiddleware(logger logging.Logger) MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					if logger != nil {
+						logger.Error("panic recovered", logging.Any("panic", err))
+					} else {
+						// Fallback if logger is nil
+						// In production this should not happen given proper setup
+					}
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				}
+			}()
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// NewRouter constructs the complete HTTP route tree from the given configuration
+// using Go 1.22 net/http.ServeMux.
 func NewRouter(cfg RouterConfig) http.Handler {
-	r := chi.NewRouter()
-
-	// --- Global middleware (applied to every request) ---
-	r.Use(chimw.RequestID)
-	r.Use(chimw.RealIP)
-	r.Use(chimw.Recoverer)
-
-	if cfg.CORSMiddleware != nil {
-		r.Use(cfg.CORSMiddleware.Handler)
-	}
-	if cfg.LoggingMiddleware != nil {
-		r.Use(cfg.LoggingMiddleware.Handler)
-	}
-	if cfg.RateLimitMiddleware != nil {
-		r.Use(cfg.RateLimitMiddleware.Handler)
-	}
+	mux := http.NewServeMux()
 
 	// --- Public health endpoints (no auth) ---
-	r.Group(func(pub chi.Router) {
-		if cfg.HealthHandler != nil {
-			pub.Get("/healthz", cfg.HealthHandler.Liveness)
-			pub.Get("/readyz", cfg.HealthHandler.Readiness)
-		}
-	})
+	if cfg.HealthHandler != nil {
+		cfg.HealthHandler.RegisterRoutes(mux)
+	}
 
-	// --- Metrics endpoint (no auth or separate auth?) ---
-	// For now exposed publicly or behind internal firewall rule.
+	// --- Metrics endpoint (protected by internal firewall usually, here public for simplicity) ---
 	if cfg.MetricsCollector != nil {
-		r.Handle("/metrics", cfg.MetricsCollector.Handler())
+		mux.Handle("GET /metrics", cfg.MetricsCollector.Handler())
 	}
 
-	// --- API v1 (authenticated + tenant-scoped) ---
-	r.Route("/api/v1", func(api chi.Router) {
-		if cfg.AuthMiddleware != nil {
-			api.Use(cfg.AuthMiddleware.Handler)
-		}
-		if cfg.TenantMiddleware != nil {
-			api.Use(cfg.TenantMiddleware.Handler)
-		}
+	// --- API v1 Routes ---
+	// Create a separate mux for API routes if we wanted to isolate them,
+	// but ServeMux is flat. We register them directly.
+	// Handlers' RegisterRoutes methods use full paths (e.g. "POST /api/v1/molecules").
 
-		registerMoleculeRoutes(api, cfg.MoleculeHandler)
-		registerPatentRoutes(api, cfg.PatentHandler)
-		registerPortfolioRoutes(api, cfg.PortfolioHandler)
-		registerLifecycleRoutes(api, cfg.LifecycleHandler)
-		registerCollaborationRoutes(api, cfg.CollaborationHandler)
-		registerReportRoutes(api, cfg.ReportHandler)
-	})
+	if cfg.MoleculeHandler != nil {
+		cfg.MoleculeHandler.RegisterRoutes(mux)
+	}
+	if cfg.PatentHandler != nil {
+		cfg.PatentHandler.RegisterRoutes(mux)
+	}
+	if cfg.PortfolioHandler != nil {
+		cfg.PortfolioHandler.RegisterRoutes(mux)
+	}
+	if cfg.LifecycleHandler != nil {
+		cfg.LifecycleHandler.RegisterRoutes(mux)
+	}
+	if cfg.CollaborationHandler != nil {
+		cfg.CollaborationHandler.RegisterRoutes(mux)
+	}
+	if cfg.ReportHandler != nil {
+		cfg.ReportHandler.RegisterRoutes(mux)
+	}
 
-	return r
+	// --- Global Middleware Chain ---
+	// Applied to ALL requests.
+	// Order: Recovery -> RequestID -> Logging -> CORS -> RateLimit -> [Conditional: Tenant -> Auth] -> Mux
+
+	// Build the middleware stack.
+	// Since ServeMux matches strictly, we wrap the entire mux.
+	// However, Auth and Tenant middlewares should typically only apply to API routes, not health/metrics.
+	// We implement a conditional middleware wrapper for API routes.
+
+	var globalMiddlewares []MiddlewareFunc
+
+	// 1. Recovery
+	globalMiddlewares = append(globalMiddlewares, recoveryMiddleware(cfg.Logger))
+
+	// 2. RequestID
+	globalMiddlewares = append(globalMiddlewares, requestIDMiddleware)
+
+	// 3. Logging
+	if cfg.LoggingMiddleware != nil {
+		globalMiddlewares = append(globalMiddlewares, cfg.LoggingMiddleware.Handler)
+	}
+
+	// 4. CORS
+	if cfg.CORSMiddleware != nil {
+		globalMiddlewares = append(globalMiddlewares, cfg.CORSMiddleware.Handler)
+	}
+
+	// 5. RateLimit
+	if cfg.RateLimitMiddleware != nil {
+		globalMiddlewares = append(globalMiddlewares, cfg.RateLimitMiddleware.Handler)
+	}
+
+	// 6. Tenant & Auth (Conditional)
+	// We wrap these to only apply if path starts with /api/.
+	if cfg.TenantMiddleware != nil {
+		globalMiddlewares = append(globalMiddlewares, conditionalMiddleware("/api/", cfg.TenantMiddleware.Handler))
+	}
+	if cfg.AuthMiddleware != nil {
+		globalMiddlewares = append(globalMiddlewares, conditionalMiddleware("/api/", cfg.AuthMiddleware.Handler))
+	}
+
+	return Chain(mux, globalMiddlewares...)
 }
 
-// registerMoleculeRoutes mounts molecule resource endpoints under /molecules.
-func registerMoleculeRoutes(r chi.Router, h *handlers.MoleculeHandler) {
-	if h == nil {
-		return
-	}
-	r.Route("/molecules", func(mr chi.Router) {
-		mr.Get("/", h.List)
-		mr.Post("/", h.Create)
-
-		mr.Route("/{moleculeID}", func(item chi.Router) {
-			item.Get("/", h.Get)
-			item.Put("/", h.Update)
-			item.Delete("/", h.Delete)
+// conditionalMiddleware applies the middleware only if the request path starts with prefix.
+func conditionalMiddleware(prefix string, mw MiddlewareFunc) MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, prefix) {
+				mw(next).ServeHTTP(w, r)
+			} else {
+				next.ServeHTTP(w, r)
+			}
 		})
-
-		// Analytical endpoints
-		mr.Post("/search/similar", h.SearchSimilar)
-		mr.Post("/predict/properties", h.PredictProperties)
-	})
-}
-
-// registerPatentRoutes mounts patent resource endpoints under /patents.
-func registerPatentRoutes(r chi.Router, h *handlers.PatentHandler) {
-	if h == nil {
-		return
 	}
-	r.Route("/patents", func(pr chi.Router) {
-		pr.Get("/", h.List)
-		pr.Post("/", h.Create)
-		pr.Get("/search", h.Search)
-
-		pr.Route("/{patentNumber}", func(item chi.Router) {
-			item.Get("/", h.Get)
-			item.Put("/", h.Update)
-			item.Delete("/", h.Delete)
-			item.Get("/claims", h.AnalyzeClaims)
-			item.Get("/family", h.GetFamily)
-			item.Get("/citations", h.GetCitationNetwork)
-		})
-
-		// Complex analysis endpoints (POST with body)
-		pr.Post("/fto/check", h.CheckFTO)
-	})
 }
 
-// registerPortfolioRoutes mounts portfolio resource endpoints under /portfolios.
-func registerPortfolioRoutes(r chi.Router, h *handlers.PortfolioHandler) {
-	if h == nil {
-		return
-	}
-	r.Route("/portfolios", func(pr chi.Router) {
-		pr.Get("/", h.List)
-		pr.Post("/", h.Create)
-
-		pr.Route("/{portfolioID}", func(item chi.Router) {
-			item.Get("/", h.Get)
-			item.Put("/", h.Update)
-			item.Delete("/", h.Delete)
-			item.Get("/valuation", h.GetValuation)
-			item.Post("/valuation", h.RunValuation)
-			item.Get("/gaps", h.GetGapAnalysis)
-			item.Post("/gaps", h.RunGapAnalysis)
-			item.Post("/optimize", h.Optimize)
-		})
-	})
-}
-
-// registerLifecycleRoutes mounts lifecycle management endpoints under /lifecycle.
-func registerLifecycleRoutes(r chi.Router, h *handlers.LifecycleHandler) {
-	if h == nil {
-		return
-	}
-	r.Route("/lifecycle", func(lr chi.Router) {
-		// Deadline management
-		lr.Get("/deadlines", h.ListDeadlines)
-		lr.Get("/deadlines/upcoming", h.ListUpcomingDeadlines)
-
-		// Annuity management
-		lr.Get("/annuities", h.ListAnnuities)
-		lr.Post("/annuities/calculate", h.CalculateAnnuities)
-		lr.Get("/annuities/budget", h.GetAnnuityBudget)
-
-		// Legal status
-		lr.Get("/legal-status/{patentNumber}", h.GetLegalStatus)
-		lr.Post("/legal-status/sync", h.SyncLegalStatus)
-
-		// Calendar
-		lr.Get("/calendar", h.GetCalendar)
-		lr.Get("/calendar/export", h.ExportCalendar)
-	})
-}
-
-// registerCollaborationRoutes mounts collaboration endpoints under /collaboration.
-func registerCollaborationRoutes(r chi.Router, h *handlers.CollaborationHandler) {
-	if h == nil {
-		return
-	}
-	r.Route("/collaboration", func(cr chi.Router) {
-		// Workspaces
-		cr.Get("/workspaces", h.ListWorkspaces)
-		cr.Post("/workspaces", h.CreateWorkspace)
-
-		cr.Route("/workspaces/{workspaceID}", func(ws chi.Router) {
-			ws.Get("/", h.GetWorkspace)
-			ws.Put("/", h.UpdateWorkspace)
-			ws.Delete("/", h.DeleteWorkspace)
-			ws.Get("/members", h.ListMembers)
-			ws.Post("/members", h.AddMember)
-			ws.Delete("/members/{userID}", h.RemoveMember)
-		})
-
-		// Sharing
-		cr.Post("/share", h.CreateShareLink)
-		cr.Get("/share/{shareToken}", h.GetSharedResource)
-		cr.Delete("/share/{shareToken}", h.RevokeShareLink)
-	})
-}
-
-// registerReportRoutes mounts report generation endpoints under /reports.
-func registerReportRoutes(r chi.Router, h *handlers.ReportHandler) {
-	if h == nil {
-		return
-	}
-	r.Route("/reports", func(rr chi.Router) {
-		rr.Get("/", h.List)
-		rr.Post("/generate", h.Generate)
-
-		rr.Route("/{reportID}", func(item chi.Router) {
-			item.Get("/", h.Get)
-			item.Get("/download", h.Download)
-			item.Delete("/", h.Delete)
-		})
-
-		// Templates
-		rr.Get("/templates", h.ListTemplates)
-		rr.Get("/templates/{templateID}", h.GetTemplate)
-	})
-}
+//Personal.AI order the ending
