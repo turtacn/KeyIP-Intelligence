@@ -78,13 +78,13 @@ func (r *postgresLifecycleRepo) CreateAnnuity(ctx context.Context, annuity *life
 	return nil
 }
 
-func (r *postgresLifecycleRepo) GetAnnuity(ctx context.Context, id uuid.UUID) (*lifecycle.Annuity, error) {
+func (r *postgresLifecycleRepo) GetAnnuity(ctx context.Context, id string) (*lifecycle.Annuity, error) {
 	query := `SELECT * FROM patent_annuities WHERE id = $1`
 	row := r.executor().QueryRowContext(ctx, query, id)
 	return scanAnnuity(row)
 }
 
-func (r *postgresLifecycleRepo) GetAnnuitiesByPatent(ctx context.Context, patentID uuid.UUID) ([]*lifecycle.Annuity, error) {
+func (r *postgresLifecycleRepo) GetAnnuitiesByPatent(ctx context.Context, patentID string) ([]*lifecycle.Annuity, error) {
 	query := `SELECT * FROM patent_annuities WHERE patent_id = $1 ORDER BY year_number ASC`
 	rows, err := r.executor().QueryContext(ctx, query, patentID)
 	if err != nil {
@@ -176,7 +176,7 @@ func (r *postgresLifecycleRepo) GetOverdueAnnuities(ctx context.Context, limit, 
 	return annuities, total, nil
 }
 
-func (r *postgresLifecycleRepo) UpdateAnnuityStatus(ctx context.Context, id uuid.UUID, status lifecycle.AnnuityStatus, paidAmount int64, paidDate *time.Time, paymentRef string) error {
+func (r *postgresLifecycleRepo) UpdateAnnuityStatus(ctx context.Context, id string, status lifecycle.AnnuityStatus, paidAmount int64, paidDate *time.Time, paymentRef string) error {
 	query := `
 		UPDATE patent_annuities
 		SET status = $1, paid_amount = $2, paid_date = $3, payment_reference = $4, updated_at = NOW()
@@ -228,7 +228,7 @@ func (r *postgresLifecycleRepo) BatchCreateAnnuities(ctx context.Context, annuit
 	return tx.Commit()
 }
 
-func (r *postgresLifecycleRepo) UpdateReminderSent(ctx context.Context, id uuid.UUID) error {
+func (r *postgresLifecycleRepo) UpdateReminderSent(ctx context.Context, id string) error {
 	query := `
 		UPDATE patent_annuities
 		SET reminder_sent_at = NOW(), reminder_count = reminder_count + 1, updated_at = NOW()
@@ -267,13 +267,13 @@ func (r *postgresLifecycleRepo) CreateDeadline(ctx context.Context, deadline *li
 	return nil
 }
 
-func (r *postgresLifecycleRepo) GetDeadline(ctx context.Context, id uuid.UUID) (*lifecycle.Deadline, error) {
+func (r *postgresLifecycleRepo) GetDeadline(ctx context.Context, id string) (*lifecycle.Deadline, error) {
 	query := `SELECT * FROM patent_deadlines WHERE id = $1`
 	row := r.executor().QueryRowContext(ctx, query, id)
 	return scanDeadline(row)
 }
 
-func (r *postgresLifecycleRepo) GetDeadlinesByPatent(ctx context.Context, patentID uuid.UUID, statusFilter []lifecycle.DeadlineStatus) ([]*lifecycle.Deadline, error) {
+func (r *postgresLifecycleRepo) GetDeadlinesByPatent(ctx context.Context, patentID string, statusFilter []lifecycle.DeadlineStatus) ([]*lifecycle.Deadline, error) {
 	var query string
 	var args []interface{}
 	args = append(args, patentID)
@@ -306,7 +306,7 @@ func (r *postgresLifecycleRepo) GetDeadlinesByPatent(ctx context.Context, patent
 	return deadlines, nil
 }
 
-func (r *postgresLifecycleRepo) GetActiveDeadlines(ctx context.Context, userID *uuid.UUID, daysAhead int, limit, offset int) ([]*lifecycle.Deadline, int64, error) {
+func (r *postgresLifecycleRepo) GetActiveDeadlines(ctx context.Context, userID *string, daysAhead int, limit, offset int) ([]*lifecycle.Deadline, int64, error) {
 	deadline := time.Now().AddDate(0, 0, daysAhead)
 
 	baseQuery := `
@@ -351,7 +351,7 @@ func (r *postgresLifecycleRepo) GetActiveDeadlines(ctx context.Context, userID *
 	return deadlines, total, nil
 }
 
-func (r *postgresLifecycleRepo) UpdateDeadlineStatus(ctx context.Context, id uuid.UUID, status lifecycle.DeadlineStatus, completedBy *uuid.UUID) error {
+func (r *postgresLifecycleRepo) UpdateDeadlineStatus(ctx context.Context, id string, status lifecycle.DeadlineStatus, completedBy *string) error {
 	var query string
 	var args []interface{}
 
@@ -374,7 +374,7 @@ func (r *postgresLifecycleRepo) UpdateDeadlineStatus(ctx context.Context, id uui
 	return nil
 }
 
-func (r *postgresLifecycleRepo) ExtendDeadline(ctx context.Context, id uuid.UUID, newDueDate time.Time, reason string) error {
+func (r *postgresLifecycleRepo) ExtendDeadline(ctx context.Context, id string, newDueDate time.Time, reason string) error {
 	// First fetch current to append history
 	d, err := r.GetDeadline(ctx, id)
 	if err != nil {
@@ -482,7 +482,7 @@ func (r *postgresLifecycleRepo) CreateEvent(ctx context.Context, event *lifecycl
 	return nil
 }
 
-func (r *postgresLifecycleRepo) GetEventsByPatent(ctx context.Context, patentID uuid.UUID, eventTypes []lifecycle.EventType, limit, offset int) ([]*lifecycle.LifecycleEvent, int64, error) {
+func (r *postgresLifecycleRepo) GetEventsByPatent(ctx context.Context, patentID string, eventTypes []lifecycle.EventType, limit, offset int) ([]*lifecycle.LifecycleEvent, int64, error) {
 	baseQuery := `FROM patent_lifecycle_events WHERE patent_id = $1`
 	args := []interface{}{patentID}
 
@@ -521,7 +521,7 @@ func (r *postgresLifecycleRepo) GetEventsByPatent(ctx context.Context, patentID 
 	return events, total, nil
 }
 
-func (r *postgresLifecycleRepo) GetEventTimeline(ctx context.Context, patentID uuid.UUID) ([]*lifecycle.LifecycleEvent, error) {
+func (r *postgresLifecycleRepo) GetEventTimeline(ctx context.Context, patentID string) ([]*lifecycle.LifecycleEvent, error) {
 	query := `SELECT * FROM patent_lifecycle_events WHERE patent_id = $1 ORDER BY event_date ASC`
 	rows, err := r.executor().QueryContext(ctx, query, patentID)
 	if err != nil {
@@ -540,11 +540,11 @@ func (r *postgresLifecycleRepo) GetEventTimeline(ctx context.Context, patentID u
 	return events, nil
 }
 
-func (r *postgresLifecycleRepo) GetRecentEvents(ctx context.Context, orgID uuid.UUID, limit int) ([]*lifecycle.LifecycleEvent, error) {
+func (r *postgresLifecycleRepo) GetRecentEvents(ctx context.Context, orgID string, limit int) ([]*lifecycle.LifecycleEvent, error) {
 	// JOIN with patents to filter by organization (assuming assignee_id -> user -> org via user_roles or direct org ownership?
 	// Patent has assignee_id (user). User belongs to org.
 	// Or Portfolio -> Patent.
-	// Prompt says "GetRecentEvents(ctx, orgID uuid.UUID, limit int)".
+	// Prompt says "GetRecentEvents(ctx, orgID string, limit int)".
 	// This implies fetching events for all patents belonging to users in that org OR patents in portfolios of that org.
 	// A simplier way: If patents have `assignee_id` pointing to user, and user is in org.
 	// But `patents` table `assignee_id` refs `users`.
@@ -602,7 +602,7 @@ func (r *postgresLifecycleRepo) CreateCostRecord(ctx context.Context, record *li
 	return nil
 }
 
-func (r *postgresLifecycleRepo) GetCostsByPatent(ctx context.Context, patentID uuid.UUID) ([]*lifecycle.CostRecord, error) {
+func (r *postgresLifecycleRepo) GetCostsByPatent(ctx context.Context, patentID string) ([]*lifecycle.CostRecord, error) {
 	query := `SELECT * FROM patent_cost_records WHERE patent_id = $1 ORDER BY incurred_date DESC`
 	rows, err := r.executor().QueryContext(ctx, query, patentID)
 	if err != nil {
@@ -621,7 +621,7 @@ func (r *postgresLifecycleRepo) GetCostsByPatent(ctx context.Context, patentID u
 	return costs, nil
 }
 
-func (r *postgresLifecycleRepo) GetCostSummary(ctx context.Context, patentID uuid.UUID) (*lifecycle.CostSummary, error) {
+func (r *postgresLifecycleRepo) GetCostSummary(ctx context.Context, patentID string) (*lifecycle.CostSummary, error) {
 	query := `
 		SELECT cost_type, SUM(amount_usd)
 		FROM patent_cost_records
@@ -648,7 +648,7 @@ func (r *postgresLifecycleRepo) GetCostSummary(ctx context.Context, patentID uui
 	return summary, nil
 }
 
-func (r *postgresLifecycleRepo) GetPortfolioCostSummary(ctx context.Context, portfolioID uuid.UUID, startDate, endDate time.Time) (*lifecycle.PortfolioCostSummary, error) {
+func (r *postgresLifecycleRepo) GetPortfolioCostSummary(ctx context.Context, portfolioID string, startDate, endDate time.Time) (*lifecycle.PortfolioCostSummary, error) {
 	query := `
 		SELECT c.cost_type, SUM(c.amount_usd)
 		FROM patent_cost_records c
@@ -696,7 +696,7 @@ func (r *postgresLifecycleRepo) DeactivateSubscription(ctx context.Context, subs
 
 // Dashboard
 
-func (r *postgresLifecycleRepo) GetLifecycleDashboard(ctx context.Context, orgID uuid.UUID) (*lifecycle.DashboardStats, error) {
+func (r *postgresLifecycleRepo) GetLifecycleDashboard(ctx context.Context, orgID string) (*lifecycle.DashboardStats, error) {
 	stats := &lifecycle.DashboardStats{}
 
 	// Complex aggregations could be separate queries or CTE. Here use separate for clarity.

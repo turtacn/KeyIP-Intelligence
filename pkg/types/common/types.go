@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -384,5 +385,20 @@ const (
 	// RiskCritical indicates critical risk.
 	RiskCritical RiskLevel = "CRITICAL"
 )
+
+// CachePort defines the interface for caching.
+type CachePort interface {
+	Get(ctx context.Context, key string, value interface{}) error
+	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
+	Delete(ctx context.Context, key string) error
+}
+
+// Logger defines the interface for logging.
+type Logger interface {
+	Info(msg string, keysAndValues ...interface{})
+	Error(msg string, keysAndValues ...interface{})
+	Warn(msg string, keysAndValues ...interface{})
+	Debug(msg string, keysAndValues ...interface{})
+}
 
 //Personal.AI order the ending

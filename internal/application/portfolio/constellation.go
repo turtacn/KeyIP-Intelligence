@@ -392,7 +392,7 @@ func (s *constellationServiceImpl) GenerateConstellation(ctx context.Context, re
 	if err != nil {
 		return nil, errors.NewInvalidParameterError("invalid portfolio ID format")
 	}
-	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioID)
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioID.String())
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "failed to load portfolio")
 	}
@@ -505,7 +505,7 @@ func (s *constellationServiceImpl) GetTechDomainDistribution(ctx context.Context
 	if err != nil {
 		return nil, errors.NewInvalidParameterError("invalid portfolio ID format")
 	}
-	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID)
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID.String())
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "failed to load portfolio")
 	}

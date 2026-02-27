@@ -39,10 +39,10 @@ func (s *PortfolioRepoTestSuite) TearDownTest() {
 }
 
 func (s *PortfolioRepoTestSuite) TestCreate_Success() {
-	id := uuid.New()
+	id := uuid.New().String()
 	p := &portfolio.Portfolio{
 		Name:    "OLED Tech",
-		OwnerID: uuid.New(),
+		OwnerID: uuid.New().String(),
 		Status:  "active",
 	}
 	meta, _ := json.Marshal(p.Metadata)
@@ -57,8 +57,8 @@ func (s *PortfolioRepoTestSuite) TestCreate_Success() {
 }
 
 func (s *PortfolioRepoTestSuite) TestGetByID_Found() {
-	id := uuid.New()
-	ownerID := uuid.New()
+	id := uuid.New().String()
+	ownerID := uuid.New().String()
 
 	// Columns: id, name, description, owner_id, status, tech_domains, target_jurisdictions, metadata, created_at, updated_at, deleted_at
 	cols := []string{
@@ -88,7 +88,7 @@ func (s *PortfolioRepoTestSuite) TestGetByID_Found() {
 }
 
 func (s *PortfolioRepoTestSuite) TestUpdate_OptimisticLock() {
-	id := uuid.New()
+	id := uuid.New().String()
 	p := &portfolio.Portfolio{
 		ID:        id,
 		Name:      "Updated",
@@ -104,7 +104,7 @@ func (s *PortfolioRepoTestSuite) TestUpdate_OptimisticLock() {
 }
 
 func (s *PortfolioRepoTestSuite) TestUpdate_Conflict() {
-	id := uuid.New()
+	id := uuid.New().String()
 	p := &portfolio.Portfolio{
 		ID:        id,
 		UpdatedAt: time.Now(),

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
@@ -57,7 +56,7 @@ func (r *postgresPortfolioRepo) Create(ctx context.Context, p *portfolio.Portfol
 	return nil
 }
 
-func (r *postgresPortfolioRepo) GetByID(ctx context.Context, id uuid.UUID) (*portfolio.Portfolio, error) {
+func (r *postgresPortfolioRepo) GetByID(ctx context.Context, id string) (*portfolio.Portfolio, error) {
 	query := `SELECT * FROM portfolios WHERE id = $1 AND deleted_at IS NULL`
 	row := r.executor().QueryRowContext(ctx, query, id)
 	p, err := scanPortfolio(row)
@@ -94,19 +93,22 @@ func (r *postgresPortfolioRepo) Update(ctx context.Context, p *portfolio.Portfol
 	return nil
 }
 
-func (r *postgresPortfolioRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {
+func (r *postgresPortfolioRepo) SoftDelete(ctx context.Context, id string) error {
 	query := `UPDATE portfolios SET deleted_at = NOW() WHERE id = $1`
 	_, err := r.executor().ExecContext(ctx, query, id)
 	return err
 }
 
-func (r *postgresPortfolioRepo) List(ctx context.Context, ownerID uuid.UUID, status *portfolio.Status, limit, offset int) ([]*portfolio.Portfolio, int64, error) {
+func (r *postgresPortfolioRepo) List(ctx context.Context, ownerID string, opts ...portfolio.PortfolioQueryOption) ([]*portfolio.Portfolio, int64, error) {
+	// Apply options
+	options := portfolio.ApplyPortfolioOptions(opts...)
+
 	baseQuery := `FROM portfolios WHERE owner_id = $1 AND deleted_at IS NULL`
 	args := []interface{}{ownerID}
 
-	if status != nil {
+	if options.Status != nil {
 		baseQuery += ` AND status = $2`
-		args = append(args, *status)
+		args = append(args, *options.Status)
 	}
 
 	var total int64
@@ -116,7 +118,7 @@ func (r *postgresPortfolioRepo) List(ctx context.Context, ownerID uuid.UUID, sta
 	}
 
 	dataQuery := fmt.Sprintf("SELECT * %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d", baseQuery, len(args)+1, len(args)+2)
-	args = append(args, limit, offset)
+	args = append(args, options.Limit, options.Offset)
 
 	rows, err := r.executor().QueryContext(ctx, dataQuery, args...)
 	if err != nil {
@@ -133,14 +135,14 @@ func (r *postgresPortfolioRepo) List(ctx context.Context, ownerID uuid.UUID, sta
 	return portfolios, total, nil
 }
 
-func (r *postgresPortfolioRepo) GetByOwner(ctx context.Context, ownerID uuid.UUID) ([]*portfolio.Portfolio, error) {
-	list, _, err := r.List(ctx, ownerID, nil, 1000, 0)
+func (r *postgresPortfolioRepo) GetByOwner(ctx context.Context, ownerID string) ([]*portfolio.Portfolio, error) {
+	list, _, err := r.List(ctx, ownerID)
 	return list, err
 }
 
 // Patents Association
 
-func (r *postgresPortfolioRepo) AddPatent(ctx context.Context, portfolioID, patentID uuid.UUID, role string, addedBy uuid.UUID) error {
+func (r *postgresPortfolioRepo) AddPatent(ctx context.Context, portfolioID, patentID string, role string, addedBy string) error {
 	query := `
 		INSERT INTO portfolio_patents (portfolio_id, patent_id, role_in_portfolio, added_by, added_at)
 		VALUES ($1, $2, $3, $4, NOW())
@@ -155,13 +157,13 @@ func (r *postgresPortfolioRepo) AddPatent(ctx context.Context, portfolioID, pate
 	return nil
 }
 
-func (r *postgresPortfolioRepo) RemovePatent(ctx context.Context, portfolioID, patentID uuid.UUID) error {
+func (r *postgresPortfolioRepo) RemovePatent(ctx context.Context, portfolioID, patentID string) error {
 	query := `DELETE FROM portfolio_patents WHERE portfolio_id = $1 AND patent_id = $2`
 	_, err := r.executor().ExecContext(ctx, query, portfolioID, patentID)
 	return err
 }
 
-func (r *postgresPortfolioRepo) GetPatents(ctx context.Context, portfolioID uuid.UUID, role *string, limit, offset int) ([]*patent.Patent, int64, error) {
+func (r *postgresPortfolioRepo) GetPatents(ctx context.Context, portfolioID string, role *string, limit, offset int) ([]*patent.Patent, int64, error) {
 	// JOIN with patents table
 	baseQuery := `
 		FROM patents p
@@ -200,49 +202,49 @@ func (r *postgresPortfolioRepo) GetPatents(ctx context.Context, portfolioID uuid
 	return patents, total, nil
 }
 
-func (r *postgresPortfolioRepo) IsPatentInPortfolio(ctx context.Context, portfolioID, patentID uuid.UUID) (bool, error) {
+func (r *postgresPortfolioRepo) IsPatentInPortfolio(ctx context.Context, portfolioID, patentID string) (bool, error) {
 	var exists bool
 	query := `SELECT EXISTS(SELECT 1 FROM portfolio_patents WHERE portfolio_id = $1 AND patent_id = $2)`
 	err := r.executor().QueryRowContext(ctx, query, portfolioID, patentID).Scan(&exists)
 	return exists, err
 }
 
-func (r *postgresPortfolioRepo) BatchAddPatents(ctx context.Context, portfolioID uuid.UUID, patentIDs []uuid.UUID, role string, addedBy uuid.UUID) error {
+func (r *postgresPortfolioRepo) BatchAddPatents(ctx context.Context, portfolioID string, patentIDs []string, role string, addedBy string) error {
 	// ... (implementation using CopyIn or unnest)
 	return nil
 }
 
-func (r *postgresPortfolioRepo) GetPortfoliosByPatent(ctx context.Context, patentID uuid.UUID) ([]*portfolio.Portfolio, error) {
+func (r *postgresPortfolioRepo) GetPortfoliosByPatent(ctx context.Context, patentID string) ([]*portfolio.Portfolio, error) {
 	// ...
 	return nil, nil
 }
 
 // Valuation (Implement stubs for brevity, detailed implementation similar to above)
 func (r *postgresPortfolioRepo) CreateValuation(ctx context.Context, v *portfolio.Valuation) error { return nil }
-func (r *postgresPortfolioRepo) GetLatestValuation(ctx context.Context, patentID uuid.UUID) (*portfolio.Valuation, error) { return nil, nil }
-func (r *postgresPortfolioRepo) GetValuationHistory(ctx context.Context, patentID uuid.UUID, limit int) ([]*portfolio.Valuation, error) { return nil, nil }
-func (r *postgresPortfolioRepo) GetValuationsByPortfolio(ctx context.Context, portfolioID uuid.UUID) ([]*portfolio.Valuation, error) { return nil, nil }
-func (r *postgresPortfolioRepo) GetValuationDistribution(ctx context.Context, portfolioID uuid.UUID) (map[portfolio.ValuationTier]int64, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetLatestValuation(ctx context.Context, patentID string) (*portfolio.Valuation, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetValuationHistory(ctx context.Context, patentID string, limit int) ([]*portfolio.Valuation, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetValuationsByPortfolio(ctx context.Context, portfolioID string) ([]*portfolio.Valuation, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetValuationDistribution(ctx context.Context, portfolioID string) (map[portfolio.ValuationTier]int64, error) { return nil, nil }
 func (r *postgresPortfolioRepo) BatchCreateValuations(ctx context.Context, valuations []*portfolio.Valuation) error { return nil }
 
 // HealthScore
 func (r *postgresPortfolioRepo) CreateHealthScore(ctx context.Context, score *portfolio.HealthScore) error { return nil }
-func (r *postgresPortfolioRepo) GetLatestHealthScore(ctx context.Context, portfolioID uuid.UUID) (*portfolio.HealthScore, error) { return nil, nil }
-func (r *postgresPortfolioRepo) GetHealthScoreHistory(ctx context.Context, portfolioID uuid.UUID, limit int) ([]*portfolio.HealthScore, error) { return nil, nil }
-func (r *postgresPortfolioRepo) GetHealthScoreTrend(ctx context.Context, portfolioID uuid.UUID, startDate, endDate time.Time) ([]*portfolio.HealthScore, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetLatestHealthScore(ctx context.Context, portfolioID string) (*portfolio.HealthScore, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetHealthScoreHistory(ctx context.Context, portfolioID string, limit int) ([]*portfolio.HealthScore, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetHealthScoreTrend(ctx context.Context, portfolioID string, startDate, endDate time.Time) ([]*portfolio.HealthScore, error) { return nil, nil }
 
 // Suggestions
 func (r *postgresPortfolioRepo) CreateSuggestion(ctx context.Context, s *portfolio.OptimizationSuggestion) error { return nil }
-func (r *postgresPortfolioRepo) GetSuggestions(ctx context.Context, portfolioID uuid.UUID, status *string, limit, offset int) ([]*portfolio.OptimizationSuggestion, int64, error) { return nil, 0, nil }
-func (r *postgresPortfolioRepo) UpdateSuggestionStatus(ctx context.Context, id uuid.UUID, status string, resolvedBy uuid.UUID) error { return nil }
-func (r *postgresPortfolioRepo) GetPendingSuggestionCount(ctx context.Context, portfolioID uuid.UUID) (int64, error) { return 0, nil }
+func (r *postgresPortfolioRepo) GetSuggestions(ctx context.Context, portfolioID string, status *string, limit, offset int) ([]*portfolio.OptimizationSuggestion, int64, error) { return nil, 0, nil }
+func (r *postgresPortfolioRepo) UpdateSuggestionStatus(ctx context.Context, id string, status string, resolvedBy string) error { return nil }
+func (r *postgresPortfolioRepo) GetPendingSuggestionCount(ctx context.Context, portfolioID string) (int64, error) { return 0, nil }
 
 // Analytics
-func (r *postgresPortfolioRepo) GetPortfolioSummary(ctx context.Context, portfolioID uuid.UUID) (*portfolio.Summary, error) { return nil, nil }
-func (r *postgresPortfolioRepo) GetJurisdictionCoverage(ctx context.Context, portfolioID uuid.UUID) (map[string]int64, error) { return nil, nil }
-func (r *postgresPortfolioRepo) GetTechDomainCoverage(ctx context.Context, portfolioID uuid.UUID) (map[string]int64, error) { return nil, nil }
-func (r *postgresPortfolioRepo) GetExpiryTimeline(ctx context.Context, portfolioID uuid.UUID) ([]*portfolio.ExpiryTimelineEntry, error) { return nil, nil }
-func (r *postgresPortfolioRepo) ComparePortfolios(ctx context.Context, portfolioIDs []uuid.UUID) ([]*portfolio.ComparisonResult, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetPortfolioSummary(ctx context.Context, portfolioID string) (*portfolio.Summary, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetJurisdictionCoverage(ctx context.Context, portfolioID string) (map[string]int64, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetTechDomainCoverage(ctx context.Context, portfolioID string) (map[string]int64, error) { return nil, nil }
+func (r *postgresPortfolioRepo) GetExpiryTimeline(ctx context.Context, portfolioID string) ([]*portfolio.ExpiryTimelineEntry, error) { return nil, nil }
+func (r *postgresPortfolioRepo) ComparePortfolios(ctx context.Context, portfolioIDs []string) ([]*portfolio.ComparisonResult, error) { return nil, nil }
 
 // Transaction
 func (r *postgresPortfolioRepo) WithTx(ctx context.Context, fn func(portfolio.PortfolioRepository) error) error {

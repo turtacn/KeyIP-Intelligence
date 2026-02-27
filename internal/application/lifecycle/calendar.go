@@ -26,6 +26,7 @@ import (
 	"github.com/google/uuid"
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -170,9 +171,9 @@ type CalendarService interface {
 type calendarServiceImpl struct {
 	lifecycleSvc  domainLifecycle.Service
 	lifecycleRepo domainLifecycle.LifecycleRepository
-	patentRepo    patentRepoPort
-	cache         CachePort
-	logger        Logger
+	patentRepo    domainPatent.PatentRepository
+	cache         common.CachePort
+	logger        common.Logger
 	defaultTZ     string
 }
 
@@ -185,9 +186,9 @@ type CalendarServiceConfig struct {
 func NewCalendarService(
 	lifecycleSvc domainLifecycle.Service,
 	lifecycleRepo domainLifecycle.LifecycleRepository,
-	patentRepo patentRepoPort,
-	cache CachePort,
-	logger Logger,
+	patentRepo domainPatent.PatentRepository,
+	cache common.CachePort,
+	logger common.Logger,
 	cfg CalendarServiceConfig,
 ) CalendarService {
 	tz := cfg.DefaultTimezone

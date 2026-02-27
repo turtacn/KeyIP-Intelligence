@@ -39,10 +39,10 @@ func (s *LifecycleRepoTestSuite) TearDownTest() {
 }
 
 func (s *LifecycleRepoTestSuite) TestCreateAnnuity_Success() {
-	id := uuid.New()
+	id := uuid.New().String()
 	amount := int64(1000)
 	annuity := &lifecycle.Annuity{
-		PatentID:   uuid.New(),
+		PatentID:   uuid.New().String(),
 		YearNumber: 1,
 		DueDate:    time.Now().Add(time.Hour * 24 * 365),
 		Status:     lifecycle.AnnuityStatusUpcoming,
@@ -64,8 +64,8 @@ func (s *LifecycleRepoTestSuite) TestCreateAnnuity_Success() {
 }
 
 func (s *LifecycleRepoTestSuite) TestGetAnnuity_Found() {
-	id := uuid.New()
-	patentID := uuid.New()
+	id := uuid.New().String()
+	patentID := uuid.New().String()
 	dueDate := time.Now()
 	meta := map[string]any{"k": "v"}
 	metaJSON, _ := json.Marshal(meta)
@@ -95,7 +95,7 @@ func (s *LifecycleRepoTestSuite) TestGetAnnuity_Found() {
 }
 
 func (s *LifecycleRepoTestSuite) TestGetAnnuity_NotFound() {
-	id := uuid.New()
+	id := uuid.New().String()
 	s.mock.ExpectQuery("SELECT \\* FROM patent_annuities WHERE id = \\$1").
 		WithArgs(id).
 		WillReturnError(sql.ErrNoRows)
@@ -120,7 +120,7 @@ func (s *LifecycleRepoTestSuite) TestGetUpcomingAnnuities() {
 			"agent_name", "agent_reference", "notes", "reminder_sent_at", "reminder_count", "metadata",
 			"created_at", "updated_at",
 		}).AddRow(
-			uuid.New(), uuid.New(), 1, time.Now(), nil, "upcoming",
+			uuid.New().String(), uuid.New().String(), 1, time.Now(), nil, "upcoming",
 			amount, "USD", nil, nil, "",
 			"", "", "", nil, 0, []byte("{}"),
 			time.Now(), time.Now(),

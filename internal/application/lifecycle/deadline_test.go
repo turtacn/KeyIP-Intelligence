@@ -11,6 +11,7 @@ import (
 	"time"
 
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ---------------------------------------------------------------------------
@@ -53,8 +54,8 @@ type testDeadlineOpts struct {
 	lifecycleSvc  domainLifecycle.Service
 	lifecycleRepo domainLifecycle.LifecycleRepository
 	patentRepo    *mockPatentRepo
-	cache         CachePort
-	logger        Logger
+	cache         common.CachePort
+	logger        common.Logger
 }
 
 // ---------------------------------------------------------------------------

@@ -776,7 +776,7 @@ func (s *valuationServiceImpl) AssessPatent(ctx context.Context, req *SinglePate
 		s.logger.Error("failed to fetch patent for assessment",
 			logging.String("patent_id", req.PatentID),
 			logging.Err(err))
-		return nil, errors.NewNotFound(fmt.Sprintf("patent %s not found", req.PatentID))
+		return nil, errors.NewNotFound("patent %s not found", req.PatentID)
 	}
 
 	// 4. Score each requested dimension
@@ -1023,9 +1023,9 @@ func (s *valuationServiceImpl) AssessPortfolioFull(ctx context.Context, req *Por
 			return nil, errors.Wrap(parseErr, errors.ErrCodeValidation, "invalid portfolio ID")
 		}
 		
-		_, fetchErr := s.portfolioRepo.GetByID(ctx, portfolioUUID)
+		_, fetchErr := s.portfolioRepo.GetByID(ctx, portfolioUUID.String())
 		if fetchErr != nil {
-			return nil, errors.NewNotFound(fmt.Sprintf("portfolio %s not found", req.PortfolioID))
+			return nil, errors.NewNotFound("portfolio %s not found", req.PortfolioID)
 		}
 		
 		// Get patents from portfolio
@@ -1256,7 +1256,7 @@ func (s *valuationServiceImpl) ExportAssessment(ctx context.Context, assessmentI
 
 	record, err := s.assessmentRepo.FindByID(ctx, assessmentID)
 	if err != nil {
-		return nil, errors.NewNotFound(fmt.Sprintf("assessment %s not found", assessmentID))
+		return nil, errors.NewNotFound("assessment %s not found", assessmentID)
 	}
 
 	switch format {
@@ -1383,7 +1383,7 @@ func (s *valuationServiceImpl) RecommendActions(ctx context.Context, assessmentI
 
 	record, err := s.assessmentRepo.FindByID(ctx, assessmentID)
 	if err != nil {
-		return nil, errors.NewNotFound(fmt.Sprintf("assessment %s not found", assessmentID))
+		return nil, errors.NewNotFound("assessment %s not found", assessmentID)
 	}
 
 	recs := s.generateRecommendationsFromRecord(record)

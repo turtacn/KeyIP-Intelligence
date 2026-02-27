@@ -26,6 +26,7 @@ import (
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ---------------------------------------------------------------------------
@@ -189,9 +190,9 @@ type DeadlineService interface {
 type deadlineServiceImpl struct {
 	lifecycleSvc  domainLifecycle.Service
 	lifecycleRepo domainLifecycle.LifecycleRepository
-	patentRepo    patentRepoPort
-	cache         CachePort
-	logger        Logger
+	patentRepo    domainPatent.PatentRepository
+	cache         common.CachePort
+	logger        common.Logger
 }
 
 // DeadlineServiceConfig holds tunables.
@@ -203,9 +204,9 @@ type DeadlineServiceConfig struct {
 func NewDeadlineService(
 	lifecycleSvc domainLifecycle.Service,
 	lifecycleRepo domainLifecycle.LifecycleRepository,
-	patentRepo patentRepoPort,
-	cache CachePort,
-	logger Logger,
+	patentRepo domainPatent.PatentRepository,
+	cache common.CachePort,
+	logger common.Logger,
 ) DeadlineService {
 	return &deadlineServiceImpl{
 		lifecycleSvc:  lifecycleSvc,
@@ -590,7 +591,19 @@ func (s *deadlineServiceImpl) generateDeadlinesForPatent(
 	}
 	filingDate := *patent.FilingDate
 
-	maxYears := jurisdictionMaxLife(jurisdiction)
+	maxYears := 20
+	switch jurisdiction {
+	case domainLifecycle.JurisdictionCN:
+		maxYears = 20
+	case domainLifecycle.JurisdictionUS:
+		maxYears = 20
+	case domainLifecycle.JurisdictionEP:
+		maxYears = 20
+	case domainLifecycle.JurisdictionJP:
+		maxYears = 20
+	case domainLifecycle.JurisdictionKR:
+		maxYears = 20
+	}
 	for year := 1; year <= maxYears; year++ {
 		dueDate := filingDate.AddDate(year, 0, 0)
 		deadlines = append(deadlines, Deadline{

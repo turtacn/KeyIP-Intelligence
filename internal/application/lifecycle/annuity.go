@@ -45,6 +45,7 @@ import (
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ---------------------------------------------------------------------------
@@ -345,8 +346,8 @@ type annuityServiceImpl struct {
 	patentRepo     domainPatent.PatentRepository
 	exchangeRate   ExchangeRateProvider
 	valueProvider  PatentValueProvider
-	cache          CachePort
-	logger         Logger
+	cache          common.CachePort
+	logger         common.Logger
 
 	// Configuration
 	defaultCurrency        Currency
@@ -370,8 +371,8 @@ func NewAnnuityService(
 	patentRepo domainPatent.PatentRepository,
 	exchangeRate ExchangeRateProvider,
 	valueProvider PatentValueProvider,
-	cache CachePort,
-	logger Logger,
+	cache common.CachePort,
+	logger common.Logger,
 	cfg AnnuityServiceConfig,
 ) AnnuityService {
 	if cfg.DefaultCurrency == "" {
@@ -457,7 +458,7 @@ func (s *annuityServiceImpl) CalculateAnnuity(ctx context.Context, req *Calculat
 	}
 
 	baseFee := MoneyAmount{
-		Amount:   domainAnnuity.Fee,
+		Amount:   float64(domainAnnuity.Fee),
 		Currency: jurisdictionBaseCurrency(req.Jurisdiction),
 	}
 
@@ -674,7 +675,7 @@ func (s *annuityServiceImpl) GenerateBudget(ctx context.Context, req *GenerateBu
 			}
 
 			baseFee := MoneyAmount{
-				Amount:   entry.Fee,
+				Amount:   float64(entry.Fee),
 				Currency: jurisdictionBaseCurrency(patentJurisdiction),
 			}
 			converted, convErr := s.convertCurrency(ctx, baseFee, targetCurrency)
@@ -803,7 +804,7 @@ func (s *annuityServiceImpl) GetPaymentSchedule(ctx context.Context, req *Paymen
 			}
 
 			baseFee := MoneyAmount{
-				Amount:   se.Fee,
+				Amount:   float64(se.Fee),
 				Currency: jurisdictionBaseCurrency(jurisdiction),
 			}
 			converted, convErr := s.convertCurrency(ctx, baseFee, targetCurrency)
@@ -883,7 +884,7 @@ func (s *annuityServiceImpl) OptimizeCosts(ctx context.Context, req *OptimizeCos
 		var annualCost float64
 		var totalForecastCost float64
 		for _, entry := range schedule {
-			baseFee := MoneyAmount{Amount: entry.Fee, Currency: jurisdictionBaseCurrency(jurisdiction)}
+			baseFee := MoneyAmount{Amount: float64(entry.Fee), Currency: jurisdictionBaseCurrency(jurisdiction)}
 			converted, convErr := s.convertCurrency(ctx, baseFee, targetCurrency)
 			if convErr != nil {
 				converted = baseFee

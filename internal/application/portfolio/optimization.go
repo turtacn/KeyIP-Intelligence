@@ -197,7 +197,7 @@ func (s *optimizationServiceImpl) Optimize(ctx context.Context, req *Optimizatio
 		return nil, errors.Wrap(err, errors.ErrCodeValidation, "invalid portfolio ID")
 	}
 
-	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID)
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID.String())
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio")
 	}
@@ -347,7 +347,7 @@ func (s *optimizationServiceImpl) EstimateCost(ctx context.Context, portfolioID 
 		return nil, errors.Wrap(err, errors.ErrCodeValidation, "invalid portfolio ID")
 	}
 
-	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID)
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID.String())
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio")
 	}

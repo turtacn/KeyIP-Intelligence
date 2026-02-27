@@ -37,6 +37,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ---------------------------------------------------------------------------
@@ -386,6 +387,9 @@ type LegalStatusService interface {
 	ReconcileStatus(ctx context.Context, patentID string) (*ReconcileResult, error)
 }
 
+// Service is an alias for LegalStatusService for backward compatibility with apiserver.
+type Service = LegalStatusService
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -434,8 +438,8 @@ type legalStatusServiceImpl struct {
 	lifecycleRepo lifecycle.LifecycleRepository
 	patentRepo    patent.PatentRepository
 	publisher     EventPublisher
-	cache         CachePort
-	logger        Logger
+	cache         common.CachePort
+	logger        common.Logger
 	metrics       Metrics
 	config        LegalStatusConfig
 }
@@ -447,8 +451,8 @@ func NewLegalStatusService(
 	lifecycleRepo lifecycle.LifecycleRepository,
 	patentRepo patent.PatentRepository,
 	publisher EventPublisher,
-	cache CachePort,
-	logger Logger,
+	cache common.CachePort,
+	logger common.Logger,
 	metrics Metrics,
 	cfg *LegalStatusConfig,
 ) (LegalStatusService, error) {
@@ -1251,8 +1255,5 @@ func (s *legalStatusServiceImpl) ReconcileStatus(ctx context.Context, patentID s
 // ---------------------------------------------------------------------------
 
 var _ LegalStatusService = (*legalStatusServiceImpl)(nil)
-
-// Service is an alias for LegalStatusService for backward compatibility with apiserver.
-type Service = LegalStatusService
 
 //Personal.AI order the ending

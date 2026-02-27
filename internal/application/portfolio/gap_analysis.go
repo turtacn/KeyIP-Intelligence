@@ -199,7 +199,7 @@ func (s *gapAnalysisServiceImpl) AnalyzeGaps(ctx context.Context, req *GapAnalys
 	if err != nil {
 		return nil, errors.NewInvalidParameterError("invalid portfolio ID format")
 	}
-	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID)
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID.String())
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "failed to load portfolio")
 	}
@@ -327,7 +327,7 @@ func (s *gapAnalysisServiceImpl) GetExpirationRisks(ctx context.Context, portfol
 		return nil, errors.Wrap(err, errors.ErrCodeValidation, "invalid portfolio ID")
 	}
 
-	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID)
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID.String())
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio")
 	}
@@ -362,7 +362,7 @@ func (s *gapAnalysisServiceImpl) GetGeographicGaps(ctx context.Context, portfoli
 		return nil, errors.Wrap(err, errors.ErrCodeValidation, "invalid portfolio ID")
 	}
 
-	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID)
+	portfolio, err := s.portfolioRepo.GetByID(ctx, portfolioUUID.String())
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to load portfolio")
 	}

@@ -12,6 +12,7 @@ import (
 
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ---------------------------------------------------------------------------
@@ -57,8 +58,8 @@ type testServiceOpts struct {
 	patentRepo    domainPatent.PatentRepository
 	exchangeRate  ExchangeRateProvider
 	valueProvider PatentValueProvider
-	cache         CachePort
-	logger        Logger
+	cache         common.CachePort
+	logger        common.Logger
 	cfg           AnnuityServiceConfig
 }
 
