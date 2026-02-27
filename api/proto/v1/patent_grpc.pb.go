@@ -8,15 +8,27 @@ import (
 	"context"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // PatentServiceClient is the client API for PatentService service.
 type PatentServiceClient interface {
 	GetPatent(ctx context.Context, in *GetPatentRequest, opts ...grpc.CallOption) (*GetPatentResponse, error)
+	ListPatents(ctx context.Context, in *ListPatentsRequest, opts ...grpc.CallOption) (*ListPatentsResponse, error)
+	ImportPatent(ctx context.Context, in *ImportPatentRequest, opts ...grpc.CallOption) (*ImportPatentResponse, error)
+	UpdatePatent(ctx context.Context, in *UpdatePatentRequest, opts ...grpc.CallOption) (*UpdatePatentResponse, error)
+	DeletePatent(ctx context.Context, in *DeletePatentRequest, opts ...grpc.CallOption) (*DeletePatentResponse, error)
 	SearchPatents(ctx context.Context, in *SearchPatentsRequest, opts ...grpc.CallOption) (*SearchPatentsResponse, error)
+	GetPatentClaims(ctx context.Context, in *GetPatentClaimsRequest, opts ...grpc.CallOption) (*GetPatentClaimsResponse, error)
+	ParseMarkush(ctx context.Context, in *ParseMarkushRequest, opts ...grpc.CallOption) (*ParseMarkushResponse, error)
+	AssessInfringementRisk(ctx context.Context, in *AssessInfringementRiskRequest, opts ...grpc.CallOption) (*AssessInfringementRiskResponse, error)
+	AssessPatentValue(ctx context.Context, in *AssessPatentValueRequest, opts ...grpc.CallOption) (*AssessPatentValueResponse, error)
+	GetPatentFamily(ctx context.Context, in *GetPatentFamilyRequest, opts ...grpc.CallOption) (*GetPatentFamilyResponse, error)
+
+	// Legacy or additional methods
 	AnalyzeClaims(ctx context.Context, in *AnalyzeClaimsRequest, opts ...grpc.CallOption) (*AnalyzeClaimsResponse, error)
 	CheckFTO(ctx context.Context, in *CheckFTORequest, opts ...grpc.CallOption) (*CheckFTOResponse, error)
-	GetPatentFamily(ctx context.Context, in *GetPatentFamilyRequest, opts ...grpc.CallOption) (*GetPatentFamilyResponse, error)
 	GetCitationNetwork(ctx context.Context, in *GetCitationNetworkRequest, opts ...grpc.CallOption) (*GetCitationNetworkResponse, error)
 }
 
@@ -31,7 +43,43 @@ func NewPatentServiceClient(cc grpc.ClientConnInterface) PatentServiceClient {
 
 func (c *patentServiceClient) GetPatent(ctx context.Context, in *GetPatentRequest, opts ...grpc.CallOption) (*GetPatentResponse, error) {
 	out := new(GetPatentResponse)
-	err := c.cc.Invoke(ctx, "/patent.v1.PatentService/GetPatent", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/GetPatent", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *patentServiceClient) ListPatents(ctx context.Context, in *ListPatentsRequest, opts ...grpc.CallOption) (*ListPatentsResponse, error) {
+	out := new(ListPatentsResponse)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/ListPatents", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *patentServiceClient) ImportPatent(ctx context.Context, in *ImportPatentRequest, opts ...grpc.CallOption) (*ImportPatentResponse, error) {
+	out := new(ImportPatentResponse)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/ImportPatent", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *patentServiceClient) UpdatePatent(ctx context.Context, in *UpdatePatentRequest, opts ...grpc.CallOption) (*UpdatePatentResponse, error) {
+	out := new(UpdatePatentResponse)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/UpdatePatent", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *patentServiceClient) DeletePatent(ctx context.Context, in *DeletePatentRequest, opts ...grpc.CallOption) (*DeletePatentResponse, error) {
+	out := new(DeletePatentResponse)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/DeletePatent", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -40,25 +88,43 @@ func (c *patentServiceClient) GetPatent(ctx context.Context, in *GetPatentReques
 
 func (c *patentServiceClient) SearchPatents(ctx context.Context, in *SearchPatentsRequest, opts ...grpc.CallOption) (*SearchPatentsResponse, error) {
 	out := new(SearchPatentsResponse)
-	err := c.cc.Invoke(ctx, "/patent.v1.PatentService/SearchPatents", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/SearchPatents", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *patentServiceClient) AnalyzeClaims(ctx context.Context, in *AnalyzeClaimsRequest, opts ...grpc.CallOption) (*AnalyzeClaimsResponse, error) {
-	out := new(AnalyzeClaimsResponse)
-	err := c.cc.Invoke(ctx, "/patent.v1.PatentService/AnalyzeClaims", in, out, opts...)
+func (c *patentServiceClient) GetPatentClaims(ctx context.Context, in *GetPatentClaimsRequest, opts ...grpc.CallOption) (*GetPatentClaimsResponse, error) {
+	out := new(GetPatentClaimsResponse)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/GetPatentClaims", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *patentServiceClient) CheckFTO(ctx context.Context, in *CheckFTORequest, opts ...grpc.CallOption) (*CheckFTOResponse, error) {
-	out := new(CheckFTOResponse)
-	err := c.cc.Invoke(ctx, "/patent.v1.PatentService/CheckFTO", in, out, opts...)
+func (c *patentServiceClient) ParseMarkush(ctx context.Context, in *ParseMarkushRequest, opts ...grpc.CallOption) (*ParseMarkushResponse, error) {
+	out := new(ParseMarkushResponse)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/ParseMarkush", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *patentServiceClient) AssessInfringementRisk(ctx context.Context, in *AssessInfringementRiskRequest, opts ...grpc.CallOption) (*AssessInfringementRiskResponse, error) {
+	out := new(AssessInfringementRiskResponse)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/AssessInfringementRisk", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *patentServiceClient) AssessPatentValue(ctx context.Context, in *AssessPatentValueRequest, opts ...grpc.CallOption) (*AssessPatentValueResponse, error) {
+	out := new(AssessPatentValueResponse)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/AssessPatentValue", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +133,25 @@ func (c *patentServiceClient) CheckFTO(ctx context.Context, in *CheckFTORequest,
 
 func (c *patentServiceClient) GetPatentFamily(ctx context.Context, in *GetPatentFamilyRequest, opts ...grpc.CallOption) (*GetPatentFamilyResponse, error) {
 	out := new(GetPatentFamilyResponse)
-	err := c.cc.Invoke(ctx, "/patent.v1.PatentService/GetPatentFamily", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/GetPatentFamily", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *patentServiceClient) AnalyzeClaims(ctx context.Context, in *AnalyzeClaimsRequest, opts ...grpc.CallOption) (*AnalyzeClaimsResponse, error) {
+	out := new(AnalyzeClaimsResponse)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/AnalyzeClaims", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *patentServiceClient) CheckFTO(ctx context.Context, in *CheckFTORequest, opts ...grpc.CallOption) (*CheckFTOResponse, error) {
+	out := new(CheckFTOResponse)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/CheckFTO", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +160,7 @@ func (c *patentServiceClient) GetPatentFamily(ctx context.Context, in *GetPatent
 
 func (c *patentServiceClient) GetCitationNetwork(ctx context.Context, in *GetCitationNetworkRequest, opts ...grpc.CallOption) (*GetCitationNetworkResponse, error) {
 	out := new(GetCitationNetworkResponse)
-	err := c.cc.Invoke(ctx, "/patent.v1.PatentService/GetCitationNetwork", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/keyip.v1.PatentService/GetCitationNetwork", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -84,36 +168,74 @@ func (c *patentServiceClient) GetCitationNetwork(ctx context.Context, in *GetCit
 }
 
 // PatentServiceServer is the server API for PatentService service.
+// All implementations must embed UnimplementedPatentServiceServer
+// for forward compatibility
 type PatentServiceServer interface {
 	GetPatent(context.Context, *GetPatentRequest) (*GetPatentResponse, error)
+	ListPatents(context.Context, *ListPatentsRequest) (*ListPatentsResponse, error)
+	ImportPatent(context.Context, *ImportPatentRequest) (*ImportPatentResponse, error)
+	UpdatePatent(context.Context, *UpdatePatentRequest) (*UpdatePatentResponse, error)
+	DeletePatent(context.Context, *DeletePatentRequest) (*DeletePatentResponse, error)
 	SearchPatents(context.Context, *SearchPatentsRequest) (*SearchPatentsResponse, error)
+	GetPatentClaims(context.Context, *GetPatentClaimsRequest) (*GetPatentClaimsResponse, error)
+	ParseMarkush(context.Context, *ParseMarkushRequest) (*ParseMarkushResponse, error)
+	AssessInfringementRisk(context.Context, *AssessInfringementRiskRequest) (*AssessInfringementRiskResponse, error)
+	AssessPatentValue(context.Context, *AssessPatentValueRequest) (*AssessPatentValueResponse, error)
+	GetPatentFamily(context.Context, *GetPatentFamilyRequest) (*GetPatentFamilyResponse, error)
+
+	// Legacy or additional methods
 	AnalyzeClaims(context.Context, *AnalyzeClaimsRequest) (*AnalyzeClaimsResponse, error)
 	CheckFTO(context.Context, *CheckFTORequest) (*CheckFTOResponse, error)
-	GetPatentFamily(context.Context, *GetPatentFamilyRequest) (*GetPatentFamilyResponse, error)
 	GetCitationNetwork(context.Context, *GetCitationNetworkRequest) (*GetCitationNetworkResponse, error)
+
 	mustEmbedUnimplementedPatentServiceServer()
 }
 
 // UnimplementedPatentServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedPatentServiceServer struct{}
+type UnimplementedPatentServiceServer struct {
+}
 
 func (UnimplementedPatentServiceServer) GetPatent(context.Context, *GetPatentRequest) (*GetPatentResponse, error) {
-	return nil, nil
+	return nil, status.Errorf(codes.Unimplemented, "method GetPatent not implemented")
+}
+func (UnimplementedPatentServiceServer) ListPatents(context.Context, *ListPatentsRequest) (*ListPatentsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListPatents not implemented")
+}
+func (UnimplementedPatentServiceServer) ImportPatent(context.Context, *ImportPatentRequest) (*ImportPatentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ImportPatent not implemented")
+}
+func (UnimplementedPatentServiceServer) UpdatePatent(context.Context, *UpdatePatentRequest) (*UpdatePatentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdatePatent not implemented")
+}
+func (UnimplementedPatentServiceServer) DeletePatent(context.Context, *DeletePatentRequest) (*DeletePatentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeletePatent not implemented")
 }
 func (UnimplementedPatentServiceServer) SearchPatents(context.Context, *SearchPatentsRequest) (*SearchPatentsResponse, error) {
-	return nil, nil
+	return nil, status.Errorf(codes.Unimplemented, "method SearchPatents not implemented")
 }
-func (UnimplementedPatentServiceServer) AnalyzeClaims(context.Context, *AnalyzeClaimsRequest) (*AnalyzeClaimsResponse, error) {
-	return nil, nil
+func (UnimplementedPatentServiceServer) GetPatentClaims(context.Context, *GetPatentClaimsRequest) (*GetPatentClaimsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPatentClaims not implemented")
 }
-func (UnimplementedPatentServiceServer) CheckFTO(context.Context, *CheckFTORequest) (*CheckFTOResponse, error) {
-	return nil, nil
+func (UnimplementedPatentServiceServer) ParseMarkush(context.Context, *ParseMarkushRequest) (*ParseMarkushResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ParseMarkush not implemented")
+}
+func (UnimplementedPatentServiceServer) AssessInfringementRisk(context.Context, *AssessInfringementRiskRequest) (*AssessInfringementRiskResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AssessInfringementRisk not implemented")
+}
+func (UnimplementedPatentServiceServer) AssessPatentValue(context.Context, *AssessPatentValueRequest) (*AssessPatentValueResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AssessPatentValue not implemented")
 }
 func (UnimplementedPatentServiceServer) GetPatentFamily(context.Context, *GetPatentFamilyRequest) (*GetPatentFamilyResponse, error) {
-	return nil, nil
+	return nil, status.Errorf(codes.Unimplemented, "method GetPatentFamily not implemented")
+}
+func (UnimplementedPatentServiceServer) AnalyzeClaims(context.Context, *AnalyzeClaimsRequest) (*AnalyzeClaimsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AnalyzeClaims not implemented")
+}
+func (UnimplementedPatentServiceServer) CheckFTO(context.Context, *CheckFTORequest) (*CheckFTOResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckFTO not implemented")
 }
 func (UnimplementedPatentServiceServer) GetCitationNetwork(context.Context, *GetCitationNetworkRequest) (*GetCitationNetworkResponse, error) {
-	return nil, nil
+	return nil, status.Errorf(codes.Unimplemented, "method GetCitationNetwork not implemented")
 }
 func (UnimplementedPatentServiceServer) mustEmbedUnimplementedPatentServiceServer() {}
 
@@ -129,18 +251,322 @@ func RegisterPatentServiceServer(s grpc.ServiceRegistrar, srv PatentServiceServe
 
 // PatentService_ServiceDesc is the grpc.ServiceDesc for PatentService service.
 var PatentService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "patent.v1.PatentService",
+	ServiceName: "keyip.v1.PatentService",
 	HandlerType: (*PatentServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{MethodName: "GetPatent", Handler: nil},
-		{MethodName: "SearchPatents", Handler: nil},
-		{MethodName: "AnalyzeClaims", Handler: nil},
-		{MethodName: "CheckFTO", Handler: nil},
-		{MethodName: "GetPatentFamily", Handler: nil},
-		{MethodName: "GetCitationNetwork", Handler: nil},
+		{
+			MethodName: "GetPatent",
+			Handler:    _PatentService_GetPatent_Handler,
+		},
+		{
+			MethodName: "ListPatents",
+			Handler:    _PatentService_ListPatents_Handler,
+		},
+		{
+			MethodName: "ImportPatent",
+			Handler:    _PatentService_ImportPatent_Handler,
+		},
+		{
+			MethodName: "UpdatePatent",
+			Handler:    _PatentService_UpdatePatent_Handler,
+		},
+		{
+			MethodName: "DeletePatent",
+			Handler:    _PatentService_DeletePatent_Handler,
+		},
+		{
+			MethodName: "SearchPatents",
+			Handler:    _PatentService_SearchPatents_Handler,
+		},
+		{
+			MethodName: "GetPatentClaims",
+			Handler:    _PatentService_GetPatentClaims_Handler,
+		},
+		{
+			MethodName: "ParseMarkush",
+			Handler:    _PatentService_ParseMarkush_Handler,
+		},
+		{
+			MethodName: "AssessInfringementRisk",
+			Handler:    _PatentService_AssessInfringementRisk_Handler,
+		},
+		{
+			MethodName: "AssessPatentValue",
+			Handler:    _PatentService_AssessPatentValue_Handler,
+		},
+		{
+			MethodName: "GetPatentFamily",
+			Handler:    _PatentService_GetPatentFamily_Handler,
+		},
+		{
+			MethodName: "AnalyzeClaims",
+			Handler:    _PatentService_AnalyzeClaims_Handler,
+		},
+		{
+			MethodName: "CheckFTO",
+			Handler:    _PatentService_CheckFTO_Handler,
+		},
+		{
+			MethodName: "GetCitationNetwork",
+			Handler:    _PatentService_GetCitationNetwork_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "patent/v1/patent.proto",
+	Metadata: "patent.proto",
+}
+
+// Handler Functions (Generic Boilerplate)
+
+func _PatentService_GetPatent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPatentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).GetPatent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/GetPatent",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).GetPatent(ctx, req.(*GetPatentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_ListPatents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPatentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).ListPatents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/ListPatents",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).ListPatents(ctx, req.(*ListPatentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_ImportPatent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImportPatentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).ImportPatent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/ImportPatent",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).ImportPatent(ctx, req.(*ImportPatentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_UpdatePatent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePatentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).UpdatePatent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/UpdatePatent",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).UpdatePatent(ctx, req.(*UpdatePatentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_DeletePatent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeletePatentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).DeletePatent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/DeletePatent",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).DeletePatent(ctx, req.(*DeletePatentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_SearchPatents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchPatentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).SearchPatents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/SearchPatents",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).SearchPatents(ctx, req.(*SearchPatentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_GetPatentClaims_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPatentClaimsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).GetPatentClaims(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/GetPatentClaims",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).GetPatentClaims(ctx, req.(*GetPatentClaimsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_ParseMarkush_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ParseMarkushRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).ParseMarkush(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/ParseMarkush",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).ParseMarkush(ctx, req.(*ParseMarkushRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_AssessInfringementRisk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssessInfringementRiskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).AssessInfringementRisk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/AssessInfringementRisk",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).AssessInfringementRisk(ctx, req.(*AssessInfringementRiskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_AssessPatentValue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssessPatentValueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).AssessPatentValue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/AssessPatentValue",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).AssessPatentValue(ctx, req.(*AssessPatentValueRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_GetPatentFamily_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPatentFamilyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).GetPatentFamily(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/GetPatentFamily",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).GetPatentFamily(ctx, req.(*GetPatentFamilyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_AnalyzeClaims_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AnalyzeClaimsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).AnalyzeClaims(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/AnalyzeClaims",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).AnalyzeClaims(ctx, req.(*AnalyzeClaimsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_CheckFTO_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckFTORequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).CheckFTO(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/CheckFTO",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).CheckFTO(ctx, req.(*CheckFTORequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PatentService_GetCitationNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCitationNetworkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatentServiceServer).GetCitationNetwork(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/keyip.v1.PatentService/GetCitationNetwork",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatentServiceServer).GetCitationNetwork(ctx, req.(*GetCitationNetworkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 //Personal.AI order the ending
