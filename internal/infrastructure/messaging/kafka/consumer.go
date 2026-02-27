@@ -107,6 +107,11 @@ func NewConsumer(cfg ConsumerConfig, logger logging.Logger) (*Consumer, error) {
 	if cfg.FetchMaxBytes == 0 { cfg.FetchMaxBytes = 50 * 1024 * 1024 } // 50MB
 
 	// Create Reader Config
+	commitInterval := cfg.AutoCommitInterval
+	if !cfg.EnableAutoCommit {
+		commitInterval = 0
+	}
+
 	readerCfg := kafka.ReaderConfig{
 		Brokers:           cfg.Brokers,
 		GroupID:           cfg.GroupID,
@@ -114,7 +119,7 @@ func NewConsumer(cfg ConsumerConfig, logger logging.Logger) (*Consumer, error) {
 		MinBytes:          cfg.FetchMinBytes,
 		MaxBytes:          cfg.FetchMaxBytes,
 		MaxWait:           cfg.MaxPollInterval, // MaxWait roughly equals poll interval
-		CommitInterval:    cfg.AutoCommitInterval,
+		CommitInterval:    commitInterval,
 		SessionTimeout:    cfg.SessionTimeout,
 		HeartbeatInterval: cfg.HeartbeatInterval,
 		StartOffset:       kafka.FirstOffset,

@@ -476,12 +476,16 @@ func (s *Searcher) GetEntityByIDs(ctx context.Context, collectionName string, id
 }
 
 func (s *Searcher) GetEntityCount(ctx context.Context, collectionName string) (int64, error) {
-	_, err := s.client.GetMilvusClient().GetCollectionStatistics(ctx, collectionName)
+	stats, err := s.client.GetMilvusClient().GetCollectionStatistics(ctx, collectionName)
 	if err != nil {
 		return 0, err
 	}
-	// Parse row_count - SDK returns map[string]string
-	// Implement real parsing if needed or return 0 for now as previously.
+	if val, ok := stats["row_count"]; ok {
+		var count int64
+		if _, err := fmt.Sscan(val, &count); err == nil {
+			return count, nil
+		}
+	}
 	return 0, nil
 }
 
@@ -535,14 +539,22 @@ func (s *Searcher) convertToColumns(ctx context.Context, collectionName string, 
 			}
 			col = entity.NewColumnFloat(name, floatValues)
 		case entity.FieldTypeFloatVector:
-			// Expecting []float32
 			vecValues := make([][]float32, len(values))
+			var dim int
 			for i, v := range values {
-				if vv, ok := v.([]float32); ok { vecValues[i] = vv }
-				// handle []interface{} from JSON?
+				if vv, ok := v.([]float32); ok {
+					vecValues[i] = vv
+					if dim == 0 { dim = len(vv) }
+				} else if ifaceSlice, ok := v.([]interface{}); ok {
+					// Handle JSON numeric array
+					vec := make([]float32, len(ifaceSlice))
+					for j, item := range ifaceSlice {
+						if f, ok := item.(float64); ok { vec[j] = float32(f) }
+					}
+					vecValues[i] = vec
+					if dim == 0 { dim = len(vec) }
+				}
 			}
-			dim := 0
-			if len(vecValues) > 0 { dim = len(vecValues[0]) }
 			col = entity.NewColumnFloatVector(name, dim, vecValues)
 		}
 
@@ -562,14 +574,21 @@ func (s *Searcher) convertSearchResults(results []client.SearchResult) [][]commo
 			id, _ := res.IDs.GetAsInt64(j)
 			score := res.Scores[j]
 
-			// Fields
 			fields := make(map[string]interface{})
-			// Assuming we can access fields.
+			// Extract fields if available
+			for _, col := range res.Fields {
+				name := col.Name()
+				// Column data length matches ResultCount
+				if j < col.Len() {
+					val, _ := col.Get(j)
+					fields[name] = val
+				}
+			}
 
 			hits[i][j] = common.VectorHit{
-				ID:    id,
-				Score: score,
-				Fields: fields, // partial
+				ID:     id,
+				Score:  score,
+				Fields: fields,
 			}
 		}
 	}
