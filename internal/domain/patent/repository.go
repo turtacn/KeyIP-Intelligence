@@ -12,19 +12,21 @@ import (
 
 // PatentSearchCriteria encapsulates filters for querying patents.
 type PatentSearchCriteria struct {
+	Query             string         `json:"query"` // Full text query
 	PatentNumbers     []string       `json:"patent_numbers"`
 	TitleKeywords     []string       `json:"title_keywords"`
 	AbstractKeywords  []string       `json:"abstract_keywords"`
 	FullTextKeywords  []string       `json:"full_text_keywords"`
 	Offices           []PatentOffice `json:"offices"`
-	Statuses          []PatentStatus `json:"statuses"`
+	Status            []PatentStatus `json:"status"` // Corrected field name
+	Jurisdictions     []string       `json:"jurisdictions"` // Added
 	IPCCodes          []string       `json:"ipc_codes"`
 	ApplicantNames    []string       `json:"applicant_names"`
 	InventorNames     []string       `json:"inventor_names"`
 	MoleculeIDs       []string       `json:"molecule_ids"`
 	FamilyID          string         `json:"family_id"`
-	FilingDateFrom    *time.Time     `json:"filing_date_from"`
-	FilingDateTo      *time.Time     `json:"filing_date_to"`
+	FilingDateStart   *time.Time     `json:"filing_date_start"` // Corrected field name
+	FilingDateEnd     *time.Time     `json:"filing_date_end"`   // Corrected field name
 	GrantDateFrom     *time.Time     `json:"grant_date_from"`
 	GrantDateTo       *time.Time     `json:"grant_date_to"`
 	ExpiryDateFrom    *time.Time     `json:"expiry_date_from"`
@@ -55,7 +57,7 @@ func (c PatentSearchCriteria) Validate() error {
 	if c.SortOrder != "" && c.SortOrder != "asc" && c.SortOrder != "desc" {
 		return errors.InvalidParam("invalid sort order")
 	}
-	if c.FilingDateFrom != nil && c.FilingDateTo != nil && c.FilingDateFrom.After(*c.FilingDateTo) {
+	if c.FilingDateStart != nil && c.FilingDateEnd != nil && c.FilingDateStart.After(*c.FilingDateEnd) {
 		return errors.InvalidParam("filing date from cannot be after filing date to")
 	}
 	// Similar checks for other date ranges could be added
@@ -64,10 +66,10 @@ func (c PatentSearchCriteria) Validate() error {
 
 func (c PatentSearchCriteria) HasFilters() bool {
 	return len(c.PatentNumbers) > 0 || len(c.TitleKeywords) > 0 || len(c.AbstractKeywords) > 0 ||
-		len(c.FullTextKeywords) > 0 || len(c.Offices) > 0 || len(c.Statuses) > 0 ||
+		len(c.FullTextKeywords) > 0 || len(c.Offices) > 0 || len(c.Status) > 0 ||
 		len(c.IPCCodes) > 0 || len(c.ApplicantNames) > 0 || len(c.InventorNames) > 0 ||
 		len(c.MoleculeIDs) > 0 || c.FamilyID != "" ||
-		c.FilingDateFrom != nil || c.FilingDateTo != nil ||
+		c.FilingDateStart != nil || c.FilingDateEnd != nil ||
 		c.GrantDateFrom != nil || c.GrantDateTo != nil ||
 		c.ExpiryDateFrom != nil || c.ExpiryDateTo != nil ||
 		c.HasMarkushStructure != nil || c.MinClaimCount != nil || c.MaxClaimCount != nil ||
@@ -174,5 +176,3 @@ type Repository = PatentRepository
 var (
 	ErrPatentNotFound = fmt.Errorf("patent not found")
 )
-
-//Personal.AI order the ending

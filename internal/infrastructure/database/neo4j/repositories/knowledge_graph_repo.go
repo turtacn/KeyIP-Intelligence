@@ -2,7 +2,9 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	driver "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/neo4j"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
@@ -110,8 +112,108 @@ func (r *neo4jKnowledgeGraphRepo) GetSubgraph(ctx context.Context, centerNodeID 
 	if depth > 5 {
 		return nil, ErrInvalidArgument
 	}
-	// ... (Query logic)
-	return &Subgraph{}, nil
+
+	query := `
+		MATCH (start)
+		WHERE (start.id = $centerId OR start.patent_number = $centerId)
+		CALL apoc.path.subgraphAll(start, {
+			maxLevel: $depth,
+			relationshipFilter: $relFilter
+		})
+		YIELD nodes, relationships
+		RETURN nodes, relationships
+	`
+
+	// Build relationship filter string
+	relFilter := ""
+	if len(relationTypes) > 0 {
+		relFilter = ""
+		for i, rt := range relationTypes {
+			if i > 0 {
+				relFilter += "|"
+			}
+			relFilter += rt
+		}
+	}
+
+	params := map[string]interface{}{
+		"centerId":  centerNodeID,
+		"depth":     depth,
+		"relFilter": relFilter,
+	}
+
+	res, err := r.driver.ExecuteRead(ctx, func(tx driver.Transaction) (interface{}, error) {
+		// Use result interface from driver package, but here we expect full neo4j driver behavior.
+		// The custom driver.Transaction returns driver.Result which is custom.
+		// But in knowledge_graph_repo.go we need to access records.
+		// Let's assume tx.Run returns something that has Next() and Record().
+		// It does: driver.Result interface.
+
+		result, err := tx.Run(ctx, query, params)
+		if err != nil {
+			return nil, err
+		}
+
+		if result.Next(ctx) {
+			rec := result.Record()
+			// neo4j.Record has Get method? No, it has Values and Get(key).
+			// driver.Result.Record() returns *neo4j.Record.
+
+			nodesVal, _ := rec.Get("nodes")
+			relsVal, _ := rec.Get("relationships")
+
+			subgraph := &Subgraph{
+				CenterNodeID: centerNodeID,
+				Depth:        depth,
+			}
+
+			// Parse nodes
+			// nodesVal is likely []interface{} where each is neo4j.Node
+			if nodesList, ok := nodesVal.([]interface{}); ok {
+				for _, n := range nodesList {
+					if node, ok := n.(neo4j.Node); ok {
+						gn := &GraphNode{
+							ID:         fmt.Sprintf("%d", node.Id), // Internal ID, or property ID? Using internal for now or property if available
+							Labels:     node.Labels,
+							Properties: node.Props,
+						}
+						// Prefer 'id' property if exists
+						if idProp, ok := node.Props["id"].(string); ok {
+							gn.ID = idProp
+						}
+						subgraph.Nodes = append(subgraph.Nodes, gn)
+					}
+				}
+			}
+
+			// Parse relationships
+			if relsList, ok := relsVal.([]interface{}); ok {
+				for _, r := range relsList {
+					if rel, ok := r.(neo4j.Relationship); ok {
+						subgraph.Relations = append(subgraph.Relations, &Relation{
+							ID:         fmt.Sprintf("%d", rel.Id),
+							Type:       rel.Type,
+							Properties: rel.Props,
+							// From/To node IDs would need mapping back to GraphNodes if we want structure,
+							// but here we just list them.
+						})
+					}
+				}
+			}
+			return subgraph, nil
+		}
+		return nil, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		// If no result found for center node, return empty subgraph or error?
+		// Usually if center node doesn't exist, query returns nothing.
+		return nil, errors.New(errors.ErrCodeNotFound, "subgraph not found")
+	}
+	return res.(*Subgraph), nil
 }
 
 func (r *neo4jKnowledgeGraphRepo) GetNeighborhood(ctx context.Context, nodeID string, nodeType string, maxNodes int) (*Subgraph, error) {
@@ -177,5 +279,3 @@ func (r *neo4jKnowledgeGraphRepo) EnsureIndexes(ctx context.Context) error {
 func (r *neo4jKnowledgeGraphRepo) EnsureConstraints(ctx context.Context) error {
 	return nil
 }
-
-//Personal.AI order the ending

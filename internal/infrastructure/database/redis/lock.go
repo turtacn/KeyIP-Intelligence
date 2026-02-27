@@ -244,21 +244,23 @@ type redisReentrantLock struct {
 	watchdogDone   chan struct{}
 }
 
-// ... Implement ReentrantLock similar to Mutex but with Hash and Lua scripts ...
-// Detailed implementation skipped for brevity but would follow same pattern.
-// I'll provide stubs that fail or simple implementation.
-// Reentrant Lock Implementation:
+// Reentrant Lock Implementation
 
 func (m *redisReentrantLock) Lock(ctx context.Context) error {
-	// ... retry loop
 	for i := 0; i <= m.config.retryCount; i++ {
 		ok, err := m.TryLock(ctx)
-		if err != nil { return err }
-		if ok { return nil }
+		if err != nil {
+			return err
+		}
+		if ok {
+			return nil
+		}
 		if i < m.config.retryCount {
 			select {
-			case <-ctx.Done(): return ctx.Err()
-			case <-time.After(m.config.retryDelay): continue
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(m.config.retryDelay):
+				continue
 			}
 		}
 	}
@@ -280,12 +282,13 @@ func (m *redisReentrantLock) TryLock(ctx context.Context) (bool, error) {
 		end
 	`)
 	res, err := script.Run(ctx, m.client.GetUnderlyingClient(), []string{m.name}, m.ownerID, m.config.ttl.Milliseconds()).Result()
-	if err != nil { return false, err }
+	if err != nil {
+		return false, err
+	}
 	if res.(int64) == 1 {
-		if m.config.watchdogEnabled { m.startWatchdog() } // Only start if not already running? Or handle idempotency.
-		// Watchdog for reentrant: should check if running.
-		// But simpler: just ensure we have one watchdog per lock instance.
-		if m.watchdogCancel == nil { m.startWatchdog() }
+		if m.config.watchdogEnabled && m.watchdogCancel == nil {
+			m.startWatchdog()
+		}
 		return true, nil
 	}
 	return false, nil
@@ -301,14 +304,23 @@ func (m *redisReentrantLock) Unlock(ctx context.Context) error {
 			redis.call("DEL", KEYS[1])
 			return 0
 		else
+			redis.call("PEXPIRE", KEYS[1], ARGV[2]) -- Reset expiration on partial unlock to prevent expiry? Or keep original? Usually keep or extend.
 			return count
 		end
 	`)
-	res, err := script.Run(ctx, m.client.GetUnderlyingClient(), []string{m.name}, m.ownerID).Result()
-	if err != nil { return err }
+	// Note: We might want to extend TTL on partial unlock to keep it alive for the remaining nesting levels.
+	// Adding ARGV[2] for TTL.
+	res, err := script.Run(ctx, m.client.GetUnderlyingClient(), []string{m.name}, m.ownerID, m.config.ttl.Milliseconds()).Result()
+	if err != nil {
+		return err
+	}
 	val := res.(int64)
-	if val == -1 { return ErrLockNotHeld }
-	if val == 0 { m.stopWatchdog() }
+	if val == -1 {
+		return ErrLockNotHeld
+	}
+	if val == 0 {
+		m.stopWatchdog()
+	}
 	return nil
 }
 
@@ -321,7 +333,9 @@ func (m *redisReentrantLock) Extend(ctx context.Context, ttl time.Duration) (boo
 		end
 	`)
 	res, err := script.Run(ctx, m.client.GetUnderlyingClient(), []string{m.name}, m.ownerID, ttl.Milliseconds()).Result()
-	if err != nil { return false, err }
+	if err != nil {
+		return false, err
+	}
 	return res.(int64) == 1, nil
 }
 

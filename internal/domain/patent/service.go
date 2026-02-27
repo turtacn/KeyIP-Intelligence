@@ -572,10 +572,10 @@ func (s *PatentService) SearchBySimilarity(ctx context.Context, req *SimilarityS
 		criteria.IPCCodes = req.TechDomains
 	}
 	if req.DateFrom != nil {
-		criteria.FilingDateFrom = req.DateFrom
+		criteria.FilingDateStart = req.DateFrom
 	}
 	if req.DateTo != nil {
-		criteria.FilingDateTo = req.DateTo
+		criteria.FilingDateEnd = req.DateTo
 	}
 
 	// Delegate to repository

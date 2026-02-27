@@ -129,10 +129,32 @@ func NewMinIORepository(client *MinIOClient, log logging.Logger) ObjectStorageRe
 	}
 }
 
+// sanitizeObjectKey removes potentially malicious characters from object keys to prevent directory traversal.
+func sanitizeObjectKey(key string) string {
+	// Remove null bytes
+	key = strings.ReplaceAll(key, "\x00", "")
+	// Remove ../ pattern
+	key = strings.ReplaceAll(key, "../", "")
+	// Remove ./ pattern
+	key = strings.ReplaceAll(key, "./", "")
+	// Collapse multiple slashes
+	for strings.Contains(key, "//") {
+		key = strings.ReplaceAll(key, "//", "/")
+	}
+	// Remove leading slash
+	key = strings.TrimPrefix(key, "/")
+	return key
+}
+
 func (r *minioRepository) Upload(ctx context.Context, req *UploadRequest) (*UploadResult, error) {
 	if req.Bucket == "" || req.ObjectKey == "" {
 		return nil, ErrInvalidRequest
 	}
+	req.ObjectKey = sanitizeObjectKey(req.ObjectKey)
+	if req.ObjectKey == "" {
+		return nil, errors.New(errors.ErrCodeValidation, "invalid object key")
+	}
+
 	if req.ContentType == "" && len(req.Data) > 0 {
 		req.ContentType = http.DetectContentType(req.Data[:min(512, len(req.Data))])
 	}
@@ -160,14 +182,24 @@ func (r *minioRepository) Upload(ctx context.Context, req *UploadRequest) (*Uplo
 }
 
 func (r *minioRepository) UploadStream(ctx context.Context, req *StreamUploadRequest) (*UploadResult, error) {
+	req.ObjectKey = sanitizeObjectKey(req.ObjectKey)
+	if req.ObjectKey == "" {
+		return nil, errors.New(errors.ErrCodeValidation, "invalid object key")
+	}
+
 	opts := minio.PutObjectOptions{
 		ContentType:  req.ContentType,
 		UserMetadata: req.Metadata,
+		UserTags:     req.Tags,
 	}
 	if req.Size == -1 {
-		opts.PartSize = uint64(r.partSize)
+		// Use default part size if not specified or set by config
+		if r.partSize > 0 {
+			opts.PartSize = uint64(r.partSize)
+		} else {
+			opts.PartSize = 5 * 1024 * 1024 // 5MB default minio part size
+		}
 	}
-	// ... tags ...
 
 	info, err := r.client.GetClient().PutObject(ctx, req.Bucket, req.ObjectKey, req.Reader, req.Size, opts)
 	if err != nil {
@@ -181,6 +213,7 @@ func (r *minioRepository) UploadStream(ctx context.Context, req *StreamUploadReq
 }
 
 func (r *minioRepository) Download(ctx context.Context, bucket, objectKey string) (*DownloadResult, error) {
+	objectKey = sanitizeObjectKey(objectKey)
 	obj, err := r.client.GetClient().GetObject(ctx, bucket, objectKey, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, err

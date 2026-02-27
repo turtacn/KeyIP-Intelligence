@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -219,13 +221,83 @@ func (r *postgresPatentRepo) HardDelete(ctx context.Context, id uuid.UUID) error
 // Search
 
 func (r *postgresPatentRepo) Search(ctx context.Context, c patent.PatentSearchCriteria) (*patent.PatentSearchResult, error) {
-	// Full Text Search implementation
+	query := `FROM patents WHERE deleted_at IS NULL`
+	var args []interface{}
+	argIdx := 1
+
+	if c.Query != "" {
+		// Full text search on title and abstract
+		// Assuming plainto_tsquery is available or standard. Using websearch_to_tsquery or plainto_tsquery.
+		// Using standard PostgreSQL FTS syntax.
+		query += fmt.Sprintf(` AND (to_tsvector('english', title) || to_tsvector('english', abstract)) @@ plainto_tsquery($%d)`, argIdx)
+		args = append(args, c.Query)
+		argIdx++
+	}
+
+	if len(c.Jurisdictions) > 0 {
+		query += fmt.Sprintf(` AND jurisdiction = ANY($%d)`, argIdx)
+		args = append(args, pq.Array(c.Jurisdictions))
+		argIdx++
+	}
+
+	if len(c.Status) > 0 {
+		statuses := make([]string, len(c.Status))
+		for i, s := range c.Status {
+			statuses[i] = s.String()
+		}
+		query += fmt.Sprintf(` AND status = ANY($%d)`, argIdx)
+		args = append(args, pq.Array(statuses))
+		argIdx++
+	}
+
+	if c.FilingDateStart != nil {
+		query += fmt.Sprintf(` AND filing_date >= $%d`, argIdx)
+		args = append(args, *c.FilingDateStart)
+		argIdx++
+	}
+
+	if c.FilingDateEnd != nil {
+		query += fmt.Sprintf(` AND filing_date <= $%d`, argIdx)
+		args = append(args, *c.FilingDateEnd)
+		argIdx++
+	}
+
+	// Count total
+	var total int64
+	countQuery := `SELECT COUNT(*) ` + query
+	err := r.executor().QueryRowContext(ctx, countQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count search results")
+	}
+
+	// Apply pagination
+	if c.Limit <= 0 {
+		c.Limit = 20
+	}
+	if c.Offset < 0 {
+		c.Offset = 0
+	}
+
+	query += fmt.Sprintf(` ORDER BY filing_date DESC LIMIT $%d OFFSET $%d`, argIdx, argIdx+1)
+	args = append(args, c.Limit, c.Offset)
+
+	rows, err := r.executor().QueryContext(ctx, "SELECT * "+query, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to search patents")
+	}
+	defer rows.Close()
+
+	patents, err := scanPatents(rows)
+	if err != nil {
+		return nil, err
+	}
+
 	return &patent.PatentSearchResult{
-		Patents: []*patent.Patent{},
-		Total:   0,
+		Patents: patents,
+		Total:   total,
 		Offset:  c.Offset,
 		Limit:   c.Limit,
-		HasMore: false,
+		HasMore: int64(c.Offset+len(patents)) < total,
 	}, nil
 }
 
@@ -561,4 +633,6 @@ func scanPatents(rows *sql.Rows) ([]*patent.Patent, error) {
 	return list, nil
 }
 
-//Personal.AI order the ending
+func itoa(i int) string {
+	return strconv.Itoa(i)
+}
