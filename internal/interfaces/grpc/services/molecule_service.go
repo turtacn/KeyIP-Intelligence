@@ -13,7 +13,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/molecule/v1"
+	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
 )
 
 // MoleculeServiceServer implements the gRPC MoleculeService

@@ -12,7 +12,7 @@
 //   * 实现配置加载：调用 internal/config.Load()
 //   * 实现日志初始化：基于配置创建 Logger
 //   * 实现基础设施初始化：PostgreSQL、Neo4j、Redis、OpenSearch、Milvus、Kafka Consumer、MinIO
-//   * 实现 Worker Pool：可配置并发数的 goroutine 池
+//   * 实现 Worker Pool：可配置并发数的 goroutine 池，使用 `errgroup` 管理并发
 //   * 实现 Topic 路由：根据 Kafka topic 将消息分发到对应的 Handler
 //   * 实现 Handler 注册：
 //     - patent.document.parse → 专利文档解析 Handler
@@ -49,9 +49,10 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
@@ -198,61 +199,60 @@ func main() {
 	}
 	defer dlqProducer.Close()
 
-	// Context for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
+	// Context for graceful shutdown and error propagation
+	// errgroup creates a context that is cancelled when any goroutine returns a non-nil error
+	// or when the parent context is cancelled (e.g. by signal).
+	parentCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	g, ctx := errgroup.WithContext(parentCtx)
 
 	// Start health check server
 	healthSrv := startHealthServer(cfg, logger, metricsCollector)
 
-	// Start worker pool
-	var wg sync.WaitGroup
+	// Message channel
 	msgChan := make(chan *common.Message, numWorkers*2)
 
-	// Spawn workers
+	// Spawn workers using errgroup
 	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-			workerLoop(ctx, workerID, msgChan, handlerRegistry, dlqProducer, logger)
-		}(i)
+		workerID := i
+		g.Go(func() error {
+			return workerLoop(ctx, workerID, msgChan, handlerRegistry, dlqProducer, logger)
+		})
 	}
 
-	// Spawn consumer loop
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		consumerLoop(ctx, consumer, msgChan, logger)
-	}()
+	// Spawn consumer loop using errgroup
+	g.Go(func() error {
+		defer close(msgChan)
+		return consumerLoop(ctx, consumer, msgChan, logger)
+	})
 
 	logger.Info("worker pool started", logging.Int("workers", numWorkers))
 
-	// Wait for shutdown signal
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	sig := <-quit
-	logger.Info("received shutdown signal", logging.String("signal", sig.String()))
+	// Listen for OS signals in a separate goroutine
+	// We use a separate channel for signals to not block the main flow
+	// If signal received, we cancel the parent context which propagates to errgroup
+	stopChan := make(chan os.Signal, 1)
+	signal.Notify(stopChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Initiate graceful shutdown
-	cancel()
-
-	// Close message channel after consumer stops
-	// Workers will drain remaining messages
-	logger.Info("waiting for workers to finish current tasks")
-
-	// Wait with timeout
-	done := make(chan struct{})
 	go func() {
-		wg.Wait()
-		close(done)
+		select {
+		case sig := <-stopChan:
+			logger.Info("received shutdown signal", logging.String("signal", sig.String()))
+			cancel() // Cancel parent context, stopping all errgroup goroutines
+		case <-ctx.Done():
+			// Context cancelled elsewhere (e.g. error in group)
+		}
 	}()
 
-	select {
-	case <-done:
-		logger.Info("all workers finished")
-	case <-time.After(defaultHandlerTimeout + 30*time.Second):
-		logger.Warn("shutdown timeout exceeded, forcing exit")
+	// Wait for all goroutines to finish
+	if err := g.Wait(); err != nil {
+		if err != context.Canceled {
+			logger.Error("worker group exited with error", logging.Err(err))
+		}
 	}
+
+	logger.Info("all workers finished")
 
 	// Shutdown health server
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -489,15 +489,16 @@ func workerLoop(
 	handlers map[string]MessageHandler,
 	dlqProducer *kafkaclient.Producer,
 	logger logging.Logger,
-) {
+) error {
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("worker stopping", logging.Int("worker_id", workerID))
-			return
+			return nil
 		case msg, ok := <-msgChan:
 			if !ok {
-				return
+				// Channel closed
+				return nil
 			}
 			processMessage(ctx, workerID, msg, handlers, dlqProducer, logger)
 		}
@@ -527,6 +528,12 @@ func processMessage(
 
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
+		// Check context before processing
+		if err := ctx.Err(); err != nil {
+			logger.Warn("context cancelled during processing", logging.Err(err))
+			return
+		}
+
 		if err := handler.Handle(handlerCtx, msg); err != nil {
 			lastErr = err
 			logger.Warn("handler error, retrying",
@@ -535,8 +542,12 @@ func processMessage(
 				logging.Err(err),
 			)
 			// Exponential backoff
-			time.Sleep(time.Duration(1<<uint(attempt)) * time.Second)
-			continue
+			select {
+			case <-time.After(time.Duration(1<<uint(attempt)) * time.Second):
+				continue
+			case <-ctx.Done():
+				return
+			}
 		}
 		// Success - offset is auto-committed by the consumer
 		logger.Debug("message processed successfully",
@@ -572,15 +583,16 @@ func consumerLoop(
 	consumer *kafkaclient.Consumer,
 	msgChan chan<- *common.Message,
 	logger logging.Logger,
-) {
-	defer close(msgChan)
-	
-	handler := func(ctx context.Context, msg *common.Message) error {
+) error {
+	// handler puts messages onto channel
+	handler := func(msgCtx context.Context, msg *common.Message) error {
 		select {
 		case msgChan <- msg:
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-msgCtx.Done():
+			return msgCtx.Err()
 		}
 	}
 
@@ -589,13 +601,16 @@ func consumerLoop(
 	}
 
 	// Start the consumer - it will process messages via its internal handlers
+	// Assuming Consumer.Start blocks until error or context cancel
 	if err := consumer.Start(ctx); err != nil {
-		logger.Error("consumer start error", logging.Err(err))
+		if err != context.Canceled {
+			logger.Error("consumer start error", logging.Err(err))
+			return err
+		}
 	}
 	
-	// Block until context is cancelled
-	<-ctx.Done()
 	logger.Info("consumer loop stopping")
+	return nil
 }
 
 //Personal.AI order the ending

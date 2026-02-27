@@ -32,6 +32,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/lifecycle"
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/reporting"
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/client"
@@ -105,17 +109,62 @@ func NewRootCommand() *cobra.Command {
 	pf.DurationVar(&opts.Timeout, "timeout", 30*time.Second, "global operation timeout")
 	pf.StringVar(&opts.ServerAddr, "server", "", "API server address (default: http://localhost:8080)")
 
-	// Note: Subcommands are registered via RegisterCommands() after dependency injection
-	// in cmd/keyip/main.go. The following are placeholder commands for when dependencies
-	// are not available (e.g., running keyip --help without a running server).
-	cmd.AddCommand(
-		createPlaceholderCommand("search", "Search molecules and patents"),
-		createPlaceholderCommand("assess", "Assess patent portfolio value"),
-		createPlaceholderCommand("lifecycle", "Manage patent lifecycle"),
-		createPlaceholderCommand("report", "Generate IP reports"),
-	)
-
 	return cmd
+}
+
+// RegisterCommands registers all subcommands with the root command.
+// This is called from main.go after dependency injection.
+func RegisterCommands(rootCmd *cobra.Command, deps CommandDependencies) {
+	// Import necessary packages inside the function or file to avoid circular dependencies if they exist,
+	// but here we rely on the main.go or the packages being available.
+	// Since we are inside `cli` package, we need to ensure the service interfaces match what New*Cmd functions expect.
+	// The New*Cmd functions in this package expect concrete interfaces from application layer.
+	// We need to cast the interface{} placeholders to the correct types if we want to be strict,
+	// or update CommandDependencies to use correct types.
+	// Given the context, let's update CommandDependencies to use the correct types imported from application layer.
+	// However, to keep this change minimal and focused on registration, we will assume
+	// the caller passes the correct types and we might need to do type assertions if New*Cmd expect specific interfaces.
+	// Actually, NewSearchCmd expects patent_mining.SimilaritySearchService.
+	// NewAssessCmd expects portfolio.ValuationService.
+	// NewLifecycleCmd expects lifecycle.*Service.
+	// NewReportCmd expects reporting.*Service.
+
+	// To avoid import cycles or compilation errors if those packages are not imported here, we should add imports.
+	// But `cli` package already imports them in search.go, assess.go, etc. so they are available in the package scope.
+
+	rootCmd.AddCommand(
+		NewSearchCmd(deps.SimilaritySearchService, deps.Logger),
+		NewAssessCmd(deps.ValuationService, deps.Logger),
+		NewLifecycleCmd(
+			deps.DeadlineService,
+			deps.AnnuityService,
+			deps.LegalStatusService,
+			deps.CalendarService,
+			deps.Logger,
+		),
+		NewReportCmd(
+			deps.FTOReportService,
+			deps.InfringementReportService,
+			deps.PortfolioReportService,
+			deps.TemplateService,
+			deps.Logger,
+		),
+	)
+}
+
+// CommandDependencies aggregates service dependencies for CLI commands.
+type CommandDependencies struct {
+	Logger                    logging.Logger
+	SimilaritySearchService   patent_mining.SimilaritySearchService
+	ValuationService          portfolio.ValuationService
+	DeadlineService           lifecycle.DeadlineService
+	AnnuityService            lifecycle.AnnuityService
+	LegalStatusService        lifecycle.LegalStatusService
+	CalendarService           lifecycle.CalendarService
+	FTOReportService          reporting.FTOReportService
+	InfringementReportService reporting.InfringementReportService
+	PortfolioReportService    reporting.PortfolioReportService
+	TemplateService           reporting.TemplateService
 }
 
 // persistentPreRun initializes config, logger, and client, then stores CLIContext.
