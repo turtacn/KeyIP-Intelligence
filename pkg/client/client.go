@@ -23,13 +23,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	kerrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
 // Version is the SDK semantic version.
 const Version = "0.1.0"
-
-// ErrInvalidConfig is returned when client configuration is invalid.
-var ErrInvalidConfig = errors.New("keyip: invalid client configuration")
 
 // ---------------------------------------------------------------------------
 // Logger
@@ -145,14 +143,14 @@ type Client struct {
 // Optional behaviour can be customised via Option functions.
 func NewClient(baseURL string, apiKey string, opts ...Option) (*Client, error) {
 	if baseURL == "" {
-		return nil, fmt.Errorf("%w: baseURL is required", ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: baseURL is required", kerrors.ErrInvalidConfig)
 	}
 	parsed, err := url.Parse(baseURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return nil, fmt.Errorf("%w: baseURL must use http or https scheme, got %q", ErrInvalidConfig, baseURL)
+		return nil, fmt.Errorf("%w: baseURL must use http or https scheme, got %q", kerrors.ErrInvalidConfig, baseURL)
 	}
 	if apiKey == "" {
-		return nil, fmt.Errorf("%w: apiKey is required", ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: apiKey is required", kerrors.ErrInvalidConfig)
 	}
 
 	c := &Client{
@@ -256,7 +254,7 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
-			return fmt.Errorf("keyip: failed to marshal request body: %w", err)
+			return kerrors.WrapMsg(err, "failed to marshal request body")
 		}
 		bodyBytes = b
 	}
@@ -290,7 +288,7 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 
 		req, err := http.NewRequestWithContext(ctx, method, fullURL, reqBody)
 		if err != nil {
-			return fmt.Errorf("keyip: failed to create request: %w", err)
+			return kerrors.WrapMsg(err, "failed to create request")
 		}
 
 		req.Header.Set("Authorization", "Bearer "+c.apiKey)
@@ -342,7 +340,7 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 			method, path, resp.StatusCode, elapsed, requestID)
 
 		if readErr != nil {
-			lastErr = fmt.Errorf("keyip: failed to read response body: %w", readErr)
+			lastErr = kerrors.WrapMsg(readErr, "failed to read response body")
 			continue
 		}
 
@@ -379,7 +377,7 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 		// ---- 2xx / 3xx Success ----
 		if result != nil && len(respBody) > 0 {
 			if err := json.Unmarshal(respBody, result); err != nil {
-				return fmt.Errorf("keyip: failed to unmarshal response body: %w", err)
+				return kerrors.WrapMsg(err, "failed to unmarshal response body")
 			}
 		}
 		return nil

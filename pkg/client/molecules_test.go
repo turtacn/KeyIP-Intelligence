@@ -14,6 +14,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	kerrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
 // ---------------------------------------------------------------------------
@@ -145,7 +147,7 @@ func TestSearch_EmptyQuery(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.Search(context.Background(), &MoleculeSearchRequest{Query: ""})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -155,7 +157,7 @@ func TestSearch_NilRequest(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.Search(context.Background(), nil)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -187,7 +189,7 @@ func TestSearch_SimilarityOutOfRange(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.Search(context.Background(), &MoleculeSearchRequest{Query: "test", Similarity: 1.5})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -197,7 +199,7 @@ func TestSearch_SimilarityNegative(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.Search(context.Background(), &MoleculeSearchRequest{Query: "test", Similarity: -0.1})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -313,7 +315,7 @@ func TestGet_EmptyID(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.Get(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -361,7 +363,7 @@ func TestGetBySMILES_EmptySMILES(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.GetBySMILES(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -407,7 +409,7 @@ func TestGetByInChIKey_EmptyKey(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.GetByInChIKey(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -417,7 +419,7 @@ func TestGetByInChIKey_InvalidFormat(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.GetByInChIKey(context.Background(), "invalid-key")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -427,7 +429,7 @@ func TestGetByInChIKey_LowercaseRejected(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.GetByInChIKey(context.Background(), "bsynrymutxbxsq-uhfffaoysa-n")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -478,7 +480,7 @@ func TestPredictProperties_EmptySMILES(t *testing.T) {
 	_, err := mc.PredictProperties(context.Background(), &MoleculePropertyRequest{
 		SMILES: "", Properties: []string{"logp"},
 	})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -490,7 +492,7 @@ func TestPredictProperties_EmptyProperties(t *testing.T) {
 	_, err := mc.PredictProperties(context.Background(), &MoleculePropertyRequest{
 		SMILES: "CCO", Properties: []string{},
 	})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -500,7 +502,7 @@ func TestPredictProperties_NilRequest(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.PredictProperties(context.Background(), nil)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -556,7 +558,7 @@ func TestBatchSearch_EmptyMolecules(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.BatchSearch(context.Background(), &BatchSearchRequest{Molecules: []string{}})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -566,7 +568,7 @@ func TestBatchSearch_NilRequest(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.BatchSearch(context.Background(), nil)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -580,7 +582,7 @@ func TestBatchSearch_ExceedLimit(t *testing.T) {
 		mols[i] = fmt.Sprintf("C%d", i)
 	}
 	_, err := mc.BatchSearch(context.Background(), &BatchSearchRequest{Molecules: mols})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -599,6 +601,36 @@ func TestBatchSearch_ExactLimit(t *testing.T) {
 	}
 	if res.TotalProcessed != 1000 {
 		t.Errorf("TotalProcessed: want 1000, got %d", res.TotalProcessed)
+	}
+}
+
+func TestBatchSearch_OverLimit(t *testing.T) {
+	mc := newTestMoleculesClient(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("should not be called")
+	})
+	mols := make([]string, 1001)
+	for i := range mols {
+		mols[i] = fmt.Sprintf("C%d", i)
+	}
+	_, err := mc.BatchSearch(context.Background(), &BatchSearchRequest{Molecules: mols})
+	// Check for kerrors.ErrInvalidArgument wrapped
+	if err == nil || !strings.Contains(err.Error(), "exceeds maximum") {
+		t.Errorf("expected error about limit, got %v", err)
+	}
+}
+
+func TestGetBySMILES_URLEncoding(t *testing.T) {
+	expectedSMILES := "C#C/C=C\\[C@@H](O)[NH3+]"
+	mc := newTestMoleculesClient(t, func(w http.ResponseWriter, r *http.Request) {
+		got := r.URL.Query().Get("smiles")
+		if got != expectedSMILES {
+			t.Errorf("smiles query: want %q, got %q", expectedSMILES, got)
+		}
+		writeJSON(t, w, 200, moleculeDetailResp{Data: MoleculeDetail{}})
+	})
+	_, err := mc.GetBySMILES(context.Background(), expectedSMILES)
+	if err != nil {
+		t.Fatalf("GetBySMILES: %v", err)
 	}
 }
 
@@ -661,7 +693,7 @@ func TestGetPatents_EmptyID(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, _, err := mc.GetPatents(context.Background(), "", 1, 20)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -734,7 +766,7 @@ func TestGetActivities_EmptyID(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.GetActivities(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -804,7 +836,7 @@ func TestCompareMolecules_EmptySMILES1(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.CompareMolecules(context.Background(), "", "CCO")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -814,7 +846,7 @@ func TestCompareMolecules_EmptySMILES2(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := mc.CompareMolecules(context.Background(), "CCO", "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }

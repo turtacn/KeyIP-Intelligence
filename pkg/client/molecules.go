@@ -9,19 +9,18 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+
+	kerrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
 // ---------------------------------------------------------------------------
 // Validation helpers
 // ---------------------------------------------------------------------------
 
-// ErrInvalidArgument is returned when a caller-supplied argument is invalid.
-var ErrInvalidArgument = fmt.Errorf("keyip: invalid argument")
-
 var inchiKeyRe = regexp.MustCompile(`^[A-Z]{14}-[A-Z]{10}-[A-Z]$`)
 
 func invalidArg(msg string) error {
-	return fmt.Errorf("%w: %s", ErrInvalidArgument, msg)
+	return fmt.Errorf("%w: %s", kerrors.ErrInvalidArgument, msg)
 }
 
 // ---------------------------------------------------------------------------

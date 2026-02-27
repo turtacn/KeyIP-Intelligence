@@ -14,6 +14,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	kerrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
 // ---------------------------------------------------------------------------
@@ -188,7 +190,7 @@ func TestGetDeadline_EmptyID(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := lc.GetDeadline(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -242,7 +244,7 @@ func TestGetAnnuities_EmptyPatentNumber(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := lc.GetAnnuities(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -320,7 +322,7 @@ func TestRecordAnnuityPayment_EmptyAnnuityID(t *testing.T) {
 	_, err := lc.RecordAnnuityPayment(context.Background(), &AnnuityPayRequest{
 		AnnuityID: "", PaidDate: "2025-01-15", Amount: 100,
 	})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -332,7 +334,7 @@ func TestRecordAnnuityPayment_EmptyPaidDate(t *testing.T) {
 	_, err := lc.RecordAnnuityPayment(context.Background(), &AnnuityPayRequest{
 		AnnuityID: "an-1", PaidDate: "", Amount: 100,
 	})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -344,7 +346,7 @@ func TestRecordAnnuityPayment_ZeroAmount(t *testing.T) {
 	_, err := lc.RecordAnnuityPayment(context.Background(), &AnnuityPayRequest{
 		AnnuityID: "an-1", PaidDate: "2025-01-15", Amount: 0,
 	})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -356,7 +358,7 @@ func TestRecordAnnuityPayment_NegativeAmount(t *testing.T) {
 	_, err := lc.RecordAnnuityPayment(context.Background(), &AnnuityPayRequest{
 		AnnuityID: "an-1", PaidDate: "2025-01-15", Amount: -100,
 	})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -366,7 +368,7 @@ func TestRecordAnnuityPayment_NilRequest(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := lc.RecordAnnuityPayment(context.Background(), nil)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -451,7 +453,7 @@ func TestGetLegalStatus_EmptyPatentNumber(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := lc.GetLegalStatus(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -495,7 +497,7 @@ func TestSyncLegalStatus_EmptyPatentNumbers(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	err := lc.SyncLegalStatus(context.Background(), []string{})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -505,7 +507,7 @@ func TestSyncLegalStatus_NilPatentNumbers(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	err := lc.SyncLegalStatus(context.Background(), nil)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -585,7 +587,7 @@ func TestGetReminders_EmptyPatentNumber(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := lc.GetReminders(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -629,7 +631,7 @@ func TestSetReminder_EmptyPatentNumber(t *testing.T) {
 	_, err := lc.SetReminder(context.Background(), &ReminderConfigRequest{
 		PatentNumber: "", ReminderDays: []int{30}, Channels: []string{"email"},
 	})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -641,7 +643,7 @@ func TestSetReminder_EmptyReminderDays(t *testing.T) {
 	_, err := lc.SetReminder(context.Background(), &ReminderConfigRequest{
 		PatentNumber: "CN115000001B", ReminderDays: []int{}, Channels: []string{"email"},
 	})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -653,7 +655,7 @@ func TestSetReminder_EmptyChannels(t *testing.T) {
 	_, err := lc.SetReminder(context.Background(), &ReminderConfigRequest{
 		PatentNumber: "CN115000001B", ReminderDays: []int{30}, Channels: []string{},
 	})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -663,7 +665,7 @@ func TestSetReminder_NilRequest(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := lc.SetReminder(context.Background(), nil)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -733,7 +735,7 @@ func TestDeleteReminder_EmptyID(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	err := lc.DeleteReminder(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -812,6 +814,13 @@ func TestBuildDeadlineQueryParams_SpecialCharacters(t *testing.T) {
 	}
 	if !strings.Contains(pn, "US 11&000") {
 		t.Errorf("decoded patent_numbers should contain 'US 11&000', got %s", pn)
+	}
+	// Verify actual encoding in raw string (e.g. / -> %2F, & -> %26)
+	if !strings.Contains(qs, "%2F") {
+		t.Errorf("expected %%2F in query string for slash, got %s", qs)
+	}
+	if !strings.Contains(qs, "%26") {
+		t.Errorf("expected %%26 in query string for ampersand, got %s", qs)
 	}
 }
 

@@ -16,6 +16,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	kerrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
 // ---------------------------------------------------------------------------
@@ -181,7 +183,7 @@ func TestPatentSearch_EmptyQuery(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.Search(context.Background(), &PatentSearchRequest{Query: ""})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -191,7 +193,7 @@ func TestPatentSearch_NilRequest(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.Search(context.Background(), nil)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -445,7 +447,7 @@ func TestPatentGet_EmptyID(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.Get(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -503,7 +505,7 @@ func TestPatentGetByNumber_EmptyNumber(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.GetByNumber(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -552,7 +554,7 @@ func TestPatentGetFamily_EmptyNumber(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.GetFamily(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -607,7 +609,7 @@ func TestPatentGetCitations_EmptyNumber(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.GetCitations(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -654,7 +656,7 @@ func TestPatentGetCitedBy_EmptyNumber(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.GetCitedBy(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -696,7 +698,7 @@ func TestPatentGetMolecules_EmptyNumber(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, _, err := pc.GetMolecules(context.Background(), "", 1, 20)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -778,7 +780,7 @@ func TestPatentEvaluateValue_EmptyPatentNumbers(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.EvaluateValue(context.Background(), &PatentValueRequest{PatentNumbers: []string{}})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -788,7 +790,7 @@ func TestPatentEvaluateValue_NilPatentNumbers(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.EvaluateValue(context.Background(), &PatentValueRequest{PatentNumbers: nil})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -798,7 +800,7 @@ func TestPatentEvaluateValue_NilRequest(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.EvaluateValue(context.Background(), nil)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -812,7 +814,7 @@ func TestPatentEvaluateValue_ExceedLimit(t *testing.T) {
 		nums[i] = fmt.Sprintf("P%d", i)
 	}
 	_, err := pc.EvaluateValue(context.Background(), &PatentValueRequest{PatentNumbers: nums})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -929,7 +931,7 @@ func TestPatentGetLandscape_EmptyQuery(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.GetLandscape(context.Background(), &PatentLandscapeRequest{Query: ""})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -939,7 +941,7 @@ func TestPatentGetLandscape_NilRequest(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.GetLandscape(context.Background(), nil)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -1044,7 +1046,7 @@ func TestPatentGetLegalEvents_EmptyNumber(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.GetLegalEvents(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -1099,7 +1101,7 @@ func TestPatentGetClaims_EmptyNumber(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.GetClaims(context.Background(), "")
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -1176,7 +1178,7 @@ func TestPatentSemanticSearch_EmptyText(t *testing.T) {
 		t.Fatal("should not be called")
 	})
 	_, err := pc.SemanticSearch(context.Background(), "", 1, 20)
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -1251,7 +1253,7 @@ func TestPatentSearch_DateRange_FromAfterTo(t *testing.T) {
 		Query:     "test",
 		DateRange: &DateRange{Field: "filing_date", From: "2024-01-01", To: "2020-01-01"},
 	})
-	if !errors.Is(err, ErrInvalidArgument) {
+	if !errors.Is(err, kerrors.ErrInvalidArgument) {
 		t.Errorf("expected ErrInvalidArgument, got %v", err)
 	}
 }
@@ -1277,6 +1279,20 @@ func TestPatentSearch_DateRange_OnlyTo(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Search with only To should not error: %v", err)
+	}
+}
+
+func TestPatentSearch_DateRange_InvalidOrder(t *testing.T) {
+	pc := newTestPatentsClient(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("should not be called")
+	})
+	_, err := pc.Search(context.Background(), &PatentSearchRequest{
+		Query:     "test",
+		DateRange: &DateRange{Field: "filing_date", From: "2025-01-01", To: "2024-01-01"},
+	})
+	// Expect invalid argument error
+	if err == nil || !strings.Contains(err.Error(), "must not be after") {
+		t.Errorf("expected date range error, got %v", err)
 	}
 }
 
