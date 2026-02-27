@@ -17,6 +17,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	storageminio "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/storage/minio"
 	chemextractor "github.com/turtacn/KeyIP-Intelligence/internal/intelligence/chem_extractor"
+	"github.com/turtacn/KeyIP-Intelligence/internal/testutil"
 	apperrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -107,6 +108,7 @@ func (m *MockMoleculeRepo) FindWithoutFingerprint(ctx context.Context, fpType mo
 
 // MockPatentRepo
 type MockPatentRepo struct {
+	testutil.BasePatentRepoMock
 	AssociateMoleculeFunc func(ctx context.Context, patentID string, moleculeID string) error
 }
 
@@ -119,38 +121,6 @@ func (m *MockPatentRepo) AssociateMolecule(ctx context.Context, patentID string,
 
 func (m *MockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string) ([]*patent.Patent, error) { return nil, nil }
 func (m *MockPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*patent.Patent, error) { return nil, nil }
-
-func (m *MockPatentRepo) Create(ctx context.Context, p *patent.Patent) error { return nil }
-func (m *MockPatentRepo) GetByID(ctx context.Context, id uuid.UUID) (*patent.Patent, error) { return nil, nil }
-func (m *MockPatentRepo) GetByPatentNumber(ctx context.Context, number string) (*patent.Patent, error) { return nil, nil }
-func (m *MockPatentRepo) Update(ctx context.Context, p *patent.Patent) error { return nil }
-func (m *MockPatentRepo) SoftDelete(ctx context.Context, id uuid.UUID) error { return nil }
-func (m *MockPatentRepo) Restore(ctx context.Context, id uuid.UUID) error { return nil }
-func (m *MockPatentRepo) HardDelete(ctx context.Context, id uuid.UUID) error { return nil }
-func (m *MockPatentRepo) Search(ctx context.Context, query patent.SearchQuery) (*patent.SearchResult, error) { return nil, nil }
-func (m *MockPatentRepo) GetByFamilyID(ctx context.Context, familyID string) ([]*patent.Patent, error) { return nil, nil }
-func (m *MockPatentRepo) GetByAssignee(ctx context.Context, assigneeID uuid.UUID, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
-func (m *MockPatentRepo) GetByJurisdiction(ctx context.Context, jurisdiction string, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
-func (m *MockPatentRepo) GetExpiringPatents(ctx context.Context, daysAhead int, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
-func (m *MockPatentRepo) FindDuplicates(ctx context.Context, fullTextHash string) ([]*patent.Patent, error) { return nil, nil }
-func (m *MockPatentRepo) CreateClaim(ctx context.Context, claim *patent.Claim) error { return nil }
-func (m *MockPatentRepo) GetClaimsByPatent(ctx context.Context, patentID uuid.UUID) ([]*patent.Claim, error) { return nil, nil }
-func (m *MockPatentRepo) UpdateClaim(ctx context.Context, claim *patent.Claim) error { return nil }
-func (m *MockPatentRepo) DeleteClaimsByPatent(ctx context.Context, patentID uuid.UUID) error { return nil }
-func (m *MockPatentRepo) BatchCreateClaims(ctx context.Context, claims []*patent.Claim) error { return nil }
-func (m *MockPatentRepo) GetIndependentClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.Claim, error) { return nil, nil }
-func (m *MockPatentRepo) SetInventors(ctx context.Context, patentID uuid.UUID, inventors []*patent.Inventor) error { return nil }
-func (m *MockPatentRepo) GetInventors(ctx context.Context, patentID uuid.UUID) ([]*patent.Inventor, error) { return nil, nil }
-func (m *MockPatentRepo) SearchByInventor(ctx context.Context, inventorName string, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
-func (m *MockPatentRepo) SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
-func (m *MockPatentRepo) SetPriorityClaims(ctx context.Context, patentID uuid.UUID, claims []*patent.PriorityClaim) error { return nil }
-func (m *MockPatentRepo) GetPriorityClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.PriorityClaim, error) { return nil, nil }
-func (m *MockPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Patent) (int, error) { return 0, nil }
-func (m *MockPatentRepo) BatchUpdateStatus(ctx context.Context, ids []uuid.UUID, status patent.PatentStatus) (int64, error) { return 0, nil }
-func (m *MockPatentRepo) CountByStatus(ctx context.Context) (map[patent.PatentStatus]int64, error) { return nil, nil }
-func (m *MockPatentRepo) CountByJurisdiction(ctx context.Context) (map[string]int64, error) { return nil, nil }
-func (m *MockPatentRepo) CountByYear(ctx context.Context, field string) (map[int]int64, error) { return nil, nil }
-func (m *MockPatentRepo) GetIPCDistribution(ctx context.Context, level int) (map[string]int64, error) { return nil, nil }
 func (m *MockPatentRepo) WithTx(ctx context.Context, fn func(patent.PatentRepository) error) error { return nil }
 
 // MockStorage

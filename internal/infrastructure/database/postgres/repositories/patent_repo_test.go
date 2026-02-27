@@ -56,7 +56,7 @@ func (s *PatentRepoTestSuite) TestCreate_Success() {
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), raw, meta).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(id, time.Now(), time.Now()))
 
-	err := s.repo.Create(context.Background(), p)
+	err := s.repo.Save(context.Background(), p)
 	s.NoError(err)
 	s.Equal(id, p.ID)
 }

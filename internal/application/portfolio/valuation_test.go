@@ -16,6 +16,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/testutil"
 	pkgerrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -24,6 +25,7 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockPatentRepo struct {
+	testutil.BasePatentRepoMock
 	patents     map[string]*patent.Patent
 	byPortfolio map[string][]*patent.Patent
 	byAssignee  map[string][]*patent.Patent
@@ -111,8 +113,8 @@ func (m *mockPatentRepo) GetByPatentNumber(ctx context.Context, number string) (
 func (m *mockPatentRepo) SoftDelete(ctx context.Context, id uuid.UUID) error  { return m.err }
 func (m *mockPatentRepo) Restore(ctx context.Context, id uuid.UUID) error     { return m.err }
 func (m *mockPatentRepo) HardDelete(ctx context.Context, id uuid.UUID) error  { return m.err }
-func (m *mockPatentRepo) Search(ctx context.Context, query patent.SearchQuery) (*patent.SearchResult, error) {
-	return &patent.SearchResult{}, m.err
+func (m *mockPatentRepo) Search(ctx context.Context, criteria patent.PatentSearchCriteria) (*patent.PatentSearchResult, error) {
+	return &patent.PatentSearchResult{}, m.err
 }
 func (m *mockPatentRepo) GetByFamilyID(ctx context.Context, familyID string) ([]*patent.Patent, error) {
 	return nil, m.err
@@ -194,6 +196,45 @@ func (m *mockPatentRepo) CountByYear(ctx context.Context, field string) (map[int
 }
 func (m *mockPatentRepo) GetIPCDistribution(ctx context.Context, level int) (map[string]int64, error) {
 	return nil, m.err
+}
+func (m *mockPatentRepo) FindByApplicant(ctx context.Context, applicantName string) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) FindByFamilyID(ctx context.Context, familyID string) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) CountByIPCSection(ctx context.Context) (map[string]int64, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) CountByOffice(ctx context.Context) (map[patent.PatentOffice]int64, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) FindCitedBy(ctx context.Context, patentNumber string) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) FindCiting(ctx context.Context, patentNumber string) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) FindExpiringBefore(ctx context.Context, date time.Time) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) FindActiveByIPCCode(ctx context.Context, ipcCode string) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) FindWithMarkushStructures(ctx context.Context, offset, limit int) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) FindByPatentNumbers(ctx context.Context, numbers []string) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) FindByIPCCode(ctx context.Context, ipcCode string) ([]*patent.Patent, error) {
+	return nil, m.err
+}
+func (m *mockPatentRepo) SaveBatch(ctx context.Context, patents []*patent.Patent) error {
+	return m.err
+}
+func (m *mockPatentRepo) Exists(ctx context.Context, patentNumber string) (bool, error) {
+	return false, m.err
 }
 
 // Transaction
@@ -634,10 +675,17 @@ func makeTestPatent(id, title, status string, claimCount int, ipcCount int, fili
 	}
 	
 	// Convert claims to pointers
-	claimPtrs := make([]*patent.Claim, len(claims))
-	for i := range claims {
-		claimPtrs[i] = &claims[i]
-	}
+	// ClaimSet is []Claim in domain/patent/entity.go
+	// But patent struct has Claims ClaimSet
+	// Wait, the test helper makeTestPatent constructs patent.Patent.
+	// Let's check patent.Patent definition in entity.go again.
+	// type Patent struct { ... Claims ClaimSet ... }
+	// type ClaimSet []Claim
+	// So we need to assign []Claim, not []*Claim.
+
+	// Convert claims to ClaimSet ([]Claim)
+	claimSet := make(patent.ClaimSet, len(claims))
+	copy(claimSet, claims)
 
 	return &patent.Patent{
 		ID:           patentID,
@@ -645,7 +693,7 @@ func makeTestPatent(id, title, status string, claimCount int, ipcCount int, fili
 		Title:        title,
 		Abstract:     "An improved method to enhance performance and reduce latency in distributed systems",
 		Status:       patentStatus,
-		Claims:       claimPtrs,
+		Claims:       claimSet,
 		IPCCodes:     ipcs,
 		FilingDate:   &filingDate,
 		FamilyID:     "family-" + id,

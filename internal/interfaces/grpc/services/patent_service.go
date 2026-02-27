@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -99,20 +98,26 @@ func (s *PatentServiceServer) SearchPatents(
 		offset, _ = strconv.ParseInt(string(decoded), 10, 64)
 	}
 
-	// Build search query
-	query := patent.SearchQuery{
-		Keyword:        req.Query,
-		IPCCode:        strings.Join(req.IpcClasses, ","),
-		Jurisdiction:   strings.Join(req.PatentOffices, ","),
-		FilingDateFrom: parseDate(req.ApplicationDateFrom),
-		FilingDateTo:   parseDate(req.ApplicationDateTo),
-		Offset:         int(offset),
-		Limit:          int(pageSize),
-		SortBy:         req.SortBy,
+	// Build search criteria
+	var offices []patent.PatentOffice
+	for _, o := range req.PatentOffices {
+		offices = append(offices, patent.PatentOffice(o))
+	}
+
+	criteria := patent.PatentSearchCriteria{
+		TitleKeywords:    []string{req.Query},
+		AbstractKeywords: []string{req.Query},
+		IPCCodes:         req.IpcClasses,
+		Offices:          offices,
+		FilingDateFrom:   parseDate(req.ApplicationDateFrom),
+		FilingDateTo:     parseDate(req.ApplicationDateTo),
+		Offset:           int(offset),
+		Limit:            int(pageSize),
+		SortBy:           req.SortBy,
 	}
 
 	// Execute search
-	result, err := s.patentRepo.Search(ctx, query)
+	result, err := s.patentRepo.Search(ctx, criteria)
 	if err != nil {
 		s.logger.Error("failed to search patents",
 			logging.Err(err),
@@ -121,22 +126,22 @@ func (s *PatentServiceServer) SearchPatents(
 	}
 
 	// Convert patents to proto
-	pbPatents := make([]*pb.Patent, len(result.Items))
-	for i, pat := range result.Items {
+	pbPatents := make([]*pb.Patent, len(result.Patents))
+	for i, pat := range result.Patents {
 		pbPatents[i] = patentDomainToProto(pat)
 	}
 
 	// Generate next page token
 	var nextPageToken string
-	if int64(len(result.Items)) == int64(pageSize) {
-		nextOffset := offset + int64(len(result.Items))
+	if int64(len(result.Patents)) == int64(pageSize) {
+		nextOffset := offset + int64(len(result.Patents))
 		nextPageToken = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d", nextOffset)))
 	}
 
 	return &pb.SearchPatentsResponse{
 		Patents:       pbPatents,
 		NextPageToken: nextPageToken,
-		TotalCount:    result.TotalCount,
+		TotalCount:    result.Total,
 	}, nil
 }
 

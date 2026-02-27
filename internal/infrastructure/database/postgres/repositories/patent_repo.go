@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -34,6 +35,13 @@ func (r *postgresPatentRepo) executor() queryExecutor {
 }
 
 // Patent CRUD
+
+func (r *postgresPatentRepo) Save(ctx context.Context, p *patent.Patent) error {
+	// Simple create for now as Create is implemented as Insert.
+	// Ideally should check for existence and call Update if exists.
+	// But sticking to alias for now.
+	return r.Create(ctx, p)
+}
 
 func (r *postgresPatentRepo) Create(ctx context.Context, p *patent.Patent) error {
 	query := `
@@ -150,6 +158,10 @@ func (r *postgresPatentRepo) GetByID(ctx context.Context, id uuid.UUID) (*patent
 	return p, nil
 }
 
+func (r *postgresPatentRepo) FindByPatentNumber(ctx context.Context, number string) (*patent.Patent, error) {
+	return r.GetByPatentNumber(ctx, number)
+}
+
 func (r *postgresPatentRepo) GetByPatentNumber(ctx context.Context, number string) (*patent.Patent, error) {
 	query := `SELECT * FROM patents WHERE patent_number = $1 AND deleted_at IS NULL`
 	row := r.executor().QueryRowContext(ctx, query, number)
@@ -206,9 +218,40 @@ func (r *postgresPatentRepo) HardDelete(ctx context.Context, id uuid.UUID) error
 
 // Search
 
-func (r *postgresPatentRepo) Search(ctx context.Context, q patent.SearchQuery) (*patent.SearchResult, error) {
+func (r *postgresPatentRepo) Search(ctx context.Context, c patent.PatentSearchCriteria) (*patent.PatentSearchResult, error) {
 	// Full Text Search implementation
-	return &patent.SearchResult{}, nil
+	return &patent.PatentSearchResult{
+		Patents: []*patent.Patent{},
+		Total:   0,
+		Offset:  c.Offset,
+		Limit:   c.Limit,
+		HasMore: false,
+	}, nil
+}
+
+func (r *postgresPatentRepo) FindByID(ctx context.Context, id string) (*patent.Patent, error) {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return nil, errors.NewInvalidInputError("invalid patent ID")
+	}
+	return r.GetByID(ctx, uid)
+}
+
+func (r *postgresPatentRepo) FindCitedBy(ctx context.Context, patentNumber string) ([]*patent.Patent, error) {
+	return nil, nil
+}
+
+func (r *postgresPatentRepo) FindCiting(ctx context.Context, patentNumber string) ([]*patent.Patent, error) {
+	return nil, nil
+}
+
+func (r *postgresPatentRepo) FindByApplicant(ctx context.Context, applicantName string) ([]*patent.Patent, error) {
+	pats, _, err := r.SearchByAssigneeName(ctx, applicantName, 50, 0)
+	return pats, err
+}
+
+func (r *postgresPatentRepo) FindByFamilyID(ctx context.Context, familyID string) ([]*patent.Patent, error) {
+	return r.GetByFamilyID(ctx, familyID)
 }
 
 func (r *postgresPatentRepo) GetByFamilyID(ctx context.Context, familyID string) ([]*patent.Patent, error) {
@@ -250,12 +293,57 @@ func (r *postgresPatentRepo) GetByJurisdiction(ctx context.Context, jurisdiction
 	return nil, 0, nil
 }
 
+func (r *postgresPatentRepo) FindExpiringBefore(ctx context.Context, date time.Time) ([]*patent.Patent, error) {
+	return nil, nil
+}
+
 func (r *postgresPatentRepo) GetExpiringPatents(ctx context.Context, daysAhead int, limit, offset int) ([]*patent.Patent, int64, error) {
 	return nil, 0, nil
 }
 
 func (r *postgresPatentRepo) FindDuplicates(ctx context.Context, fullTextHash string) ([]*patent.Patent, error) {
 	return nil, nil
+}
+
+func (r *postgresPatentRepo) FindByPatentNumbers(ctx context.Context, numbers []string) ([]*patent.Patent, error) {
+	if len(numbers) == 0 {
+		return []*patent.Patent{}, nil
+	}
+	query := `SELECT * FROM patents WHERE patent_number = ANY($1) AND deleted_at IS NULL`
+	rows, err := r.executor().QueryContext(ctx, query, pq.Array(numbers))
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to find patents by numbers")
+	}
+	defer rows.Close()
+	return scanPatents(rows)
+}
+
+func (r *postgresPatentRepo) FindByIPCCode(ctx context.Context, ipcCode string) ([]*patent.Patent, error) {
+	return nil, nil
+}
+
+func (r *postgresPatentRepo) FindByIDs(ctx context.Context, ids []string) ([]*patent.Patent, error) {
+	if len(ids) == 0 {
+		return []*patent.Patent{}, nil
+	}
+	// Simplified implementation for now, assuming UUIDs
+	var uids []uuid.UUID
+	for _, id := range ids {
+		if uid, err := uuid.Parse(id); err == nil {
+			uids = append(uids, uid)
+		}
+	}
+	if len(uids) == 0 {
+		return []*patent.Patent{}, nil
+	}
+
+	query := `SELECT * FROM patents WHERE id = ANY($1) AND deleted_at IS NULL`
+	rows, err := r.executor().QueryContext(ctx, query, pq.Array(uids))
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to find patents by IDs")
+	}
+	defer rows.Close()
+	return scanPatents(rows)
 }
 
 func (r *postgresPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*patent.Patent, error) {
@@ -369,12 +457,41 @@ func (r *postgresPatentRepo) SearchByAssigneeName(ctx context.Context, assigneeN
 }
 
 // Batch
+func (r *postgresPatentRepo) SaveBatch(ctx context.Context, patents []*patent.Patent) error {
+	_, err := r.BatchCreate(ctx, patents)
+	return err
+}
+
 func (r *postgresPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Patent) (int, error) { return 0, nil }
 func (r *postgresPatentRepo) BatchUpdateStatus(ctx context.Context, ids []uuid.UUID, status patent.PatentStatus) (int64, error) { return 0, nil }
 
 // Stats
 func (r *postgresPatentRepo) CountByStatus(ctx context.Context) (map[patent.PatentStatus]int64, error) { return nil, nil }
-func (r *postgresPatentRepo) CountByJurisdiction(ctx context.Context) (map[string]int64, error) { return nil, nil }
+func (r *postgresPatentRepo) CountByJurisdiction(ctx context.Context) (map[string]int64, error) {
+	query := `
+		SELECT jurisdiction, COUNT(*)
+		FROM patents
+		WHERE deleted_at IS NULL
+		GROUP BY jurisdiction
+	`
+	rows, err := r.executor().QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count by jurisdiction")
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int64)
+	for rows.Next() {
+		var jurisdiction string
+		var count int64
+		if err := rows.Scan(&jurisdiction, &count); err != nil {
+			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan jurisdiction count")
+		}
+		counts[jurisdiction] = count
+	}
+	return counts, nil
+}
+
 func (r *postgresPatentRepo) CountByYear(ctx context.Context, field string) (map[int]int64, error) { return nil, nil }
 func (r *postgresPatentRepo) GetIPCDistribution(ctx context.Context, level int) (map[string]int64, error) { return nil, nil }
 

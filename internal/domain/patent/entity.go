@@ -359,29 +359,6 @@ func (p *Patent) addEvent(event common.DomainEvent) {
 	p.domainEvents = append(p.domainEvents, event)
 }
 
-// SearchQuery represents criteria for searching patents.
-type SearchQuery struct {
-	Keyword        string
-	Status         *PatentStatus
-	PatentType     string
-	Jurisdiction   string
-	FilingDateFrom *time.Time
-	FilingDateTo   *time.Time
-	AssigneeID     *uuid.UUID
-	FamilyID       string
-	IPCCode        string
-	Limit          int
-	Offset         int
-	SortBy         string
-}
-
-// SearchResult contains search hits.
-type SearchResult struct {
-	Items      []*Patent
-	TotalCount int64
-	Facets     map[string]map[string]int64
-}
-
 // ClaimCount returns the total number of claims.
 func (p *Patent) ClaimCount() int {
 	return len(p.Claims)

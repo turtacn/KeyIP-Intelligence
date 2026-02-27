@@ -6,7 +6,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"

@@ -117,15 +117,24 @@ type PatentRepository interface {
 
 	Search(ctx context.Context, criteria PatentSearchCriteria) (*PatentSearchResult, error)
 	FindByMoleculeID(ctx context.Context, moleculeID string) ([]*Patent, error)
+
+	// Family
 	FindByFamilyID(ctx context.Context, familyID string) ([]*Patent, error)
+	GetByFamilyID(ctx context.Context, familyID string) ([]*Patent, error)
+
 	FindByIPCCode(ctx context.Context, ipcCode string) ([]*Patent, error)
+
+	// Applicant/Assignee
 	FindByApplicant(ctx context.Context, applicantName string) ([]*Patent, error)
+	SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*Patent, int64, error)
+
 	FindCitedBy(ctx context.Context, patentNumber string) ([]*Patent, error)
 	FindCiting(ctx context.Context, patentNumber string) ([]*Patent, error)
 
 	CountByStatus(ctx context.Context) (map[PatentStatus]int64, error)
 	CountByOffice(ctx context.Context) (map[PatentOffice]int64, error)
 	CountByIPCSection(ctx context.Context) (map[string]int64, error)
+	CountByJurisdiction(ctx context.Context) (map[string]int64, error)
 	CountByYear(ctx context.Context, field string) (map[int]int64, error)
 
 	FindExpiringBefore(ctx context.Context, date time.Time) ([]*Patent, error)

@@ -18,6 +18,7 @@ import (
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/molpatent_gnn"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/testutil"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -312,6 +313,7 @@ var _ domainportfolio.PortfolioRepository = (*mockPortfolioRepoConstellation)(ni
 // -----------------------------------------------------------------------
 
 type mockPatentRepoConstellation struct {
+	testutil.BasePatentRepoMock
 	byPortfolio map[string][]*domainpatent.Patent
 	byAssignee  map[string][]*domainpatent.Patent
 	byIDs       map[string]*domainpatent.Patent
@@ -367,7 +369,7 @@ func (m *mockPatentRepoConstellation) HardDelete(ctx context.Context, id uuid.UU
 	return nil
 }
 
-func (m *mockPatentRepoConstellation) Search(ctx context.Context, query domainpatent.SearchQuery) (*domainpatent.SearchResult, error) {
+func (m *mockPatentRepoConstellation) Search(ctx context.Context, criteria domainpatent.PatentSearchCriteria) (*domainpatent.PatentSearchResult, error) {
 	return nil, nil
 }
 
@@ -385,94 +387,6 @@ func (m *mockPatentRepoConstellation) SearchByAssigneeName(ctx context.Context, 
 	}
 	patents := m.byAssignee[assigneeName]
 	return patents, int64(len(patents)), nil
-}
-
-func (m *mockPatentRepoConstellation) GetByJurisdiction(ctx context.Context, jurisdiction string, limit, offset int) ([]*domainpatent.Patent, int64, error) {
-	return nil, 0, nil
-}
-
-func (m *mockPatentRepoConstellation) GetExpiringPatents(ctx context.Context, daysAhead int, limit, offset int) ([]*domainpatent.Patent, int64, error) {
-	return nil, 0, nil
-}
-
-func (m *mockPatentRepoConstellation) FindDuplicates(ctx context.Context, fullTextHash string) ([]*domainpatent.Patent, error) {
-	return nil, nil
-}
-
-func (m *mockPatentRepoConstellation) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*domainpatent.Patent, error) {
-	return nil, nil
-}
-
-func (m *mockPatentRepoConstellation) AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error {
-	return nil
-}
-
-func (m *mockPatentRepoConstellation) CreateClaim(ctx context.Context, claim *domainpatent.Claim) error {
-	return nil
-}
-
-func (m *mockPatentRepoConstellation) GetClaimsByPatent(ctx context.Context, patentID uuid.UUID) ([]*domainpatent.Claim, error) {
-	return nil, nil
-}
-
-func (m *mockPatentRepoConstellation) UpdateClaim(ctx context.Context, claim *domainpatent.Claim) error {
-	return nil
-}
-
-func (m *mockPatentRepoConstellation) DeleteClaimsByPatent(ctx context.Context, patentID uuid.UUID) error {
-	return nil
-}
-
-func (m *mockPatentRepoConstellation) BatchCreateClaims(ctx context.Context, claims []*domainpatent.Claim) error {
-	return nil
-}
-
-func (m *mockPatentRepoConstellation) GetIndependentClaims(ctx context.Context, patentID uuid.UUID) ([]*domainpatent.Claim, error) {
-	return nil, nil
-}
-
-func (m *mockPatentRepoConstellation) SetInventors(ctx context.Context, patentID uuid.UUID, inventors []*domainpatent.Inventor) error {
-	return nil
-}
-
-func (m *mockPatentRepoConstellation) GetInventors(ctx context.Context, patentID uuid.UUID) ([]*domainpatent.Inventor, error) {
-	return nil, nil
-}
-
-func (m *mockPatentRepoConstellation) SearchByInventor(ctx context.Context, inventorName string, limit, offset int) ([]*domainpatent.Patent, int64, error) {
-	return nil, 0, nil
-}
-
-func (m *mockPatentRepoConstellation) SetPriorityClaims(ctx context.Context, patentID uuid.UUID, claims []*domainpatent.PriorityClaim) error {
-	return nil
-}
-
-func (m *mockPatentRepoConstellation) GetPriorityClaims(ctx context.Context, patentID uuid.UUID) ([]*domainpatent.PriorityClaim, error) {
-	return nil, nil
-}
-
-func (m *mockPatentRepoConstellation) BatchCreate(ctx context.Context, patents []*domainpatent.Patent) (int, error) {
-	return 0, nil
-}
-
-func (m *mockPatentRepoConstellation) BatchUpdateStatus(ctx context.Context, ids []uuid.UUID, status domainpatent.PatentStatus) (int64, error) {
-	return 0, nil
-}
-
-func (m *mockPatentRepoConstellation) CountByStatus(ctx context.Context) (map[domainpatent.PatentStatus]int64, error) {
-	return nil, nil
-}
-
-func (m *mockPatentRepoConstellation) CountByJurisdiction(ctx context.Context) (map[string]int64, error) {
-	return nil, nil
-}
-
-func (m *mockPatentRepoConstellation) CountByYear(ctx context.Context, field string) (map[int]int64, error) {
-	return nil, nil
-}
-
-func (m *mockPatentRepoConstellation) GetIPCDistribution(ctx context.Context, level int) (map[string]int64, error) {
-	return nil, nil
 }
 
 func (m *mockPatentRepoConstellation) WithTx(ctx context.Context, fn func(domainpatent.PatentRepository) error) error {

@@ -511,4 +511,100 @@ func (s *PatentService) publishEvents(ctx context.Context, p *Patent, events ...
 	}
 }
 
-//Personal.AI order the ending
+// SimilaritySearchRequest defines parameters for patent similarity search.
+type SimilaritySearchRequest struct {
+	MoleculeID     string
+	SMILES         string
+	Threshold      float64
+	Limit          int
+	Offset         int
+	MaxResults     int
+	PatentOffices  []string
+	Assignees      []string
+	TechDomains    []string
+	DateFrom       *time.Time
+	DateTo         *time.Time
+	ExcludePatents []string
+}
+
+// SimilaritySearchResult defines the output of a similarity search.
+type SimilaritySearchResult struct {
+	Patent             *Patent
+	PatentNumber       string
+	Title              string
+	Assignee           string
+	FilingDate         time.Time
+	LegalStatus        string
+	IPCCodes           []string
+	Score              float64
+	MorganSimilarity   float64
+	RDKitSimilarity    float64
+	AtomPairSimilarity float64
+}
+
+func (s *PatentService) GetPatentsByMoleculeID(ctx context.Context, moleculeID string) ([]*Patent, error) {
+	return s.patentRepo.FindByMoleculeID(ctx, moleculeID)
+}
+
+func (s *PatentService) SearchBySimilarity(ctx context.Context, req *SimilaritySearchRequest) ([]*SimilaritySearchResult, error) {
+	// Map request to repository search criteria
+	criteria := PatentSearchCriteria{
+		MoleculeIDs: []string{req.MoleculeID},
+		Limit:       req.Limit,
+		Offset:      req.Offset,
+	}
+	if req.MaxResults > 0 {
+		criteria.Limit = req.MaxResults
+	}
+	if criteria.Limit == 0 {
+		criteria.Limit = 50
+	}
+
+	if len(req.PatentOffices) > 0 {
+		for _, o := range req.PatentOffices {
+			criteria.Offices = append(criteria.Offices, PatentOffice(o))
+		}
+	}
+	if len(req.Assignees) > 0 {
+		criteria.ApplicantNames = req.Assignees
+	}
+	if len(req.TechDomains) > 0 {
+		criteria.IPCCodes = req.TechDomains
+	}
+	if req.DateFrom != nil {
+		criteria.FilingDateFrom = req.DateFrom
+	}
+	if req.DateTo != nil {
+		criteria.FilingDateTo = req.DateTo
+	}
+
+	// Delegate to repository
+	result, err := s.patentRepo.Search(ctx, criteria)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert results
+	searchResults := make([]*SimilaritySearchResult, len(result.Patents))
+	for i, p := range result.Patents {
+		var filingDate time.Time
+		if p.FilingDate != nil {
+			filingDate = *p.FilingDate
+		}
+		searchResults[i] = &SimilaritySearchResult{
+			Patent:             p,
+			PatentNumber:       p.PatentNumber,
+			Title:              p.Title,
+			Assignee:           p.AssigneeName,
+			FilingDate:         filingDate,
+			LegalStatus:        p.Status.String(),
+			IPCCodes:           p.IPCCodes,
+			Score:              1.0, // Dummy score as repo search doesn't return similarity yet
+			MorganSimilarity:   1.0,
+			RDKitSimilarity:    1.0,
+			AtomPairSimilarity: 1.0,
+		}
+	}
+
+	return searchResults, nil
+}

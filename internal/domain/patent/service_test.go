@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
@@ -71,6 +72,10 @@ func (m *MockPatentRepository) FindByFamilyID(ctx context.Context, familyID stri
 	args := m.Called(ctx, familyID)
 	return args.Get(0).([]*Patent), args.Error(1)
 }
+func (m *MockPatentRepository) GetByFamilyID(ctx context.Context, familyID string) ([]*Patent, error) {
+	args := m.Called(ctx, familyID)
+	return args.Get(0).([]*Patent), args.Error(1)
+}
 func (m *MockPatentRepository) FindByIPCCode(ctx context.Context, ipcCode string) ([]*Patent, error) {
 	args := m.Called(ctx, ipcCode)
 	return args.Get(0).([]*Patent), args.Error(1)
@@ -78,6 +83,10 @@ func (m *MockPatentRepository) FindByIPCCode(ctx context.Context, ipcCode string
 func (m *MockPatentRepository) FindByApplicant(ctx context.Context, applicantName string) ([]*Patent, error) {
 	args := m.Called(ctx, applicantName)
 	return args.Get(0).([]*Patent), args.Error(1)
+}
+func (m *MockPatentRepository) SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*Patent, int64, error) {
+	args := m.Called(ctx, assigneeName, limit, offset)
+	return args.Get(0).([]*Patent), args.Get(1).(int64), args.Error(2)
 }
 func (m *MockPatentRepository) FindCitedBy(ctx context.Context, patentNumber string) ([]*Patent, error) {
 	args := m.Called(ctx, patentNumber)
@@ -99,6 +108,10 @@ func (m *MockPatentRepository) CountByIPCSection(ctx context.Context) (map[strin
 	args := m.Called(ctx)
 	return args.Get(0).(map[string]int64), args.Error(1)
 }
+func (m *MockPatentRepository) CountByJurisdiction(ctx context.Context) (map[string]int64, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(map[string]int64), args.Error(1)
+}
 func (m *MockPatentRepository) CountByYear(ctx context.Context, field string) (map[int]int64, error) {
 	args := m.Called(ctx, field)
 	return args.Get(0).(map[int]int64), args.Error(1)
@@ -113,6 +126,22 @@ func (m *MockPatentRepository) FindActiveByIPCCode(ctx context.Context, ipcCode 
 }
 func (m *MockPatentRepository) FindWithMarkushStructures(ctx context.Context, offset, limit int) ([]*Patent, error) {
 	args := m.Called(ctx, offset, limit)
+	return args.Get(0).([]*Patent), args.Error(1)
+}
+func (m *MockPatentRepository) AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error {
+	args := m.Called(ctx, patentID, moleculeID)
+	return args.Error(0)
+}
+func (m *MockPatentRepository) GetByID(ctx context.Context, id uuid.UUID) (*Patent, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(*Patent), args.Error(1)
+}
+func (m *MockPatentRepository) GetByPatentNumber(ctx context.Context, number string) (*Patent, error) {
+	args := m.Called(ctx, number)
+	return args.Get(0).(*Patent), args.Error(1)
+}
+func (m *MockPatentRepository) ListByPortfolio(ctx context.Context, portfolioID string) ([]*Patent, error) {
+	args := m.Called(ctx, portfolioID)
 	return args.Get(0).([]*Patent), args.Error(1)
 }
 

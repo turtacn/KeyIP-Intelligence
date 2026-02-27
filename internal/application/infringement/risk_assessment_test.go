@@ -25,6 +25,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/claim_bert"
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/infringe_net"
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/molpatent_gnn"
+	"github.com/turtacn/KeyIP-Intelligence/internal/testutil"
 )
 
 // ===========================================================================
@@ -53,31 +54,40 @@ func (m *mockMoleculeSvc) CanonicalizeFromInChI(ctx context.Context, inchi strin
 	return "canonical-from-inchi", "INCHIKEY-FROM-INCHI", nil
 }
 
-// --- Mock PatentDomainService ---
+// --- Mock Repositories for Patent Service ---
 
-type mockPatentSvc struct {
-	patent.PatentDomainService
-	searchBySimilarityFn func(ctx context.Context, req *patent.SimilaritySearchRequest) ([]*patent.SimilaritySearchResult, error)
-	getPatentByNumberFn  func(ctx context.Context, number string) (*patent.Patent, error)
+type mockPatentRepoForService struct {
+	testutil.BasePatentRepoMock
+	searchFn            func(ctx context.Context, criteria patent.PatentSearchCriteria) (*patent.PatentSearchResult, error)
+	getPatentByNumberFn func(ctx context.Context, number string) (*patent.Patent, error)
 }
 
-func (m *mockPatentSvc) SearchBySimilarity(ctx context.Context, req *patent.SimilaritySearchRequest) ([]*patent.SimilaritySearchResult, error) {
-	if m.searchBySimilarityFn != nil {
-		return m.searchBySimilarityFn(ctx, req)
-	}
-	return []*patent.SimilaritySearchResult{}, nil
-}
-
-func (m *mockPatentSvc) GetPatentByNumber(ctx context.Context, number string) (*patent.Patent, error) {
+// Override methods needed by tests
+func (m *mockPatentRepoForService) FindByPatentNumber(ctx context.Context, patentNumber string) (*patent.Patent, error) {
 	if m.getPatentByNumberFn != nil {
-		return m.getPatentByNumberFn(ctx, number)
+		return m.getPatentByNumberFn(ctx, patentNumber)
 	}
-	// Return a dummy patent to avoid nil pointer dereference
-	return &patent.Patent{
-		PatentNumber: number,
-		Claims:       []*patent.Claim{{Text: "dummy claim"}},
+	return nil, nil
+}
+
+func (m *mockPatentRepoForService) Search(ctx context.Context, criteria patent.PatentSearchCriteria) (*patent.PatentSearchResult, error) {
+	if m.searchFn != nil {
+		return m.searchFn(ctx, criteria)
+	}
+	return &patent.PatentSearchResult{
+		Patents: []*patent.Patent{},
+		Total:   0,
 	}, nil
 }
+
+type mockMarkushRepoForService struct {}
+func (m *mockMarkushRepoForService) Save(ctx context.Context, markush *patent.MarkushStructure) error { return nil }
+func (m *mockMarkushRepoForService) FindByID(ctx context.Context, id string) (*patent.MarkushStructure, error) { return nil, nil }
+func (m *mockMarkushRepoForService) FindByPatentID(ctx context.Context, patentID string) ([]*patent.MarkushStructure, error) { return nil, nil }
+func (m *mockMarkushRepoForService) FindByClaimNumber(ctx context.Context, patentID string, claimNumber int) ([]*patent.MarkushStructure, error) { return nil, nil }
+func (m *mockMarkushRepoForService) FindMatchingMolecule(ctx context.Context, smiles string) ([]*patent.MarkushStructure, error) { return nil, nil }
+func (m *mockMarkushRepoForService) Delete(ctx context.Context, id string) error { return nil }
+func (m *mockMarkushRepoForService) CountByPatentID(ctx context.Context, patentID string) (int64, error) { return 0, nil }
 
 // --- Mock InfringeNetAssessor ---
 
@@ -362,7 +372,8 @@ func (s *mockSummary) Observe(value float64) {}
 type testHarness struct {
 	svc            RiskAssessmentService
 	moleculeSvc    *mockMoleculeSvc
-	patentSvc      *mockPatentSvc
+	// patentSvc      *mockPatentSvc -- Removed as we use real service with mock repo
+	patentRepo     *mockPatentRepoForService
 	infringeNet    *mockInfringeNet
 	claimParser    *mockClaimParser
 	gnnInference   *mockGNNInference
@@ -378,7 +389,7 @@ func newTestHarness(t *testing.T) *testHarness {
 
 	h := &testHarness{
 		moleculeSvc:    &mockMoleculeSvc{},
-		patentSvc:      &mockPatentSvc{},
+		patentRepo:     &mockPatentRepoForService{},
 		infringeNet:    &mockInfringeNet{},
 		claimParser:    &mockClaimParser{},
 		gnnInference:   &mockGNNInference{},
@@ -391,9 +402,21 @@ func newTestHarness(t *testing.T) *testHarness {
 	appMetrics := prom.NewAppMetrics(&mockMetricsCollector{})
 	h.metrics = appMetrics
 
+	// Create a dummy PatentService because we can't easily mock a concrete struct's methods that aren't interface-based without embedding/overriding in a way that satisfies the type checker if RiskAssessmentService expects *patent.PatentService.
+	// However, risk_assessment.go defines `patentSvc *patent.PatentService` in the struct.
+	// Since *patent.PatentService is a concrete type, we cannot inject a mock implementation unless we change the dependency to an interface or use a different testing strategy.
+	// Given the constraints, I will attempt to make `mockPatentSvc` embed `*patent.PatentService` but we cannot override methods of a concrete type in Go like virtual functions.
+	// The plan should have addressed making `PatentService` an interface if we wanted to mock it, or we rely on `patent.PatentService` delegating to a mocked repository.
+	// Let's assume we can construct a real PatentService with a mock repository.
+
+	// Setup real patent service with mock repository
+	// We want h.patentRepo (which is *mockPatentRepoForService) to be used.
+	mockMarkush := &mockMarkushRepoForService{}
+	realPatentSvc := patent.NewPatentService(h.patentRepo, mockMarkush, nil, &mockLogger{})
+
 	svc, err := NewRiskAssessmentService(RiskAssessmentServiceConfig{
 		MoleculeSvc:    h.moleculeSvc,
-		PatentSvc:      h.patentSvc,
+		PatentSvc:      realPatentSvc,
 		InfringeNet:    h.infringeNet,
 		ClaimParser:    h.claimParser,
 		GNNInference:   h.gnnInference,
@@ -478,26 +501,28 @@ func TestAssessMolecule_CacheMiss_WithCandidates_StandardDepth(t *testing.T) {
 
 	filingDate := time.Date(2020, 1, 15, 0, 0, 0, 0, time.UTC)
 
-	h.patentSvc.searchBySimilarityFn = func(ctx context.Context, req *patent.SimilaritySearchRequest) ([]*patent.SimilaritySearchResult, error) {
-		return []*patent.SimilaritySearchResult{
-			{
-				PatentNumber:       "US10000001",
-				Title:              "OLED Emitter Compound",
-				Assignee:           "CompetitorA",
-				FilingDate:         filingDate,
-				LegalStatus:        "active",
-				IPCCodes:           []string{"C07D401/04"},
-				MorganSimilarity:   0.90,
-				RDKitSimilarity:    0.90,
-				AtomPairSimilarity: 0.90,
+	h.patentRepo.searchFn = func(ctx context.Context, criteria patent.PatentSearchCriteria) (*patent.PatentSearchResult, error) {
+		// Return patent directly as Search in repository returns *PatentSearchResult
+		return &patent.PatentSearchResult{
+			Patents: []*patent.Patent{
+				{
+					PatentNumber: "US10000001",
+					Title:        "OLED Emitter Compound",
+					AssigneeName: "CompetitorA",
+					FilingDate:   &filingDate,
+					Status:       patent.PatentStatusGranted, // map "active"
+					IPCCodes:     []string{"C07D401/04"},
+				},
 			},
+			Total: 1,
 		}, nil
 	}
 
-	h.patentSvc.getPatentByNumberFn = func(ctx context.Context, number string) (*patent.Patent, error) {
+	h.patentRepo.getPatentByNumberFn = func(ctx context.Context, number string) (*patent.Patent, error) {
+		// Use ClaimSet properly
 		return &patent.Patent{
 			PatentNumber: number,
-			Claims: []*patent.Claim{
+			Claims:       patent.ClaimSet{
 				{Number: 1, Text: "A composition...", Type: patent.ClaimTypeIndependent},
 			},
 		}, nil
@@ -524,21 +549,21 @@ func TestAssessMolecule_CacheMiss_DeepDepth_WithInfringeNet(t *testing.T) {
 	h := newTestHarness(t)
 	ctx := context.Background()
 
-	h.patentSvc.searchBySimilarityFn = func(ctx context.Context, req *patent.SimilaritySearchRequest) ([]*patent.SimilaritySearchResult, error) {
-		return []*patent.SimilaritySearchResult{
-			{
-				PatentNumber:       "US20200001",
-				MorganSimilarity:   0.90,
-				RDKitSimilarity:    0.90,
-				AtomPairSimilarity: 0.90,
+	h.patentRepo.searchFn = func(ctx context.Context, criteria patent.PatentSearchCriteria) (*patent.PatentSearchResult, error) {
+		return &patent.PatentSearchResult{
+			Patents: []*patent.Patent{
+				{
+					PatentNumber: "US20200001",
+				},
 			},
+			Total: 1,
 		}, nil
 	}
 
-	h.patentSvc.getPatentByNumberFn = func(ctx context.Context, number string) (*patent.Patent, error) {
+	h.patentRepo.getPatentByNumberFn = func(ctx context.Context, number string) (*patent.Patent, error) {
 		return &patent.Patent{
 			PatentNumber: number,
-			Claims: []*patent.Claim{
+			Claims:       patent.ClaimSet{
 				{Number: 1, Text: "A compound...", Type: patent.ClaimTypeIndependent},
 			},
 		}, nil

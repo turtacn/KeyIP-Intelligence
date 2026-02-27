@@ -133,8 +133,8 @@ type TestEnvironment struct {
 
 	// Domain services
 	MoleculeService      domainMolecule.Service
-	PatentService        domainPatent.PatentDomainService
-	PortfolioService     domainPortfolio.PortfolioService
+	PatentService        *domainPatent.PatentService
+	PortfolioService     domainPortfolio.Service
 	LifecycleService     domainLifecycle.Service
 	CollaborationService domainCollaboration.CollaborationService
 

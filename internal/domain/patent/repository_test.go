@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
@@ -123,9 +124,16 @@ func (m *mockPatentRepo) CountByStatus(ctx context.Context) (map[PatentStatus]in
 func (m *mockPatentRepo) CountByOffice(ctx context.Context) (map[PatentOffice]int64, error) { return nil, nil }
 func (m *mockPatentRepo) CountByIPCSection(ctx context.Context) (map[string]int64, error) { return nil, nil }
 func (m *mockPatentRepo) CountByYear(ctx context.Context, field string) (map[int]int64, error) { return nil, nil }
+func (m *mockPatentRepo) CountByJurisdiction(ctx context.Context) (map[string]int64, error) { return nil, nil }
+func (m *mockPatentRepo) GetByFamilyID(ctx context.Context, familyID string) ([]*Patent, error) { return nil, nil }
+func (m *mockPatentRepo) GetByPatentNumber(ctx context.Context, number string) (*Patent, error) { return nil, nil }
+func (m *mockPatentRepo) GetByID(ctx context.Context, id uuid.UUID) (*Patent, error) { return nil, nil }
+func (m *mockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string) ([]*Patent, error) { return nil, nil }
+func (m *mockPatentRepo) SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*Patent, int64, error) { return nil, 0, nil }
 func (m *mockPatentRepo) FindExpiringBefore(ctx context.Context, date time.Time) ([]*Patent, error) { return nil, nil }
 func (m *mockPatentRepo) FindActiveByIPCCode(ctx context.Context, ipcCode string) ([]*Patent, error) { return nil, nil }
 func (m *mockPatentRepo) FindWithMarkushStructures(ctx context.Context, offset, limit int) ([]*Patent, error) { return nil, nil }
+func (m *mockPatentRepo) AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error { return nil }
 
 func TestPatentRepository_InterfaceCompile(t *testing.T) {
 	var _ PatentRepository = (*mockPatentRepo)(nil)
