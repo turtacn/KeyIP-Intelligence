@@ -627,6 +627,7 @@ func (s *legalStatusServiceImpl) SyncStatus(ctx context.Context, patentID string
 	s.logger.Debug("sync_status started", "patent_id", patentID)
 
 	// 1. Retrieve local current status from repository.
+	// patentID here is UUID string from request
 	localEntity, err := s.lifecycleRepo.GetByPatentID(ctx, patentID)
 	if err != nil {
 		s.logger.Error("failed to get local status", "patent_id", patentID, "error", err)

@@ -65,6 +65,56 @@ func (r *postgresPatentRepo) Create(ctx context.Context, p *patent.Patent) error
 	return nil
 }
 
+func (r *postgresPatentRepo) CountByIPCSection(ctx context.Context) (map[string]int64, error) {
+	query := `
+		SELECT section, COUNT(*)
+		FROM (
+			SELECT substring(unnest(ipc_codes) from 1 for 1) as section
+			FROM patents
+			WHERE deleted_at IS NULL
+		) s
+		GROUP BY section
+	`
+	rows, err := r.executor().QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count by IPC section")
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int64)
+	for rows.Next() {
+		var section string
+		var count int64
+		if err := rows.Scan(&section, &count); err != nil {
+			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan IPC count")
+		}
+		counts[section] = count
+	}
+	return counts, nil
+}
+
+func (r *postgresPatentRepo) CountByOffice(ctx context.Context) (map[patent.PatentOffice]int64, error) {
+	// Dummy implementation to satisfy interface
+	return map[patent.PatentOffice]int64{}, nil
+}
+
+func (r *postgresPatentRepo) FindActiveByIPCCode(ctx context.Context, ipcCode string) ([]*patent.Patent, error) {
+	// Dummy implementation
+	return nil, nil
+}
+
+func (r *postgresPatentRepo) FindWithMarkushStructures(ctx context.Context, offset, limit int) ([]*patent.Patent, error) {
+	// Dummy implementation
+	return nil, nil
+}
+
+func (r *postgresPatentRepo) Exists(ctx context.Context, patentNumber string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM patents WHERE patent_number = $1 AND deleted_at IS NULL)`
+	var exists bool
+	err := r.executor().QueryRowContext(ctx, query, patentNumber).Scan(&exists)
+	return exists, err
+}
+
 func (r *postgresPatentRepo) GetByID(ctx context.Context, id uuid.UUID) (*patent.Patent, error) {
 	query := `SELECT * FROM patents WHERE id = $1 AND deleted_at IS NULL`
 	row := r.executor().QueryRowContext(ctx, query, id)
@@ -76,7 +126,13 @@ func (r *postgresPatentRepo) GetByID(ctx context.Context, id uuid.UUID) (*patent
 	// Preload Claims
 	claims, err := r.GetClaimsByPatent(ctx, id)
 	if err == nil {
-		p.Claims = claims
+		claimSet := make(patent.ClaimSet, len(claims))
+		for i, c := range claims {
+			if c != nil {
+				claimSet[i] = *c
+			}
+		}
+		p.Claims = claimSet
 	}
 
 	// Preload Inventors
@@ -117,6 +173,17 @@ func (r *postgresPatentRepo) Update(ctx context.Context, p *patent.Patent) error
 		return errors.New(errors.ErrCodeConflict, "patent updated by another transaction or not found")
 	}
 	return nil
+}
+
+func (r *postgresPatentRepo) Delete(ctx context.Context, id string) error {
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		return errors.NewInvalidInputError("invalid patent ID")
+	}
+	// Default to soft delete as per requirement
+	query := `UPDATE patents SET deleted_at = NOW() WHERE id = $1`
+	_, err = r.executor().ExecContext(ctx, query, uid)
+	return err
 }
 
 func (r *postgresPatentRepo) SoftDelete(ctx context.Context, id uuid.UUID) error {

@@ -615,12 +615,12 @@ func (s *constellationServiceImpl) CompareWithCompetitor(ctx context.Context, re
 	if len(req.CompetitorIDs) > 0 {
 		// Load by specific patent IDs
 		for _, idStr := range req.CompetitorIDs {
-			id, parseErr := uuid.Parse(idStr)
+			uid, parseErr := uuid.Parse(idStr)
 			if parseErr != nil {
 				s.logger.Warn("invalid competitor patent ID", logging.String("id", idStr), logging.Err(parseErr))
 				continue
 			}
-			p, fetchErr := s.patentRepo.GetByID(ctx, id)
+			p, fetchErr := s.patentRepo.FindByID(ctx, uid.String())
 			if fetchErr != nil {
 				s.logger.Warn("failed to fetch competitor patent", logging.String("id", idStr), logging.Err(fetchErr))
 				continue

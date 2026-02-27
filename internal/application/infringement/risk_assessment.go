@@ -844,7 +844,7 @@ type RiskAssessmentService interface {
 // infringement risk assessment.
 type riskAssessmentServiceImpl struct {
 	moleculeSvc    molecule.MoleculeDomainService
-	patentSvc      patent.PatentDomainService
+	patentSvc      *patent.PatentService
 	infringeNet    infringe_net.InfringementAssessor
 	claimParser    claim_bert.ClaimParser
 	gnnInference   molpatent_gnn.GNNInferenceService
@@ -860,7 +860,7 @@ type riskAssessmentServiceImpl struct {
 // risk assessment service.
 type RiskAssessmentServiceConfig struct {
 	MoleculeSvc    molecule.MoleculeDomainService
-	PatentSvc      patent.PatentDomainService
+	PatentSvc      *patent.PatentService
 	InfringeNet    infringe_net.InfringementAssessor
 	ClaimParser    claim_bert.ClaimParser
 	GNNInference   molpatent_gnn.GNNInferenceService

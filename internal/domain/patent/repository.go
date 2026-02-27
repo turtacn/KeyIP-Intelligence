@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
@@ -130,9 +131,12 @@ type PatentRepository interface {
 	FindExpiringBefore(ctx context.Context, date time.Time) ([]*Patent, error)
 	FindActiveByIPCCode(ctx context.Context, ipcCode string) ([]*Patent, error)
 	FindWithMarkushStructures(ctx context.Context, offset, limit int) ([]*Patent, error)
+	AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error
 
 	// Legacy methods aliases if needed by existing code calling PatentRepository
-	// ... (Implementation specific, interface should be clean)
+	GetByID(ctx context.Context, id uuid.UUID) (*Patent, error)
+	GetByPatentNumber(ctx context.Context, number string) (*Patent, error)
+	ListByPortfolio(ctx context.Context, portfolioID string) ([]*Patent, error)
 }
 
 // MarkushRepository defines the interface for Markush structure data access.
