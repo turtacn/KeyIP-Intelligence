@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,7 +17,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/collaboration"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/lifecycle"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/molecule"
-	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent"
+	// "github.com/turtacn/KeyIP-Intelligence/internal/application/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/reporting"
@@ -201,7 +200,7 @@ func main() {
 	// --- Application Services ---
 	// Mocking services not fully implemented in context to allow compilation
 	moleculeSvc := molecule.NewService(moleculeRepo, logger)
-	patentSvc := patent.NewService(patentRepo, logger)
+	// patentSvc := patent.NewService(patentRepo, logger)
 	// portfolioSvc := portfolio.NewService(portfolioRepo, logger)
 	// lifecycleSvc := lifecycle.NewService(lifecycleRepo, logger)
 	// collaborationSvc := collaboration.NewService(collaborationRepo, logger)
@@ -221,7 +220,12 @@ func main() {
 	// patentHandler := handlers.NewPatentHandler(patentSvc, logger)
 	// ... other handlers
 
-	healthHandler := handlers.NewHealthHandler(pgConn, redisClient, logger)
+	healthHandler := handlers.NewHealthHandler(
+		config.Version,
+		// Adapters to satisfy HealthChecker interface
+		&postgresHealthAdapter{pgConn},
+		&redisHealthAdapter{redisClient},
+	)
 
 	// --- Router ---
 	routerCfg := httpserver.RouterConfig{
