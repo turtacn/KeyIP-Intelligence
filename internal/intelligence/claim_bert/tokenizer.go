@@ -713,16 +713,16 @@ func compileChemicalPatterns() []*regexp.Regexp {
 		`\b[A-Z][a-z]?\d*(?:\([A-Z][a-z]?\d*\)\d*)*(?:[A-Z][a-z]?\d*)*\b`,
 
 		// Markush keywords: alkyl, aryl, heteroaryl, etc.
-		`\b(?:alkyl|aryl|heteroaryl|cycloalkyl|heterocycl\w*|halogen|halo)\b`,
+		`(?i)\b(?:alkyl|aryl|heteroaryl|cycloalkyl|heterocycl\w*|halogen|halo)\b`,
 
 		// IUPAC-style chemical names with numbers and hyphens
 		// e.g. 2-methylpropan-1-ol, 4-(2-hydroxyethyl)piperazine
-		`\b\d*[,-]?\s*(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|phenyl|benzyl|amino|hydroxy|oxo|chloro|bromo|fluoro|nitro|cyano|carboxy|sulfo)\w*(?:-\w+)*\b`,
+		`(?i)\b\d*[,-]?\s*(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|phenyl|benzyl|amino|hydroxy|oxo|chloro|bromo|fluoro|nitro|cyano|carboxy|sulfo)\w*(?:-\w+)*\b`,
 	}
 
 	compiled := make([]*regexp.Regexp, 0, len(patterns))
 	for _, p := range patterns {
-		re, err := regexp.Compile("(?i)" + p)
+		re, err := regexp.Compile(p)
 		if err != nil {
 			continue // skip invalid patterns silently
 		}
@@ -819,4 +819,3 @@ var _ Tokenizer = (*WordPieceTokenizer)(nil)
 
 // Suppress unused import for math in edge cases.
 var _ = math.MaxInt
-
