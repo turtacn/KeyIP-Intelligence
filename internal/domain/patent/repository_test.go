@@ -48,8 +48,8 @@ func TestPatentSearchCriteria_Validate_DateRangeInvalid(t *testing.T) {
 	now := time.Now()
 	later := now.Add(time.Hour)
 	c := PatentSearchCriteria{
-		FilingDateFrom: &later,
-		FilingDateTo:   &now,
+		FilingDateStart: &later,
+		FilingDateEnd:   &now,
 	}
 	assert.Error(t, c.Validate())
 }
