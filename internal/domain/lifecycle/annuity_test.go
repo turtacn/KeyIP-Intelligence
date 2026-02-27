@@ -1,165 +1,82 @@
 package lifecycle
 
 import (
-	"context"
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
-type MockLifecycleRepository struct {
-	mock.Mock
+func TestNewAnnuity(t *testing.T) {
+	due := time.Now().AddDate(1, 0, 0)
+	a, err := NewAnnuity("pat-1", 1, due, "USD", 1000)
+	assert.NoError(t, err)
+	assert.NotNil(t, a)
+	assert.Equal(t, "pat-1", a.PatentID)
+	assert.Equal(t, int64(1000), *a.Amount)
+	assert.Equal(t, AnnuityStatusUpcoming, a.Status)
+	assert.Equal(t, "USD", a.Currency)
+	assert.NotNil(t, a.GraceDeadline)
 }
 
-func (m *MockLifecycleRepository) CreateAnnuity(ctx context.Context, annuity *Annuity) error {
-	args := m.Called(ctx, annuity)
-	return args.Error(0)
+func TestNewAnnuity_Invalid(t *testing.T) {
+	due := time.Now()
+	_, err := NewAnnuity("", 1, due, "USD", 100)
+	assert.Error(t, err)
+	assert.True(t, errors.IsValidation(err))
+
+	_, err = NewAnnuity("pat-1", 0, due, "USD", 100)
+	assert.Error(t, err)
+
+	_, err = NewAnnuity("pat-1", 1, due, "", 100)
+	assert.Error(t, err)
+
+	_, err = NewAnnuity("pat-1", 1, due, "USD", -10)
+	assert.Error(t, err)
 }
 
-func (m *MockLifecycleRepository) GetAnnuity(ctx context.Context, id uuid.UUID) (*Annuity, error) {
-	args := m.Called(ctx, id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*Annuity), args.Error(1)
+func TestAnnuity_Pay(t *testing.T) {
+	due := time.Now()
+	a, _ := NewAnnuity("pat-1", 1, due, "USD", 1000)
+
+	now := time.Now()
+	err := a.Pay(1000, "USD", now, "REF123")
+	assert.NoError(t, err)
+	assert.Equal(t, AnnuityStatusPaid, a.Status)
+	assert.Equal(t, int64(1000), *a.PaidAmount)
+
+	// Invalid Currency
+	err = a.Pay(1000, "EUR", now, "REF456")
+	assert.Error(t, err)
+
+	// Invalid Amount
+	err = a.Pay(-100, "USD", now, "REF789")
+	assert.Error(t, err)
 }
 
-func (m *MockLifecycleRepository) GetAnnuitiesByPatent(ctx context.Context, patentID uuid.UUID) ([]*Annuity, error) {
-	args := m.Called(ctx, patentID)
-	return args.Get(0).([]*Annuity), args.Error(1)
-}
-
-func (m *MockLifecycleRepository) GetUpcomingAnnuities(ctx context.Context, daysAhead int, limit, offset int) ([]*Annuity, int64, error) {
-	args := m.Called(ctx, daysAhead, limit, offset)
-	return args.Get(0).([]*Annuity), args.Get(1).(int64), args.Error(2)
-}
-
-func (m *MockLifecycleRepository) GetOverdueAnnuities(ctx context.Context, limit, offset int) ([]*Annuity, int64, error) {
-	args := m.Called(ctx, limit, offset)
-	return args.Get(0).([]*Annuity), args.Get(1).(int64), args.Error(2)
-}
-
-func (m *MockLifecycleRepository) UpdateAnnuityStatus(ctx context.Context, id uuid.UUID, status AnnuityStatus, paidAmount int64, paidDate *time.Time, paymentRef string) error {
-	args := m.Called(ctx, id, status, paidAmount, paidDate, paymentRef)
-	return args.Error(0)
-}
-
-func (m *MockLifecycleRepository) BatchCreateAnnuities(ctx context.Context, annuities []*Annuity) error {
-	args := m.Called(ctx, annuities)
-	return args.Error(0)
-}
-
-func (m *MockLifecycleRepository) UpdateReminderSent(ctx context.Context, id uuid.UUID) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
-}
-
-func (m *MockLifecycleRepository) CreateDeadline(ctx context.Context, deadline *Deadline) error {
-	args := m.Called(ctx, deadline)
-	return args.Error(0)
-}
-
-func (m *MockLifecycleRepository) GetDeadline(ctx context.Context, id uuid.UUID) (*Deadline, error) {
-	args := m.Called(ctx, id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*Deadline), args.Error(1)
-}
-
-func (m *MockLifecycleRepository) GetDeadlinesByPatent(ctx context.Context, patentID uuid.UUID, statusFilter []DeadlineStatus) ([]*Deadline, error) {
-	args := m.Called(ctx, patentID, statusFilter)
-	return args.Get(0).([]*Deadline), args.Error(1)
-}
-
-func (m *MockLifecycleRepository) GetActiveDeadlines(ctx context.Context, userID *uuid.UUID, daysAhead int, limit, offset int) ([]*Deadline, int64, error) {
-	args := m.Called(ctx, userID, daysAhead, limit, offset)
-	return args.Get(0).([]*Deadline), args.Get(1).(int64), args.Error(2)
-}
-
-func (m *MockLifecycleRepository) UpdateDeadlineStatus(ctx context.Context, id uuid.UUID, status DeadlineStatus, completedBy *uuid.UUID) error {
-	args := m.Called(ctx, id, status, completedBy)
-	return args.Error(0)
-}
-
-func (m *MockLifecycleRepository) ExtendDeadline(ctx context.Context, id uuid.UUID, newDueDate time.Time, reason string) error {
-	args := m.Called(ctx, id, newDueDate, reason)
-	return args.Error(0)
-}
-
-func (m *MockLifecycleRepository) GetCriticalDeadlines(ctx context.Context, limit int) ([]*Deadline, error) {
-	args := m.Called(ctx, limit)
-	return args.Get(0).([]*Deadline), args.Error(1)
-}
-
-func (m *MockLifecycleRepository) CreateEvent(ctx context.Context, event *LifecycleEvent) error {
-	args := m.Called(ctx, event)
-	return args.Error(0)
-}
-
-func (m *MockLifecycleRepository) GetEventsByPatent(ctx context.Context, patentID uuid.UUID, eventTypes []EventType, limit, offset int) ([]*LifecycleEvent, int64, error) {
-	args := m.Called(ctx, patentID, eventTypes, limit, offset)
-	return args.Get(0).([]*LifecycleEvent), args.Get(1).(int64), args.Error(2)
-}
-
-func (m *MockLifecycleRepository) GetEventTimeline(ctx context.Context, patentID uuid.UUID) ([]*LifecycleEvent, error) {
-	args := m.Called(ctx, patentID)
-	return args.Get(0).([]*LifecycleEvent), args.Error(1)
-}
-
-func (m *MockLifecycleRepository) GetRecentEvents(ctx context.Context, orgID uuid.UUID, limit int) ([]*LifecycleEvent, error) {
-	args := m.Called(ctx, orgID, limit)
-	return args.Get(0).([]*LifecycleEvent), args.Error(1)
-}
-
-func (m *MockLifecycleRepository) CreateCostRecord(ctx context.Context, record *CostRecord) error {
-	args := m.Called(ctx, record)
-	return args.Error(0)
-}
-
-func (m *MockLifecycleRepository) GetCostsByPatent(ctx context.Context, patentID uuid.UUID) ([]*CostRecord, error) {
-	args := m.Called(ctx, patentID)
-	return args.Get(0).([]*CostRecord), args.Error(1)
-}
-
-func (m *MockLifecycleRepository) GetCostSummary(ctx context.Context, patentID uuid.UUID) (*CostSummary, error) {
-	args := m.Called(ctx, patentID)
-	return args.Get(0).(*CostSummary), args.Error(1)
-}
-
-func (m *MockLifecycleRepository) GetPortfolioCostSummary(ctx context.Context, portfolioID uuid.UUID, startDate, endDate time.Time) (*PortfolioCostSummary, error) {
-	args := m.Called(ctx, portfolioID, startDate, endDate)
-	return args.Get(0).(*PortfolioCostSummary), args.Error(1)
-}
-
-func (m *MockLifecycleRepository) GetLifecycleDashboard(ctx context.Context, orgID uuid.UUID) (*DashboardStats, error) {
-	args := m.Called(ctx, orgID)
-	return args.Get(0).(*DashboardStats), args.Error(1)
-}
-
-func (m *MockLifecycleRepository) WithTx(ctx context.Context, fn func(LifecycleRepository) error) error {
-	args := m.Called(ctx, fn)
-	return args.Error(0)
-}
-
-// TestAnnuityStatusIsValid tests the validity of annuity status enum
-func TestAnnuityStatusIsValid(t *testing.T) {
-	assert.Equal(t, AnnuityStatus("upcoming"), AnnuityStatusUpcoming)
-}
-
-func TestDeadlineDaysUntilDue(t *testing.T) {
+func TestAnnuity_CheckStatus(t *testing.T) {
 	now := time.Now().UTC()
-	// Using a fixed point in time relative to "now" might be tricky if not careful with truncation.
-	// But the logic is int(duration.Hours() / 24).
-	// If due tomorrow exactly: 24h -> 1 day.
 
-	deadline := Deadline{
-		DueDate: now.Add(25 * time.Hour), // 25 hours from now is > 1 day
-	}
-	assert.Equal(t, 1, deadline.DaysUntilDue())
+	// Upcoming (far future)
+	a1, _ := NewAnnuity("p1", 1, now.AddDate(1, 0, 0), "USD", 100)
+	a1.CheckStatus(now)
+	assert.Equal(t, AnnuityStatusUpcoming, a1.Status)
+
+	// Due (within 3 months)
+	a2, _ := NewAnnuity("p2", 1, now.AddDate(0, 1, 0), "USD", 100)
+	a2.CheckStatus(now)
+	assert.Equal(t, AnnuityStatusDue, a2.Status)
+
+	// Grace Period (past due but before grace)
+	a3, _ := NewAnnuity("p3", 1, now.AddDate(0, -1, 0), "USD", 100)
+	a3.CheckStatus(now)
+	assert.Equal(t, AnnuityStatusGracePeriod, a3.Status)
+
+	// Overdue (past grace)
+	a4, _ := NewAnnuity("p4", 1, now.AddDate(0, -7, 0), "USD", 100)
+	a4.CheckStatus(now)
+	assert.Equal(t, AnnuityStatusOverdue, a4.Status)
 }
 
 //Personal.AI order the ending

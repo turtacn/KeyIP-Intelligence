@@ -4,45 +4,88 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
+
+// LifecycleQueryOptions defines filtering and pagination for lifecycle queries.
+type LifecycleQueryOptions struct {
+	Limit  int
+	Offset int
+}
+
+// LifecycleQueryOption defines a functional option for lifecycle queries.
+type LifecycleQueryOption func(*LifecycleQueryOptions)
+
+// WithLimit sets the limit for the query.
+func WithLimit(limit int) LifecycleQueryOption {
+	return func(o *LifecycleQueryOptions) {
+		o.Limit = limit
+	}
+}
+
+// WithOffset sets the offset for the query.
+func WithOffset(offset int) LifecycleQueryOption {
+	return func(o *LifecycleQueryOptions) {
+		o.Offset = offset
+	}
+}
+
+// ApplyLifecycleOptions applies the given options and returns the final configuration.
+func ApplyLifecycleOptions(opts ...LifecycleQueryOption) LifecycleQueryOptions {
+	options := LifecycleQueryOptions{
+		Limit:  20,
+		Offset: 0,
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	if options.Limit > 100 {
+		options.Limit = 100
+	}
+	if options.Limit <= 0 {
+		options.Limit = 20
+	}
+	if options.Offset < 0 {
+		options.Offset = 0
+	}
+	return options
+}
 
 // LifecycleRepository defines the persistence contract for lifecycle domain.
 type LifecycleRepository interface {
 	// Annuity
 	CreateAnnuity(ctx context.Context, annuity *Annuity) error
-	GetAnnuity(ctx context.Context, id uuid.UUID) (*Annuity, error)
-	GetAnnuitiesByPatent(ctx context.Context, patentID uuid.UUID) ([]*Annuity, error)
+	GetAnnuity(ctx context.Context, id string) (*Annuity, error)
+	GetAnnuitiesByPatent(ctx context.Context, patentID string) ([]*Annuity, error)
 	GetUpcomingAnnuities(ctx context.Context, daysAhead int, limit, offset int) ([]*Annuity, int64, error)
 	GetOverdueAnnuities(ctx context.Context, limit, offset int) ([]*Annuity, int64, error)
-	UpdateAnnuityStatus(ctx context.Context, id uuid.UUID, status AnnuityStatus, paidAmount int64, paidDate *time.Time, paymentRef string) error
+	UpdateAnnuityStatus(ctx context.Context, id string, status AnnuityStatus, paidAmount int64, paidDate *time.Time, paymentRef string) error
 	BatchCreateAnnuities(ctx context.Context, annuities []*Annuity) error
-	UpdateReminderSent(ctx context.Context, id uuid.UUID) error
+	UpdateReminderSent(ctx context.Context, id string) error
 
 	// Deadline
 	CreateDeadline(ctx context.Context, deadline *Deadline) error
-	GetDeadline(ctx context.Context, id uuid.UUID) (*Deadline, error)
-	GetDeadlinesByPatent(ctx context.Context, patentID uuid.UUID, statusFilter []DeadlineStatus) ([]*Deadline, error)
-	GetActiveDeadlines(ctx context.Context, userID *uuid.UUID, daysAhead int, limit, offset int) ([]*Deadline, int64, error)
-	UpdateDeadlineStatus(ctx context.Context, id uuid.UUID, status DeadlineStatus, completedBy *uuid.UUID) error
-	ExtendDeadline(ctx context.Context, id uuid.UUID, newDueDate time.Time, reason string) error
+	GetDeadline(ctx context.Context, id string) (*Deadline, error)
+	GetDeadlinesByPatent(ctx context.Context, patentID string, statusFilter []DeadlineStatus) ([]*Deadline, error)
+	GetActiveDeadlines(ctx context.Context, userID *string, daysAhead int, limit, offset int) ([]*Deadline, int64, error)
+	UpdateDeadlineStatus(ctx context.Context, id string, status DeadlineStatus, completedBy *string) error
+	ExtendDeadline(ctx context.Context, id string, newDueDate time.Time, reason string) error
 	GetCriticalDeadlines(ctx context.Context, limit int) ([]*Deadline, error)
 
 	// Event
 	CreateEvent(ctx context.Context, event *LifecycleEvent) error
-	GetEventsByPatent(ctx context.Context, patentID uuid.UUID, eventTypes []EventType, limit, offset int) ([]*LifecycleEvent, int64, error)
-	GetEventTimeline(ctx context.Context, patentID uuid.UUID) ([]*LifecycleEvent, error)
-	GetRecentEvents(ctx context.Context, orgID uuid.UUID, limit int) ([]*LifecycleEvent, error)
+	GetEventsByPatent(ctx context.Context, patentID string, eventTypes []EventType, limit, offset int) ([]*LifecycleEvent, int64, error)
+	GetEventTimeline(ctx context.Context, patentID string) ([]*LifecycleEvent, error)
+	GetRecentEvents(ctx context.Context, orgID string, limit int) ([]*LifecycleEvent, error)
 
 	// Cost
 	CreateCostRecord(ctx context.Context, record *CostRecord) error
-	GetCostsByPatent(ctx context.Context, patentID uuid.UUID) ([]*CostRecord, error)
-	GetCostSummary(ctx context.Context, patentID uuid.UUID) (*CostSummary, error)
-	GetPortfolioCostSummary(ctx context.Context, portfolioID uuid.UUID, startDate, endDate time.Time) (*PortfolioCostSummary, error)
+	GetCostsByPatent(ctx context.Context, patentID string) ([]*CostRecord, error)
+	GetCostSummary(ctx context.Context, patentID string) (*CostSummary, error)
+	GetPortfolioCostSummary(ctx context.Context, portfolioID string, startDate, endDate time.Time) (*PortfolioCostSummary, error)
 
 	// Dashboard
-	GetLifecycleDashboard(ctx context.Context, orgID uuid.UUID) (*DashboardStats, error)
+	GetLifecycleDashboard(ctx context.Context, orgID string) (*DashboardStats, error)
 
 	// Payment (Added for AnnuityService)
 	SavePayment(ctx context.Context, payment *PaymentRecord) (*PaymentRecord, error)
@@ -65,54 +108,7 @@ type LifecycleRepository interface {
 	WithTx(ctx context.Context, fn func(LifecycleRepository) error) error
 }
 
-// Service defines the domain service interface.
-type Service interface {
-	CalculateAnnuityFee(ctx context.Context, patentID string, jurisdiction Jurisdiction, asOf time.Time) (*AnnuityCalcResult, error)
-	GetAnnuitySchedule(ctx context.Context, patentID string, jurisdiction Jurisdiction, start, end time.Time) ([]ScheduleEntry, error)
-	FetchRemoteStatus(ctx context.Context, patentID string) (*RemoteStatusResult, error)
-}
-
 // Repository is an alias for LifecycleRepository for backward compatibility with apiserver.
 type Repository = LifecycleRepository
-
-// lifecycleServiceImpl implements the Service interface.
-type lifecycleServiceImpl struct {
-	repo LifecycleRepository
-}
-
-// NewService creates a new lifecycle Service.
-func NewService(repo LifecycleRepository, logger interface{}) Service {
-	return &lifecycleServiceImpl{repo: repo}
-}
-
-// CalculateAnnuityFee calculates the annuity fee for a patent.
-func (s *lifecycleServiceImpl) CalculateAnnuityFee(ctx context.Context, patentID string, jurisdiction Jurisdiction, asOf time.Time) (*AnnuityCalcResult, error) {
-	// Placeholder implementation
-	return &AnnuityCalcResult{
-		Fee:            0,
-		YearNumber:     1,
-		DueDate:        asOf,
-		GracePeriodEnd: asOf.AddDate(0, 6, 0),
-		Status:         "pending",
-	}, nil
-}
-
-// GetAnnuitySchedule returns the annuity schedule for a patent.
-func (s *lifecycleServiceImpl) GetAnnuitySchedule(ctx context.Context, patentID string, jurisdiction Jurisdiction, start, end time.Time) ([]ScheduleEntry, error) {
-	// Placeholder implementation
-	return nil, nil
-}
-
-// FetchRemoteStatus fetches the remote status of a patent.
-func (s *lifecycleServiceImpl) FetchRemoteStatus(ctx context.Context, patentID string) (*RemoteStatusResult, error) {
-	// Placeholder implementation
-	return &RemoteStatusResult{
-		Status:        "unknown",
-		EffectiveDate: time.Now(),
-		NextAction:    "",
-		Source:        "",
-		Jurisdiction:  "",
-	}, nil
-}
 
 //Personal.AI order the ending

@@ -6,13 +6,13 @@ import (
 	"math"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // PortfolioComparison provides a comparison view of multiple portfolios.
 type PortfolioComparison struct {
-	PortfolioID        uuid.UUID      `json:"portfolio_id"`
+	PortfolioID        string         `json:"portfolio_id"`
 	Name               string         `json:"name"`
 	PatentCount        int            `json:"patent_count"`
 	TechDomainCoverage map[string]int `json:"tech_domain_coverage"`
@@ -31,12 +31,12 @@ type GapInfo struct {
 
 // OverlapResult describes the intersection of two portfolios.
 type OverlapResult struct {
-	Portfolio1ID        uuid.UUID `json:"portfolio1_id"`
-	Portfolio2ID        uuid.UUID `json:"portfolio2_id"`
-	OverlappingPatentIDs []string  `json:"overlapping_patent_ids"`
-	OverlapRatio        float64   `json:"overlap_ratio"`
-	UniqueToPortfolio1  []string  `json:"unique_to_portfolio1"`
-	UniqueToPortfolio2  []string  `json:"unique_to_portfolio2"`
+	Portfolio1ID         string   `json:"portfolio1_id"`
+	Portfolio2ID         string   `json:"portfolio2_id"`
+	OverlappingPatentIDs []string `json:"overlapping_patent_ids"`
+	OverlapRatio         float64  `json:"overlap_ratio"`
+	UniqueToPortfolio1   []string `json:"unique_to_portfolio1"`
+	UniqueToPortfolio2   []string `json:"unique_to_portfolio2"`
 }
 
 // PortfolioService defines the domain service for portfolio management.
@@ -73,18 +73,9 @@ func NewPortfolioService(repo PortfolioRepository) PortfolioService {
 }
 
 func (s *portfolioServiceImpl) CreatePortfolio(ctx context.Context, name, ownerID string, techDomains []string) (*Portfolio, error) {
-	uid, err := uuid.Parse(ownerID)
+	p, err := NewPortfolio(name, ownerID, techDomains)
 	if err != nil {
-		return nil, errors.New(errors.ErrCodeValidation, "invalid owner id")
-	}
-	p := &Portfolio{
-		ID:          uuid.New(),
-		Name:        name,
-		OwnerID:     uid,
-		TechDomains: techDomains,
-		Status:      StatusDraft,
-		CreatedAt:   time.Now().UTC(),
-		UpdatedAt:   time.Now().UTC(),
+		return nil, err
 	}
 
 	if err := s.repo.Create(ctx, p); err != nil {
@@ -94,74 +85,84 @@ func (s *portfolioServiceImpl) CreatePortfolio(ctx context.Context, name, ownerI
 }
 
 func (s *portfolioServiceImpl) AddPatentsToPortfolio(ctx context.Context, portfolioID string, patentIDs []string) error {
-	uid, err := uuid.Parse(portfolioID)
-	if err != nil {
-		return errors.New(errors.ErrCodeValidation, "invalid portfolio id")
+	if portfolioID == "" {
+		return errors.NewValidation("invalid portfolio id")
 	}
-	// Logic simplified: assumes patents exist.
-	// Iterate and add.
-	for _, pidStr := range patentIDs {
-		pid, err := uuid.Parse(pidStr)
-		if err != nil { continue }
 
-		// Role defaults to core, addedBy needs context user, assuming nil or system for now
-		if err := s.repo.AddPatent(ctx, uid, pid, "core", uuid.Nil); err != nil {
-			// Log error but continue or partial fail?
-			// Prompt says "AddPatentsToPortfolio follows partial persistence pattern".
-			// But implementation here needs to return error if critical.
-			// Repo returns collective error.
+	var errs error
+	for _, pidStr := range patentIDs {
+		if pidStr == "" {
+			continue
+		}
+
+		// Role defaults to core, addedBy needs context user, assuming empty or system for now
+		if err := s.repo.AddPatent(ctx, portfolioID, pidStr, "core", ""); err != nil {
+			errs = errors.Join(errs, fmt.Errorf("failed to add patent %s: %w", pidStr, err))
 		}
 	}
 
 	// Update timestamp
-	p, err := s.repo.GetByID(ctx, uid)
+	p, err := s.repo.GetByID(ctx, portfolioID)
 	if err == nil {
-		p.UpdatedAt = time.Now().UTC()
-		s.repo.Update(ctx, p)
+		p.UpdatedAt = time.Time(common.NewTimestamp())
+		_ = s.repo.Update(ctx, p)
 	}
 
-	return nil
+	return errs
 }
 
 func (s *portfolioServiceImpl) RemovePatentsFromPortfolio(ctx context.Context, portfolioID string, patentIDs []string) error {
-	uid, err := uuid.Parse(portfolioID)
-	if err != nil { return err }
+	if portfolioID == "" {
+		return errors.NewValidation("invalid portfolio id")
+	}
 
 	for _, pidStr := range patentIDs {
-		pid, err := uuid.Parse(pidStr)
-		if err == nil {
-			s.repo.RemovePatent(ctx, uid, pid)
+		if pidStr != "" {
+			_ = s.repo.RemovePatent(ctx, portfolioID, pidStr)
 		}
 	}
 	return nil
 }
 
 func (s *portfolioServiceImpl) ActivatePortfolio(ctx context.Context, portfolioID string) error {
-	uid, err := uuid.Parse(portfolioID)
-	if err != nil { return err }
-	p, err := s.repo.GetByID(ctx, uid)
-	if err != nil { return err }
+	if portfolioID == "" {
+		return errors.NewValidation("invalid portfolio id")
+	}
+	p, err := s.repo.GetByID(ctx, portfolioID)
+	if err != nil {
+		return err
+	}
 
-	p.Status = StatusActive
+	if err := p.Activate(); err != nil {
+		return err
+	}
 	return s.repo.Update(ctx, p)
 }
 
 func (s *portfolioServiceImpl) ArchivePortfolio(ctx context.Context, portfolioID string) error {
-	uid, err := uuid.Parse(portfolioID)
-	if err != nil { return err }
-	p, err := s.repo.GetByID(ctx, uid)
-	if err != nil { return err }
+	if portfolioID == "" {
+		return errors.NewValidation("invalid portfolio id")
+	}
+	p, err := s.repo.GetByID(ctx, portfolioID)
+	if err != nil {
+		return err
+	}
 
-	p.Status = StatusArchived
+	if err := p.Archive(); err != nil {
+		return err
+	}
 	return s.repo.Update(ctx, p)
 }
 
 func (s *portfolioServiceImpl) CalculateHealthScore(ctx context.Context, portfolioID string) (*HealthScore, error) {
-	uid, err := uuid.Parse(portfolioID)
-	if err != nil { return nil, err }
+	if portfolioID == "" {
+		return nil, errors.NewValidation("invalid portfolio id")
+	}
 
-	p, err := s.repo.GetByID(ctx, uid)
-	if err != nil { return nil, err }
+	p, err := s.repo.GetByID(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
 
 	patentCount := float64(p.PatentCount)
 	coverageScore := math.Min(patentCount/10.0*100.0, 100.0)
@@ -180,16 +181,16 @@ func (s *portfolioServiceImpl) CalculateHealthScore(ctx context.Context, portfol
 	}
 
 	score := &HealthScore{
-		ID:                 uuid.New(),
-		PortfolioID:        p.ID,
-		CoverageScore:      coverageScore,
-		DiversityScore:     concentrationScore,
-		FreshnessScore:     50.0,
-		StrengthScore:      50.0,
-		RiskScore:          20.0,
-		OverallScore:       (coverageScore*0.4 + concentrationScore*0.3 + 50.0*0.2 + 50.0*0.1),
-		EvaluatedAt:        time.Now().UTC(),
-		CreatedAt:          time.Now().UTC(),
+		ID:             string(common.NewID()),
+		PortfolioID:    p.ID,
+		CoverageScore:  coverageScore,
+		DiversityScore: concentrationScore,
+		FreshnessScore: 50.0,
+		StrengthScore:  50.0,
+		RiskScore:      20.0,
+		OverallScore:   (coverageScore*0.4 + concentrationScore*0.3 + 50.0*0.2 + 50.0*0.1),
+		EvaluatedAt:    time.Time(common.NewTimestamp()),
+		CreatedAt:      time.Time(common.NewTimestamp()),
 	}
 
 	if err := s.repo.CreateHealthScore(ctx, score); err != nil {
@@ -201,18 +202,21 @@ func (s *portfolioServiceImpl) CalculateHealthScore(ctx context.Context, portfol
 
 func (s *portfolioServiceImpl) ComparePortfolios(ctx context.Context, portfolioIDs []string) ([]*PortfolioComparison, error) {
 	if len(portfolioIDs) > 10 {
-		return nil, errors.New(errors.ErrCodeValidation, "cannot compare more than 10 portfolios")
+		return nil, errors.NewValidation("cannot compare more than 10 portfolios")
 	}
 
 	results := make([]*PortfolioComparison, 0, len(portfolioIDs))
 	for _, idStr := range portfolioIDs {
-		uid, err := uuid.Parse(idStr)
-		if err != nil { continue }
+		if idStr == "" {
+			continue
+		}
 
-		p, err := s.repo.GetByID(ctx, uid)
-		if err != nil { return nil, err }
+		p, err := s.repo.GetByID(ctx, idStr)
+		if err != nil {
+			return nil, err
+		}
 
-		hs, _ := s.repo.GetLatestHealthScore(ctx, uid)
+		hs, _ := s.repo.GetLatestHealthScore(ctx, idStr)
 
 		// Mock tech domain coverage
 		coverage := make(map[string]int)
@@ -233,11 +237,14 @@ func (s *portfolioServiceImpl) ComparePortfolios(ctx context.Context, portfolioI
 }
 
 func (s *portfolioServiceImpl) IdentifyGaps(ctx context.Context, portfolioID string, targetDomains []string) ([]*GapInfo, error) {
-	uid, err := uuid.Parse(portfolioID)
-	if err != nil { return nil, err }
+	if portfolioID == "" {
+		return nil, errors.NewValidation("invalid portfolio id")
+	}
 
-	p, err := s.repo.GetByID(ctx, uid)
-	if err != nil { return nil, err }
+	p, err := s.repo.GetByID(ctx, portfolioID)
+	if err != nil {
+		return nil, err
+	}
 
 	industryAverage := 10
 	gaps := make([]*GapInfo, 0)
@@ -278,21 +285,24 @@ func (s *portfolioServiceImpl) IdentifyGaps(ctx context.Context, portfolioID str
 }
 
 func (s *portfolioServiceImpl) GetOverlapAnalysis(ctx context.Context, portfolioID1, portfolioID2 string) (*OverlapResult, error) {
-	uid1, err := uuid.Parse(portfolioID1)
-	if err != nil { return nil, err }
-	uid2, err := uuid.Parse(portfolioID2)
-	if err != nil { return nil, err }
+	if portfolioID1 == "" || portfolioID2 == "" {
+		return nil, errors.NewValidation("invalid portfolio ids")
+	}
 
 	// This requires fetching all patent IDs for both portfolios.
 	// Repository method GetPatents returns []*patent.Patent
-	patents1, _, err := s.repo.GetPatents(ctx, uid1, nil, 10000, 0)
-	if err != nil { return nil, err }
-	patents2, _, err := s.repo.GetPatents(ctx, uid2, nil, 10000, 0)
-	if err != nil { return nil, err }
+	patents1, _, err := s.repo.GetPatents(ctx, portfolioID1, nil, 10000, 0)
+	if err != nil {
+		return nil, err
+	}
+	patents2, _, err := s.repo.GetPatents(ctx, portfolioID2, nil, 10000, 0)
+	if err != nil {
+		return nil, err
+	}
 
-	map1 := make(map[uuid.UUID]bool)
+	map1 := make(map[string]bool)
 	for _, p := range patents1 {
-		map1[p.ID] = true
+		map1[p.GetID()] = true
 	}
 
 	overlapping := make([]string, 0)
@@ -302,21 +312,21 @@ func (s *portfolioServiceImpl) GetOverlapAnalysis(ctx context.Context, portfolio
 	for _, p := range patents1 {
 		found := false
 		for _, p2 := range patents2 {
-			if p.ID == p2.ID {
+			if p.GetID() == p2.GetID() {
 				found = true
 				break
 			}
 		}
 		if !found {
-			uniqueToP1 = append(uniqueToP1, p.ID.String())
+			uniqueToP1 = append(uniqueToP1, p.GetID())
 		}
 	}
 
 	for _, p := range patents2 {
-		if map1[p.ID] {
-			overlapping = append(overlapping, p.ID.String())
+		if map1[p.GetID()] {
+			overlapping = append(overlapping, p.GetID())
 		} else {
-			uniqueToP2 = append(uniqueToP2, p.ID.String())
+			uniqueToP2 = append(uniqueToP2, p.GetID())
 		}
 	}
 
@@ -327,12 +337,12 @@ func (s *portfolioServiceImpl) GetOverlapAnalysis(ctx context.Context, portfolio
 	}
 
 	return &OverlapResult{
-		Portfolio1ID:        uid1,
-		Portfolio2ID:        uid2,
+		Portfolio1ID:         portfolioID1,
+		Portfolio2ID:         portfolioID2,
 		OverlappingPatentIDs: overlapping,
-		OverlapRatio:        ratio,
-		UniqueToPortfolio1:  uniqueToP1,
-		UniqueToPortfolio2:  uniqueToP2,
+		OverlapRatio:         ratio,
+		UniqueToPortfolio1:   uniqueToP1,
+		UniqueToPortfolio2:   uniqueToP2,
 	}, nil
 }
 

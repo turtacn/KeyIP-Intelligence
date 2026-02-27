@@ -519,4 +519,9 @@ func As(err error, target interface{}) bool {
 	return stdliberrors.As(err, target)
 }
 
+// Join wraps multiple errors into a single error.
+func Join(errs ...error) error {
+	return stdliberrors.Join(errs...)
+}
+
 //Personal.AI order the ending

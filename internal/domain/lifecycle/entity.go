@@ -3,42 +3,7 @@ package lifecycle
 import (
 	"time"
 
-	"github.com/google/uuid"
-)
-
-// Jurisdiction represents a legal jurisdiction (e.g., CN, US).
-type Jurisdiction string
-
-const (
-	JurisdictionCN Jurisdiction = "CN"
-	JurisdictionUS Jurisdiction = "US"
-	JurisdictionEP Jurisdiction = "EP"
-	JurisdictionJP Jurisdiction = "JP"
-	JurisdictionKR Jurisdiction = "KR"
-)
-
-// AnnuityStatus represents the status of an annuity payment.
-type AnnuityStatus string
-
-const (
-	AnnuityStatusUpcoming    AnnuityStatus = "upcoming"
-	AnnuityStatusDue         AnnuityStatus = "due"
-	AnnuityStatusOverdue     AnnuityStatus = "overdue"
-	AnnuityStatusPaid        AnnuityStatus = "paid"
-	AnnuityStatusGracePeriod AnnuityStatus = "grace_period"
-	AnnuityStatusWaived      AnnuityStatus = "waived"
-	AnnuityStatusAbandoned   AnnuityStatus = "abandoned"
-)
-
-// DeadlineStatus represents the status of a deadline.
-type DeadlineStatus string
-
-const (
-	DeadlineStatusActive    DeadlineStatus = "active"
-	DeadlineStatusCompleted DeadlineStatus = "completed"
-	DeadlineStatusMissed    DeadlineStatus = "missed"
-	DeadlineStatusExtended  DeadlineStatus = "extended"
-	DeadlineStatusWaived    DeadlineStatus = "waived"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // EventType represents the type of lifecycle event.
@@ -65,86 +30,40 @@ const (
 	EventTypeCustom             EventType = "custom"
 )
 
-// Annuity represents a yearly fee.
-type Annuity struct {
-	ID               uuid.UUID      `json:"id"`
-	PatentID         uuid.UUID      `json:"patent_id"`
-	YearNumber       int            `json:"year_number"`
-	DueDate          time.Time      `json:"due_date"`
-	GraceDeadline    *time.Time     `json:"grace_deadline,omitempty"`
-	Status           AnnuityStatus  `json:"status"`
-	Amount           *int64         `json:"amount,omitempty"`
-	Currency         string         `json:"currency"`
-	PaidAmount       *int64         `json:"paid_amount,omitempty"`
-	PaidDate         *time.Time     `json:"paid_date,omitempty"`
-	PaymentReference string         `json:"payment_reference,omitempty"`
-	AgentName        string         `json:"agent_name,omitempty"`
-	AgentReference   string         `json:"agent_reference,omitempty"`
-	Notes            string         `json:"notes,omitempty"`
-	ReminderSentAt   *time.Time     `json:"reminder_sent_at,omitempty"`
-	ReminderCount    int            `json:"reminder_count"`
-	Metadata         map[string]any `json:"metadata,omitempty"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
-}
-
-// Deadline represents a critical date.
-type Deadline struct {
-	ID              uuid.UUID      `json:"id"`
-	PatentID        uuid.UUID      `json:"patent_id"`
-	DeadlineType    string         `json:"deadline_type"`
-	Title           string         `json:"title"`
-	Description     string         `json:"description,omitempty"`
-	DueDate         time.Time      `json:"due_date"`
-	OriginalDueDate time.Time      `json:"original_due_date"`
-	Status          DeadlineStatus `json:"status"`
-	Priority        string         `json:"priority"`
-	AssigneeID      *uuid.UUID     `json:"assignee_id,omitempty"`
-	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
-	CompletedBy     *uuid.UUID     `json:"completed_by,omitempty"`
-	ExtensionCount  int            `json:"extension_count"`
-	ExtensionHistory []map[string]any `json:"extension_history,omitempty"`
-	ReminderConfig  map[string]any `json:"reminder_config,omitempty"`
-	LastReminderAt  *time.Time     `json:"last_reminder_at,omitempty"`
-	Metadata        map[string]any `json:"metadata,omitempty"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
-}
-
 // LifecycleEvent represents a historical event.
 type LifecycleEvent struct {
-	ID                uuid.UUID      `json:"id"`
-	PatentID          uuid.UUID      `json:"patent_id"`
-	EventType         EventType      `json:"event_type"`
-	EventDate         time.Time      `json:"event_date"`
-	Title             string         `json:"title"`
-	Description       string         `json:"description,omitempty"`
-	ActorID           *uuid.UUID     `json:"actor_id,omitempty"`
-	ActorName         string         `json:"actor_name,omitempty"`
-	RelatedDeadlineID *uuid.UUID     `json:"related_deadline_id,omitempty"`
-	RelatedAnnuityID  *uuid.UUID     `json:"related_annuity_id,omitempty"`
-	BeforeState       map[string]any `json:"before_state,omitempty"`
-	AfterState        map[string]any `json:"after_state,omitempty"`
+	ID                string              `json:"id"`
+	PatentID          string              `json:"patent_id"`
+	EventType         EventType           `json:"event_type"`
+	EventDate         time.Time           `json:"event_date"`
+	Title             string              `json:"title"`
+	Description       string              `json:"description,omitempty"`
+	ActorID           *string             `json:"actor_id,omitempty"`
+	ActorName         string              `json:"actor_name,omitempty"`
+	RelatedDeadlineID *string             `json:"related_deadline_id,omitempty"`
+	RelatedAnnuityID  *string             `json:"related_annuity_id,omitempty"`
+	BeforeState       map[string]any      `json:"before_state,omitempty"`
+	AfterState        map[string]any      `json:"after_state,omitempty"`
 	Attachments       []map[string]string `json:"attachments,omitempty"`
-	Source            string         `json:"source"`
-	Metadata          map[string]any `json:"metadata,omitempty"`
-	CreatedAt         time.Time      `json:"created_at"`
+	Source            string              `json:"source"`
+	Metadata          map[string]any      `json:"metadata,omitempty"`
+	CreatedAt         time.Time           `json:"created_at"`
 }
 
 // CostRecord represents a financial transaction.
 type CostRecord struct {
-	ID               uuid.UUID      `json:"id"`
-	PatentID         uuid.UUID      `json:"patent_id"`
+	ID               string         `json:"id"`
+	PatentID         string         `json:"patent_id"`
 	CostType         string         `json:"cost_type"`
-	Amount           int64          `json:"amount"`
+	Amount           int64          `json:"amount"` // Money in minor units
 	Currency         string         `json:"currency"`
 	AmountUSD        *int64         `json:"amount_usd,omitempty"`
 	ExchangeRate     *float64       `json:"exchange_rate,omitempty"`
 	IncurredDate     time.Time      `json:"incurred_date"`
 	Description      string         `json:"description,omitempty"`
 	InvoiceReference string         `json:"invoice_reference,omitempty"`
-	RelatedAnnuityID *uuid.UUID     `json:"related_annuity_id,omitempty"`
-	RelatedEventID   *uuid.UUID     `json:"related_event_id,omitempty"`
+	RelatedAnnuityID *string        `json:"related_annuity_id,omitempty"`
+	RelatedEventID   *string        `json:"related_event_id,omitempty"`
 	Metadata         map[string]any `json:"metadata,omitempty"`
 	CreatedAt        time.Time      `json:"created_at"`
 }
@@ -196,14 +115,14 @@ type PaymentQuery struct {
 
 // SubscriptionEntity represents a subscription for status updates.
 type SubscriptionEntity struct {
-	ID            string       `json:"id"`
-	PatentIDs     []string     `json:"patent_ids,omitempty"`
-	PortfolioID   string       `json:"portfolio_id,omitempty"`
-	StatusFilters []string     `json:"status_filters,omitempty"`
-	Channels      []string     `json:"channels"`
-	Recipient     string       `json:"recipient"`
-	Active        bool         `json:"active"`
-	CreatedAt     time.Time    `json:"created_at"`
+	ID            string    `json:"id"`
+	PatentIDs     []string  `json:"patent_ids,omitempty"`
+	PortfolioID   string    `json:"portfolio_id,omitempty"`
+	StatusFilters []string  `json:"status_filters,omitempty"`
+	Channels      []string  `json:"channels"`
+	Recipient     string    `json:"recipient"`
+	Active        bool      `json:"active"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // CustomEvent represents a user-defined calendar event.
@@ -226,16 +145,16 @@ type CustomEvent struct {
 
 // LegalStatusEntity represents the persistent legal status of a patent.
 type LegalStatusEntity struct {
-	PatentID                string       `json:"patent_id"`
-	Jurisdiction            string       `json:"jurisdiction"`
-	Status                  string       `json:"status"`
-	PreviousStatus          string       `json:"previous_status"`
-	EffectiveDate           time.Time    `json:"effective_date"`
-	NextAction              string       `json:"next_action,omitempty"`
-	NextDeadline            *time.Time   `json:"next_deadline,omitempty"`
-	RemoteStatus            string       `json:"remote_status"`
-	LastSyncAt              *time.Time   `json:"last_sync_at"`
-	ConsecutiveSyncFailures int          `json:"consecutive_sync_failures"`
+	PatentID                string         `json:"patent_id"`
+	Jurisdiction            string         `json:"jurisdiction"`
+	Status                  string         `json:"status"`
+	PreviousStatus          string         `json:"previous_status"`
+	EffectiveDate           time.Time      `json:"effective_date"`
+	NextAction              string         `json:"next_action,omitempty"`
+	NextDeadline            *time.Time     `json:"next_deadline,omitempty"`
+	RemoteStatus            string         `json:"remote_status"`
+	LastSyncAt              *time.Time     `json:"last_sync_at"`
+	ConsecutiveSyncFailures int            `json:"consecutive_sync_failures"`
 	RawData                 map[string]any `json:"raw_data,omitempty"`
 }
 
@@ -252,7 +171,8 @@ type StatusHistoryEntity struct {
 
 // AnnuityCalcResult holds the result of domain-level annuity calculation.
 type AnnuityCalcResult struct {
-	Fee            float64
+	Fee            int64 // Money in minor units
+	Currency       string
 	YearNumber     int
 	DueDate        time.Time
 	GracePeriodEnd time.Time
@@ -262,7 +182,8 @@ type AnnuityCalcResult struct {
 // ScheduleEntry is a single entry in an annuity schedule.
 type ScheduleEntry struct {
 	YearNumber     int
-	Fee            float64
+	Fee            int64 // Money in minor units
+	Currency       string
 	DueDate        time.Time
 	GracePeriodEnd time.Time
 	Status         string
@@ -277,12 +198,17 @@ type RemoteStatusResult struct {
 	Jurisdiction  string
 }
 
-
-//DaysUntilDue calculates days remaining until due date
-func (d *Deadline) DaysUntilDue() int {
-	now := time.Now().UTC()
-	duration := d.DueDate.Sub(now)
-	return int(duration.Hours() / 24)
+// RemainingLifeYears calculates remaining life in years.
+func RemainingLifeYears(expiryDate *time.Time) float64 {
+	if expiryDate == nil {
+		return 0
+	}
+	now := time.Time(common.NewTimestamp())
+	if now.After(*expiryDate) {
+		return 0
+	}
+	duration := expiryDate.Sub(now)
+	return duration.Hours() / (24 * 365.25)
 }
 
 //Personal.AI order the ending

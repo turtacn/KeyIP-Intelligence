@@ -3,16 +3,17 @@ package portfolio
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
-// PortfolioStatus defines the lifecycle state of a portfolio.
+// Status defines the lifecycle state of a portfolio.
 type Status string
 
 const (
+	StatusDraft    Status = "draft"
 	StatusActive   Status = "active"
 	StatusArchived Status = "archived"
-	StatusDraft    Status = "draft"
 )
 
 // ValuationTier defines the valuation grade.
@@ -28,25 +29,92 @@ const (
 
 // Portfolio represents a collection of patents.
 type Portfolio struct {
-	ID                 uuid.UUID      `json:"id"`
-	Name               string         `json:"name"`
-	Description        string         `json:"description,omitempty"`
-	OwnerID            uuid.UUID      `json:"owner_id"`
-	Status             Status         `json:"status"`
-	TechDomains        []string       `json:"tech_domains,omitempty"`
-	TargetJurisdictions []string      `json:"target_jurisdictions,omitempty"`
-	Metadata           map[string]any `json:"metadata,omitempty"`
-	PatentCount        int            `json:"patent_count,omitempty"` // Aggregated field
-	CreatedAt          time.Time      `json:"created_at"`
-	UpdatedAt          time.Time      `json:"updated_at"`
-	DeletedAt          *time.Time     `json:"deleted_at,omitempty"`
+	ID                  string         `json:"id"`
+	Name                string         `json:"name"`
+	Description         string         `json:"description,omitempty"`
+	OwnerID             string         `json:"owner_id"`
+	Status              Status         `json:"status"`
+	TechDomains         []string       `json:"tech_domains,omitempty"`
+	TargetJurisdictions []string       `json:"target_jurisdictions,omitempty"`
+	Metadata            map[string]any `json:"metadata,omitempty"`
+	PatentCount         int            `json:"patent_count,omitempty"` // Aggregated field
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
+	DeletedAt           *time.Time     `json:"deleted_at,omitempty"`
+}
+
+// NewPortfolio creates a new portfolio in Draft status.
+func NewPortfolio(name, ownerID string, techDomains []string) (*Portfolio, error) {
+	if name == "" {
+		return nil, errors.NewValidation("name cannot be empty")
+	}
+	if ownerID == "" {
+		return nil, errors.NewValidation("ownerID cannot be empty")
+	}
+	if len(techDomains) == 0 {
+		techDomains = []string{}
+	}
+
+	now := time.Time(common.NewTimestamp())
+	return &Portfolio{
+		ID:          string(common.NewID()),
+		Name:        name,
+		OwnerID:     ownerID,
+		Status:      StatusDraft,
+		TechDomains: techDomains,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}, nil
+}
+
+// Validate validates the portfolio entity.
+func (p *Portfolio) Validate() error {
+	if p.ID == "" {
+		return errors.NewValidation("ID cannot be empty")
+	}
+	if p.Name == "" {
+		return errors.NewValidation("Name cannot be empty")
+	}
+	if len(p.Name) > 256 {
+		return errors.NewValidation("Name cannot be longer than 256 characters")
+	}
+	if p.OwnerID == "" {
+		return errors.NewValidation("OwnerID cannot be empty")
+	}
+	switch p.Status {
+	case StatusDraft, StatusActive, StatusArchived:
+		// valid
+	default:
+		return errors.NewValidation("invalid status: " + string(p.Status))
+	}
+	return nil
+}
+
+// Activate transitions the portfolio from Draft to Active.
+func (p *Portfolio) Activate() error {
+	if p.Status != StatusDraft {
+		return errors.NewValidation("can only activate from draft status")
+	}
+	p.Status = StatusActive
+	p.UpdatedAt = time.Time(common.NewTimestamp())
+	return nil
+}
+
+// Archive transitions the portfolio from Active to Archived.
+func (p *Portfolio) Archive() error {
+	if p.Status != StatusActive {
+		return errors.NewValidation("can only archive from active status")
+	}
+	p.Status = StatusArchived
+	p.UpdatedAt = time.Time(common.NewTimestamp())
+	return nil
 }
 
 // Valuation represents a patent valuation.
 type Valuation struct {
-	ID                uuid.UUID      `json:"id"`
-	PatentID          uuid.UUID      `json:"patent_id"`
-	PortfolioID       *uuid.UUID     `json:"portfolio_id,omitempty"`
+	ID                string         `json:"id"`
+	PatentID          string         `json:"patent_id"`
+	PortfolioID       *string        `json:"portfolio_id,omitempty"`
 	TechnicalScore    float64        `json:"technical_score"`
 	LegalScore        float64        `json:"legal_score"`
 	MarketScore       float64        `json:"market_score"`
@@ -64,14 +132,14 @@ type Valuation struct {
 	Assumptions       map[string]any `json:"assumptions,omitempty"`
 	ValidFrom         time.Time      `json:"valid_from"`
 	ValidUntil        *time.Time     `json:"valid_until,omitempty"`
-	EvaluatedBy       *uuid.UUID     `json:"evaluated_by,omitempty"`
+	EvaluatedBy       *string        `json:"evaluated_by,omitempty"`
 	CreatedAt         time.Time      `json:"created_at"`
 }
 
 // HealthScore represents the health of a portfolio.
 type HealthScore struct {
-	ID                       uuid.UUID      `json:"id"`
-	PortfolioID              uuid.UUID      `json:"portfolio_id"`
+	ID                       string         `json:"id"`
+	PortfolioID              string         `json:"portfolio_id"`
 	OverallScore             float64        `json:"overall_score"`
 	CoverageScore            float64        `json:"coverage_score"`
 	DiversityScore           float64        `json:"diversity_score"`
@@ -93,24 +161,24 @@ type HealthScore struct {
 
 // OptimizationSuggestion represents a suggestion for portfolio optimization.
 type OptimizationSuggestion struct {
-	ID               uuid.UUID      `json:"id"`
-	PortfolioID      uuid.UUID      `json:"portfolio_id"`
-	HealthScoreID    *uuid.UUID     `json:"health_score_id,omitempty"`
-	SuggestionType   string         `json:"suggestion_type"`
-	Priority         string         `json:"priority"`
-	Title            string         `json:"title"`
-	Description      string         `json:"description"`
-	TargetPatentID   *uuid.UUID     `json:"target_patent_id,omitempty"`
-	TargetTechDomain string         `json:"target_tech_domain,omitempty"`
-	TargetJurisdiction string       `json:"target_jurisdiction,omitempty"`
-	EstimatedImpact  *float64       `json:"estimated_impact,omitempty"`
-	EstimatedCost    *int64         `json:"estimated_cost,omitempty"`
-	Rationale        map[string]any `json:"rationale"`
-	Status           string         `json:"status"`
-	ResolvedBy       *uuid.UUID     `json:"resolved_by,omitempty"`
-	ResolvedAt       *time.Time     `json:"resolved_at,omitempty"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
+	ID                 string         `json:"id"`
+	PortfolioID        string         `json:"portfolio_id"`
+	HealthScoreID      *string        `json:"health_score_id,omitempty"`
+	SuggestionType     string         `json:"suggestion_type"`
+	Priority           string         `json:"priority"`
+	Title              string         `json:"title"`
+	Description        string         `json:"description"`
+	TargetPatentID     *string        `json:"target_patent_id,omitempty"`
+	TargetTechDomain   string         `json:"target_tech_domain,omitempty"`
+	TargetJurisdiction string         `json:"target_jurisdiction,omitempty"`
+	EstimatedImpact    *float64       `json:"estimated_impact,omitempty"`
+	EstimatedCost      *int64         `json:"estimated_cost,omitempty"`
+	Rationale          map[string]any `json:"rationale"`
+	Status             string         `json:"status"`
+	ResolvedBy         *string        `json:"resolved_by,omitempty"`
+	ResolvedAt         *time.Time     `json:"resolved_at,omitempty"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
 }
 
 // Summary represents a high-level summary of a portfolio.
@@ -131,9 +199,9 @@ type ExpiryTimelineEntry struct {
 
 // ComparisonResult represents a comparison between portfolios.
 type ComparisonResult struct {
-	PortfolioID uuid.UUID `json:"portfolio_id"`
-	Metric      string    `json:"metric"`
-	Value       float64   `json:"value"`
+	PortfolioID string  `json:"portfolio_id"`
+	Metric      string  `json:"metric"`
+	Value       float64 `json:"value"`
 }
 
 //Personal.AI order the ending
