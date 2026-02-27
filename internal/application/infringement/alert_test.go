@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/redis"
-	kafkainfra "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/messaging/kafka"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
@@ -145,7 +144,7 @@ func (m *mockAlertRepository) FindOverSLA(ctx context.Context) ([]*Alert, error)
 
 type mockAlertProducer struct {
 	mu       sync.Mutex
-	messages []*kafkainfra.ProducerMessage
+	messages []*commontypes.ProducerMessage
 	publishErr error
 }
 
@@ -153,7 +152,7 @@ func newMockAlertProducer() *mockAlertProducer {
 	return &mockAlertProducer{}
 }
 
-func (m *mockAlertProducer) Publish(ctx context.Context, msg *kafkainfra.ProducerMessage) error {
+func (m *mockAlertProducer) Publish(ctx context.Context, msg *commontypes.ProducerMessage) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.publishErr != nil {
@@ -161,6 +160,20 @@ func (m *mockAlertProducer) Publish(ctx context.Context, msg *kafkainfra.Produce
 	}
 	m.messages = append(m.messages, msg)
 	return nil
+}
+
+func (m *mockAlertProducer) PublishBatch(ctx context.Context, msgs []*commontypes.ProducerMessage) (*commontypes.BatchPublishResult, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.publishErr != nil {
+		return nil, m.publishErr
+	}
+	m.messages = append(m.messages, msgs...)
+	return &commontypes.BatchPublishResult{Succeeded: len(msgs)}, nil
+}
+
+func (m *mockAlertProducer) PublishAsync(ctx context.Context, msg *commontypes.ProducerMessage) {
+	m.Publish(ctx, msg)
 }
 
 func (m *mockAlertProducer) Close() error { return nil }

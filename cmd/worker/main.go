@@ -64,8 +64,9 @@ import (
 	opensearchclient "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/search/opensearch"
 	milvusclient "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/search/milvus"
 	kafkaclient "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/messaging/kafka"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 
-	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"
+	intcommon "github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"
 )
 
 const (
@@ -206,7 +207,7 @@ func main() {
 
 	// Start worker pool
 	var wg sync.WaitGroup
-	msgChan := make(chan *kafkaclient.Message, numWorkers*2)
+	msgChan := make(chan *common.Message, numWorkers*2)
 
 	// Spawn workers
 	for i := 0; i < numWorkers; i++ {
@@ -265,7 +266,7 @@ func main() {
 
 // MessageHandler processes a single Kafka message.
 type MessageHandler interface {
-	Handle(ctx context.Context, msg *kafkaclient.Message) error
+	Handle(ctx context.Context, msg *common.Message) error
 	Topic() string
 }
 
@@ -401,14 +402,14 @@ func initWorkerInfrastructure(cfg *config.Config, logger logging.Logger) (*worke
 	return infra, nil
 }
 
-func initWorkerIntelligence(cfg *config.Config, logger logging.Logger) (common.ModelRegistry, error) {
+func initWorkerIntelligence(cfg *config.Config, logger logging.Logger) (intcommon.ModelRegistry, error) {
 	// Create a model loader and registry
 	// For now, use a noop implementation until full intelligence layer is wired
-	loader := common.NewNoopModelLoader()
-	metrics := common.NewNoopIntelligenceMetrics()
-	logAdapter := common.NewNoopLogger()
+	loader := intcommon.NewNoopModelLoader()
+	metrics := intcommon.NewNoopIntelligenceMetrics()
+	logAdapter := intcommon.NewNoopLogger()
 
-	registry, err := common.NewModelRegistry(loader, metrics, logAdapter)
+	registry, err := intcommon.NewModelRegistry(loader, metrics, logAdapter)
 	if err != nil {
 		return nil, fmt.Errorf("model registry: %w", err)
 	}
@@ -419,7 +420,7 @@ func initWorkerIntelligence(cfg *config.Config, logger logging.Logger) (common.M
 func buildHandlerRegistry(
 	cfg *config.Config,
 	infra *workerInfrastructure,
-	registry common.ModelRegistry,
+	registry intcommon.ModelRegistry,
 	logger logging.Logger,
 ) map[string]MessageHandler {
 	// Placeholder handler registry - actual handlers to be implemented
@@ -440,7 +441,7 @@ type stubHandler struct {
 	logger logging.Logger
 }
 
-func (h *stubHandler) Handle(ctx context.Context, msg *kafkaclient.Message) error {
+func (h *stubHandler) Handle(ctx context.Context, msg *common.Message) error {
 	h.logger.Info("processing message",
 		logging.String("topic", h.topic),
 		logging.Int("partition", msg.Partition),
@@ -484,7 +485,7 @@ func startHealthServer(cfg *config.Config, logger logging.Logger, metrics promet
 func workerLoop(
 	ctx context.Context,
 	workerID int,
-	msgChan <-chan *kafkaclient.Message,
+	msgChan <-chan *common.Message,
 	handlers map[string]MessageHandler,
 	dlqProducer *kafkaclient.Producer,
 	logger logging.Logger,
@@ -506,7 +507,7 @@ func workerLoop(
 func processMessage(
 	ctx context.Context,
 	workerID int,
-	msg *kafkaclient.Message,
+	msg *common.Message,
 	handlers map[string]MessageHandler,
 	dlqProducer *kafkaclient.Producer,
 	logger logging.Logger,
@@ -550,7 +551,7 @@ func processMessage(
 		logging.String("topic", msg.Topic),
 		logging.Err(lastErr),
 	)
-	dlqMsg := &kafkaclient.ProducerMessage{
+	dlqMsg := &common.ProducerMessage{
 		Topic: msg.Topic + ".dlq",
 		Key:   msg.Key,
 		Value: msg.Value,
@@ -569,11 +570,24 @@ func processMessage(
 func consumerLoop(
 	ctx context.Context,
 	consumer *kafkaclient.Consumer,
-	msgChan chan<- *kafkaclient.Message,
+	msgChan chan<- *common.Message,
 	logger logging.Logger,
 ) {
 	defer close(msgChan)
 	
+	handler := func(ctx context.Context, msg *common.Message) error {
+		select {
+		case msgChan <- msg:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	for _, topic := range allTopics {
+		consumer.Subscribe(topic, handler)
+	}
+
 	// Start the consumer - it will process messages via its internal handlers
 	if err := consumer.Start(ctx); err != nil {
 		logger.Error("consumer start error", logging.Err(err))

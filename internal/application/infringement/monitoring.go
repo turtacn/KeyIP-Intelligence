@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/redis"
-	kafkainfra "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/messaging/kafka"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	common "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // WatchlistStatus represents the state of a monitoring watchlist.
@@ -299,7 +299,7 @@ func (s *monitoringServiceImpl) CreateWatchlist(ctx context.Context, req *Create
 		"owner_id":     watchlist.OwnerID,
 		"timestamp":    now.Format(time.RFC3339),
 	})
-	_ = s.producer.Publish(ctx, &kafkainfra.ProducerMessage{
+	_ = s.producer.Publish(ctx, &common.ProducerMessage{
 		Topic: "monitoring.watchlist.created",
 		Key:   []byte(watchlist.ID),
 		Value: payload,
@@ -634,7 +634,7 @@ func (s *monitoringServiceImpl) RunScan(ctx context.Context, watchlistID string)
 		"alerts_created": alertsCreated,
 		"duration_ms":    result.Duration.Milliseconds(),
 	})
-	_ = s.producer.Publish(ctx, &kafkainfra.ProducerMessage{
+	_ = s.producer.Publish(ctx, &common.ProducerMessage{
 		Topic: "monitoring.scan.completed",
 		Key:   []byte(scanID),
 		Value: payload,

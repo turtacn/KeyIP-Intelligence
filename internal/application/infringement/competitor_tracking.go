@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/redis"
-	kafkainfra "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/messaging/kafka"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	common "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // CompetitorStatus represents the tracking state of a competitor.
@@ -250,7 +250,7 @@ func (s *competitorTrackingServiceImpl) TrackCompetitor(ctx context.Context, req
 		"watchlist_id":  competitor.WatchlistID,
 		"timestamp":     now.Format(time.RFC3339),
 	})
-	_ = s.producer.Publish(ctx, &kafkainfra.ProducerMessage{
+	_ = s.producer.Publish(ctx, &common.ProducerMessage{
 		Topic: "competitor.tracked",
 		Key:   []byte(competitor.ID),
 		Value: payload,
@@ -403,7 +403,7 @@ func (s *competitorTrackingServiceImpl) DetectNewFilings(ctx context.Context, co
 			"patent_number": d.PatentNumber,
 			"detected_at":   d.DetectedAt.Format(time.RFC3339),
 		})
-		_ = s.producer.Publish(ctx, &kafkainfra.ProducerMessage{
+		_ = s.producer.Publish(ctx, &common.ProducerMessage{
 			Topic: "competitor.new_filing",
 			Key:   []byte(d.PatentNumber),
 			Value: payload,

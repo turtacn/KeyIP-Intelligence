@@ -34,7 +34,6 @@ import (
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/redis"
-	kafkainfra "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/messaging/kafka"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
@@ -255,7 +254,7 @@ type AlertRepository interface {
 
 // MessageProducer abstracts the messaging system.
 type MessageProducer interface {
-	Publish(ctx context.Context, msg *kafkainfra.ProducerMessage) error
+	Publish(ctx context.Context, msg *commontypes.ProducerMessage) error
 }
 
 // AlertService defines the application-level contract for infringement alert management.
@@ -774,7 +773,7 @@ func (s *alertServiceImpl) dispatchAlert(ctx context.Context, alert *Alert) erro
 			continue
 		}
 
-		pm := &kafkainfra.ProducerMessage{
+		pm := &commontypes.ProducerMessage{
 			Topic: fmt.Sprintf("alert.dispatch.%s", ch.name),
 			Key:   []byte(alert.ID),
 			Value: payload,
