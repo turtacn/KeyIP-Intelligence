@@ -9,6 +9,7 @@ import (
 
 	opensearchgo "github.com/opensearch-project/opensearch-go/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 func newTestSearcher(serverURL string) *Searcher {
@@ -55,9 +56,9 @@ func TestSearch_SimpleMatch(t *testing.T) {
 	defer server.Close()
 
 	searcher := newTestSearcher(server.URL)
-	req := SearchRequest{
+	req := common.SearchRequest{
 		IndexName: "test-index",
-		Query: &Query{
+		Query: &common.Query{
 			QueryType: "match",
 			Field:     "title",
 			Value:     "test",
@@ -88,9 +89,9 @@ func TestSearch_WithAggregations(t *testing.T) {
 	defer server.Close()
 
 	searcher := newTestSearcher(server.URL)
-	req := SearchRequest{
+	req := common.SearchRequest{
 		IndexName: "test-index",
-		Aggregations: map[string]Aggregation{
+		Aggregations: map[string]common.Aggregation{
 			"types": {
 				AggType: "terms",
 				Field:   "type",
@@ -143,7 +144,7 @@ func TestScrollSearch_Success(t *testing.T) {
 
 	searcher := newTestSearcher(server.URL)
 	count := 0
-	err := searcher.ScrollSearch(context.Background(), SearchRequest{IndexName: "test"}, func(hits []SearchHit) error {
+	err := searcher.ScrollSearch(context.Background(), common.SearchRequest{IndexName: "test"}, func(hits []common.SearchHit) error {
 		count += len(hits)
 		return nil
 	})
@@ -173,5 +174,3 @@ func TestSuggest_Success(t *testing.T) {
 	assert.Len(t, suggestions, 1)
 	assert.Equal(t, "test", suggestions[0])
 }
-
-//Personal.AI order the ending

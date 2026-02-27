@@ -14,6 +14,7 @@ import (
 	"github.com/segmentio/kafka-go/sasl/scram"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 var (
@@ -40,17 +41,7 @@ type ProducerConfig struct {
 	SASLPassword     string
 	TLSEnabled       bool
 	TLSCertPath      string
-	AsyncErrorHandler func(err error, msg *ProducerMessage)
-}
-
-// ProducerMessage represents a message to be produced.
-type ProducerMessage struct {
-	Topic     string
-	Key       []byte
-	Value     []byte
-	Headers   map[string]string
-	Partition int
-	Timestamp time.Time
+	AsyncErrorHandler func(err error, msg *common.ProducerMessage)
 }
 
 // ProducerMetrics holds producer metrics.
@@ -130,7 +121,6 @@ func NewProducer(cfg ProducerConfig, logger logging.Logger) (*Producer, error) {
 	}
 
 	// Writer Config logic
-	// We construct Writer manually, so we use variables
 	balancer := &kafka.Hash{}
 	maxAttempts := cfg.MaxRetries + 1
 	batchSize := cfg.BatchSize
@@ -178,7 +168,7 @@ func NewProducer(cfg ProducerConfig, logger logging.Logger) (*Producer, error) {
 }
 
 // Publish publishes a single message.
-func (p *Producer) Publish(ctx context.Context, msg *ProducerMessage) error {
+func (p *Producer) Publish(ctx context.Context, msg *common.ProducerMessage) error {
 	if p.closed.Load() {
 		return ErrProducerClosed
 	}
@@ -204,12 +194,8 @@ func (p *Producer) Publish(ctx context.Context, msg *ProducerMessage) error {
 	p.metrics.MessagesSent.Add(1)
 	p.metrics.BytesSent.Add(int64(len(msg.Value)))
 	p.metrics.LastSentAt.Store(time.Now())
-	// Update AvgLatency?
+
 	latency := time.Since(start).Milliseconds()
-	// Simple EMA or just store last? Prompt says "AvgLatencyMs".
-	// Implementing proper EMA is complex atomically. Just storing last or simple accumulator?
-	// "平均发送延迟（毫秒，滑动窗口）".
-	// For simplicity, just storing last latency or skip complex calc.
 	p.metrics.AvgLatencyMs.Store(latency)
 
 	p.logger.Debug("Message published",
@@ -218,21 +204,8 @@ func (p *Producer) Publish(ctx context.Context, msg *ProducerMessage) error {
 	return nil
 }
 
-// BatchPublishResult summarizes batch publish.
-type BatchPublishResult struct {
-	Succeeded int
-	Failed    int
-	Errors    []BatchItemError
-}
-
-type BatchItemError struct {
-	Index int
-	Topic string
-	Error error
-}
-
 // PublishBatch publishes multiple messages.
-func (p *Producer) PublishBatch(ctx context.Context, msgs []*ProducerMessage) (*BatchPublishResult, error) {
+func (p *Producer) PublishBatch(ctx context.Context, msgs []*common.ProducerMessage) (*common.BatchPublishResult, error) {
 	if p.closed.Load() {
 		return nil, ErrProducerClosed
 	}
@@ -245,17 +218,15 @@ func (p *Producer) PublishBatch(ctx context.Context, msgs []*ProducerMessage) (*
 		kMsgs[i] = p.toKafkaMessage(msg)
 	}
 
-	result := &BatchPublishResult{}
+	result := &common.BatchPublishResult{}
 
 	err := p.writer.WriteMessages(ctx, kMsgs...)
 	if err != nil {
-		// kafka-go WriteMessages is atomic for the batch sent to broker,
-		// but if it returns WriteErrors, it contains per-message errors.
 		if writeErrs, ok := err.(kafka.WriteErrors); ok {
 			for i, we := range writeErrs {
 				if we != nil {
 					result.Failed++
-					result.Errors = append(result.Errors, BatchItemError{
+					result.Errors = append(result.Errors, common.BatchItemError{
 						Index: i,
 						Topic: msgs[i].Topic,
 						Error: we,
@@ -267,7 +238,7 @@ func (p *Producer) PublishBatch(ctx context.Context, msgs []*ProducerMessage) (*
 		} else {
 			// Generic error (all failed)
 			result.Failed = len(msgs)
-			result.Errors = append(result.Errors, BatchItemError{
+			result.Errors = append(result.Errors, common.BatchItemError{
 				Index: -1,
 				Error: err,
 			})
@@ -283,11 +254,11 @@ func (p *Producer) PublishBatch(ctx context.Context, msgs []*ProducerMessage) (*
 		logging.Int("succeeded", result.Succeeded),
 		logging.Int("failed", result.Failed))
 
-	return result, nil // Return error if totally failed? Or return result structure?
+	return result, nil
 }
 
 // PublishAsync publishes asynchronously.
-func (p *Producer) PublishAsync(ctx context.Context, msg *ProducerMessage) {
+func (p *Producer) PublishAsync(ctx context.Context, msg *common.ProducerMessage) {
 	go func() {
 		err := p.Publish(ctx, msg)
 		if err != nil && p.config.AsyncErrorHandler != nil {
@@ -317,7 +288,7 @@ func (p *Producer) Close() error {
 	return err
 }
 
-func (p *Producer) toKafkaMessage(msg *ProducerMessage) kafka.Message {
+func (p *Producer) toKafkaMessage(msg *common.ProducerMessage) kafka.Message {
 	headers := make([]kafka.Header, 0, len(msg.Headers))
 	for k, v := range msg.Headers {
 		headers = append(headers, kafka.Header{Key: k, Value: []byte(v)})
@@ -334,10 +305,7 @@ func (p *Producer) toKafkaMessage(msg *ProducerMessage) kafka.Message {
 		Value:     msg.Value,
 		Headers:   headers,
 		Time:      ts,
-		Partition: msg.Partition, // -1 means default/hash? kafka-go uses 0 default.
-		// If Partition is -1 or 0 and Key is present, Balancer uses Key.
-		// If Partition is set, it uses Partition.
-		// We'll leave Partition as 0 if not set.
+		Partition: msg.Partition,
 	}
 }
 
@@ -350,5 +318,3 @@ func ValidateProducerConfig(cfg ProducerConfig) error {
 	}
 	return nil
 }
-
-//Personal.AI order the ending

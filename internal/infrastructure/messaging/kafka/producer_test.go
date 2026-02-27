@@ -8,6 +8,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // mockKafkaWriter
@@ -45,8 +46,8 @@ func newTestProducerConfig() ProducerConfig {
 	}
 }
 
-func newTestProducerMessage(topic, key, value string) *ProducerMessage {
-	return &ProducerMessage{
+func newTestProducerMessage(topic, key, value string) *common.ProducerMessage {
+	return &common.ProducerMessage{
 		Topic: topic,
 		Key:   []byte(key),
 		Value: []byte(value),
@@ -119,7 +120,7 @@ func TestPublishBatch_PartialFailure(t *testing.T) {
 		},
 	}
 	p := newTestProducer(mock)
-	msgs := []*ProducerMessage{
+	msgs := []*common.ProducerMessage{
 		newTestProducerMessage("test", "1", "1"),
 		newTestProducerMessage("test", "2", "2"),
 	}
@@ -165,5 +166,3 @@ func TestClose_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, closed)
 }
-
-//Personal.AI order the ending

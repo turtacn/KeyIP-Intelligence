@@ -10,6 +10,7 @@ import (
 	"github.com/segmentio/kafka-go"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // Topic Constants
@@ -34,18 +35,6 @@ const (
 	TopicDeadLetterPatent       = "dead_letter.patent"
 	TopicDeadLetterInfringement = "dead_letter.infringement"
 )
-
-// TopicConfig defines configuration for a topic.
-type TopicConfig struct {
-	Name              string
-	NumPartitions     int
-	ReplicationFactor int
-	RetentionMs       int64
-	CleanupPolicy     string // "delete" or "compact"
-	MaxMessageBytes   int
-	MinInsyncReplicas int
-	Configs           map[string]string
-}
 
 // EventEnvelope standardizes event messages.
 type EventEnvelope struct {
@@ -134,7 +123,7 @@ func (e *EventEnvelope) DecodePayload(target interface{}) error {
 	return json.Unmarshal(e.Payload, target)
 }
 
-func (e *EventEnvelope) ToMessage(topic string) (*ProducerMessage, error) {
+func (e *EventEnvelope) ToMessage(topic string) (*common.ProducerMessage, error) {
 	val, err := json.Marshal(e)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeSerialization, "failed to marshal envelope")
@@ -147,7 +136,7 @@ func (e *EventEnvelope) ToMessage(topic string) (*ProducerMessage, error) {
 	if e.TraceID != "" {
 		headers["trace_id"] = e.TraceID
 	}
-	return &ProducerMessage{
+	return &common.ProducerMessage{
 		Topic:     topic,
 		Value:     val,
 		Headers:   headers,
@@ -155,7 +144,7 @@ func (e *EventEnvelope) ToMessage(topic string) (*ProducerMessage, error) {
 	}, nil
 }
 
-func MessageToEventEnvelope(msg *Message) (*EventEnvelope, error) {
+func MessageToEventEnvelope(msg *common.Message) (*EventEnvelope, error) {
 	if len(msg.Value) == 0 {
 		return nil, errors.New(errors.ErrCodeValidation, "empty message value")
 	}
@@ -195,7 +184,7 @@ func NewTopicManager(brokers []string, logger logging.Logger) (*TopicManager, er
 	}, nil
 }
 
-func (m *TopicManager) CreateTopic(ctx context.Context, cfg TopicConfig) error {
+func (m *TopicManager) CreateTopic(ctx context.Context, cfg common.TopicConfig) error {
 	if cfg.Name == "" {
 		return errors.New(errors.ErrCodeValidation, "topic name required")
 	}
@@ -228,25 +217,13 @@ func (m *TopicManager) CreateTopic(ctx context.Context, cfg TopicConfig) error {
 
 	err := m.conn.CreateTopics(kCfg)
 	if err != nil {
-		// Ignore "TopicAlreadyExists" error?
-		// kafka-go doesn't export error constants easily?
-		// But CreateTopics returns error if exists.
-		// Prompt says "Topic 已存在时返回 nil（幂等）".
-		// We check error message? Or use specialized error check if available.
-		// kafka-go might return syscall error or custom error.
-		// Assuming we just log and return nil if it says "already exists".
-		if err.Error() == "topic already exists" { // Simplified check
+		if err.Error() == "topic already exists" {
 			return nil
 		}
-		// Better way: Check if topic exists first?
-		// Or assume it's fine.
-		// Let's implement TopicExists check first to be cleaner.
 		exists, _ := m.TopicExists(ctx, cfg.Name)
 		if exists {
 			return nil
 		}
-		// If check failed or not exists, try create.
-		// If we tried create and it failed with "exists", return nil.
 		return err
 	}
 	m.logger.Info("Topic created", logging.String("topic", cfg.Name))
@@ -256,9 +233,7 @@ func (m *TopicManager) CreateTopic(ctx context.Context, cfg TopicConfig) error {
 func (m *TopicManager) DeleteTopic(ctx context.Context, name string) error {
 	err := m.conn.DeleteTopics(name)
 	if err != nil {
-		// Ignore not found?
-		// If "unknown topic or partition", return nil.
-		return nil // Simplification for idempotency
+		return nil
 	}
 	m.logger.Warn("Topic deleted", logging.String("topic", name))
 	return nil
@@ -267,11 +242,6 @@ func (m *TopicManager) DeleteTopic(ctx context.Context, name string) error {
 func (m *TopicManager) TopicExists(ctx context.Context, name string) (bool, error) {
 	partitions, err := m.conn.ReadPartitions(name)
 	if err != nil {
-		// If error contains "Unknown topic", return false
-		// But ReadPartitions might fail for other reasons.
-		// If it returns error, we assume false or error?
-		// kafka-go ReadPartitions throws error for unknown topic?
-		// Let's assume yes.
 		return false, nil
 	}
 	return len(partitions) > 0, nil
@@ -294,7 +264,7 @@ func (m *TopicManager) ListTopics(ctx context.Context) ([]string, error) {
 	return topics, nil
 }
 
-func (m *TopicManager) EnsureTopics(ctx context.Context, topics []TopicConfig) error {
+func (m *TopicManager) EnsureTopics(ctx context.Context, topics []common.TopicConfig) error {
 	for _, topic := range topics {
 		if err := m.CreateTopic(ctx, topic); err != nil {
 			return err
@@ -311,11 +281,10 @@ func (m *TopicManager) Close() error {
 	return m.conn.Close()
 }
 
-func DefaultTopics() []TopicConfig {
-	return []TopicConfig{
+func DefaultTopics() []common.TopicConfig {
+	return []common.TopicConfig{
 		{Name: TopicPatentIngested, NumPartitions: 12, ReplicationFactor: 3, RetentionMs: 7 * 24 * 3600 * 1000},
 		{Name: TopicPatentAnalyzed, NumPartitions: 6, ReplicationFactor: 3, RetentionMs: 7 * 24 * 3600 * 1000},
-		// ... add all topics from prompt ...
 		{Name: TopicPatentUpdated, NumPartitions: 6, ReplicationFactor: 3, RetentionMs: 7 * 24 * 3600 * 1000},
 		{Name: TopicPatentDeleted, NumPartitions: 3, ReplicationFactor: 3, RetentionMs: 30 * 24 * 3600 * 1000},
 		{Name: TopicPatentVectorized, NumPartitions: 6, ReplicationFactor: 3, RetentionMs: 3 * 24 * 3600 * 1000},
@@ -335,5 +304,3 @@ func DefaultTopics() []TopicConfig {
 		{Name: TopicDeadLetterInfringement, NumPartitions: 3, ReplicationFactor: 3, RetentionMs: 30 * 24 * 3600 * 1000},
 	}
 }
-
-//Personal.AI order the ending

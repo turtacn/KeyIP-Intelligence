@@ -9,6 +9,7 @@ import (
 	"github.com/segmentio/kafka-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // MockLogger (reused)
@@ -83,16 +84,16 @@ func TestValidateConsumerConfig_EmptyBrokers(t *testing.T) {
 
 func TestSubscribe_Success(t *testing.T) {
 	c := &Consumer{
-		handlers: make(map[string]MessageHandler),
+		handlers: make(map[string]common.MessageHandler),
 		logger:   newMockLogger(),
 	}
-	c.Subscribe("topic", func(ctx context.Context, msg *Message) error { return nil })
+	c.Subscribe("topic", func(ctx context.Context, msg *common.Message) error { return nil })
 	assert.Len(t, c.handlers, 1)
 }
 
 func TestStart_AlreadyRunning(t *testing.T) {
 	c := &Consumer{
-		handlers: make(map[string]MessageHandler),
+		handlers: make(map[string]common.MessageHandler),
 		logger:   newMockLogger(),
 	}
 	// Manually set running
@@ -125,12 +126,12 @@ func TestConsumeLoop_SingleMessage(t *testing.T) {
 		reader:   mockReader,
 		config:   newTestConsumerConfig(),
 		logger:   newMockLogger(),
-		handlers: make(map[string]MessageHandler),
+		handlers: make(map[string]common.MessageHandler),
 		metrics:  &ConsumerMetrics{},
 	}
 
 	handlerCalled := make(chan struct{})
-	c.Subscribe("test-topic", func(ctx context.Context, msg *Message) error {
+	c.Subscribe("test-topic", func(ctx context.Context, msg *common.Message) error {
 		assert.Equal(t, "value", string(msg.Value))
 		close(handlerCalled)
 		return nil
@@ -163,7 +164,7 @@ func TestProcessMessage_RetrySuccess(t *testing.T) {
 	}
 
 	attempts := 0
-	handler := func(ctx context.Context, msg *Message) error {
+	handler := func(ctx context.Context, msg *common.Message) error {
 		attempts++
 		if attempts < 2 {
 			return errors.New("fail")
@@ -171,7 +172,7 @@ func TestProcessMessage_RetrySuccess(t *testing.T) {
 		return nil
 	}
 
-	err := c.processMessage(context.Background(), &Message{}, handler)
+	err := c.processMessage(context.Background(), &common.Message{}, handler)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, attempts)
 	assert.Equal(t, int64(1), c.metrics.MessagesRetried.Load())
@@ -189,14 +190,12 @@ func TestProcessMessage_RetryExhausted(t *testing.T) {
 		logger:  newMockLogger(),
 	}
 
-	handler := func(ctx context.Context, msg *Message) error {
+	handler := func(ctx context.Context, msg *common.Message) error {
 		return errors.New("fail")
 	}
 
-	err := c.processMessage(context.Background(), &Message{}, handler)
+	err := c.processMessage(context.Background(), &common.Message{}, handler)
 	// Should return nil (handled/dropped)
 	assert.NoError(t, err)
 	// But logged error
 }
-
-//Personal.AI order the ending

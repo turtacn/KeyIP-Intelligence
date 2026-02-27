@@ -401,4 +401,293 @@ type Logger interface {
 	Debug(msg string, keysAndValues ...interface{})
 }
 
-//Personal.AI order the ending
+// --- Search Engine Types ---
+
+// SearchRequest defines a search query.
+type SearchRequest struct {
+	IndexName      string                 `json:"index_name"`
+	Query          *Query                 `json:"query"`
+	Filters        []Filter               `json:"filters,omitempty"`
+	Sort           []SortField            `json:"sort,omitempty"`
+	Pagination     *Pagination            `json:"pagination,omitempty"`
+	Highlight      *HighlightConfig       `json:"highlight,omitempty"`
+	Aggregations   map[string]Aggregation `json:"aggregations,omitempty"`
+	SourceIncludes []string               `json:"source_includes,omitempty"`
+	SourceExcludes []string               `json:"source_excludes,omitempty"`
+}
+
+// Query defines a search query structure.
+type Query struct {
+	QueryType          string      `json:"query_type"`
+	Field              string      `json:"field,omitempty"`
+	Fields             []string    `json:"fields,omitempty"`
+	Value              interface{} `json:"value,omitempty"`
+	Boost              float64     `json:"boost,omitempty"`
+	Must               []Query     `json:"must,omitempty"`
+	Should             []Query     `json:"should,omitempty"`
+	MustNot            []Query     `json:"must_not,omitempty"`
+	MinimumShouldMatch string      `json:"minimum_should_match,omitempty"`
+}
+
+// Filter defines a filter condition.
+type Filter struct {
+	Field      string      `json:"field"`
+	FilterType string      `json:"filter_type"`
+	Value      interface{} `json:"value,omitempty"`
+	RangeFrom  interface{} `json:"range_from,omitempty"`
+	RangeTo    interface{} `json:"range_to,omitempty"`
+}
+
+// HighlightConfig defines highlighting settings.
+type HighlightConfig struct {
+	Fields            []string `json:"fields"`
+	PreTag            string   `json:"pre_tag,omitempty"`
+	PostTag           string   `json:"post_tag,omitempty"`
+	FragmentSize      int      `json:"fragment_size,omitempty"`
+	NumberOfFragments int      `json:"number_of_fragments,omitempty"`
+}
+
+// Aggregation defines an aggregation.
+type Aggregation struct {
+	AggType         string                 `json:"agg_type"`
+	Field           string                 `json:"field,omitempty"`
+	Size            int                    `json:"size,omitempty"`
+	Interval        string                 `json:"interval,omitempty"`
+	Ranges          []AggRange             `json:"ranges,omitempty"`
+	SubAggregations map[string]Aggregation `json:"sub_aggregations,omitempty"`
+}
+
+// AggRange defines a range for range aggregation.
+type AggRange struct {
+	Key  string      `json:"key"`
+	From interface{} `json:"from,omitempty"`
+	To   interface{} `json:"to,omitempty"`
+}
+
+// SearchResult holds the search response.
+type SearchResult struct {
+	Total        int64                        `json:"total"`
+	MaxScore     float64                      `json:"max_score"`
+	Hits         []SearchHit                  `json:"hits"`
+	Aggregations map[string]AggregationResult `json:"aggregations,omitempty"`
+	TookMs       int64                        `json:"took_ms"`
+}
+
+// SearchHit represents a single search hit.
+type SearchHit struct {
+	ID         string              `json:"id"`
+	Score      float64             `json:"score"`
+	Source     json.RawMessage     `json:"source"`
+	Highlights map[string][]string `json:"highlights,omitempty"`
+	Sort       []interface{}       `json:"sort,omitempty"`
+}
+
+// AggregationResult holds the result of an aggregation.
+type AggregationResult struct {
+	Buckets []AggBucket `json:"buckets"`
+	Value   *float64    `json:"value,omitempty"`
+}
+
+// AggBucket represents a bucket in an aggregation result.
+type AggBucket struct {
+	Key             interface{}                  `json:"key"`
+	KeyAsString     string                       `json:"key_as_string,omitempty"`
+	DocCount        int64                        `json:"doc_count"`
+	SubAggregations map[string]AggregationResult `json:"sub_aggregations,omitempty"`
+}
+
+// IndexMapping defines settings and mappings for an index.
+type IndexMapping struct {
+	Settings map[string]interface{} `json:"settings,omitempty"`
+	Mappings map[string]interface{} `json:"mappings,omitempty"`
+}
+
+// BulkResult summarizes the result of a bulk operation.
+type BulkResult struct {
+	Succeeded int             `json:"succeeded"`
+	Failed    int             `json:"failed"`
+	Errors    []BulkItemError `json:"errors,omitempty"`
+}
+
+// BulkItemError details an error for a specific document in a bulk operation.
+type BulkItemError struct {
+	DocID     string `json:"doc_id"`
+	ErrorType string `json:"error_type"`
+	Reason    string `json:"reason"`
+}
+
+// SearchEngine defines the interface for full-text search operations.
+type SearchEngine interface {
+	// Indexing
+	CreateIndex(ctx context.Context, indexName string, mapping IndexMapping) error
+	DeleteIndex(ctx context.Context, indexName string) error
+	IndexExists(ctx context.Context, indexName string) (bool, error)
+	IndexDocument(ctx context.Context, indexName string, docID string, document interface{}) error
+	DeleteDocument(ctx context.Context, indexName string, docID string) error
+	BulkIndex(ctx context.Context, indexName string, documents map[string]interface{}) (*BulkResult, error)
+	UpdateMapping(ctx context.Context, indexName string, mapping map[string]interface{}) error
+
+	// Searching
+	Search(ctx context.Context, req SearchRequest) (*SearchResult, error)
+	Count(ctx context.Context, indexName string, query *Query, filters []Filter) (int64, error)
+	ScrollSearch(ctx context.Context, req SearchRequest, batchHandler func(hits []SearchHit) error) error
+	MultiSearch(ctx context.Context, requests []SearchRequest) ([]*SearchResult, error)
+	Suggest(ctx context.Context, indexName string, field string, text string, size int) ([]string, error)
+}
+
+// --- Vector Store Types ---
+
+// VectorSearchRequest defines a vector search query.
+type VectorSearchRequest struct {
+	CollectionName     string                 `json:"collection_name"`
+	VectorFieldName    string                 `json:"vector_field_name"`
+	Vectors            [][]float32            `json:"vectors"`
+	TopK               int                    `json:"top_k"`
+	MetricType         string                 `json:"metric_type,omitempty"` // simplified from entity.MetricType
+	Filters            string                 `json:"filters,omitempty"`
+	OutputFields       []string               `json:"output_fields,omitempty"`
+	SearchParams       map[string]interface{} `json:"search_params,omitempty"`
+	GuaranteeTimestamp uint64                 `json:"guarantee_timestamp,omitempty"`
+}
+
+// VectorHit represents a single search hit.
+type VectorHit struct {
+	ID       int64                  `json:"id"`
+	Score    float32                `json:"score"`
+	Distance float32                `json:"distance,omitempty"`
+	Fields   map[string]interface{} `json:"fields,omitempty"`
+}
+
+// VectorSearchResult holds the search response.
+type VectorSearchResult struct {
+	Results [][]VectorHit `json:"results"`
+	TookMs  int64         `json:"took_ms"`
+}
+
+// InsertRequest defines data to insert.
+type InsertRequest struct {
+	CollectionName string                   `json:"collection_name"`
+	Data           []map[string]interface{} `json:"data"`
+}
+
+// InsertResult holds the insertion result.
+type InsertResult struct {
+	InsertedCount int64   `json:"inserted_count"`
+	IDs           []int64 `json:"ids"`
+}
+
+// CollectionSchema defines a collection schema (simplified for interface).
+type CollectionSchema struct {
+	Name               string        `json:"name"`
+	Description        string        `json:"description"`
+	Fields             []interface{} `json:"fields"` // Abstraction over SDK specific fields
+	EnableDynamicField bool          `json:"enable_dynamic_field"`
+}
+
+// IndexConfig defines index configuration.
+type IndexConfig struct {
+	FieldName  string            `json:"field_name"`
+	IndexType  string            `json:"index_type"` // simplified from entity.IndexType
+	MetricType string            `json:"metric_type"`
+	Params     map[string]string `json:"params,omitempty"`
+}
+
+// VectorStore defines the interface for vector database operations.
+type VectorStore interface {
+	// Schema Management
+	CreateCollection(ctx context.Context, schema CollectionSchema) error
+	DropCollection(ctx context.Context, name string) error
+	HasCollection(ctx context.Context, name string) (bool, error)
+	// DescribeCollection? SDK specific types often returned. We skip deep introspection for interface.
+	CreateIndex(ctx context.Context, collectionName string, indexCfg IndexConfig) error
+	DropIndex(ctx context.Context, collectionName string, fieldName string) error
+	LoadCollection(ctx context.Context, name string) error
+	ReleaseCollection(ctx context.Context, name string) error
+	GetLoadState(ctx context.Context, name string) (string, error)
+	EnsureCollection(ctx context.Context, schema CollectionSchema, indexConfigs []IndexConfig) error
+
+	// Data Operations
+	Insert(ctx context.Context, req InsertRequest) (*InsertResult, error)
+	Upsert(ctx context.Context, req InsertRequest) (*InsertResult, error)
+	Delete(ctx context.Context, collectionName string, ids []int64) error
+
+	// Search
+	Search(ctx context.Context, req VectorSearchRequest) (*VectorSearchResult, error)
+	SearchByID(ctx context.Context, collectionName string, vectorFieldName string, id int64, topK int, filters string, outputFields []string) ([]VectorHit, error)
+	BatchSearch(ctx context.Context, requests []VectorSearchRequest) ([]*VectorSearchResult, error)
+	// HybridSearch? Dependency on Reranker interface which might be implementation specific.
+	// We can define it generically.
+	// HybridSearch(ctx context.Context, collectionName string, requests []VectorSearchRequest, reranker Reranker, topK int) (*VectorSearchResult, error)
+
+	// Entity Retrieval
+	GetEntityByIDs(ctx context.Context, collectionName string, ids []int64, outputFields []string) ([]map[string]interface{}, error)
+	GetEntityCount(ctx context.Context, collectionName string) (int64, error)
+}
+
+// --- Messaging Types ---
+
+// ProducerMessage represents a message to be produced.
+type ProducerMessage struct {
+	Topic     string            `json:"topic"`
+	Key       []byte            `json:"key"`
+	Value     []byte            `json:"value"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	Partition int               `json:"partition"`
+	Timestamp time.Time         `json:"timestamp"`
+}
+
+// Message represents a consumed message.
+type Message struct {
+	Topic     string            `json:"topic"`
+	Partition int               `json:"partition"`
+	Offset    int64             `json:"offset"`
+	Key       []byte            `json:"key"`
+	Value     []byte            `json:"value"`
+	Headers   map[string]string `json:"headers"`
+	Timestamp time.Time         `json:"timestamp"`
+}
+
+// MessageHandler handles a consumed message.
+type MessageHandler func(ctx context.Context, msg *Message) error
+
+// TopicConfig defines configuration for a topic.
+type TopicConfig struct {
+	Name              string            `json:"name"`
+	NumPartitions     int               `json:"num_partitions"`
+	ReplicationFactor int               `json:"replication_factor"`
+	RetentionMs       int64             `json:"retention_ms"`
+	CleanupPolicy     string            `json:"cleanup_policy"`
+	MaxMessageBytes   int               `json:"max_message_bytes"`
+	MinInsyncReplicas int               `json:"min_insync_replicas"`
+	Configs           map[string]string `json:"configs,omitempty"`
+}
+
+// BatchPublishResult summarizes batch publish.
+type BatchPublishResult struct {
+	Succeeded int              `json:"succeeded"`
+	Failed    int              `json:"failed"`
+	Errors    []BatchItemError `json:"errors,omitempty"`
+}
+
+// BatchItemError details an error for a specific message in a batch.
+type BatchItemError struct {
+	Index int    `json:"index"`
+	Topic string `json:"topic"`
+	Error error  `json:"error"` // Note: error is interface, not JSON friendly, but fine for Go code
+}
+
+// MessageProducer defines the interface for producing messages.
+type MessageProducer interface {
+	Publish(ctx context.Context, msg *ProducerMessage) error
+	PublishBatch(ctx context.Context, msgs []*ProducerMessage) (*BatchPublishResult, error)
+	PublishAsync(ctx context.Context, msg *ProducerMessage)
+	Close() error
+}
+
+// MessageConsumer defines the interface for consuming messages.
+type MessageConsumer interface {
+	Subscribe(topic string, handler MessageHandler) error
+	Unsubscribe(topic string) error
+	Start(ctx context.Context) error
+	Close() error
+}

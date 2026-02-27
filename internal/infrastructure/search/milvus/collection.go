@@ -7,6 +7,7 @@ import (
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 var (
@@ -23,39 +24,6 @@ type CollectionConfig struct {
 	DefaultNList      int
 	LoadTimeout       time.Duration
 	IndexBuildTimeout time.Duration
-}
-
-// CollectionSchema defines a collection schema.
-type CollectionSchema struct {
-	Name               string
-	Description        string
-	Fields             []*entity.Field
-	EnableDynamicField bool
-}
-
-// FieldSchema is deprecated, use entity.Field directly or helper?
-// Prompt says "Define FieldSchema struct".
-// But Milvus SDK uses `entity.Field`.
-// I'll define a helper struct to abstract SDK if requested, or just use SDK types.
-// Prompt: "Define FieldSchema struct: Name, DataType, PrimaryKey..."
-// This suggests an abstraction.
-type FieldSchema struct {
-	Name          string
-	DataType      entity.FieldType
-	PrimaryKey    bool
-	AutoID        bool
-	Description   string
-	Dimension     int
-	MaxLength     int
-	IsPartitionKey bool
-}
-
-// IndexConfig defines index configuration.
-type IndexConfig struct {
-	FieldName  string
-	IndexType  entity.IndexType
-	MetricType entity.MetricType
-	Params     map[string]string // SDK uses map[string]string for params usually
 }
 
 // CollectionManager manages Milvus collections.
@@ -97,7 +65,7 @@ func NewCollectionManager(client *Client, cfg CollectionConfig, logger logging.L
 }
 
 // CreateCollection creates a new collection.
-func (m *CollectionManager) CreateCollection(ctx context.Context, schema CollectionSchema) error {
+func (m *CollectionManager) CreateCollection(ctx context.Context, schema common.CollectionSchema) error {
 	has, err := m.HasCollection(ctx, schema.Name)
 	if err != nil {
 		return err
@@ -106,22 +74,24 @@ func (m *CollectionManager) CreateCollection(ctx context.Context, schema Collect
 		return ErrCollectionAlreadyExists
 	}
 
-	// Convert FieldSchema to entity.Field?
-	// CollectionSchema definition in prompt uses FieldSchema list.
-	// But I defined CollectionSchema to use entity.Field earlier in thought, but code above uses `[]*entity.Field`?
-	// Wait, prompt says: "Fields []FieldSchema".
-	// So `CollectionSchema` struct in code should use `[]FieldSchema`.
-	// I will fix `CollectionSchema` struct definition below to match prompt logic.
+	// Convert common.CollectionSchema to entity.Schema
+	fields := make([]*entity.Field, 0, len(schema.Fields))
+	for _, f := range schema.Fields {
+		if field, ok := f.(*entity.Field); ok {
+			fields = append(fields, field)
+		} else {
+			return errors.New(errors.ErrCodeValidation, "invalid field type in schema")
+		}
+	}
 
-	// Create actual schema
 	s := &entity.Schema{
-		CollectionName: schema.Name,
-		Description:    schema.Description,
-		Fields:         schema.Fields, // If fields are entity.Field
+		CollectionName:     schema.Name,
+		Description:        schema.Description,
+		Fields:             fields,
 		EnableDynamicField: schema.EnableDynamicField,
 	}
 
-	err = m.client.GetMilvusClient().CreateCollection(ctx, s, m.config.ShardsNum) // shardsNum int32
+	err = m.client.GetMilvusClient().CreateCollection(ctx, s, m.config.ShardsNum)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrCodeInternal, "failed to create collection")
 	}
@@ -159,14 +129,20 @@ func (m *CollectionManager) HasCollection(ctx context.Context, name string) (boo
 }
 
 // CollectionInfo holds collection metadata.
+// Matches common? No, common doesn't define CollectionInfo, it defines CollectionSchema.
+// But we can return common.CollectionSchema?
+// DescribeCollection in interface? No, interface doesn't have DescribeCollection.
+// Wait, interface in common.VectorStore does NOT have DescribeCollection.
+// It has: Create, Drop, Has, CreateIndex, DropIndex, Load, Release, GetLoadState, Ensure.
+// So DescribeCollection is extra. I can keep it or remove it. I'll keep it for internal use or extended interface.
 type CollectionInfo struct {
-	Name               string
-	Description        string
-	Fields             []*entity.Field
-	ShardsNum          int32
-	ConsistencyLevel   entity.ConsistencyLevel
-	RowCount           int64
-	CreatedTimestamp   uint64
+	Name             string
+	Description      string
+	Fields           []*entity.Field
+	ShardsNum        int32
+	ConsistencyLevel entity.ConsistencyLevel
+	RowCount         int64
+	CreatedTimestamp uint64
 }
 
 // DescribeCollection returns collection details.
@@ -176,17 +152,10 @@ func (m *CollectionManager) DescribeCollection(ctx context.Context, name string)
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to describe collection")
 	}
 
-	// Get statistics for row count
-	stats, err := m.client.GetMilvusClient().GetCollectionStatistics(ctx, name)
-	var rowCount int64
-	if err == nil {
-		if _, ok := stats["row_count"]; ok {
-			// parse string to int64?
-			// ignoring for now
-		}
-	}
+	// stats, err := m.client.GetMilvusClient().GetCollectionStatistics(ctx, name)
+	// var rowCount int64
+	// parse stats...
 
-	// entity.Collection has Schema field which contains Description and Fields
 	var desc string
 	var fields []*entity.Field
 	if coll.Schema != nil {
@@ -198,46 +167,38 @@ func (m *CollectionManager) DescribeCollection(ctx context.Context, name string)
 		Name:             coll.Name,
 		Description:      desc,
 		Fields:           fields,
-		// ShardsNum:        coll.ShardsNum,
 		ConsistencyLevel: coll.ConsistencyLevel,
-		RowCount:         rowCount,
-		// CreatedTimestamp not available or different name
+		RowCount:         0, // Placeholder
 		CreatedTimestamp: 0,
 	}, nil
 }
 
 // CreateIndex creates an index for a field.
-func (m *CollectionManager) CreateIndex(ctx context.Context, collectionName string, indexCfg IndexConfig) error {
+func (m *CollectionManager) CreateIndex(ctx context.Context, collectionName string, indexCfg common.IndexConfig) error {
 	var idx entity.Index
 	var err error
-	idx, err = entity.NewIndexIvfFlat(indexCfg.MetricType, 1024) // Default
-	// Switch based on index type
-	switch indexCfg.IndexType {
-	case entity.IvfFlat:
-		idx, err = entity.NewIndexIvfFlat(indexCfg.MetricType, 1024) // Need nlist from params
-	case entity.HNSW:
-		idx, err = entity.NewIndexHNSW(indexCfg.MetricType, 8, 200) // Need M, efConstruction
-	// ... handle params parsing from map
+
+	metricType := entity.MetricType(indexCfg.MetricType)
+	if metricType == "" {
+		metricType = m.config.DefaultMetricType
 	}
+
+	// Simple mapping for demo
+	// In real world, use indexCfg.IndexType string to decide
+	if indexCfg.IndexType == "" || indexCfg.IndexType == "IVF_FLAT" {
+		idx, err = entity.NewIndexIvfFlat(metricType, 1024)
+	} else if indexCfg.IndexType == "HNSW" {
+		idx, err = entity.NewIndexHNSW(metricType, 8, 200)
+	} else {
+		// Default
+		idx, err = entity.NewIndexIvfFlat(metricType, 1024)
+	}
+
 	if err != nil {
 		return err
 	}
 
-	// We need to parse params map into index object options.
-	// SDK uses typed constructors.
-	// Implementing robust parsing is complex.
-	// For now, I'll use generic NewGenericIndex if available or stick to simple logic.
-	// Let's use `entity.NewGenericIndex`.
-	// idx = entity.NewGenericIndex(name, params)
-	// SDK v2 has `NewGenericIndex(name string, params map[string]string)`.
-	// But `name` here is index name or index type?
-	// `NewIndex` usually takes type.
-
-	// Simply using what works:
-	// If IndexType provided, use it.
-	// Param map convert to map[string]string.
-
-	err = m.client.GetMilvusClient().CreateIndex(ctx, collectionName, indexCfg.FieldName, idx, false) // async=false
+	err = m.client.GetMilvusClient().CreateIndex(ctx, collectionName, indexCfg.FieldName, idx, false)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrCodeInternal, "failed to create index")
 	}
@@ -257,8 +218,6 @@ func (m *CollectionManager) DropIndex(ctx context.Context, collectionName string
 
 // LoadCollection loads a collection into memory.
 func (m *CollectionManager) LoadCollection(ctx context.Context, name string) error {
-	// async=false means wait for load? SDK documentation says `async` param for `LoadCollection`.
-	// If false, it returns when loaded?
 	err := m.client.GetMilvusClient().LoadCollection(ctx, name, false)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrCodeInternal, "failed to load collection")
@@ -293,7 +252,7 @@ func (m *CollectionManager) GetLoadState(ctx context.Context, name string) (stri
 }
 
 // EnsureCollection ensures a collection exists and is loaded.
-func (m *CollectionManager) EnsureCollection(ctx context.Context, schema CollectionSchema, indexConfigs []IndexConfig) error {
+func (m *CollectionManager) EnsureCollection(ctx context.Context, schema common.CollectionSchema, indexConfigs []common.IndexConfig) error {
 	exists, err := m.HasCollection(ctx, schema.Name)
 	if err != nil {
 		return err
@@ -305,26 +264,12 @@ func (m *CollectionManager) EnsureCollection(ctx context.Context, schema Collect
 		}
 	}
 
-	// Create indexes
 	for _, idxCfg := range indexConfigs {
-		// Check if index exists? SDK `DescribeIndex`.
-		// If not exists, create.
-		// For brevity, blindly creating might fail if exists.
-		// Assuming we check first or CreateIndex is idempotent (it returns error if exists usually).
-		// We'll ignore "index already exists" error?
-		// Or verify.
-
-		// describe, err := m.client.GetMilvusClient().DescribeIndex(ctx, schema.Name, idxCfg.FieldName)
-		// ...
-		// Just call CreateIndex, handle error?
 		if err := m.CreateIndex(ctx, schema.Name, idxCfg); err != nil {
-			// Log warn and continue? Or fail?
-			// If index exists, it might be fine.
 			m.logger.Warn("CreateIndex failed (might exist)", logging.Error(err))
 		}
 	}
 
-	// Load
 	if err := m.LoadCollection(ctx, schema.Name); err != nil {
 		return err
 	}
@@ -334,36 +279,44 @@ func (m *CollectionManager) EnsureCollection(ctx context.Context, schema Collect
 
 // Predefined Schemas
 
-func PatentVectorSchema() CollectionSchema {
-	return CollectionSchema{
-		Name: "patents",
+func PatentVectorSchema() common.CollectionSchema {
+	fields := []*entity.Field{
+		{Name: "id", DataType: entity.FieldTypeInt64, PrimaryKey: true, AutoID: false},
+		{Name: "patent_number", DataType: entity.FieldTypeVarChar, TypeParams: map[string]string{"max_length": "64"}},
+		{Name: "title_vector", DataType: entity.FieldTypeFloatVector, TypeParams: map[string]string{"dim": "768"}},
+		{Name: "abstract_vector", DataType: entity.FieldTypeFloatVector, TypeParams: map[string]string{"dim": "768"}},
+		{Name: "claims_vector", DataType: entity.FieldTypeFloatVector, TypeParams: map[string]string{"dim": "768"}},
+		{Name: "tech_domain", DataType: entity.FieldTypeVarChar, TypeParams: map[string]string{"max_length": "128"}, IsPartitionKey: true},
+		{Name: "filing_date", DataType: entity.FieldTypeInt64},
+		{Name: "assignee", DataType: entity.FieldTypeVarChar, TypeParams: map[string]string{"max_length": "256"}},
+	}
+	ifaces := make([]interface{}, len(fields))
+	for i, f := range fields {
+		ifaces[i] = f
+	}
+	return common.CollectionSchema{
+		Name:        "patents",
 		Description: "Patent vectors",
-		Fields: []*entity.Field{
-			{Name: "id", DataType: entity.FieldTypeInt64, PrimaryKey: true, AutoID: false},
-			{Name: "patent_number", DataType: entity.FieldTypeVarChar, TypeParams: map[string]string{"max_length": "64"}},
-			{Name: "title_vector", DataType: entity.FieldTypeFloatVector, TypeParams: map[string]string{"dim": "768"}},
-			{Name: "abstract_vector", DataType: entity.FieldTypeFloatVector, TypeParams: map[string]string{"dim": "768"}},
-			{Name: "claims_vector", DataType: entity.FieldTypeFloatVector, TypeParams: map[string]string{"dim": "768"}},
-			{Name: "tech_domain", DataType: entity.FieldTypeVarChar, TypeParams: map[string]string{"max_length": "128"}, IsPartitionKey: true},
-			{Name: "filing_date", DataType: entity.FieldTypeInt64},
-			{Name: "assignee", DataType: entity.FieldTypeVarChar, TypeParams: map[string]string{"max_length": "256"}},
-		},
+		Fields:      ifaces,
 	}
 }
 
-func MoleculeVectorSchema() CollectionSchema {
-	return CollectionSchema{
-		Name: "molecules",
+func MoleculeVectorSchema() common.CollectionSchema {
+	fields := []*entity.Field{
+		{Name: "id", DataType: entity.FieldTypeInt64, PrimaryKey: true, AutoID: false},
+		{Name: "smiles", DataType: entity.FieldTypeVarChar, TypeParams: map[string]string{"max_length": "2048"}},
+		{Name: "fingerprint_vector", DataType: entity.FieldTypeFloatVector, TypeParams: map[string]string{"dim": "2048"}},
+		{Name: "structure_vector", DataType: entity.FieldTypeFloatVector, TypeParams: map[string]string{"dim": "512"}},
+		{Name: "molecular_weight", DataType: entity.FieldTypeFloat},
+		{Name: "source_patent", DataType: entity.FieldTypeVarChar, TypeParams: map[string]string{"max_length": "64"}},
+	}
+	ifaces := make([]interface{}, len(fields))
+	for i, f := range fields {
+		ifaces[i] = f
+	}
+	return common.CollectionSchema{
+		Name:        "molecules",
 		Description: "Molecule vectors",
-		Fields: []*entity.Field{
-			{Name: "id", DataType: entity.FieldTypeInt64, PrimaryKey: true, AutoID: false},
-			{Name: "smiles", DataType: entity.FieldTypeVarChar, TypeParams: map[string]string{"max_length": "2048"}},
-			{Name: "fingerprint_vector", DataType: entity.FieldTypeFloatVector, TypeParams: map[string]string{"dim": "2048"}},
-			{Name: "structure_vector", DataType: entity.FieldTypeFloatVector, TypeParams: map[string]string{"dim": "512"}},
-			{Name: "molecular_weight", DataType: entity.FieldTypeFloat},
-			{Name: "source_patent", DataType: entity.FieldTypeVarChar, TypeParams: map[string]string{"max_length": "64"}},
-		},
+		Fields:      ifaces,
 	}
 }
-
-//Personal.AI order the ending

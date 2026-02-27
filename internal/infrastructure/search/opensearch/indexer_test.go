@@ -11,6 +11,7 @@ import (
 
 	opensearchgo "github.com/opensearch-project/opensearch-go/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // Reusing MockLogger and newTestClient helper logic from client_test.go
@@ -66,7 +67,7 @@ func TestCreateIndex_Success(t *testing.T) {
 	defer server.Close()
 
 	indexer := newTestIndexer(server.URL)
-	err := indexer.CreateIndex(context.Background(), "test-index", IndexMapping{})
+	err := indexer.CreateIndex(context.Background(), "test-index", common.IndexMapping{})
 	assert.NoError(t, err)
 }
 
@@ -81,7 +82,7 @@ func TestCreateIndex_AlreadyExists(t *testing.T) {
 	defer server.Close()
 
 	indexer := newTestIndexer(server.URL)
-	err := indexer.CreateIndex(context.Background(), "test-index", IndexMapping{})
+	err := indexer.CreateIndex(context.Background(), "test-index", common.IndexMapping{})
 	assert.Error(t, err)
 	assert.Equal(t, ErrIndexAlreadyExists, err)
 }
@@ -204,5 +205,3 @@ func TestPatentIndexMapping(t *testing.T) {
 	assert.Contains(t, props, "title")
 	assert.Contains(t, props, "abstract")
 }
-
-//Personal.AI order the ending

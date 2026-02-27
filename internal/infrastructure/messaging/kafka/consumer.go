@@ -15,6 +15,7 @@ import (
 	"github.com/segmentio/kafka-go/sasl/scram"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 var (
@@ -54,20 +55,6 @@ type ConsumerConfig struct {
 	RetryConfig       RetryConfig
 }
 
-// Message represents a Kafka message.
-type Message struct {
-	Topic     string
-	Partition int
-	Offset    int64
-	Key       []byte
-	Value     []byte
-	Headers   map[string]string
-	Timestamp time.Time
-}
-
-// MessageHandler handles a message.
-type MessageHandler func(ctx context.Context, msg *Message) error
-
 // ConsumerMetrics holds consumer metrics.
 type ConsumerMetrics struct {
 	MessagesConsumed     atomic.Int64
@@ -93,7 +80,7 @@ type Consumer struct {
 	config ConsumerConfig
 	logger logging.Logger
 
-	handlers map[string]MessageHandler
+	handlers map[string]common.MessageHandler
 	mu       sync.RWMutex
 
 	running atomic.Bool
@@ -209,14 +196,14 @@ func NewConsumer(cfg ConsumerConfig, logger logging.Logger) (*Consumer, error) {
 		reader:             reader,
 		config:             cfg,
 		logger:             logger,
-		handlers:           make(map[string]MessageHandler),
+		handlers:           make(map[string]common.MessageHandler),
 		deadLetterProducer: dlProducer,
 		metrics:            &ConsumerMetrics{},
 	}, nil
 }
 
 // Subscribe subscribes to a topic.
-func (c *Consumer) Subscribe(topic string, handler MessageHandler) error {
+func (c *Consumer) Subscribe(topic string, handler common.MessageHandler) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.handlers[topic] = handler
@@ -272,7 +259,7 @@ func (c *Consumer) consumeLoop(ctx context.Context) {
 		c.metrics.Lag.Store(m.HighWaterMark - m.Offset)
 
 		// Convert to Message
-		msg := &Message{
+		msg := &common.Message{
 			Topic:     m.Topic,
 			Partition: m.Partition,
 			Offset:    m.Offset,
@@ -320,7 +307,7 @@ func (c *Consumer) consumeLoop(ctx context.Context) {
 	}
 }
 
-func (c *Consumer) processMessage(ctx context.Context, msg *Message, handler MessageHandler) error {
+func (c *Consumer) processMessage(ctx context.Context, msg *common.Message, handler common.MessageHandler) error {
 	// First attempt
 	err := handler(ctx, msg)
 	if err == nil {
@@ -371,7 +358,7 @@ func (c *Consumer) processMessage(ctx context.Context, msg *Message, handler Mes
 
 	if c.deadLetterProducer != nil && c.config.RetryConfig.DeadLetterTopic != "" {
 		// Send to DLQ
-		dlMsg := &ProducerMessage{
+		dlMsg := &common.ProducerMessage{
 			Topic: c.config.RetryConfig.DeadLetterTopic,
 			Key:   msg.Key,
 			Value: msg.Value,
@@ -383,11 +370,6 @@ func (c *Consumer) processMessage(ctx context.Context, msg *Message, handler Mes
 
 		if dlErr := c.deadLetterProducer.Publish(ctx, dlMsg); dlErr != nil {
 			c.logger.Error("Failed to send to dead letter queue", logging.Error(dlErr))
-			// We return nil to drop message rather than block forever?
-			// Or return err to not commit?
-			// If we return err, consumeLoop won't commit, and message will be redelivered.
-			// This might cause infinite loop.
-			// Best to return nil and log error (drop data but keep system alive).
 			return nil
 		}
 		c.metrics.MessagesDeadLettered.Add(1)
@@ -466,5 +448,3 @@ func ValidateConsumerConfig(cfg ConsumerConfig) error {
 	}
 	return nil
 }
-
-//Personal.AI order the ending

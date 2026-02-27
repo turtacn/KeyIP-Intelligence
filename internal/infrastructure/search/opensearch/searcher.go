@@ -11,6 +11,7 @@ import (
 	"github.com/opensearch-project/opensearch-go/v2/opensearchapi"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // SearcherConfig holds configuration for the Searcher.
@@ -22,111 +23,6 @@ type SearcherConfig struct {
 	SearchTimeout          time.Duration
 	ScrollKeepAlive        time.Duration
 	MaxScrollSize          int
-}
-
-// SearchRequest defines a search query.
-type SearchRequest struct {
-	IndexName      string
-	Query          *Query
-	Filters        []Filter
-	Sort           []SortField
-	Pagination     *Pagination
-	Highlight      *HighlightConfig
-	Aggregations   map[string]Aggregation
-	SourceIncludes []string
-	SourceExcludes []string
-}
-
-// Query defines a search query structure.
-type Query struct {
-	QueryType          string
-	Field              string
-	Fields             []string
-	Value              interface{}
-	Boost              float64
-	Must               []Query
-	Should             []Query
-	MustNot            []Query
-	MinimumShouldMatch string
-}
-
-// Filter defines a filter condition.
-type Filter struct {
-	Field     string
-	FilterType string
-	Value     interface{}
-	RangeFrom interface{}
-	RangeTo   interface{}
-}
-
-// SortField defines sorting criteria.
-type SortField struct {
-	Field string
-	Order string
-}
-
-// Pagination defines pagination parameters.
-type Pagination struct {
-	Offset int
-	Limit  int
-}
-
-// HighlightConfig defines highlighting settings.
-type HighlightConfig struct {
-	Fields            []string
-	PreTag            string
-	PostTag           string
-	FragmentSize      int
-	NumberOfFragments int
-}
-
-// Aggregation defines an aggregation.
-type Aggregation struct {
-	AggType         string
-	Field           string
-	Size            int
-	Interval        string
-	Ranges          []AggRange
-	SubAggregations map[string]Aggregation
-}
-
-// AggRange defines a range for range aggregation.
-type AggRange struct {
-	Key  string
-	From interface{}
-	To   interface{}
-}
-
-// SearchResult holds the search response.
-type SearchResult struct {
-	Total        int64
-	MaxScore     float64
-	Hits         []SearchHit
-	Aggregations map[string]AggregationResult
-	TookMs       int64
-}
-
-// SearchHit represents a single search hit.
-type SearchHit struct {
-	ID         string
-	Score      float64
-	Source     json.RawMessage
-	Highlights map[string][]string
-	Sort       []interface{}
-}
-
-// AggregationResult holds the result of an aggregation.
-type AggregationResult struct {
-	Buckets []AggBucket
-	Value   *float64
-}
-
-// AggBucket represents a bucket in an aggregation result.
-type AggBucket struct {
-	Key             interface{}
-	KeyAsString     string
-	DocCount        int64
-	SubAggregations map[string]AggregationResult
 }
 
 // Searcher performs search operations.
@@ -168,20 +64,24 @@ func NewSearcher(client *Client, cfg SearcherConfig, logger logging.Logger) *Sea
 }
 
 // Search executes a search request.
-func (s *Searcher) Search(ctx context.Context, req SearchRequest) (*SearchResult, error) {
+func (s *Searcher) Search(ctx context.Context, req common.SearchRequest) (*common.SearchResult, error) {
 	if req.IndexName == "" {
 		return nil, errors.New(errors.ErrCodeValidation, "IndexName is required")
 	}
 
 	// Validate and adjust pagination
 	if req.Pagination == nil {
-		req.Pagination = &Pagination{Offset: 0, Limit: s.config.DefaultPageSize}
+		req.Pagination = &common.Pagination{Page: 1, PageSize: s.config.DefaultPageSize}
+	} else {
+		if req.Pagination.Page < 1 {
+			req.Pagination.Page = 1
+		}
+		if req.Pagination.PageSize <= 0 {
+			req.Pagination.PageSize = s.config.DefaultPageSize
+		}
 	}
-	if req.Pagination.Limit > s.config.MaxPageSize {
-		req.Pagination.Limit = s.config.MaxPageSize
-	}
-	if req.Pagination.Offset < 0 {
-		req.Pagination.Offset = 0
+	if req.Pagination.PageSize > s.config.MaxPageSize {
+		req.Pagination.PageSize = s.config.MaxPageSize
 	}
 
 	dsl, err := s.buildQueryDSL(req)
@@ -198,9 +98,6 @@ func (s *Searcher) Search(ctx context.Context, req SearchRequest) (*SearchResult
 		Index: []string{req.IndexName},
 		Body:  bytes.NewReader(body),
 	}
-
-	// Set timeout? opensearchapi usually takes context
-	// We can wrap context with timeout if needed, but ctx is passed.
 
 	start := time.Now()
 	resp, err := osReq.Do(ctx, s.client.GetClient())
@@ -230,9 +127,9 @@ func (s *Searcher) Search(ctx context.Context, req SearchRequest) (*SearchResult
 }
 
 // Count returns the number of documents matching the query.
-func (s *Searcher) Count(ctx context.Context, indexName string, query *Query, filters []Filter) (int64, error) {
+func (s *Searcher) Count(ctx context.Context, indexName string, query *common.Query, filters []common.Filter) (int64, error) {
 	// Build partial request just for query/filter
-	req := SearchRequest{
+	req := common.SearchRequest{
 		IndexName: indexName,
 		Query:     query,
 		Filters:   filters,
@@ -242,9 +139,6 @@ func (s *Searcher) Count(ctx context.Context, indexName string, query *Query, fi
 		return 0, err
 	}
 
-	// DSL might contain from/size/sort which Count API doesn't like?
-	// Usually Count API takes query body.
-	// We should strip non-query parts.
 	queryDSL := map[string]interface{}{}
 	if q, ok := dsl["query"]; ok {
 		queryDSL["query"] = q
@@ -281,20 +175,19 @@ func (s *Searcher) Count(ctx context.Context, indexName string, query *Query, fi
 }
 
 // ScrollSearch performs a scroll search.
-func (s *Searcher) ScrollSearch(ctx context.Context, req SearchRequest, batchHandler func(hits []SearchHit) error) error {
-	// Start scroll
+func (s *Searcher) ScrollSearch(ctx context.Context, req common.SearchRequest, batchHandler func(hits []common.SearchHit) error) error {
 	dsl, err := s.buildQueryDSL(req)
 	if err != nil {
 		return err
 	}
-	// Remove from/size from DSL as scroll manages it? No, size sets batch size.
-	// Default size if not set
-	if req.Pagination == nil {
+
+	// Scroll logic
+	if req.Pagination == nil || req.Pagination.PageSize == 0 {
 		dsl["size"] = s.config.MaxScrollSize
 	} else {
-		dsl["size"] = req.Pagination.Limit // User defined batch size
+		dsl["size"] = req.Pagination.PageSize
 	}
-	delete(dsl, "from") // Scroll ignores from, always next batch
+	delete(dsl, "from")
 
 	body, err := json.Marshal(dsl)
 	if err != nil {
@@ -317,7 +210,6 @@ func (s *Searcher) ScrollSearch(ctx context.Context, req SearchRequest, batchHan
 		return s.handleErrorResponse(resp)
 	}
 
-	// Let's decode into generic map to get scroll_id and hits
 	var rawResp map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&rawResp); err != nil {
 		return errors.Wrap(err, errors.ErrCodeSerialization, "failed to decode scroll response")
@@ -327,12 +219,7 @@ func (s *Searcher) ScrollSearch(ctx context.Context, req SearchRequest, batchHan
 	hitsRaw, _ := rawResp["hits"].(map[string]interface{})
 	hitsList, _ := hitsRaw["hits"].([]interface{})
 
-	// Process first batch
 	if len(hitsList) > 0 {
-		// We need to parse hitsList into []SearchHit
-		// Re-encode and use parse logic or manual map
-		// This is inefficient. Ideally parseSearchResponse should support ScrollID or return generic.
-		// For now, let's implement a parser for hits.
 		hits, err := s.parseHits(hitsList)
 		if err != nil {
 			s.clearScroll(ctx, scrollID)
@@ -343,12 +230,10 @@ func (s *Searcher) ScrollSearch(ctx context.Context, req SearchRequest, batchHan
 			return err
 		}
 	} else {
-		// No hits, done
 		s.clearScroll(ctx, scrollID)
 		return nil
 	}
 
-	// Loop
 	for {
 		scrollReq := opensearchapi.ScrollRequest{
 			ScrollID: scrollID,
@@ -372,7 +257,6 @@ func (s *Searcher) ScrollSearch(ctx context.Context, req SearchRequest, batchHan
 			return errors.Wrap(err, errors.ErrCodeSerialization, "failed to decode scroll response")
 		}
 
-		// Update scrollID if changed (usually same)
 		if newID, ok := rawResp["_scroll_id"].(string); ok && newID != "" {
 			scrollID = newID
 		}
@@ -381,7 +265,7 @@ func (s *Searcher) ScrollSearch(ctx context.Context, req SearchRequest, batchHan
 		hitsList, _ = hitsRaw["hits"].([]interface{})
 
 		if len(hitsList) == 0 {
-			break // Done
+			break
 		}
 
 		hits, err := s.parseHits(hitsList)
@@ -411,14 +295,12 @@ func (s *Searcher) clearScroll(ctx context.Context, scrollID string) error {
 }
 
 // MultiSearch performs multiple searches in a single request.
-func (s *Searcher) MultiSearch(ctx context.Context, requests []SearchRequest) ([]*SearchResult, error) {
+func (s *Searcher) MultiSearch(ctx context.Context, requests []common.SearchRequest) ([]*common.SearchResult, error) {
 	var buf bytes.Buffer
 	for _, req := range requests {
-		// Header: {"index": "name"}
 		meta := fmt.Sprintf(`{"index": "%s"}`, req.IndexName)
 		buf.WriteString(meta + "\n")
 
-		// Body: Query DSL
 		dsl, err := s.buildQueryDSL(req)
 		if err != nil {
 			return nil, err
@@ -452,16 +334,10 @@ func (s *Searcher) MultiSearch(ctx context.Context, requests []SearchRequest) ([
 		return nil, errors.Wrap(err, errors.ErrCodeSerialization, "failed to decode msearch response")
 	}
 
-	results := make([]*SearchResult, len(requests))
+	results := make([]*common.SearchResult, len(requests))
 	for i, raw := range msearchResp.Responses {
-		// Check for error in individual response
-		// We need to parse it partially to see if it's an error
-		// Reuse parseSearchResponse but handle raw json
-		// Or wrap raw in a reader
 		r, err := s.parseSearchResponse(bytes.NewReader(raw))
 		if err != nil {
-			// Check if it's an error response
-			// Log warn and set nil
 			s.logger.Warn("msearch sub-request failed", logging.Error(err))
 			results[i] = nil
 		} else {
@@ -474,10 +350,6 @@ func (s *Searcher) MultiSearch(ctx context.Context, requests []SearchRequest) ([
 
 // Suggest provides search suggestions.
 func (s *Searcher) Suggest(ctx context.Context, indexName string, field string, text string, size int) ([]string, error) {
-	// Using completion suggester or just prefix match?
-	// Prompt says "Suggest ... 构建 completion suggest 查询".
-	// Assuming "completion" type field mapping.
-
 	suggestName := "my-suggest"
 	dsl := map[string]interface{}{
 		"suggest": map[string]interface{}{
@@ -538,7 +410,7 @@ func (s *Searcher) Suggest(ctx context.Context, indexName string, field string, 
 
 // Private methods
 
-func (s *Searcher) buildQueryDSL(req SearchRequest) (map[string]interface{}, error) {
+func (s *Searcher) buildQueryDSL(req common.SearchRequest) (map[string]interface{}, error) {
 	dsl := map[string]interface{}{}
 
 	// Query
@@ -554,8 +426,6 @@ func (s *Searcher) buildQueryDSL(req SearchRequest) (map[string]interface{}, err
 			filterClauses[i] = s.buildFilter(f)
 		}
 
-		// Wrap query in bool/filter
-		// If there is already a query, it goes to "must". Filters go to "filter".
 		boolQuery := map[string]interface{}{
 			"filter": filterClauses,
 		}
@@ -573,8 +443,8 @@ func (s *Searcher) buildQueryDSL(req SearchRequest) (map[string]interface{}, err
 
 	// Pagination
 	if req.Pagination != nil {
-		dsl["from"] = req.Pagination.Offset
-		dsl["size"] = req.Pagination.Limit
+		dsl["from"] = req.Pagination.Offset()
+		dsl["size"] = req.Pagination.PageSize
 	}
 
 	// Sort
@@ -619,7 +489,7 @@ func (s *Searcher) buildQueryDSL(req SearchRequest) (map[string]interface{}, err
 	return dsl, nil
 }
 
-func (s *Searcher) buildQuery(q *Query) map[string]interface{} {
+func (s *Searcher) buildQuery(q *common.Query) map[string]interface{} {
 	switch q.QueryType {
 	case "match":
 		return map[string]interface{}{
@@ -704,7 +574,7 @@ func (s *Searcher) buildQuery(q *Query) map[string]interface{} {
 	return nil
 }
 
-func (s *Searcher) buildFilter(f Filter) map[string]interface{} {
+func (s *Searcher) buildFilter(f common.Filter) map[string]interface{} {
 	switch f.FilterType {
 	case "term":
 		return map[string]interface{}{
@@ -733,7 +603,7 @@ func (s *Searcher) buildFilter(f Filter) map[string]interface{} {
 	return nil
 }
 
-func (s *Searcher) buildAggregations(aggs map[string]Aggregation) map[string]interface{} {
+func (s *Searcher) buildAggregations(aggs map[string]common.Aggregation) map[string]interface{} {
 	dsl := map[string]interface{}{}
 	for name, agg := range aggs {
 		aggDSL := map[string]interface{}{}
@@ -780,7 +650,7 @@ func (s *Searcher) buildAggregations(aggs map[string]Aggregation) map[string]int
 	return dsl
 }
 
-func (s *Searcher) parseSearchResponse(body io.Reader) (*SearchResult, error) {
+func (s *Searcher) parseSearchResponse(body io.Reader) (*common.SearchResult, error) {
 	var resp struct {
 		Took int64 `json:"took"`
 		Hits struct {
@@ -803,14 +673,14 @@ func (s *Searcher) parseSearchResponse(body io.Reader) (*SearchResult, error) {
 		return nil, errors.Wrap(err, errors.ErrCodeSerialization, "failed to decode search response")
 	}
 
-	result := &SearchResult{
+	result := &common.SearchResult{
 		Total:    resp.Hits.Total.Value,
 		MaxScore: resp.Hits.MaxScore,
 		TookMs:   resp.Took,
 	}
 
 	for _, h := range resp.Hits.Hits {
-		result.Hits = append(result.Hits, SearchHit{
+		result.Hits = append(result.Hits, common.SearchHit{
 			ID:         h.ID,
 			Score:      h.Score,
 			Source:     h.Source,
@@ -820,7 +690,7 @@ func (s *Searcher) parseSearchResponse(body io.Reader) (*SearchResult, error) {
 	}
 
 	if len(resp.Aggregations) > 0 {
-		result.Aggregations = make(map[string]AggregationResult)
+		result.Aggregations = make(map[string]common.AggregationResult)
 		for name, raw := range resp.Aggregations {
 			result.Aggregations[name] = s.parseAggregationResult(raw)
 		}
@@ -829,15 +699,15 @@ func (s *Searcher) parseSearchResponse(body io.Reader) (*SearchResult, error) {
 	return result, nil
 }
 
-func (s *Searcher) parseHits(hitsList []interface{}) ([]SearchHit, error) {
-	hits := make([]SearchHit, len(hitsList))
+func (s *Searcher) parseHits(hitsList []interface{}) ([]common.SearchHit, error) {
+	hits := make([]common.SearchHit, len(hitsList))
 	for i, item := range hitsList {
 		m, ok := item.(map[string]interface{})
 		if !ok {
 			return nil, fmt.Errorf("invalid hit format")
 		}
 
-		h := SearchHit{}
+		h := common.SearchHit{}
 		if id, ok := m["_id"].(string); ok { h.ID = id }
 		if score, ok := m["_score"].(float64); ok { h.Score = score }
 		if src, ok := m["_source"]; ok {
@@ -864,12 +734,12 @@ func (s *Searcher) parseHits(hitsList []interface{}) ([]SearchHit, error) {
 	return hits, nil
 }
 
-func (s *Searcher) parseAggregationResult(raw json.RawMessage) AggregationResult {
+func (s *Searcher) parseAggregationResult(raw json.RawMessage) common.AggregationResult {
 	// Need to determine if it's bucket or metric agg
 	var asMap map[string]interface{}
 	json.Unmarshal(raw, &asMap)
 
-	res := AggregationResult{}
+	res := common.AggregationResult{}
 
 	if val, ok := asMap["value"].(float64); ok {
 		res.Value = &val
@@ -880,7 +750,7 @@ func (s *Searcher) parseAggregationResult(raw json.RawMessage) AggregationResult
 			bMap, ok := b.(map[string]interface{})
 			if !ok { continue }
 
-			bucket := AggBucket{}
+			bucket := common.AggBucket{}
 			if key, ok := bMap["key"]; ok {
 				bucket.Key = key
 			}
@@ -893,7 +763,7 @@ func (s *Searcher) parseAggregationResult(raw json.RawMessage) AggregationResult
 				bucket.DocCount = int64(docCount)
 			}
 
-			bucket.SubAggregations = make(map[string]AggregationResult)
+			bucket.SubAggregations = make(map[string]common.AggregationResult)
 			for k, v := range bMap {
 				if k == "key" || k == "doc_count" || k == "key_as_string" { continue }
 
@@ -934,5 +804,3 @@ func (s *Searcher) handleErrorResponse(resp *opensearchapi.Response) error {
 	}
 	return errors.Wrapf(errors.New(errors.ErrCodeInternal, "search error"), errors.ErrCodeInternal, "OpenSearch error status: %d", resp.StatusCode)
 }
-
-//Personal.AI order the ending

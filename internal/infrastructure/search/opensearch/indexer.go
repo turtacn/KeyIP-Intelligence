@@ -11,6 +11,7 @@ import (
 	"github.com/opensearch-project/opensearch-go/v2/opensearchapi"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 var (
@@ -29,12 +30,6 @@ type IndexerConfig struct {
 	BulkFlushBytes    int
 	BulkWorkers       int
 	RefreshPolicy     string
-}
-
-// IndexMapping defines the settings and mappings for an index.
-type IndexMapping struct {
-	Settings map[string]interface{} `json:"settings,omitempty"`
-	Mappings map[string]interface{} `json:"mappings,omitempty"`
 }
 
 // Indexer manages index operations and document ingestion.
@@ -70,7 +65,7 @@ func NewIndexer(client *Client, cfg IndexerConfig, logger logging.Logger) *Index
 }
 
 // CreateIndex creates a new index with the given mapping.
-func (i *Indexer) CreateIndex(ctx context.Context, indexName string, mapping IndexMapping) error {
+func (i *Indexer) CreateIndex(ctx context.Context, indexName string, mapping common.IndexMapping) error {
 	// Check if index exists
 	exists, err := i.IndexExists(ctx, indexName)
 	if err != nil {
@@ -177,23 +172,9 @@ func (i *Indexer) IndexDocument(ctx context.Context, indexName string, docID str
 	return nil
 }
 
-// BulkResult summarizes the result of a bulk operation.
-type BulkResult struct {
-	Succeeded int
-	Failed    int
-	Errors    []BulkItemError
-}
-
-// BulkItemError details an error for a specific document in a bulk operation.
-type BulkItemError struct {
-	DocID     string
-	ErrorType string
-	Reason    string
-}
-
 // BulkIndex indexes multiple documents in batches.
-func (i *Indexer) BulkIndex(ctx context.Context, indexName string, documents map[string]interface{}) (*BulkResult, error) {
-	result := &BulkResult{}
+func (i *Indexer) BulkIndex(ctx context.Context, indexName string, documents map[string]interface{}) (*common.BulkResult, error) {
+	result := &common.BulkResult{}
 	if len(documents) == 0 {
 		return result, nil
 	}
@@ -226,7 +207,7 @@ func (i *Indexer) BulkIndex(ctx context.Context, indexName string, documents map
 			docBytes, err := json.Marshal(doc)
 			if err != nil {
 				result.Failed++
-				result.Errors = append(result.Errors, BulkItemError{
+				result.Errors = append(result.Errors, common.BulkItemError{
 					DocID:     id,
 					ErrorType: "serialization_error",
 					Reason:    err.Error(),
@@ -256,7 +237,7 @@ func (i *Indexer) BulkIndex(ctx context.Context, indexName string, documents map
 		if resp.IsError() {
 			result.Failed += len(batchIDs)
 			err = i.handleErrorResponse(resp, errors.New(errors.ErrCodeInternal, "bulk batch failed"))
-			result.Errors = append(result.Errors, BulkItemError{
+			result.Errors = append(result.Errors, common.BulkItemError{
 				DocID:     "batch_error",
 				ErrorType: "http_error",
 				Reason:    err.Error(),
@@ -307,7 +288,7 @@ func (i *Indexer) BulkIndex(ctx context.Context, indexName string, documents map
 					result.Succeeded++
 				} else {
 					result.Failed++
-					result.Errors = append(result.Errors, BulkItemError{
+					result.Errors = append(result.Errors, common.BulkItemError{
 						DocID:     info.ID,
 						ErrorType: info.Error.Type,
 						Reason:    info.Error.Reason,
@@ -399,8 +380,8 @@ func (i *Indexer) handleErrorResponse(resp *opensearchapi.Response, defaultErr e
 
 // Predefined Mappings
 
-func PatentIndexMapping() IndexMapping {
-	return IndexMapping{
+func PatentIndexMapping() common.IndexMapping {
+	return common.IndexMapping{
 		Settings: map[string]interface{}{
 			"number_of_shards": 3,
 			"number_of_replicas": 1,
@@ -439,8 +420,8 @@ func PatentIndexMapping() IndexMapping {
 	}
 }
 
-func MoleculeIndexMapping() IndexMapping {
-	return IndexMapping{
+func MoleculeIndexMapping() common.IndexMapping {
+	return common.IndexMapping{
 		Settings: map[string]interface{}{
 			"number_of_shards": 3,
 			"number_of_replicas": 1,
@@ -459,5 +440,3 @@ func MoleculeIndexMapping() IndexMapping {
 		},
 	}
 }
-
-//Personal.AI order the ending

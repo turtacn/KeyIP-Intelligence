@@ -7,6 +7,7 @@ import (
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
 	"github.com/stretchr/testify/assert"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 func newTestSearcher(mock client.Client) *Searcher {
@@ -93,7 +94,7 @@ func TestInsert_Success(t *testing.T) {
 	}
 
 	s := newTestSearcher(mock)
-	req := InsertRequest{
+	req := common.InsertRequest{
 		CollectionName: "test",
 		Data: []map[string]interface{}{
 			{"vec": []float32{0.1, 0.2}},
@@ -117,7 +118,7 @@ func TestSearch_Success(t *testing.T) {
 		},
 	}
 	s := newTestSearcher(mock)
-	req := VectorSearchRequest{
+	req := common.VectorSearchRequest{
 		CollectionName:  "test",
 		VectorFieldName: "vec",
 		Vectors:         [][]float32{{0.1, 0.2}},
@@ -152,10 +153,10 @@ func TestHybridSearch_RRF(t *testing.T) {
 	}
 	s := newTestSearcher(mock)
 
-	req1 := VectorSearchRequest{CollectionName: "test", VectorFieldName: "vec1", Vectors: [][]float32{{0.1}}}
-	req2 := VectorSearchRequest{CollectionName: "test", VectorFieldName: "vec2", Vectors: [][]float32{{0.2}}}
+	req1 := common.VectorSearchRequest{CollectionName: "test", VectorFieldName: "vec1", Vectors: [][]float32{{0.1}}}
+	req2 := common.VectorSearchRequest{CollectionName: "test", VectorFieldName: "vec2", Vectors: [][]float32{{0.2}}}
 
-	res, err := s.HybridSearch(context.Background(), "test", []VectorSearchRequest{req1, req2}, &RRFReranker{K: 60}, 10)
+	res, err := s.HybridSearch(context.Background(), "test", []common.VectorSearchRequest{req1, req2}, &RRFReranker{K: 60}, 10)
 	assert.NoError(t, err)
 	// ID 2 should be top because it appears in both (rank 2 and rank 1)
 	// Score(2) = 1/(60+2) + 1/(60+1) = 1/62 + 1/61 ~= 0.0161 + 0.0164 = 0.0325
@@ -166,5 +167,3 @@ func TestHybridSearch_RRF(t *testing.T) {
 	assert.Equal(t, int64(1), res.Results[0][1].ID)
 	assert.Equal(t, int64(3), res.Results[0][2].ID)
 }
-
-//Personal.AI order the ending

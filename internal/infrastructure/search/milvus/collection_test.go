@@ -7,6 +7,7 @@ import (
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
 	"github.com/stretchr/testify/assert"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // Define a new mock for collection operations
@@ -114,7 +115,9 @@ func TestCreateCollection_Success(t *testing.T) {
 		},
 	}
 	mgr := newTestCollectionManager(mock)
-	schema := CollectionSchema{Name: "test"}
+	// We need to pass *entity.Field as interface{}
+	fields := []interface{}{&entity.Field{Name: "id"}}
+	schema := common.CollectionSchema{Name: "test", Fields: fields}
 	err := mgr.CreateCollection(context.Background(), schema)
 	assert.NoError(t, err)
 }
@@ -126,7 +129,7 @@ func TestCreateCollection_AlreadyExists(t *testing.T) {
 		},
 	}
 	mgr := newTestCollectionManager(mock)
-	schema := CollectionSchema{Name: "test"}
+	schema := common.CollectionSchema{Name: "test"}
 	err := mgr.CreateCollection(context.Background(), schema)
 	assert.Error(t, err)
 	assert.Equal(t, ErrCollectionAlreadyExists, err)
@@ -178,7 +181,7 @@ func TestCreateIndex_Success(t *testing.T) {
 		},
 	}
 	mgr := newTestCollectionManager(mock)
-	cfg := IndexConfig{FieldName: "vec", IndexType: entity.IvfFlat, MetricType: entity.COSINE}
+	cfg := common.IndexConfig{FieldName: "vec", IndexType: "IVF_FLAT", MetricType: "COSINE"}
 	err := mgr.CreateIndex(context.Background(), "test", cfg)
 	assert.NoError(t, err)
 }
@@ -227,8 +230,9 @@ func TestEnsureCollection_CreateAndLoad(t *testing.T) {
 		},
 	}
 	mgr := newTestCollectionManager(mock)
-	schema := CollectionSchema{Name: "test"}
-	err := mgr.EnsureCollection(context.Background(), schema, []IndexConfig{{FieldName: "vec"}})
+	fields := []interface{}{&entity.Field{Name: "vec"}}
+	schema := common.CollectionSchema{Name: "test", Fields: fields}
+	err := mgr.EnsureCollection(context.Background(), schema, []common.IndexConfig{{FieldName: "vec"}})
 	assert.NoError(t, err)
 	assert.True(t, created)
 	assert.True(t, loaded)
@@ -239,5 +243,3 @@ func TestPatentVectorSchema(t *testing.T) {
 	assert.Equal(t, "patents", s.Name)
 	assert.Len(t, s.Fields, 8)
 }
-
-//Personal.AI order the ending

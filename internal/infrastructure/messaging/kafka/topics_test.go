@@ -6,6 +6,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 type mockKafkaConn struct {
@@ -68,7 +69,7 @@ func TestCreateTopic_Success(t *testing.T) {
 		},
 	}
 	m := newTestTopicManager(mock)
-	err := m.CreateTopic(context.Background(), TopicConfig{Name: "test", NumPartitions: 1, ReplicationFactor: 1})
+	err := m.CreateTopic(context.Background(), common.TopicConfig{Name: "test", NumPartitions: 1, ReplicationFactor: 1})
 	assert.NoError(t, err)
 }
 
@@ -92,7 +93,7 @@ func TestEventEnvelope_RoundTrip(t *testing.T) {
 	msg, err := env.ToMessage("topic")
 	assert.NoError(t, err)
 
-	kafkaMsg := &Message{Value: msg.Value}
+	kafkaMsg := &common.Message{Value: msg.Value}
 	decodedEnv, err := MessageToEventEnvelope(kafkaMsg)
 	assert.NoError(t, err)
 
@@ -101,5 +102,3 @@ func TestEventEnvelope_RoundTrip(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "123", decodedPayload.PatentID)
 }
-
-//Personal.AI order the ending

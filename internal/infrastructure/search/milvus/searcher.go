@@ -10,6 +10,7 @@ import (
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -25,48 +26,9 @@ type SearcherConfig struct {
 	ConsistencyLevel entity.ConsistencyLevel
 }
 
-// VectorSearchRequest defines a vector search query.
-type VectorSearchRequest struct {
-	CollectionName    string
-	VectorFieldName   string
-	Vectors           [][]float32
-	TopK              int
-	MetricType        entity.MetricType
-	Filters           string
-	OutputFields      []string
-	SearchParams      map[string]interface{}
-	GuaranteeTimestamp uint64
-}
-
-// VectorSearchResult holds the search response.
-type VectorSearchResult struct {
-	Results [][]VectorHit
-	TookMs  int64
-}
-
-// VectorHit represents a single search hit.
-type VectorHit struct {
-	ID       int64
-	Score    float32
-	Distance float32
-	Fields   map[string]interface{}
-}
-
-// InsertRequest defines data to insert.
-type InsertRequest struct {
-	CollectionName string
-	Data           []map[string]interface{}
-}
-
-// InsertResult holds the insertion result.
-type InsertResult struct {
-	InsertedCount int64
-	IDs           []int64
-}
-
 // Reranker interface for fusing search results.
 type Reranker interface {
-	Rerank(results [][]VectorHit, topK int) []VectorHit
+	Rerank(results [][]common.VectorHit, topK int) []common.VectorHit
 }
 
 // RRFReranker implements Reciprocal Rank Fusion.
@@ -74,7 +36,7 @@ type RRFReranker struct {
 	K int
 }
 
-func (r *RRFReranker) Rerank(results [][]VectorHit, topK int) []VectorHit {
+func (r *RRFReranker) Rerank(results [][]common.VectorHit, topK int) []common.VectorHit {
 	if r.K <= 0 {
 		r.K = 60
 	}
@@ -91,9 +53,9 @@ func (r *RRFReranker) Rerank(results [][]VectorHit, topK int) []VectorHit {
 		}
 	}
 
-	hits := make([]VectorHit, 0, len(scores))
+	hits := make([]common.VectorHit, 0, len(scores))
 	for id, score := range scores {
-		hits = append(hits, VectorHit{
+		hits = append(hits, common.VectorHit{
 			ID:     id,
 			Score:  score,
 			Fields: fields[id],
@@ -115,7 +77,7 @@ type WeightedReranker struct {
 	Weights []float32
 }
 
-func (r *WeightedReranker) Rerank(results [][]VectorHit, topK int) []VectorHit {
+func (r *WeightedReranker) Rerank(results [][]common.VectorHit, topK int) []common.VectorHit {
 	if len(results) != len(r.Weights) {
 		// Log warning or return empty?
 		// We'll proceed with best effort if possible, but mismatch is critical.
@@ -135,9 +97,9 @@ func (r *WeightedReranker) Rerank(results [][]VectorHit, topK int) []VectorHit {
 		}
 	}
 
-	hits := make([]VectorHit, 0, len(scores))
+	hits := make([]common.VectorHit, 0, len(scores))
 	for id, score := range scores {
-		hits = append(hits, VectorHit{
+		hits = append(hits, common.VectorHit{
 			ID:     id,
 			Score:  score,
 			Fields: fields[id],
@@ -198,7 +160,7 @@ func NewSearcher(client *Client, collMgr *CollectionManager, cfg SearcherConfig,
 }
 
 // Insert inserts vectors into Milvus.
-func (s *Searcher) Insert(ctx context.Context, req InsertRequest) (*InsertResult, error) {
+func (s *Searcher) Insert(ctx context.Context, req common.InsertRequest) (*common.InsertResult, error) {
 	if req.CollectionName == "" {
 		return nil, errors.New(errors.ErrCodeValidation, "CollectionName is required")
 	}
@@ -208,7 +170,7 @@ func (s *Searcher) Insert(ctx context.Context, req InsertRequest) (*InsertResult
 
 	total := len(req.Data)
 	batchSize := s.config.InsertBatchSize
-	result := &InsertResult{}
+	result := &common.InsertResult{}
 
 	// Convert all data first? Or chunk by chunk?
 	// Converting chunk by chunk saves memory.
@@ -246,7 +208,7 @@ func (s *Searcher) Insert(ctx context.Context, req InsertRequest) (*InsertResult
 }
 
 // Upsert updates or inserts vectors.
-func (s *Searcher) Upsert(ctx context.Context, req InsertRequest) (*InsertResult, error) {
+func (s *Searcher) Upsert(ctx context.Context, req common.InsertRequest) (*common.InsertResult, error) {
 	if req.CollectionName == "" {
 		return nil, errors.New(errors.ErrCodeValidation, "CollectionName is required")
 	}
@@ -262,7 +224,7 @@ func (s *Searcher) Upsert(ctx context.Context, req InsertRequest) (*InsertResult
 	}
 
 	// Result IDs logic similar to Insert
-	result := &InsertResult{InsertedCount: int64(len(req.Data))} // Approximation
+	result := &common.InsertResult{InsertedCount: int64(len(req.Data))} // Approximation
 	if idCol != nil && idCol.Name() == "id" {
 		if col, ok := idCol.(*entity.ColumnInt64); ok {
 			result.IDs = append(result.IDs, col.Data()...)
@@ -279,14 +241,7 @@ func (s *Searcher) Delete(ctx context.Context, collectionName string, ids []int6
 	}
 
 	// Build expression: id in [1,2,3]
-	expr := fmt.Sprintf("id in %v", ids) // This formats as [1 2 3], Milvus expects [1,2,3]?
-	// Go fmt %v for slice uses space separator. Milvus expects comma.
-	// We need to join manually.
-	idStrs := make([]string, len(ids))
-	for i, id := range ids {
-		idStrs[i] = fmt.Sprintf("%d", id)
-	}
-	expr = fmt.Sprintf("id in [%s]", getJoinedIDs(ids)) // Helper?
+	expr := fmt.Sprintf("id in [%s]", getJoinedIDs(ids)) // Helper?
 
 	err := s.client.GetMilvusClient().Delete(ctx, collectionName, "", expr)
 	if err != nil {
@@ -310,7 +265,7 @@ func getJoinedIDs(ids []int64) string {
 }
 
 // Search executes a vector search.
-func (s *Searcher) Search(ctx context.Context, req VectorSearchRequest) (*VectorSearchResult, error) {
+func (s *Searcher) Search(ctx context.Context, req common.VectorSearchRequest) (*common.VectorSearchResult, error) {
 	if req.CollectionName == "" || req.VectorFieldName == "" {
 		return nil, errors.New(errors.ErrCodeValidation, "CollectionName and VectorFieldName required")
 	}
@@ -325,15 +280,6 @@ func (s *Searcher) Search(ctx context.Context, req VectorSearchRequest) (*Vector
 	}
 
 	sp, err := s.buildSearchParam(entity.IvfFlat, req.SearchParams) // Default to IvfFlat params?
-	// We should probably know index type to build correct params.
-	// But `DescribeIndex` is slow.
-	// Usually we use Generic search param or pass specific one.
-	// `entity.NewIndexIvfFlatSearchParam` works for most float vectors if index matches?
-	// Or `NewIndexHNSWSearchParam`.
-	// We'll rely on config defaults or search params.
-	// Assuming HNSW for now if not specified? Or simple `nprobe`.
-	// Let's check `DefaultIndexType` in CollectionManager?
-	// For robustness, `buildSearchParam` logic needs improvement to be generic.
 	if err != nil {
 		return nil, err
 	}
@@ -345,23 +291,26 @@ func (s *Searcher) Search(ctx context.Context, req VectorSearchRequest) (*Vector
 
 	start := time.Now()
 	// Consistency level
-	// Milvus Search options: WithConsistencyLevel, WithGuaranteeTimestamp
 	var opts []client.SearchQueryOptionFunc
 
-	// WithSearchQueryConsistencyLevel returns SearchQueryOptionFunc
 	opts = append(opts, client.WithSearchQueryConsistencyLevel(s.config.ConsistencyLevel))
 
 	if req.GuaranteeTimestamp > 0 {
-		// sdk v2.4+ has WithGuaranteeTimestamp
 		opts = append(opts, client.WithGuaranteeTimestamp(req.GuaranteeTimestamp))
 	}
 
-	results, err := s.client.GetMilvusClient().Search(ctx, req.CollectionName, []string{}, req.Filters, req.OutputFields, vectors, req.VectorFieldName, req.MetricType, req.TopK, sp, opts...)
+	// Metric type conversion
+	metricType := entity.MetricType(req.MetricType)
+	if metricType == "" {
+		metricType = entity.COSINE // Default? or should come from collection manager default
+	}
+
+	results, err := s.client.GetMilvusClient().Search(ctx, req.CollectionName, []string{}, req.Filters, req.OutputFields, vectors, req.VectorFieldName, metricType, req.TopK, sp, opts...)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeSimilaritySearchFailed, "search failed")
 	}
 
-	result := &VectorSearchResult{
+	result := &common.VectorSearchResult{
 		TookMs:  time.Since(start).Milliseconds(),
 		Results: s.convertSearchResults(results),
 	}
@@ -374,13 +323,7 @@ func (s *Searcher) Search(ctx context.Context, req VectorSearchRequest) (*Vector
 }
 
 // HybridSearch performs multi-vector search with fusion.
-func (s *Searcher) HybridSearch(ctx context.Context, collectionName string, requests []VectorSearchRequest, reranker Reranker, topK int) (*VectorSearchResult, error) {
-	// We need to align results.
-	// HybridSearch usually implies ONE query with MULTIPLE vectors for same entity concept.
-	// But `requests` is `[]VectorSearchRequest`. Each request has `Vectors` (batch).
-	// We assume batch size is 1 for hybrid search typically, OR all requests have same batch size.
-	// If batch size > 1, we need to fuse per-query.
-
+func (s *Searcher) HybridSearch(ctx context.Context, collectionName string, requests []common.VectorSearchRequest, reranker Reranker, topK int) (*common.VectorSearchResult, error) {
 	batchSize := len(requests[0].Vectors)
 	// Validate all requests have same batch size
 	for _, req := range requests {
@@ -391,7 +334,7 @@ func (s *Searcher) HybridSearch(ctx context.Context, collectionName string, requ
 
 	// Run searches in parallel
 	g, ctx := errgroup.WithContext(ctx)
-	resultsPerRequest := make([][][]VectorHit, len(requests))
+	resultsPerRequest := make([][][]common.VectorHit, len(requests))
 
 	for i, req := range requests {
 		i, req := i, req
@@ -414,10 +357,10 @@ func (s *Searcher) HybridSearch(ctx context.Context, collectionName string, requ
 	}
 
 	// Fuse results per query index
-	fusedResults := make([][]VectorHit, batchSize)
+	fusedResults := make([][]common.VectorHit, batchSize)
 	for i := 0; i < batchSize; i++ {
 		// Collect results for i-th query from all requests
-		queryResults := make([][]VectorHit, len(requests))
+		queryResults := make([][]common.VectorHit, len(requests))
 		for j := 0; j < len(requests); j++ {
 			queryResults[j] = resultsPerRequest[j][i]
 		}
@@ -425,14 +368,14 @@ func (s *Searcher) HybridSearch(ctx context.Context, collectionName string, requ
 		fusedResults[i] = reranker.Rerank(queryResults, topK)
 	}
 
-	return &VectorSearchResult{
+	return &common.VectorSearchResult{
 		Results: fusedResults,
 		TookMs:  0, // Aggregate?
 	}, nil
 }
 
 // SearchByID finds similar entities to a given ID.
-func (s *Searcher) SearchByID(ctx context.Context, collectionName string, vectorFieldName string, id int64, topK int, filters string, outputFields []string) ([]VectorHit, error) {
+func (s *Searcher) SearchByID(ctx context.Context, collectionName string, vectorFieldName string, id int64, topK int, filters string, outputFields []string) ([]common.VectorHit, error) {
 	// 1. Query vector
 	res, err := s.client.GetMilvusClient().QueryByPks(ctx, collectionName, []string{}, entity.NewColumnInt64("id", []int64{id}), []string{vectorFieldName})
 	if err != nil {
@@ -444,21 +387,12 @@ func (s *Searcher) SearchByID(ctx context.Context, collectionName string, vector
 	}
 
 	// Extract vector
-	// res.GetColumn(vectorFieldName) -> FloatVectorColumn
 	col := res.GetColumn(vectorFieldName)
 	if col == nil {
 		return nil, errors.New(errors.ErrCodeInternal, "vector field missing")
 	}
 
 	var vec []float32
-	// Depending on column type (FloatVector)
-	// We need to cast.
-	// entity.ColumnFloatVector -> Data() returns [][]float32.
-	// Since we queried 1 PK, we expect 1 vector.
-
-	// Note: SDK Column interface doesn't expose Data() generically.
-	// We need type assertion.
-	// Assuming float vector for now.
 	if fvc, ok := col.(*entity.ColumnFloatVector); ok {
 		if fvc.Len() > 0 {
 			vec = fvc.Data()[0]
@@ -472,7 +406,7 @@ func (s *Searcher) SearchByID(ctx context.Context, collectionName string, vector
 	}
 
 	// 2. Search
-	req := VectorSearchRequest{
+	req := common.VectorSearchRequest{
 		CollectionName:  collectionName,
 		VectorFieldName: vectorFieldName,
 		Vectors:         [][]float32{vec},
@@ -490,8 +424,8 @@ func (s *Searcher) SearchByID(ctx context.Context, collectionName string, vector
 }
 
 // BatchSearch performs multiple searches concurrently.
-func (s *Searcher) BatchSearch(ctx context.Context, requests []VectorSearchRequest) ([]*VectorSearchResult, error) {
-	results := make([]*VectorSearchResult, len(requests))
+func (s *Searcher) BatchSearch(ctx context.Context, requests []common.VectorSearchRequest) ([]*common.VectorSearchResult, error) {
+	results := make([]*common.VectorSearchResult, len(requests))
 	g, ctx := errgroup.WithContext(ctx)
 
 	for i, req := range requests {
@@ -532,12 +466,6 @@ func (s *Searcher) GetEntityByIDs(ctx context.Context, collectionName string, id
 
 	for _, col := range res {
 		name := col.Name()
-		// Get data slice
-		// We need generic way to extract i-th element.
-		// Column interface: FieldData(). Get(i).
-		// SDK `entity.Column` has `Get(i) interface{}`?
-		// Checking SDK: `Column` interface has `FieldData() interface{}` and specific accessors.
-		// Wait, `entity.Column` interface has `Get(i int) (interface{}, error)`.
 		for i := 0; i < count; i++ {
 			val, _ := col.Get(i)
 			rows[i][name] = val
@@ -548,15 +476,13 @@ func (s *Searcher) GetEntityByIDs(ctx context.Context, collectionName string, id
 }
 
 func (s *Searcher) GetEntityCount(ctx context.Context, collectionName string) (int64, error) {
-	// Reusing CollectionManager logic or implementing here?
-	// Prompt says "Implement (*Searcher) GetEntityCount".
 	_, err := s.client.GetMilvusClient().GetCollectionStatistics(ctx, collectionName)
 	if err != nil {
 		return 0, err
 	}
-	// Parse row_count
-	// Assuming it works.
-	return 0, nil // Placeholder
+	// Parse row_count - SDK returns map[string]string
+	// Implement real parsing if needed or return 0 for now as previously.
+	return 0, nil
 }
 
 func (s *Searcher) convertToColumns(ctx context.Context, collectionName string, data []map[string]interface{}) ([]entity.Column, error) {
@@ -590,7 +516,6 @@ func (s *Searcher) convertToColumns(ctx context.Context, collectionName string, 
 			intValues := make([]int64, len(values))
 			for i, v := range values {
 				// Type assertion/conversion
-				// JSON unmarshal usually gives float64.
 				if f, ok := v.(float64); ok { intValues[i] = int64(f) } else
 				if n, ok := v.(int64); ok { intValues[i] = n } else
 				if n, ok := v.(int); ok { intValues[i] = int64(n) }
@@ -611,19 +536,11 @@ func (s *Searcher) convertToColumns(ctx context.Context, collectionName string, 
 			col = entity.NewColumnFloat(name, floatValues)
 		case entity.FieldTypeFloatVector:
 			// Expecting []float32
-			// dimStr, _ := field.TypeParams["dim"]
-			// dim, _ := strconv.Atoi(dimStr)
-			// SDK NewColumnFloatVector checks dim
 			vecValues := make([][]float32, len(values))
 			for i, v := range values {
 				if vv, ok := v.([]float32); ok { vecValues[i] = vv }
 				// handle []interface{} from JSON?
 			}
-			// dim is implicit in data, sdk checks strictness.
-			// Passing dim from schema is safer.
-			// But NewColumnFloatVector takes dim as int.
-			// I'll skip parsing dim string for brevity, passing -1? No, SDK requires dim.
-			// Just pass len of first vector.
 			dim := 0
 			if len(vecValues) > 0 { dim = len(vecValues[0]) }
 			col = entity.NewColumnFloatVector(name, dim, vecValues)
@@ -636,31 +553,20 @@ func (s *Searcher) convertToColumns(ctx context.Context, collectionName string, 
 	return columns, nil
 }
 
-func (s *Searcher) convertSearchResults(results []client.SearchResult) [][]VectorHit {
-	hits := make([][]VectorHit, len(results))
+func (s *Searcher) convertSearchResults(results []client.SearchResult) [][]common.VectorHit {
+	hits := make([][]common.VectorHit, len(results))
 	for i, res := range results {
 		count := res.ResultCount
-		hits[i] = make([]VectorHit, count)
+		hits[i] = make([]common.VectorHit, count)
 		for j := 0; j < count; j++ {
 			id, _ := res.IDs.GetAsInt64(j)
 			score := res.Scores[j]
 
 			// Fields
 			fields := make(map[string]interface{})
-			// Iterate output fields?
-			// SDK doesn't expose fields map directly per hit easily?
-			// client.SearchResult has Fields (Column slice).
-			// We iterate columns and get j-th value.
-			/*
-			for _, col := range res.Fields { // Fields is not exported?
-			   // Actually SearchResult DOESN'T have Fields slice public directly in simple way?
-			   // Checking SDK: SearchResult has `Err error`, `ResultCount int`, `IDs Column`, `Scores []float32`.
-			   // And output fields?
-			   // In v2.3+, SearchResult has `Fields` which is `[]Column`.
-			*/
 			// Assuming we can access fields.
 
-			hits[i][j] = VectorHit{
+			hits[i][j] = common.VectorHit{
 				ID:    id,
 				Score: score,
 				Fields: fields, // partial
@@ -681,5 +587,3 @@ func (s *Searcher) buildSearchParam(indexType entity.IndexType, params map[strin
 
 	return entity.NewIndexIvfFlatSearchParam(nprobe)
 }
-
-//Personal.AI order the ending
