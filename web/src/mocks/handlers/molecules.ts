@@ -4,7 +4,7 @@ import molecules from '@/mocks/data/molecules.json';
 const typedMolecules = molecules as any[];
 
 export const moleculeHandlers = [
-  http.get('/api/openapi/v1/molecules', ({ request }) => {
+  http.get('/api/v1/molecules', ({ request }) => {
     const url = new URL(request.url);
     const page = Number(url.searchParams.get('page')) || 1;
     const pageSize = Number(url.searchParams.get('pageSize')) || 20;
@@ -25,7 +25,7 @@ export const moleculeHandlers = [
     });
   }),
 
-  http.get('/api/openapi/v1/molecules/:id', ({ params }) => {
+  http.get('/api/v1/molecules/:id', ({ params }) => {
     const { id } = params;
     const molecule = typedMolecules.find((m: any) => m.id === id);
 

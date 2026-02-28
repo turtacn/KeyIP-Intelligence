@@ -4,7 +4,7 @@ import portfolio from '@/mocks/data/portfolio.json';
 const typedPortfolio = portfolio as any;
 
 export const portfolioHandlers = [
-  http.get('/api/openapi/v1/portfolio/summary', () => {
+  http.get('/api/v1/portfolio/summary', () => {
     return HttpResponse.json({
       code: 0,
       message: 'success',
@@ -12,7 +12,7 @@ export const portfolioHandlers = [
     });
   }),
 
-  http.get('/api/openapi/v1/portfolio/scores', () => {
+  http.get('/api/v1/portfolio/scores', () => {
       return HttpResponse.json({
         code: 0,
         message: 'success',
@@ -33,7 +33,7 @@ export const portfolioHandlers = [
       });
     }),
 
-  http.get('/api/openapi/v1/portfolio/coverage', () => {
+  http.get('/api/v1/portfolio/coverage', () => {
     return HttpResponse.json({
       code: 0,
       message: 'success',

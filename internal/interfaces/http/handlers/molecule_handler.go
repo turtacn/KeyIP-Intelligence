@@ -53,9 +53,9 @@ type StructureSearchRequest struct {
 
 // SimilaritySearchRequest is the request body for similarity search.
 type SimilaritySearchRequest struct {
-	SMILES    string  `json:"smiles"`
-	Threshold float64 `json:"threshold"` // 0.0 - 1.0
-	MaxResults int    `json:"max_results"`
+	SMILES             string  `json:"smiles"`
+	SimilarityThreshold float64 `json:"similarity_threshold"` // matches proto similarity_threshold
+	MaxResults         int    `json:"max_results"`
 }
 
 // CalculatePropertiesRequest is the request body for property calculation.
@@ -240,8 +240,8 @@ func (h *MoleculeHandler) SearchBySimilarity(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "smiles is required"))
 		return
 	}
-	if req.Threshold <= 0 || req.Threshold > 1.0 {
-		req.Threshold = 0.7
+	if req.SimilarityThreshold <= 0 || req.SimilarityThreshold > 1.0 {
+		req.SimilarityThreshold = 0.7
 	}
 	if req.MaxResults <= 0 || req.MaxResults > 1000 {
 		req.MaxResults = 100
@@ -249,7 +249,7 @@ func (h *MoleculeHandler) SearchBySimilarity(w http.ResponseWriter, r *http.Requ
 
 	input := &molecule.SimilaritySearchInput{
 		SMILES:     req.SMILES,
-		Threshold:  req.Threshold,
+		Threshold:  req.SimilarityThreshold, // mapping similarity_threshold to application input Threshold
 		MaxResults: req.MaxResults,
 	}
 

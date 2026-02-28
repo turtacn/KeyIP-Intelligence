@@ -4,7 +4,7 @@ import alerts from '@/mocks/data/alerts.json';
 const typedAlerts = alerts as any[];
 
 export const infringementHandlers = [
-  http.get('/api/openapi/v1/alerts', ({ request }) => {
+  http.get('/api/v1/alerts', ({ request }) => {
     const url = new URL(request.url);
     const riskLevel = url.searchParams.get('riskLevel');
     const page = Number(url.searchParams.get('page')) || 1;

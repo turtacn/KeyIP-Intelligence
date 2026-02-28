@@ -4,7 +4,7 @@ import lifecycle from '@/mocks/data/lifecycle.json';
 const typedLifecycle = lifecycle as any[];
 
 export const lifecycleHandlers = [
-  http.get('/api/openapi/v1/lifecycle/events', ({ request }) => {
+  http.get('/api/v1/lifecycle/events', ({ request }) => {
     const url = new URL(request.url);
     const jurisdiction = url.searchParams.get('jurisdiction');
     const status = url.searchParams.get('status');

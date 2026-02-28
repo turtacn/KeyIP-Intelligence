@@ -4,7 +4,8 @@ import { ApiResponse } from '../types/api';
 
 export const patentService = {
   async getPatents(page = 1, pageSize = 20, query = '', searchType = 'text'): Promise<ApiResponse<Patent[]>> {
-    return api.get<ApiResponse<Patent[]>>('/patents', { page, pageSize, query, searchType });
+    // Map frontend 'searchType' to backend 'query_type'
+    return api.post<ApiResponse<Patent[]>>('/patents/search', { page, page_size: pageSize, query, query_type: searchType });
   },
 
   async getPatentById(id: string): Promise<ApiResponse<Patent>> {

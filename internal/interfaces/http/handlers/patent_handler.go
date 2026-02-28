@@ -51,6 +51,7 @@ type UpdatePatentRequest struct {
 
 type SearchPatentsRequest struct {
 	Query     string `json:"query"`
+	QueryType string `json:"query_type,omitempty"` // Matches proto query_type and frontend searchType
 	Page      int    `json:"page"`
 	PageSize  int    `json:"page_size"`
 	SortBy    string `json:"sort_by,omitempty"`
@@ -80,6 +81,13 @@ func (h *PatentHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/patents/search", h.SearchPatents)
 	mux.HandleFunc("POST /api/v1/patents/search/advanced", h.AdvancedSearch)
 	mux.HandleFunc("GET /api/v1/patents/stats", h.GetPatentStats)
+
+	// Add routes for previously unimplemented placeholders matching proto
+	mux.HandleFunc("POST /api/v1/patents/analyze-claims", h.AnalyzeClaims)
+	mux.HandleFunc("GET /api/v1/patents/{id}/family", h.GetFamily)
+	mux.HandleFunc("GET /api/v1/patents/{id}/citations", h.GetCitationNetwork)
+	mux.HandleFunc("POST /api/v1/patents/check-fto", h.CheckFTO)
+	mux.HandleFunc("POST /api/v1/patents/assess-infringement", h.AssessInfringementRisk)
 }
 
 func (h *PatentHandler) CreatePatent(w http.ResponseWriter, r *http.Request) {
@@ -221,6 +229,9 @@ func (h *PatentHandler) SearchPatents(w http.ResponseWriter, r *http.Request) {
 	if req.PageSize <= 0 || req.PageSize > 100 {
 		req.PageSize = 20
 	}
+	if req.QueryType == "" {
+		req.QueryType = "keyword"
+	}
 
 	input := &patent.SearchInput{
 		Query:     req.Query,
@@ -229,6 +240,7 @@ func (h *PatentHandler) SearchPatents(w http.ResponseWriter, r *http.Request) {
 		SortBy:    req.SortBy,
 		SortOrder: req.SortOrder,
 	}
+	// Note: patent.SearchInput may need updating in internal/application/patent to accept QueryType if semantic search logic is implemented there.
 
 	result, err := h.patentSvc.Search(r.Context(), input)
 	if err != nil {
@@ -343,6 +355,26 @@ func (h *PatentHandler) GetCitationNetwork(w http.ResponseWriter, r *http.Reques
 // CheckFTO handles FTO check (placeholder for router).
 func (h *PatentHandler) CheckFTO(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "FTO check not yet implemented"})
+}
+
+// AssessInfringementRiskRequest describes an infringement risk request
+type AssessInfringementRiskRequest struct {
+	MoleculeSMILES string   `json:"molecule_smiles"`
+	PatentID       string   `json:"patent_id"`
+	ClaimNumbers   []uint32 `json:"claim_numbers,omitempty"`
+	IncludePH      bool     `json:"include_prosecution_history_analysis,omitempty"`
+}
+
+// AssessInfringementRisk handles the infringement risk assessment (placeholder for router, aligning with proto).
+func (h *PatentHandler) AssessInfringementRisk(w http.ResponseWriter, r *http.Request) {
+	var req AssessInfringementRiskRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
+		return
+	}
+
+	// TODO: Wire up to actual infringement assessment service when implemented
+	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "Infringement assessment not yet implemented in HTTP handler, see gRPC PatentService.AssessInfringementRisk"})
 }
 
 //Personal.AI order the ending

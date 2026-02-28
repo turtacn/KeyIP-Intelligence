@@ -5,15 +5,15 @@ import patents from '@/mocks/data/patents.json';
 const typedPatents = patents as any[];
 
 export const patentHandlers = [
-  http.get('/api/openapi/v1/patents', ({ request }) => {
-    const url = new URL(request.url);
-    const page = Number(url.searchParams.get('page')) || 1;
-    const pageSize = Number(url.searchParams.get('pageSize')) || 20;
-    const query = url.searchParams.get('query') || '';
-    const searchType = url.searchParams.get('searchType') || 'text';
+  http.post('/api/v1/patents/search', async ({ request }) => {
+    const body = await request.json().catch(() => ({})) as any;
+    const page = Number(body.page) || 1;
+    const pageSize = Number(body.page_size) || 20;
+    const query = body.query || '';
+    const searchType = body.query_type || 'text';
 
     // Simulate error
-    if (url.searchParams.get('__error')) {
+    if (query === '__error') {
       return new HttpResponse(null, { status: 500, statusText: 'Internal Server Error' });
     }
 
@@ -50,7 +50,7 @@ export const patentHandlers = [
     });
   }),
 
-  http.get('/api/openapi/v1/patents/:id', ({ params }) => {
+  http.get('/api/v1/patents/:id', ({ params }) => {
     const { id } = params;
     const patent = typedPatents.find((p: any) => p.id === id);
 

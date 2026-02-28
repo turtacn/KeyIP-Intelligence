@@ -4,7 +4,7 @@ import companies from '@/mocks/data/companies.json';
 const typedCompanies = companies as any[];
 
 export const partnerHandlers = [
-  http.get('/api/openapi/v1/partners', () => {
+  http.get('/api/v1/partners', () => {
     return HttpResponse.json({
       code: 0,
       message: 'success',
