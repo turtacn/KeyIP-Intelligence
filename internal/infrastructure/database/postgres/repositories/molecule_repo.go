@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -89,9 +90,51 @@ func (r *postgresMoleculeRepo) BatchSave(ctx context.Context, molecules []*molec
 
 	return totalAffected, nil
 }
-func (r *postgresMoleculeRepo) FindByIDs(ctx context.Context, ids []string) ([]*molecule.Molecule, error) { return nil, nil }
-func (r *postgresMoleculeRepo) Exists(ctx context.Context, id string) (bool, error) { return false, nil }
-func (r *postgresMoleculeRepo) ExistsByInChIKey(ctx context.Context, inchiKey string) (bool, error) { return false, nil }
+func (r *postgresMoleculeRepo) FindByIDs(ctx context.Context, ids []string) ([]*molecule.Molecule, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	query := `SELECT * FROM molecules WHERE id = ANY($1) AND deleted_at IS NULL`
+	rows, err := r.executor().QueryContext(ctx, query, pq.Array(ids))
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query by ids")
+	}
+	defer rows.Close()
+
+	var mols []*molecule.Molecule
+	for rows.Next() {
+		m, err := scanMolecule(rows)
+		if err != nil {
+			return nil, err
+		}
+		mols = append(mols, m)
+	}
+	return mols, nil
+}
+
+func (r *postgresMoleculeRepo) Exists(ctx context.Context, idStr string) (bool, error) {
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return false, errors.New(errors.ErrCodeValidation, "invalid uuid")
+	}
+	query := `SELECT EXISTS(SELECT 1 FROM molecules WHERE id = $1 AND deleted_at IS NULL)`
+	var exists bool
+	err = r.executor().QueryRowContext(ctx, query, id).Scan(&exists)
+	if err != nil {
+		return false, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to check existence")
+	}
+	return exists, nil
+}
+
+func (r *postgresMoleculeRepo) ExistsByInChIKey(ctx context.Context, inchiKey string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM molecules WHERE inchi_key = $1 AND deleted_at IS NULL)`
+	var exists bool
+	err := r.executor().QueryRowContext(ctx, query, inchiKey).Scan(&exists)
+	if err != nil {
+		return false, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to check existence by inchi key")
+	}
+	return exists, nil
+}
 func (r *postgresMoleculeRepo) buildSearchQuery(query *molecule.MoleculeQuery, isCount bool) (string, []interface{}) {
 	var sb strings.Builder
 	var args []interface{}
@@ -107,8 +150,9 @@ func (r *postgresMoleculeRepo) buildSearchQuery(query *molecule.MoleculeQuery, i
 	if len(query.HasFingerprintTypes) > 0 {
 		sb.WriteString("JOIN molecule_fingerprints mf ON m.id = mf.molecule_id ")
 	}
-	if len(query.PropertyFilters) > 0 {
-		sb.WriteString("JOIN molecule_properties mp ON m.id = mp.molecule_id ")
+
+	for i := range query.PropertyFilters {
+		sb.WriteString(fmt.Sprintf("JOIN molecule_properties mp%d ON m.id = mp%d.molecule_id ", i, i))
 	}
 
 	sb.WriteString("WHERE m.deleted_at IS NULL ")
@@ -174,19 +218,17 @@ func (r *postgresMoleculeRepo) buildSearchQuery(query *molecule.MoleculeQuery, i
 		argIdx++
 	}
 
-	if len(query.PropertyFilters) > 0 {
-		// Simplified for now: just checks first property filter if any
-		pf := query.PropertyFilters[0]
-		sb.WriteString(fmt.Sprintf("AND mp.property_type = $%d ", argIdx))
+	for i, pf := range query.PropertyFilters {
+		sb.WriteString(fmt.Sprintf("AND mp%d.property_type = $%d ", i, argIdx))
 		args = append(args, pf.Name)
 		argIdx++
 		if pf.MinValue != nil {
-			sb.WriteString(fmt.Sprintf("AND mp.value >= $%d ", argIdx))
+			sb.WriteString(fmt.Sprintf("AND mp%d.value >= $%d ", i, argIdx))
 			args = append(args, *pf.MinValue)
 			argIdx++
 		}
 		if pf.MaxValue != nil {
-			sb.WriteString(fmt.Sprintf("AND mp.value <= $%d ", argIdx))
+			sb.WriteString(fmt.Sprintf("AND mp%d.value <= $%d ", i, argIdx))
 			args = append(args, *pf.MaxValue)
 			argIdx++
 		}
@@ -294,26 +336,466 @@ func (r *postgresMoleculeRepo) Count(ctx context.Context, query *molecule.Molecu
 	}
 	return count, nil
 }
-func (r *postgresMoleculeRepo) FindBySource(ctx context.Context, source molecule.MoleculeSource, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (r *postgresMoleculeRepo) FindByStatus(ctx context.Context, status molecule.MoleculeStatus, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (r *postgresMoleculeRepo) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (r *postgresMoleculeRepo) FindByMolecularWeightRange(ctx context.Context, minWeight, maxWeight float64, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (r *postgresMoleculeRepo) FindWithFingerprint(ctx context.Context, fpType molecule.FingerprintType, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (r *postgresMoleculeRepo) FindWithoutFingerprint(ctx context.Context, fpType molecule.FingerprintType, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (r *postgresMoleculeRepo) Delete(ctx context.Context, id string) error { return nil }
-func (r *postgresMoleculeRepo) AddProperty(ctx context.Context, prop *molecule.Property) error { return nil }
-func (r *postgresMoleculeRepo) GetProperties(ctx context.Context, moleculeID uuid.UUID, propertyTypes []string) ([]*molecule.Property, error) { return nil, nil }
-func (r *postgresMoleculeRepo) GetPropertiesByType(ctx context.Context, propertyType string, minValue, maxValue float64, limit, offset int) ([]*molecule.Property, int64, error) { return nil, 0, nil }
-func (r *postgresMoleculeRepo) LinkToPatent(ctx context.Context, rel *molecule.PatentRelation) error { return nil }
-func (r *postgresMoleculeRepo) UnlinkFromPatent(ctx context.Context, patentID, moleculeID uuid.UUID, relationType string) error { return nil }
-func (r *postgresMoleculeRepo) GetPatentRelations(ctx context.Context, moleculeID uuid.UUID) ([]*molecule.PatentRelation, error) { return nil, nil }
-func (r *postgresMoleculeRepo) GetMoleculesByPatent(ctx context.Context, patentID uuid.UUID, relationType *string) ([]*molecule.Molecule, error) { return nil, nil }
-func (r *postgresMoleculeRepo) SearchBySubstructure(ctx context.Context, smarts string, limit, offset int) ([]*molecule.Molecule, int64, error) { return nil, 0, nil }
-func (r *postgresMoleculeRepo) SearchBySimilarity(ctx context.Context, targetFP []byte, fpType string, threshold float64, limit, offset int) ([]*molecule.Molecule, int64, error) { return nil, 0, nil }
-func (r *postgresMoleculeRepo) BatchSaveFingerprints(ctx context.Context, fps []*molecule.Fingerprint) error { return nil }
-func (r *postgresMoleculeRepo) CountByStatus(ctx context.Context) (map[molecule.Status]int64, error) { return nil, nil }
-func (r *postgresMoleculeRepo) GetPropertyDistribution(ctx context.Context, propertyType string, bucketCount int) ([]*molecule.DistributionBucket, error) { return nil, nil }
-func (r *postgresMoleculeRepo) DeleteFingerprints(ctx context.Context, moleculeID uuid.UUID, fpType string) error { return nil }
+func (r *postgresMoleculeRepo) FindBySource(ctx context.Context, source molecule.MoleculeSource, offset, limit int) ([]*molecule.Molecule, error) {
+	query := `SELECT * FROM molecules WHERE source = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	rows, err := r.executor().QueryContext(ctx, query, source, limit, offset)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query by source")
+	}
+	defer rows.Close()
+
+	var mols []*molecule.Molecule
+	for rows.Next() {
+		m, err := scanMolecule(rows)
+		if err != nil { return nil, err }
+		mols = append(mols, m)
+	}
+	return mols, nil
+}
+
+func (r *postgresMoleculeRepo) FindByStatus(ctx context.Context, status molecule.MoleculeStatus, offset, limit int) ([]*molecule.Molecule, error) {
+	query := `SELECT * FROM molecules WHERE status = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	rows, err := r.executor().QueryContext(ctx, query, status, limit, offset)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query by status")
+	}
+	defer rows.Close()
+
+	var mols []*molecule.Molecule
+	for rows.Next() {
+		m, err := scanMolecule(rows)
+		if err != nil { return nil, err }
+		mols = append(mols, m)
+	}
+	return mols, nil
+}
+
+func (r *postgresMoleculeRepo) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*molecule.Molecule, error) {
+	if len(tags) == 0 {
+		return nil, nil
+	}
+	query := `SELECT * FROM molecules WHERE tags @> $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	rows, err := r.executor().QueryContext(ctx, query, pq.Array(tags), limit, offset)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query by tags")
+	}
+	defer rows.Close()
+
+	var mols []*molecule.Molecule
+	for rows.Next() {
+		m, err := scanMolecule(rows)
+		if err != nil { return nil, err }
+		mols = append(mols, m)
+	}
+	return mols, nil
+}
+
+func (r *postgresMoleculeRepo) FindByMolecularWeightRange(ctx context.Context, minWeight, maxWeight float64, offset, limit int) ([]*molecule.Molecule, error) {
+	query := `SELECT * FROM molecules WHERE molecular_weight >= $1 AND molecular_weight <= $2 AND deleted_at IS NULL ORDER BY molecular_weight ASC LIMIT $3 OFFSET $4`
+	rows, err := r.executor().QueryContext(ctx, query, minWeight, maxWeight, limit, offset)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query by weight")
+	}
+	defer rows.Close()
+
+	var mols []*molecule.Molecule
+	for rows.Next() {
+		m, err := scanMolecule(rows)
+		if err != nil { return nil, err }
+		mols = append(mols, m)
+	}
+	return mols, nil
+}
+
+func (r *postgresMoleculeRepo) FindWithFingerprint(ctx context.Context, fpType molecule.FingerprintType, offset, limit int) ([]*molecule.Molecule, error) {
+	query := `
+		SELECT m.* FROM molecules m
+		JOIN molecule_fingerprints mf ON m.id = mf.molecule_id
+		WHERE mf.fingerprint_type = $1 AND m.deleted_at IS NULL
+		ORDER BY m.created_at DESC LIMIT $2 OFFSET $3
+	`
+	rows, err := r.executor().QueryContext(ctx, query, fpType, limit, offset)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query with fingerprint")
+	}
+	defer rows.Close()
+
+	var mols []*molecule.Molecule
+	for rows.Next() {
+		m, err := scanMolecule(rows)
+		if err != nil { return nil, err }
+		mols = append(mols, m)
+	}
+	return mols, nil
+}
+
+func (r *postgresMoleculeRepo) FindWithoutFingerprint(ctx context.Context, fpType molecule.FingerprintType, offset, limit int) ([]*molecule.Molecule, error) {
+	query := `
+		SELECT m.* FROM molecules m
+		LEFT JOIN molecule_fingerprints mf ON m.id = mf.molecule_id AND mf.fingerprint_type = $1
+		WHERE mf.molecule_id IS NULL AND m.deleted_at IS NULL
+		ORDER BY m.created_at DESC LIMIT $2 OFFSET $3
+	`
+	rows, err := r.executor().QueryContext(ctx, query, fpType, limit, offset)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query without fingerprint")
+	}
+	defer rows.Close()
+
+	var mols []*molecule.Molecule
+	for rows.Next() {
+		m, err := scanMolecule(rows)
+		if err != nil { return nil, err }
+		mols = append(mols, m)
+	}
+	return mols, nil
+}
+
+func (r *postgresMoleculeRepo) Delete(ctx context.Context, idStr string) error {
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return errors.New(errors.ErrCodeValidation, "invalid uuid")
+	}
+	query := `UPDATE molecules SET deleted_at = NOW() WHERE id = $1`
+	_, err = r.executor().ExecContext(ctx, query, id)
+	return err
+}
+func (r *postgresMoleculeRepo) AddProperty(ctx context.Context, prop *molecule.Property) error {
+	query := `
+		INSERT INTO molecule_properties (
+			molecule_id, property_type, value, unit, measurement_conditions, data_source, confidence, source_reference
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8
+		) RETURNING id, created_at
+	`
+	conds, _ := json.Marshal(prop.MeasurementConditions)
+	err := r.executor().QueryRowContext(ctx, query,
+		prop.MoleculeID, prop.Type, prop.Value, prop.Unit, conds, prop.DataSource, prop.Confidence, prop.SourceReference,
+	).Scan(&prop.ID, &prop.CreatedAt)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to add property")
+	}
+	return nil
+}
+
+func scanProperty(row scanner) (*molecule.Property, error) {
+	p := &molecule.Property{}
+	var conds []byte
+	err := row.Scan(
+		&p.ID, &p.MoleculeID, &p.Type, &p.Value, &p.Unit, &conds, &p.DataSource, &p.Confidence, &p.SourceReference, &p.CreatedAt,
+	)
+	if err != nil { return nil, err }
+	if len(conds) > 0 { _ = json.Unmarshal(conds, &p.MeasurementConditions) }
+	p.Name = p.Type // alias
+	return p, nil
+}
+
+func (r *postgresMoleculeRepo) GetProperties(ctx context.Context, moleculeID uuid.UUID, propertyTypes []string) ([]*molecule.Property, error) {
+	query := `SELECT id, molecule_id, property_type, value, unit, measurement_conditions, data_source, confidence, source_reference, created_at FROM molecule_properties WHERE molecule_id = $1`
+	var args []interface{}
+	args = append(args, moleculeID)
+
+	if len(propertyTypes) > 0 {
+		query += ` AND property_type = ANY($2)`
+		args = append(args, pq.Array(propertyTypes))
+	}
+	query += ` ORDER BY created_at DESC`
+
+	rows, err := r.executor().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get properties")
+	}
+	defer rows.Close()
+
+	var props []*molecule.Property
+	for rows.Next() {
+		p, err := scanProperty(rows)
+		if err != nil { return nil, err }
+		props = append(props, p)
+	}
+	return props, nil
+}
+
+func (r *postgresMoleculeRepo) GetPropertiesByType(ctx context.Context, propertyType string, minValue, maxValue float64, limit, offset int) ([]*molecule.Property, int64, error) {
+	countQuery := `SELECT COUNT(*) FROM molecule_properties WHERE property_type = $1 AND value >= $2 AND value <= $3`
+	var count int64
+	err := r.executor().QueryRowContext(ctx, countQuery, propertyType, minValue, maxValue).Scan(&count)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count properties")
+	}
+
+	query := `
+		SELECT id, molecule_id, property_type, value, unit, measurement_conditions, data_source, confidence, source_reference, created_at
+		FROM molecule_properties
+		WHERE property_type = $1 AND value >= $2 AND value <= $3
+		ORDER BY value ASC
+		LIMIT $4 OFFSET $5
+	`
+	rows, err := r.executor().QueryContext(ctx, query, propertyType, minValue, maxValue, limit, offset)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to query properties")
+	}
+	defer rows.Close()
+
+	var props []*molecule.Property
+	for rows.Next() {
+		p, err := scanProperty(rows)
+		if err != nil { return nil, 0, err }
+		props = append(props, p)
+	}
+	return props, count, nil
+}
+
+func (r *postgresMoleculeRepo) LinkToPatent(ctx context.Context, rel *molecule.PatentRelation) error {
+	query := `
+		INSERT INTO patent_molecule_relations (
+			patent_id, molecule_id, relation_type, location_in_patent, page_reference, claim_numbers, extraction_method, confidence
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8
+		) ON CONFLICT (patent_id, molecule_id, relation_type) DO UPDATE SET
+			location_in_patent = EXCLUDED.location_in_patent,
+			page_reference = EXCLUDED.page_reference,
+			claim_numbers = EXCLUDED.claim_numbers,
+			extraction_method = EXCLUDED.extraction_method,
+			confidence = EXCLUDED.confidence
+		RETURNING id, created_at
+	`
+	// Check if claims numbers should be pq.Array mapped, in Go it is usually []int64 mapped via pq.Array
+	err := r.executor().QueryRowContext(ctx, query,
+		rel.PatentID, rel.MoleculeID, rel.RelationType, rel.LocationInPatent, rel.PageReference, pq.Array(rel.ClaimNumbers), rel.ExtractionMethod, rel.Confidence,
+	).Scan(&rel.ID, &rel.CreatedAt)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to link molecule to patent")
+	}
+	return nil
+}
+
+func (r *postgresMoleculeRepo) UnlinkFromPatent(ctx context.Context, patentID, moleculeID uuid.UUID, relationType string) error {
+	query := `DELETE FROM patent_molecule_relations WHERE patent_id = $1 AND molecule_id = $2 AND relation_type = $3`
+	_, err := r.executor().ExecContext(ctx, query, patentID, moleculeID, relationType)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to unlink molecule from patent")
+	}
+	return nil
+}
+
+func scanPatentRelation(row scanner) (*molecule.PatentRelation, error) {
+	r := &molecule.PatentRelation{}
+	var claims []int64
+	err := row.Scan(
+		&r.ID, &r.PatentID, &r.MoleculeID, &r.RelationType, &r.LocationInPatent, &r.PageReference, pq.Array(&claims), &r.ExtractionMethod, &r.Confidence, &r.CreatedAt,
+	)
+	if err != nil { return nil, err }
+	r.ClaimNumbers = claims
+	return r, nil
+}
+
+func (r *postgresMoleculeRepo) GetPatentRelations(ctx context.Context, moleculeID uuid.UUID) ([]*molecule.PatentRelation, error) {
+	query := `
+		SELECT id, patent_id, molecule_id, relation_type, location_in_patent, page_reference, claim_numbers, extraction_method, confidence, created_at
+		FROM patent_molecule_relations
+		WHERE molecule_id = $1
+		ORDER BY created_at DESC
+	`
+	rows, err := r.executor().QueryContext(ctx, query, moleculeID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get patent relations")
+	}
+	defer rows.Close()
+
+	var rels []*molecule.PatentRelation
+	for rows.Next() {
+		rel, err := scanPatentRelation(rows)
+		if err != nil { return nil, err }
+		rels = append(rels, rel)
+	}
+	return rels, nil
+}
+
+func (r *postgresMoleculeRepo) GetMoleculesByPatent(ctx context.Context, patentID uuid.UUID, relationType *string) ([]*molecule.Molecule, error) {
+	var query string
+	var args []interface{}
+	args = append(args, patentID)
+
+	if relationType != nil {
+		query = `
+			SELECT m.* FROM molecules m
+			JOIN patent_molecule_relations r ON m.id = r.molecule_id
+			WHERE r.patent_id = $1 AND r.relation_type = $2 AND m.deleted_at IS NULL
+		`
+		args = append(args, *relationType)
+	} else {
+		query = `
+			SELECT m.* FROM molecules m
+			JOIN patent_molecule_relations r ON m.id = r.molecule_id
+			WHERE r.patent_id = $1 AND m.deleted_at IS NULL
+		`
+	}
+
+	rows, err := r.executor().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get molecules by patent")
+	}
+	defer rows.Close()
+
+	var mols []*molecule.Molecule
+	for rows.Next() {
+		m, err := scanMolecule(rows)
+		if err != nil { return nil, err }
+		mols = append(mols, m)
+	}
+	return mols, nil
+}
+func (r *postgresMoleculeRepo) SearchBySubstructure(ctx context.Context, smarts string, limit, offset int) ([]*molecule.Molecule, int64, error) {
+	// Typically requires pgchem or rdkit extension for genuine SMARTS substructure search
+	// SELECT m.* FROM molecules m WHERE m.smiles@>$1; (using RDKit cartridge operator)
+	// Without explicit extension setup, returning an error pointing to extension needs
+	return nil, 0, errors.New(errors.ErrCodeInvalidOperation, "substructure search requires RDKit extension setup, unimplemented in standard pg layer")
+}
+
+func (r *postgresMoleculeRepo) SearchBySimilarity(ctx context.Context, targetFP []byte, fpType string, threshold float64, limit, offset int) ([]*molecule.Molecule, int64, error) {
+	// Usually requires RDKit cartridge (<% operator for Tanimoto) or pgvector (<=> operator for Cosine)
+	// Without explicit extension, returning an error.
+	return nil, 0, errors.New(errors.ErrCodeInvalidOperation, "similarity search implemented via pgvector in SearchByVectorSimilarity, or requires RDKit cartridge")
+}
+
+func (r *postgresMoleculeRepo) BatchSaveFingerprints(ctx context.Context, fps []*molecule.Fingerprint) error {
+	if len(fps) == 0 {
+		return nil
+	}
+
+	totalAffected := 0
+	batchSize := 1000
+
+	for start := 0; start < len(fps); start += batchSize {
+		end := start + batchSize
+		if end > len(fps) {
+			end = len(fps)
+		}
+		batch := fps[start:end]
+
+		query := `
+			INSERT INTO molecule_fingerprints (
+				molecule_id, fingerprint_type, fingerprint_bits, fingerprint_vector, fingerprint_hash, parameters, model_version, created_at
+			) VALUES
+		`
+
+		var values []interface{}
+		var placeholders []string
+
+		for i, fp := range batch {
+			base := i * 8
+			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+				base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8))
+
+			params, _ := json.Marshal(fp.Parameters)
+			var vector interface{}
+			if len(fp.Vector) > 0 {
+				vector = pgvector.NewVector(fp.Vector)
+			} else {
+				vector = nil
+			}
+
+			values = append(values,
+				fp.MoleculeID, fp.Type, fp.Bits, vector, fp.Hash, params, fp.ModelVersion, time.Now(),
+			)
+		}
+
+		query += strings.Join(placeholders, ",") + ` ON CONFLICT (molecule_id, fingerprint_type, model_version) DO UPDATE SET
+			fingerprint_bits = EXCLUDED.fingerprint_bits,
+			fingerprint_vector = EXCLUDED.fingerprint_vector,
+			fingerprint_hash = EXCLUDED.fingerprint_hash
+		`
+
+		res, err := r.executor().ExecContext(ctx, query, values...)
+		if err != nil {
+			return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to batch save fingerprints")
+		}
+
+		rowsAffected, _ := res.RowsAffected()
+		totalAffected += int(rowsAffected)
+	}
+
+	return nil
+}
+
+func (r *postgresMoleculeRepo) CountByStatus(ctx context.Context) (map[molecule.Status]int64, error) {
+	query := `SELECT status, COUNT(*) FROM molecules WHERE deleted_at IS NULL GROUP BY status`
+	rows, err := r.executor().QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count by status")
+	}
+	defer rows.Close()
+
+	counts := make(map[molecule.Status]int64)
+	for rows.Next() {
+		var status string
+		var count int64
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, err
+		}
+		counts[molecule.Status(status)] = count
+	}
+	return counts, nil
+}
+
+func (r *postgresMoleculeRepo) GetPropertyDistribution(ctx context.Context, propertyType string, bucketCount int) ([]*molecule.DistributionBucket, error) {
+	if bucketCount <= 0 {
+		return nil, errors.New(errors.ErrCodeValidation, "bucketCount must be positive")
+	}
+
+	query := `
+		WITH stats AS (
+			SELECT MIN(value) as min_val, MAX(value) as max_val
+			FROM molecule_properties
+			WHERE property_type = $1
+		),
+		buckets AS (
+			SELECT
+				width_bucket(value, stats.min_val, stats.max_val + 0.000001, $2) as bucket,
+				COUNT(*) as count,
+				MIN(value) as bucket_min,
+				MAX(value) as bucket_max
+			FROM molecule_properties, stats
+			WHERE property_type = $1
+			GROUP BY bucket
+		)
+		SELECT bucket, count, bucket_min, bucket_max
+		FROM buckets
+		ORDER BY bucket ASC
+	`
+	rows, err := r.executor().QueryContext(ctx, query, propertyType, bucketCount)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get property distribution")
+	}
+	defer rows.Close()
+
+	var buckets []*molecule.DistributionBucket
+	for rows.Next() {
+		var b int
+		var c int64
+		var min, max float64
+		if err := rows.Scan(&b, &c, &min, &max); err != nil {
+			return nil, err
+		}
+		buckets = append(buckets, &molecule.DistributionBucket{
+			Bucket: b,
+			Count:  c,
+			Min:    min,
+			Max:    max,
+		})
+	}
+	return buckets, nil
+}
+
+func (r *postgresMoleculeRepo) DeleteFingerprints(ctx context.Context, moleculeID uuid.UUID, fpType string) error {
+	query := `DELETE FROM molecule_fingerprints WHERE molecule_id = $1 AND fingerprint_type = $2`
+	_, err := r.executor().ExecContext(ctx, query, moleculeID, fpType)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to delete fingerprints")
+	}
+	return nil
+}
 
 func (r *postgresMoleculeRepo) executor() queryExecutor {
 	if r.tx != nil {
