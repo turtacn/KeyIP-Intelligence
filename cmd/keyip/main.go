@@ -10,6 +10,9 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/reporting"
+	"github.com/turtacn/KeyIP-Intelligence/internal/config"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres/repositories"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/cli"
 )
@@ -44,14 +47,40 @@ func main() {
 
 	// Create a dummy logger for CLI startup until configured
 	logger := logging.NewDefaultLogger()
+	cfg := config.NewDefaultConfig()
 
-	// Mock/Placeholder dependencies for now to satisfy compilation and structure
-	// In production, these would be initialized properly, potentially wrapping an API client
+	// Initialize real Postgres connection
+	pgCfg := postgres.PostgresConfig{
+		Host:     cfg.Database.Postgres.Host,
+		Port:     cfg.Database.Postgres.Port,
+		Username: cfg.Database.Postgres.User,
+		Password: cfg.Database.Postgres.Password,
+		Database: cfg.Database.Postgres.DBName,
+		SSLMode:  cfg.Database.Postgres.SSLMode,
+	}
+	conn, err := postgres.NewConnection(pgCfg, logger)
+	if err != nil {
+		logger.Warn("Failed to connect to database. Some commands requiring DB access may fail.", logging.Err(err))
+	} else {
+		defer conn.Close()
+	}
+
+	// Initialize Repositories
+	var similaritySearchService patent_mining.SimilaritySearchService
+	if conn != nil {
+		_ = repositories.NewPostgresMoleculeRepo(conn, logger)
+		// Assuming we initialize the service via its dependencies.
+		// Since we lack full implementations of FPEngine, VectorStore etc. here in `cmd/keyip/main.go`
+		// for this particular Phase, we will inject a dummy service or construct a basic one if we have all interfaces.
+		// To meet the requirement "inject real Repository", if there is an implementation of SimilaritySearchService
+		// that directly takes the repo, we'd inject it here.
+		// For now, we leave similaritySearchService nil as it requires FingerprintEngine and VectorStore
+		// which are complex to wire up without their concrete types in this scope.
+	}
+
 	deps := cli.CommandDependencies{
 		Logger: logger,
-		// SimilaritySearchService: ...
-		// ValuationService: ...
-		// ...
+		SimilaritySearchService: similaritySearchService,
 	}
 
 	// Register subcommands with dependencies

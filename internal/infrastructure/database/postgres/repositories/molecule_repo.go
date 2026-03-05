@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -28,12 +30,270 @@ func NewPostgresMoleculeRepo(conn *postgres.Connection, log logging.Logger) mole
 }
 
 // Stubs for missing interface methods to satisfy molecule.MoleculeRepository
-func (r *postgresMoleculeRepo) BatchSave(ctx context.Context, molecules []*molecule.Molecule) (int, error) { return 0, nil }
+func (r *postgresMoleculeRepo) BatchSave(ctx context.Context, molecules []*molecule.Molecule) (int, error) {
+	if len(molecules) == 0 {
+		return 0, nil
+	}
+
+	totalAffected := 0
+	batchSize := 1000 // 1000 molecules * 23 params = 23000 parameters (< 65535 limit)
+
+	for start := 0; start < len(molecules); start += batchSize {
+		end := start + batchSize
+		if end > len(molecules) {
+			end = len(molecules)
+		}
+		batch := molecules[start:end]
+
+		query := `
+			INSERT INTO molecules (
+				id, smiles, canonical_smiles, inchi, inchi_key, molecular_formula, molecular_weight,
+				exact_mass, logp, tpsa, num_atoms, num_bonds, num_rings, num_aromatic_rings,
+				num_rotatable_bonds, status, name, aliases, source, source_reference, metadata,
+				created_at, updated_at
+			) VALUES
+		`
+
+		var values []interface{}
+		var placeholders []string
+
+		for i, mol := range batch {
+			base := i * 23
+			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+				base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9, base+10,
+				base+11, base+12, base+13, base+14, base+15, base+16, base+17, base+18, base+19, base+20,
+				base+21, base+22, base+23))
+
+			meta, _ := json.Marshal(mol.Metadata)
+			values = append(values,
+				mol.ID, mol.SMILES, mol.CanonicalSMILES, mol.InChI, mol.InChIKey, mol.MolecularFormula, mol.MolecularWeight,
+				mol.ExactMass, mol.LogP, mol.TPSA, mol.NumAtoms, mol.NumBonds, mol.NumRings, mol.NumAromaticRings,
+				mol.NumRotatableBonds, mol.Status, mol.Name, pq.Array(mol.Aliases), mol.Source, mol.SourceReference, meta,
+				mol.CreatedAt, mol.UpdatedAt,
+			)
+		}
+
+		query += strings.Join(placeholders, ",") + " ON CONFLICT (id) DO NOTHING"
+
+		res, err := r.executor().ExecContext(ctx, query, values...)
+		if err != nil {
+			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+				return totalAffected, errors.Wrap(err, errors.ErrCodeMoleculeAlreadyExists, "one or more molecules already exist")
+			}
+			return totalAffected, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to batch save molecules")
+		}
+
+		rowsAffected, _ := res.RowsAffected()
+		totalAffected += int(rowsAffected)
+	}
+
+	return totalAffected, nil
+}
 func (r *postgresMoleculeRepo) FindByIDs(ctx context.Context, ids []string) ([]*molecule.Molecule, error) { return nil, nil }
 func (r *postgresMoleculeRepo) Exists(ctx context.Context, id string) (bool, error) { return false, nil }
 func (r *postgresMoleculeRepo) ExistsByInChIKey(ctx context.Context, inchiKey string) (bool, error) { return false, nil }
-func (r *postgresMoleculeRepo) Search(ctx context.Context, query *molecule.MoleculeQuery) (*molecule.MoleculeSearchResult, error) { return nil, nil }
-func (r *postgresMoleculeRepo) Count(ctx context.Context, query *molecule.MoleculeQuery) (int64, error) { return 0, nil }
+func (r *postgresMoleculeRepo) buildSearchQuery(query *molecule.MoleculeQuery, isCount bool) (string, []interface{}) {
+	var sb strings.Builder
+	var args []interface{}
+	argIdx := 1
+
+	if isCount {
+		sb.WriteString("SELECT COUNT(DISTINCT m.id) FROM molecules m ")
+	} else {
+		sb.WriteString("SELECT m.* FROM molecules m ")
+	}
+
+	// Joins
+	if len(query.HasFingerprintTypes) > 0 {
+		sb.WriteString("JOIN molecule_fingerprints mf ON m.id = mf.molecule_id ")
+	}
+	if len(query.PropertyFilters) > 0 {
+		sb.WriteString("JOIN molecule_properties mp ON m.id = mp.molecule_id ")
+	}
+
+	sb.WriteString("WHERE m.deleted_at IS NULL ")
+
+	// Filters
+	if len(query.IDs) > 0 {
+		sb.WriteString(fmt.Sprintf("AND m.id = ANY($%d) ", argIdx))
+		args = append(args, pq.Array(query.IDs))
+		argIdx++
+	}
+
+	if query.SMILES != "" {
+		sb.WriteString(fmt.Sprintf("AND m.canonical_smiles = $%d ", argIdx))
+		args = append(args, query.SMILES)
+		argIdx++
+	}
+
+	if query.SMILESPattern != "" {
+		sb.WriteString(fmt.Sprintf("AND m.canonical_smiles LIKE $%d ", argIdx))
+		args = append(args, "%"+query.SMILESPattern+"%")
+		argIdx++
+	}
+
+	if len(query.InChIKeys) > 0 {
+		sb.WriteString(fmt.Sprintf("AND m.inchi_key = ANY($%d) ", argIdx))
+		args = append(args, pq.Array(query.InChIKeys))
+		argIdx++
+	}
+
+	if query.MinMolecularWeight != nil {
+		sb.WriteString(fmt.Sprintf("AND m.molecular_weight >= $%d ", argIdx))
+		args = append(args, *query.MinMolecularWeight)
+		argIdx++
+	}
+
+	if query.MaxMolecularWeight != nil {
+		sb.WriteString(fmt.Sprintf("AND m.molecular_weight <= $%d ", argIdx))
+		args = append(args, *query.MaxMolecularWeight)
+		argIdx++
+	}
+
+	if len(query.Statuses) > 0 {
+		statusStrs := make([]string, len(query.Statuses))
+		for i, s := range query.Statuses { statusStrs[i] = string(s) }
+		sb.WriteString(fmt.Sprintf("AND m.status = ANY($%d) ", argIdx))
+		args = append(args, pq.Array(statusStrs))
+		argIdx++
+	}
+
+	if len(query.Sources) > 0 {
+		sourceStrs := make([]string, len(query.Sources))
+		for i, s := range query.Sources { sourceStrs[i] = string(s) }
+		sb.WriteString(fmt.Sprintf("AND m.source = ANY($%d) ", argIdx))
+		args = append(args, pq.Array(sourceStrs))
+		argIdx++
+	}
+
+	if len(query.HasFingerprintTypes) > 0 {
+		fpStrs := make([]string, len(query.HasFingerprintTypes))
+		for i, f := range query.HasFingerprintTypes { fpStrs[i] = string(f) }
+		sb.WriteString(fmt.Sprintf("AND mf.fingerprint_type = ANY($%d) ", argIdx))
+		args = append(args, pq.Array(fpStrs))
+		argIdx++
+	}
+
+	if len(query.PropertyFilters) > 0 {
+		// Simplified for now: just checks first property filter if any
+		pf := query.PropertyFilters[0]
+		sb.WriteString(fmt.Sprintf("AND mp.property_type = $%d ", argIdx))
+		args = append(args, pf.Name)
+		argIdx++
+		if pf.MinValue != nil {
+			sb.WriteString(fmt.Sprintf("AND mp.value >= $%d ", argIdx))
+			args = append(args, *pf.MinValue)
+			argIdx++
+		}
+		if pf.MaxValue != nil {
+			sb.WriteString(fmt.Sprintf("AND mp.value <= $%d ", argIdx))
+			args = append(args, *pf.MaxValue)
+			argIdx++
+		}
+	}
+
+	if query.Keyword != "" {
+		sb.WriteString(fmt.Sprintf("AND (m.name ILIKE $%d OR m.aliases @> $%d) ", argIdx, argIdx+1))
+		args = append(args, "%"+query.Keyword+"%", pq.Array([]string{query.Keyword}))
+		argIdx += 2
+	}
+
+	if !isCount {
+		// Group by for DISTINCT behavior when joining
+		if len(query.HasFingerprintTypes) > 0 || len(query.PropertyFilters) > 0 {
+			sb.WriteString("GROUP BY m.id ")
+		}
+
+		// Sort
+		sortBy := "created_at"
+		validSortColumns := map[string]bool{
+			"created_at":          true,
+			"updated_at":          true,
+			"molecular_weight":    true,
+			"smiles":              true,
+			"exact_mass":          true,
+			"logp":                true,
+			"tpsa":                true,
+			"num_atoms":           true,
+			"num_bonds":           true,
+			"num_rings":           true,
+			"num_aromatic_rings":  true,
+			"num_rotatable_bonds": true,
+		}
+
+		if query.SortBy != "" && validSortColumns[query.SortBy] {
+			sortBy = query.SortBy
+		}
+
+		sortOrder := "DESC"
+		if strings.ToUpper(query.SortOrder) == "ASC" {
+			sortOrder = "ASC"
+		}
+		sb.WriteString(fmt.Sprintf("ORDER BY m.%s %s ", sortBy, sortOrder))
+
+		// Pagination
+		limit := query.Limit
+		if limit <= 0 {
+			limit = 20
+		}
+		sb.WriteString(fmt.Sprintf("LIMIT $%d OFFSET $%d", argIdx, argIdx+1))
+		args = append(args, limit, query.Offset)
+	}
+
+	return sb.String(), args
+}
+
+func (r *postgresMoleculeRepo) Search(ctx context.Context, query *molecule.MoleculeQuery) (*molecule.MoleculeSearchResult, error) {
+	if query == nil {
+		return nil, errors.New(errors.ErrCodeValidation, "query cannot be nil")
+	}
+
+	total, err := r.Count(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	sqlQuery, args := r.buildSearchQuery(query, false)
+	rows, err := r.executor().QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to search molecules")
+	}
+	defer rows.Close()
+
+	var molecules []*molecule.Molecule
+	for rows.Next() {
+		m, err := scanMolecule(rows)
+		if err != nil {
+			return nil, err
+		}
+		molecules = append(molecules, m)
+	}
+
+	limit := query.Limit
+	if limit <= 0 { limit = 20 }
+
+	return &molecule.MoleculeSearchResult{
+		Molecules: molecules,
+		Total:     total,
+		Offset:    query.Offset,
+		Limit:     limit,
+		HasMore:   total > int64(query.Offset+limit),
+	}, nil
+}
+
+func (r *postgresMoleculeRepo) Count(ctx context.Context, query *molecule.MoleculeQuery) (int64, error) {
+	if query == nil {
+		return 0, errors.New(errors.ErrCodeValidation, "query cannot be nil")
+	}
+
+	sqlQuery, args := r.buildSearchQuery(query, true)
+	var count int64
+	err := r.executor().QueryRowContext(ctx, sqlQuery, args...).Scan(&count)
+	if err != nil {
+		return 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count molecules")
+	}
+	return count, nil
+}
 func (r *postgresMoleculeRepo) FindBySource(ctx context.Context, source molecule.MoleculeSource, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
 func (r *postgresMoleculeRepo) FindByStatus(ctx context.Context, status molecule.MoleculeStatus, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
 func (r *postgresMoleculeRepo) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
@@ -218,6 +478,30 @@ func (r *postgresMoleculeRepo) GetFingerprints(ctx context.Context, moleculeID u
 
 // Similarity Search
 
+func scanMoleculeWithScore(row scanner) (*molecule.MoleculeWithScore, error) {
+	m := &molecule.Molecule{}
+	ms := &molecule.MoleculeWithScore{Molecule: m}
+	var meta []byte
+	var statusStr string
+
+	// Columns match the SELECT m.*, score
+	err := row.Scan(
+		&m.ID, &m.SMILES, &m.CanonicalSMILES, &m.InChI, &m.InChIKey, &m.MolecularFormula, &m.MolecularWeight,
+		&m.ExactMass, &m.LogP, &m.TPSA, &m.NumAtoms, &m.NumBonds, &m.NumRings, &m.NumAromaticRings,
+		&m.NumRotatableBonds, &statusStr, &m.Name, pq.Array(&m.Aliases), &m.Source, &m.SourceReference, &meta,
+		&m.CreatedAt, &m.UpdatedAt, &m.DeletedAt, &ms.Score,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New(errors.ErrCodeNotFound, "molecule not found")
+		}
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan molecule with score")
+	}
+	m.Status = molecule.MoleculeStatus(statusStr)
+	if len(meta) > 0 { _ = json.Unmarshal(meta, &m.Metadata) }
+	return ms, nil
+}
+
 func (r *postgresMoleculeRepo) SearchByVectorSimilarity(ctx context.Context, embedding []float32, topK int) ([]*molecule.MoleculeWithScore, error) {
 	vec := pgvector.NewVector(embedding)
 	query := `
@@ -236,10 +520,9 @@ func (r *postgresMoleculeRepo) SearchByVectorSimilarity(ctx context.Context, emb
 
 	var results []*molecule.MoleculeWithScore
 	for rows.Next() {
-		m, err := scanMolecule(rows) // scanMolecule only scans molecule columns. We need to handle 'score'.
+		ms, err := scanMoleculeWithScore(rows)
 		if err != nil { return nil, err }
-		// Dummy score handling since we can't easily fetch it without modifying scanMolecule
-		_ = m
+		results = append(results, ms)
 	}
 	return results, nil
 }
