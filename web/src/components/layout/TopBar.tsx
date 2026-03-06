@@ -10,7 +10,7 @@ const TopBar: React.FC = () => {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-10 pl-64 transition-all duration-300">
+    <header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-10 transition-all duration-300">
       <div className="container mx-auto px-6 h-full flex items-center justify-between">
         <div className="flex items-center">
           <div className="relative">

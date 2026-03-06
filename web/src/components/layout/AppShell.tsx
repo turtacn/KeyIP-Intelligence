@@ -10,7 +10,7 @@ const AppShell: React.FC = () => {
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       <Sidebar />
 
-      <main className="flex-1 ml-64 flex flex-col transition-all duration-300">
+      <main className="flex-1 ml-64 flex flex-col min-w-0 transition-all duration-300">
         <TopBar />
 
         <div className="flex-1 overflow-y-auto p-8 relative">

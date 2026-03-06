@@ -64,3 +64,4 @@ test/testdata/generated/
 .testcache/
 
 # //Personal.AI order the ending
+node_modules/
