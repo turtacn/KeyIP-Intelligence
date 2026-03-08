@@ -38,9 +38,9 @@ const PatentabilityAssessor: React.FC = () => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
       {/* Input Section */}
-      <Card className="flex flex-col h-full">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('mining.assessment.title')}</h3>
-        <div className="space-y-4 flex-1">
+      <Card className="flex flex-col h-full" bodyClassName="flex flex-col h-full">
+        <h3 className="text-lg font-semibold text-slate-800 mb-4 flex-shrink-0">{t('mining.assessment.title')}</h3>
+        <div className="space-y-4 flex-1 overflow-y-auto pr-2 min-h-0">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t('mining.assessment.smiles_label')}</label>
             <textarea
@@ -66,7 +66,7 @@ const PatentabilityAssessor: React.FC = () => {
             />
           </div>
         </div>
-        <div className="mt-6 pt-4 border-t border-slate-100">
+        <div className="mt-6 pt-4 border-t border-slate-100 flex-shrink-0">
           <Button
             onClick={handleAssess}
             isLoading={loading}
@@ -80,16 +80,16 @@ const PatentabilityAssessor: React.FC = () => {
       </Card>
 
       {/* Result Section */}
-      <Card className="flex flex-col h-full bg-slate-50/50">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">{t('mining.assessment.report_title')}</h3>
+      <Card className="flex flex-col h-full bg-slate-50/50" bodyClassName="flex flex-col h-full">
+        <h3 className="text-lg font-semibold text-slate-800 mb-4 flex-shrink-0">{t('mining.assessment.report_title')}</h3>
         {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 min-h-0">
             <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-4" />
             <p>Analyzing global patent database...</p>
             <p className="text-xs mt-2">Checking 15M+ documents</p>
           </div>
         ) : result ? (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 flex-1 overflow-y-auto pr-2 min-h-0">
             {/* Scores */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white p-4 rounded-lg border border-slate-200 text-center">
