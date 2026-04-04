@@ -95,14 +95,16 @@ func (c *TanimotoCalculator) Calculate(fp1, fp2 *Fingerprint) (float64, error) {
 			return 0, errors.New(errors.ErrCodeInvalidInput, "fingerprint length mismatch")
 		}
 
-		// Use helpers from fingerprint.go
+		// Calculate intersection (A AND B)
 		andBits, err := BitAnd(fp1.Bits, fp2.Bits)
-		if err != nil { return 0, err }
-		orBits, err := BitOr(fp1.Bits, fp2.Bits)
 		if err != nil { return 0, err }
 
 		intersection := PopCount(andBits)
-		union := PopCount(orBits)
+
+		// Use optimized union formula: |A| + |B| - |A AND B|
+		pop1 := fp1.BitCount()
+		pop2 := fp2.BitCount()
+		union := pop1 + pop2 - intersection
 
 		if union == 0 {
 			return 0.0, nil // Both empty

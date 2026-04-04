@@ -475,6 +475,38 @@ func (s *Searcher) GetEntityByIDs(ctx context.Context, collectionName string, id
 	return rows, nil
 }
 
+func (s *Searcher) GetMoleculeIDsFromMilvusIDs(ctx context.Context, collectionName string, ids []int64) (map[int64]string, error) {
+	if len(ids) == 0 {
+		return map[int64]string{}, nil
+	}
+
+	rows, err := s.GetEntityByIDs(ctx, collectionName, ids, []string{"id", "molecule_id"})
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to get molecule IDs from Milvus")
+	}
+
+	mapping := make(map[int64]string)
+	for _, row := range rows {
+		idVal, okID := row["id"]
+		molIDVal, okMolID := row["molecule_id"]
+		if okID && okMolID {
+			var parsedID int64
+			switch v := idVal.(type) {
+			case int64:
+				parsedID = v
+			case float64:
+				parsedID = int64(v)
+			}
+
+			if strVal, ok := molIDVal.(string); ok && parsedID != 0 {
+				mapping[parsedID] = strVal
+			}
+		}
+	}
+
+	return mapping, nil
+}
+
 func (s *Searcher) GetEntityCount(ctx context.Context, collectionName string) (int64, error) {
 	stats, err := s.client.GetMilvusClient().GetCollectionStatistics(ctx, collectionName)
 	if err != nil {
@@ -582,6 +614,13 @@ func (s *Searcher) convertSearchResults(results []client.SearchResult) [][]commo
 				if j < col.Len() {
 					val, _ := col.Get(j)
 					fields[name] = val
+				}
+			}
+
+			// Ensure molecule_id string mapping
+			if molIDVal, ok := fields["molecule_id"]; ok {
+				if strVal, ok := molIDVal.(string); ok {
+					fields["molecule_id"] = strVal
 				}
 			}
 

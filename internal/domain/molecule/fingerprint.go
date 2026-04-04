@@ -273,6 +273,71 @@ type FingerprintCalculator interface {
 	Standardize(ctx context.Context, smiles string) (canonical string, inchi string, inchiKey string, formula string, weight float64, err error)
 }
 
+// ChemClient defines the interface for an external chemical service (e.g. via gRPC or CGo).
+type ChemClient interface {
+	CalculateFingerprint(ctx context.Context, smiles string, fpType FingerprintType, radius, numBits int) ([]byte, error)
+	BatchCalculateFingerprints(ctx context.Context, smilesSlice []string, fpType FingerprintType, radius, numBits int) ([][]byte, error)
+	StandardizeSMILES(ctx context.Context, smiles string) (canonical string, inchi string, inchiKey string, formula string, weight float64, err error)
+}
+
+// RemoteFingerprintCalculator implements FingerprintCalculator using an external chemical service.
+type RemoteFingerprintCalculator struct {
+	client ChemClient
+}
+
+func NewRemoteFingerprintCalculator(client ChemClient) *RemoteFingerprintCalculator {
+	return &RemoteFingerprintCalculator{client: client}
+}
+
+func (c *RemoteFingerprintCalculator) Calculate(ctx context.Context, smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) (*Fingerprint, error) {
+	if opts == nil {
+		opts = DefaultFingerprintCalcOptions()
+	}
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
+	bits, err := c.client.CalculateFingerprint(ctx, smiles, fpType, opts.Radius, opts.NumBits)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to calculate fingerprint via external service")
+	}
+
+	return NewBitFingerprint(fpType, bits, opts.NumBits, opts.Radius)
+}
+
+func (c *RemoteFingerprintCalculator) BatchCalculate(ctx context.Context, smilesSlice []string, fpType FingerprintType, opts *FingerprintCalcOptions) ([]*Fingerprint, error) {
+	if opts == nil {
+		opts = DefaultFingerprintCalcOptions()
+	}
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
+
+	bitsSlice, err := c.client.BatchCalculateFingerprints(ctx, smilesSlice, fpType, opts.Radius, opts.NumBits)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to batch calculate fingerprints via external service")
+	}
+
+	fps := make([]*Fingerprint, len(bitsSlice))
+	for i, bits := range bitsSlice {
+		fp, err := NewBitFingerprint(fpType, bits, opts.NumBits, opts.Radius)
+		if err != nil {
+			return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to create bit fingerprint")
+		}
+		fps[i] = fp
+	}
+
+	return fps, nil
+}
+
+func (c *RemoteFingerprintCalculator) SupportedTypes() []FingerprintType {
+	return []FingerprintType{FingerprintMorgan, FingerprintMACCS, FingerprintRDKit}
+}
+
+func (c *RemoteFingerprintCalculator) Standardize(ctx context.Context, smiles string) (canonical string, inchi string, inchiKey string, formula string, weight float64, err error) {
+	return c.client.StandardizeSMILES(ctx, smiles)
+}
+
 // FingerprintCalcOptions defines configuration for fingerprint calculation.
 type FingerprintCalcOptions struct {
 	Radius      int

@@ -1,6 +1,7 @@
 package molecule
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"time"
@@ -275,6 +276,20 @@ func (m *Molecule) MarkDeleted() error {
 	m.DeletedAt = &now
 	m.Version++
 	return nil
+}
+
+// Standardize canonicalizes the SMILES structure and updates identifiers.
+func (m *Molecule) Standardize(ctx context.Context, calculator FingerprintCalculator) error {
+	if calculator == nil {
+		return errors.New(errors.ErrCodeInvalidInput, "fingerprint calculator cannot be nil")
+	}
+
+	canonicalSmiles, inchi, inchiKey, formula, weight, err := calculator.Standardize(ctx, m.SMILES)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeValidation, "failed to standardize SMILES")
+	}
+
+	return m.SetStructureIdentifiers(canonicalSmiles, inchi, inchiKey, formula, weight)
 }
 
 // SetStructureIdentifiers sets computed structure identifiers.
