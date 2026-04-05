@@ -12,7 +12,6 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
 )
 
@@ -312,95 +311,23 @@ func (s *MoleculeServiceServer) PredictProperties(
 	ctx context.Context,
 	req *pb.PredictPropertiesRequest,
 ) (*pb.PredictPropertiesResponse, error) {
-	if req.Smiles == "" {
-		return nil, status.Error(codes.InvalidArgument, "smiles is required")
-	}
-
-	// Fetch molecules by SMILES
-	molecules, err := s.moleculeRepo.FindBySMILES(ctx, req.Smiles)
-	if err != nil && !errors.IsNotFound(err) {
-		return nil, mapDomainError(err)
-	}
-
-	var mol *molecule.Molecule
-	if len(molecules) > 0 {
-		mol = molecules[0]
-	} else {
-		// Create temporary molecule for prediction
-		mol, err = molecule.NewMolecule(req.Smiles, molecule.SourcePrediction, "")
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		}
-	}
-
-	// Placeholder: use mol in future AI prediction
-	_ = mol
-
-	// Return placeholder predicted properties (actual prediction would use AI models)
-	// This is a stub implementation - real prediction would come from intelligence layer
-	return &pb.PredictPropertiesResponse{
-		Homo:               -5.5,  // eV - typical value
-		Lumo:               -2.0,  // eV - typical value
-		BandGap:            3.5,   // eV - typical value for OLED materials
-		EmissionWavelength: 450.0, // nm - blue emission
-		QuantumYield:       0.8,   // typical for good emitter
-		Stability:          0.9,   // high stability
-		Confidence:         0.5,   // moderate confidence for placeholder
-	}, nil
+	return nil, status.Error(codes.Unimplemented, "PredictProperties is not implemented")
 }
 
-// domainToProto converts domain molecule to protobuf message
-func domainToProto(mol *molecule.Molecule) *pb.Molecule {
-	if mol == nil {
-		return nil
-	}
-
-	// Convert properties to map[string]string
-	propsMap := make(map[string]string)
-	for _, prop := range mol.Properties {
-		propsMap[prop.Name] = fmt.Sprintf("%v", prop.Value)
-	}
-
-	// Convert metadata to map[string]string
-	metaMap := make(map[string]string)
-	if mol.Metadata != nil {
-		for k, v := range mol.Metadata {
-			metaMap[k] = fmt.Sprintf("%v", v)
-		}
-	}
-
-	return &pb.Molecule{
-		MoleculeId:   mol.ID.String(),
-		Smiles:       mol.SMILES,
-		Inchi:        mol.InChI,
-		Name:         mol.Name,
-		MoleculeType: string(mol.Source),
-		OledLayer:    "",
-		Properties:   propsMap,
-		Metadata:     metaMap,
-		CreatedAt:    mol.CreatedAt.Unix(),
-		UpdatedAt:    mol.UpdatedAt.Unix(),
-	}
+// BatchSimilaritySearch performs SimilaritySearch for multiple molecules concurrently
+func (s *MoleculeServiceServer) BatchSimilaritySearch(
+	req *pb.BatchSimilaritySearchRequest,
+	stream pb.MoleculeService_BatchSimilaritySearchServer,
+) error {
+	return status.Error(codes.Unimplemented, "BatchSimilaritySearch is not implemented")
 }
 
-// mapDomainError maps domain errors to gRPC status codes
-func mapDomainError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	switch {
-	case errors.IsNotFound(err):
-		return status.Error(codes.NotFound, err.Error())
-	case errors.IsValidation(err):
-		return status.Error(codes.InvalidArgument, err.Error())
-	case errors.IsConflict(err):
-		return status.Error(codes.AlreadyExists, err.Error())
-	case errors.IsUnauthorized(err):
-		return status.Error(codes.PermissionDenied, err.Error())
-	default:
-		return status.Error(codes.Internal, "internal server error")
-	}
+// AssessPatentability evaluates novelty, inventive step, and utility
+func (s *MoleculeServiceServer) AssessPatentability(
+	ctx context.Context,
+	req *pb.AssessPatentabilityRequest,
+) (*pb.AssessPatentabilityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "AssessPatentability is not implemented")
 }
 
 //Personal.AI order the ending

@@ -244,6 +244,33 @@ func TestGetMolecule(t *testing.T) {
 	})
 }
 
+func TestUnimplementedMethods(t *testing.T) {
+	mockRepo := new(MockMoleculeRepo)
+	mockSearch := new(MockSimilaritySearch)
+	mockLogger := new(MockLogger)
+	service := NewMoleculeServiceServer(mockRepo, mockSearch, mockLogger)
+
+	t.Run("PredictProperties is Unimplemented", func(t *testing.T) {
+		resp, err := service.PredictProperties(context.Background(), &pb.PredictPropertiesRequest{Smiles: "C"})
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		assert.Equal(t, codes.Unimplemented, status.Code(err))
+	})
+
+	t.Run("BatchSimilaritySearch is Unimplemented", func(t *testing.T) {
+		err := service.BatchSimilaritySearch(&pb.BatchSimilaritySearchRequest{}, nil)
+		assert.Error(t, err)
+		assert.Equal(t, codes.Unimplemented, status.Code(err))
+	})
+
+	t.Run("AssessPatentability is Unimplemented", func(t *testing.T) {
+		resp, err := service.AssessPatentability(context.Background(), &pb.AssessPatentabilityRequest{MoleculeId: "test"})
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		assert.Equal(t, codes.Unimplemented, status.Code(err))
+	})
+}
+
 func TestCreateMolecule(t *testing.T) {
 	mockRepo := new(MockMoleculeRepo)
 	mockSearch := new(MockSimilaritySearch)
