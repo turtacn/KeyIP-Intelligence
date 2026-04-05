@@ -20,7 +20,6 @@ import (
 	// "github.com/turtacn/KeyIP-Intelligence/internal/application/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
-	"github.com/turtacn/KeyIP-Intelligence/internal/application/reporting"
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/neo4j"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres"
@@ -95,7 +94,7 @@ func main() {
 	}
 	defer pgConn.Close()
 
-	// Neo4j
+	// Neo4j (Optional)
 	neo4jCfg := neo4j.Neo4jConfig{
 		URI:                          cfg.Database.Neo4j.URI,
 		Username:                     cfg.Database.Neo4j.User,
@@ -105,11 +104,12 @@ func main() {
 	}
 	neo4jDriver, err := neo4j.NewDriver(neo4jCfg, logger)
 	if err != nil {
-		logger.Fatal("failed to connect to neo4j", logging.Err(err))
+		logger.Warn("failed to connect to neo4j (optional)", logging.Err(err))
+	} else {
+		defer neo4jDriver.Close()
 	}
-	defer neo4jDriver.Close()
 
-	// Redis
+	// Redis (Required for some features, but we can make it optional for the minimal baseline)
 	redisCfg := &redis.RedisConfig{
 		Addr:         cfg.Cache.Redis.Addr,
 		Password:     cfg.Cache.Redis.Password,
@@ -122,11 +122,12 @@ func main() {
 	}
 	redisClient, err := redis.NewClient(redisCfg, logger)
 	if err != nil {
-		logger.Fatal("failed to connect to redis", logging.Err(err))
+		logger.Warn("failed to connect to redis (optional)", logging.Err(err))
+	} else {
+		defer redisClient.Close()
 	}
-	defer redisClient.Close()
 
-	// MinIO
+	// MinIO (Optional)
 	minioCfg := &minio.MinIOConfig{
 		Endpoint:      cfg.Storage.MinIO.Endpoint,
 		AccessKeyID:   cfg.Storage.MinIO.AccessKey,
@@ -137,11 +138,12 @@ func main() {
 	}
 	minioClient, err := minio.NewMinIOClient(minioCfg, logger)
 	if err != nil {
-		logger.Fatal("failed to connect to minio", logging.Err(err))
+		logger.Warn("failed to connect to minio (optional)", logging.Err(err))
+	} else {
+		defer minioClient.Close()
 	}
-	defer minioClient.Close()
 
-	// OpenSearch
+	// OpenSearch (Optional)
 	osCfg := search_os.ClientConfig{
 		Addresses: cfg.Search.OpenSearch.Addresses,
 		Username:  cfg.Search.OpenSearch.Username,
@@ -149,11 +151,12 @@ func main() {
 	}
 	osClient, err := search_os.NewClient(osCfg, logger)
 	if err != nil {
-		logger.Fatal("failed to connect to opensearch", logging.Err(err))
+		logger.Warn("failed to connect to opensearch (optional)", logging.Err(err))
+	} else {
+		defer osClient.Close()
 	}
-	defer osClient.Close()
 
-	// Milvus
+	// Milvus (Optional)
 	milvusCfg := search_milvus.ClientConfig{
 		Address:  cfg.Search.Milvus.Address,
 		Username: cfg.Search.Milvus.Username,
@@ -161,9 +164,10 @@ func main() {
 	}
 	milvusClient, err := search_milvus.NewClient(milvusCfg, logger)
 	if err != nil {
-		logger.Fatal("failed to connect to milvus", logging.Err(err))
+		logger.Warn("failed to connect to milvus (optional)", logging.Err(err))
+	} else {
+		defer milvusClient.Close()
 	}
-	defer milvusClient.Close()
 
 	// Kafka Producer (for async tasks)
 	kafkaCfg := kafka.ProducerConfig{
@@ -191,34 +195,20 @@ func main() {
 
 	// --- Repositories ---
 	moleculeRepo := pg_repos.NewPostgresMoleculeRepo(pgConn, logger)
-	patentRepo := pg_repos.NewPostgresPatentRepo(pgConn, logger)
-	// portfolioRepo := pg_repos.NewPostgresPortfolioRepo(pgConn, logger)
-	// lifecycleRepo := pg_repos.NewPostgresLifecycleRepo(pgConn, logger)
-	// collaborationRepo := pg_repos.NewPostgresCollaborationRepo(pgConn, logger)
-	// userRepo := pg_repos.NewPostgresUserRepo(pgConn, logger)
 
 	// --- Application Services ---
-	// Mocking services not fully implemented in context to allow compilation
+	// Real services for the molecule vertical slice
 	moleculeSvc := molecule.NewService(moleculeRepo, logger)
-	// patentSvc := patent.NewService(patentRepo, logger)
-	// portfolioSvc := portfolio.NewService(portfolioRepo, logger)
-	// lifecycleSvc := lifecycle.NewService(lifecycleRepo, logger)
-	// collaborationSvc := collaboration.NewService(collaborationRepo, logger)
 
-	// FTO Service needed for PatentServiceServer
-	// ftoSvc := reporting.NewFTOReportService(...)
-	// Mocking interface for now
-	var ftoSvc reporting.FTOReportService // Placeholder
-
-	// Similarity Search Service needed for MoleculeServiceServer
-	// similaritySvc := patent_mining.NewSimilaritySearchService(...)
-	// Mocking interface for now
-	var similaritySvc patent_mining.SimilaritySearchService // Placeholder
+	// Minimal Similarity Search implementation
+	similaritySvcDeps := patent_mining.SimilaritySearchDeps{
+		// Logger interface mismatch means we should leave it nil for now
+		// Or we can create an inline wrapper struct.
+	}
+	similaritySvc := patent_mining.NewSimilaritySearchService(similaritySvcDeps)
 
 	// --- Handlers ---
 	moleculeHandler := handlers.NewMoleculeHandler(moleculeSvc, logger)
-	// patentHandler := handlers.NewPatentHandler(patentSvc, logger)
-	// ... other handlers
 
 	healthHandler := handlers.NewHealthHandler(
 		config.Version,
@@ -229,12 +219,10 @@ func main() {
 
 	// --- Router ---
 	routerCfg := httpserver.RouterConfig{
-		MoleculeHandler: moleculeHandler,
-		// PatentHandler:        patentHandler,
-		HealthHandler:   healthHandler,
-		Logger:          logger,
+		MoleculeHandler:  moleculeHandler,
+		HealthHandler:    healthHandler,
+		Logger:           logger,
 		MetricsCollector: metrics,
-		// Add middlewares here
 	}
 	httpRouter := httpserver.NewRouter(routerCfg)
 
@@ -252,9 +240,8 @@ func main() {
 	// gRPC Server
 	grpcSrv := grpc.NewServer()
 
-	// Register gRPC services
+	// Register gRPC services - only the available vertical slices
 	pb.RegisterMoleculeServiceServer(grpcSrv, services.NewMoleculeServiceServer(moleculeRepo, similaritySvc, logger))
-	pb.RegisterPatentServiceServer(grpcSrv, services.NewPatentServiceServer(patentRepo, ftoSvc, logger))
 
 	// Start HTTP Server
 	go func() {
