@@ -3,6 +3,7 @@ package strategy_gpt
 import (
 	"context"
 	"fmt"
+	"sync"
 	"strings"
 	"testing"
 	"time"
@@ -780,10 +781,13 @@ func TestIndexDocument_EmptyContent(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIndexBatch_Success(t *testing.T) {
+	var mu sync.Mutex
 	indexedCount := 0
 	vs := &mockVectorStore{
 		batchInsertFn: func(ctx context.Context, items []*VectorInsertItem) error {
+			mu.Lock()
 			indexedCount += len(items)
+			mu.Unlock()
 			return nil
 		},
 	}
@@ -807,11 +811,15 @@ func TestIndexBatch_Success(t *testing.T) {
 }
 
 func TestIndexBatch_PartialFailure(t *testing.T) {
+	var mu sync.Mutex
 	callCount := 0
 	vs := &mockVectorStore{
 		batchInsertFn: func(ctx context.Context, items []*VectorInsertItem) error {
+			mu.Lock()
 			callCount++
-			if callCount == 3 {
+			count := callCount
+			mu.Unlock()
+			if count == 3 {
 				return fmt.Errorf("storage failure")
 			}
 			return nil

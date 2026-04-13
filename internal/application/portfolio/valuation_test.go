@@ -3,13 +3,15 @@
 
 package portfolio
 
+
 import (
+	"sync/atomic"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
+
 	"testing"
 	"time"
 
@@ -110,9 +112,9 @@ func (m *mockPatentRepo) GetByPatentNumber(ctx context.Context, number string) (
 	}
 	return nil, fmt.Errorf("patent not found")
 }
-func (m *mockPatentRepo) SoftDelete(ctx context.Context, id uuid.UUID) error  { return m.err }
-func (m *mockPatentRepo) Restore(ctx context.Context, id uuid.UUID) error     { return m.err }
-func (m *mockPatentRepo) HardDelete(ctx context.Context, id uuid.UUID) error  { return m.err }
+func (m *mockPatentRepo) SoftDelete(ctx context.Context, id uuid.UUID) error { return m.err }
+func (m *mockPatentRepo) Restore(ctx context.Context, id uuid.UUID) error    { return m.err }
+func (m *mockPatentRepo) HardDelete(ctx context.Context, id uuid.UUID) error { return m.err }
 func (m *mockPatentRepo) Search(ctx context.Context, criteria patent.PatentSearchCriteria) (*patent.PatentSearchResult, error) {
 	return &patent.PatentSearchResult{}, m.err
 }
@@ -640,7 +642,7 @@ func makeTestPatent(id, title, status string, claimCount int, ipcCount int, fili
 	}
 
 	filingDate := time.Now().AddDate(0, 0, -int(filingYearsAgo*365.25))
-	
+
 	// Convert ID string to UUID
 	var patentID uuid.UUID
 	if parsedID, err := uuid.Parse(id); err == nil {
@@ -648,7 +650,7 @@ func makeTestPatent(id, title, status string, claimCount int, ipcCount int, fili
 	} else {
 		patentID = uuid.New()
 	}
-	
+
 	// Convert status string to PatentStatus
 	patentStatus := patent.PatentStatusGranted
 	switch status {
@@ -675,7 +677,7 @@ func makeTestPatent(id, title, status string, claimCount int, ipcCount int, fili
 	case "lapsed":
 		patentStatus = patent.PatentStatusLapsed
 	}
-	
+
 	// Convert claims to pointers
 	// ClaimSet is []Claim in domain/patent/entity.go
 	// But patent struct has Claims ClaimSet
@@ -731,7 +733,7 @@ func buildTestService(
 	if citationRepo != nil {
 		citationRepoInterface = citationRepo
 	}
-	
+
 	var aiScorerInterface IntelligenceValueScorer
 	if aiScorer != nil {
 		aiScorerInterface = aiScorer
@@ -1134,11 +1136,11 @@ func TestAssessPatent_WithAIScorer(t *testing.T) {
 		"industry_adoption":     87,
 	}
 	aiScorer.scores[DimensionStrategicValue] = map[string]float64{
-		"portfolio_centrality":              90,
-		"blocking_power":                    92,
-		"negotiation_leverage":              88,
-		"technology_trajectory_alignment":   95,
-		"competitive_differentiation":       85,
+		"portfolio_centrality":            90,
+		"blocking_power":                  92,
+		"negotiation_leverage":            88,
+		"technology_trajectory_alignment": 95,
+		"competitive_differentiation":     85,
 	}
 
 	cache := newMockCache()
@@ -1786,12 +1788,12 @@ func TestCompareAssessments_Declining(t *testing.T) {
 	rec1 := &AssessmentRecord{
 		ID: "DEC1", PatentID: "30000000-0000-0000-0000-000000000054", OverallScore: 85, Tier: TierA,
 		DimensionScores: map[AssessmentDimension]float64{},
-		AssessedAt: now.Add(-60 * 24 * time.Hour), AssessorType: AssessorAI,
+		AssessedAt:      now.Add(-60 * 24 * time.Hour), AssessorType: AssessorAI,
 	}
 	rec2 := &AssessmentRecord{
 		ID: "DEC2", PatentID: "30000000-0000-0000-0000-000000000054", OverallScore: 55, Tier: TierC,
 		DimensionScores: map[AssessmentDimension]float64{},
-		AssessedAt: now, AssessorType: AssessorAI,
+		AssessedAt:      now, AssessorType: AssessorAI,
 	}
 	_ = assessmentRepo.Save(context.Background(), rec1)
 	_ = assessmentRepo.Save(context.Background(), rec2)
@@ -1818,12 +1820,12 @@ func TestCompareAssessments_Stable(t *testing.T) {
 	rec1 := &AssessmentRecord{
 		ID: "STB1", PatentID: "30000000-0000-0000-0000-000000000069", OverallScore: 72, Tier: TierB,
 		DimensionScores: map[AssessmentDimension]float64{},
-		AssessedAt: now.Add(-10 * 24 * time.Hour), AssessorType: AssessorHybrid,
+		AssessedAt:      now.Add(-10 * 24 * time.Hour), AssessorType: AssessorHybrid,
 	}
 	rec2 := &AssessmentRecord{
 		ID: "STB2", PatentID: "30000000-0000-0000-0000-000000000069", OverallScore: 74, Tier: TierB,
 		DimensionScores: map[AssessmentDimension]float64{},
-		AssessedAt: now, AssessorType: AssessorHybrid,
+		AssessedAt:      now, AssessorType: AssessorHybrid,
 	}
 	_ = assessmentRepo.Save(context.Background(), rec1)
 	_ = assessmentRepo.Save(context.Background(), rec2)
@@ -3735,7 +3737,3 @@ func WithHistoryOffset(offset int) HistoryOption {
 }
 
 //Personal.AI order the ending
-
-
-
-

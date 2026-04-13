@@ -457,9 +457,15 @@ func (bp *batchProcessor[T, R]) Process(
 	if fn == nil {
 		return nil, errors.NewInvalidInputError("process function must not be nil")
 	}
+	bp.shutdownMu.Lock()
 	if bp.isShutdown.Load() {
+		bp.shutdownMu.Unlock()
 		return nil, ErrShutdown
 	}
+	bp.activeWg.Add(1)
+	bp.shutdownMu.Unlock()
+	defer bp.activeWg.Done()
+
 	n := len(items)
 	if n == 0 {
 		return &BatchResult[R]{
@@ -470,16 +476,15 @@ func (bp *batchProcessor[T, R]) Process(
 
 	// Back-pressure check.
 	if bp.cfg.backpressureThreshold > 0 {
-		current := bp.pendingCount.Load()
-		if current+int64(n) > int64(bp.cfg.backpressureThreshold) {
+		current := bp.pendingCount.Add(int64(n))
+		if current > int64(bp.cfg.backpressureThreshold) {
+			bp.pendingCount.Add(-int64(n))
 			return nil, ErrBackpressure
 		}
+	} else {
+		bp.pendingCount.Add(int64(n))
 	}
-	bp.pendingCount.Add(int64(n))
 	defer bp.pendingCount.Add(-int64(n))
-
-	bp.activeWg.Add(1)
-	defer bp.activeWg.Done()
 
 	batchStart := time.Now()
 
@@ -561,9 +566,15 @@ func (bp *batchProcessor[T, R]) ProcessWithPriority(
 	if fn == nil {
 		return nil, errors.NewInvalidInputError("process function must not be nil")
 	}
+	bp.shutdownMu.Lock()
 	if bp.isShutdown.Load() {
+		bp.shutdownMu.Unlock()
 		return nil, ErrShutdown
 	}
+	bp.activeWg.Add(1)
+	bp.shutdownMu.Unlock()
+	defer bp.activeWg.Done()
+
 	n := len(items)
 	if n == 0 {
 		return &BatchResult[R]{
@@ -574,16 +585,15 @@ func (bp *batchProcessor[T, R]) ProcessWithPriority(
 
 	// Back-pressure check.
 	if bp.cfg.backpressureThreshold > 0 {
-		current := bp.pendingCount.Load()
-		if current+int64(n) > int64(bp.cfg.backpressureThreshold) {
+		current := bp.pendingCount.Add(int64(n))
+		if current > int64(bp.cfg.backpressureThreshold) {
+			bp.pendingCount.Add(-int64(n))
 			return nil, ErrBackpressure
 		}
+	} else {
+		bp.pendingCount.Add(int64(n))
 	}
-	bp.pendingCount.Add(int64(n))
 	defer bp.pendingCount.Add(-int64(n))
-
-	bp.activeWg.Add(1)
-	defer bp.activeWg.Done()
 
 	batchStart := time.Now()
 	batchCtx, batchCancel := context.WithTimeout(ctx, bp.cfg.batchTimeout)
@@ -678,10 +688,12 @@ collect:
 // ---------------------------------------------------------------------------
 
 func (bp *batchProcessor[T, R]) Shutdown(ctx context.Context) error {
+	bp.shutdownMu.Lock()
 	bp.shutdownOnce.Do(func() {
 		bp.isShutdown.Store(true)
 		close(bp.shutdownCh)
 	})
+	bp.shutdownMu.Unlock()
 
 	// Wait for in-flight work or context expiry.
 	done := make(chan struct{})

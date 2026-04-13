@@ -201,28 +201,28 @@ func TestApplyPortfolioOptions(t *testing.T) {
 			expected: PortfolioQueryOptions{Limit: 20, Offset: 0},
 		},
 		{
-			name: "Custom Limit",
-			opts: []PortfolioQueryOption{WithLimit(50)},
+			name:     "Custom Limit",
+			opts:     []PortfolioQueryOption{WithLimit(50)},
 			expected: PortfolioQueryOptions{Limit: 50, Offset: 0},
 		},
 		{
-			name: "Max Limit Enforced",
-			opts: []PortfolioQueryOption{WithLimit(150)},
+			name:     "Max Limit Enforced",
+			opts:     []PortfolioQueryOption{WithLimit(150)},
 			expected: PortfolioQueryOptions{Limit: 100, Offset: 0},
 		},
 		{
-			name: "Min Limit Enforced",
-			opts: []PortfolioQueryOption{WithLimit(0)},
+			name:     "Min Limit Enforced",
+			opts:     []PortfolioQueryOption{WithLimit(0)},
 			expected: PortfolioQueryOptions{Limit: 20, Offset: 0},
 		},
 		{
-			name: "Custom Offset",
-			opts: []PortfolioQueryOption{WithOffset(10)},
+			name:     "Custom Offset",
+			opts:     []PortfolioQueryOption{WithOffset(10)},
 			expected: PortfolioQueryOptions{Limit: 20, Offset: 10},
 		},
 		{
-			name: "Negative Offset Corrected",
-			opts: []PortfolioQueryOption{WithOffset(-1)},
+			name:     "Negative Offset Corrected",
+			opts:     []PortfolioQueryOption{WithOffset(-1)},
 			expected: PortfolioQueryOptions{Limit: 20, Offset: 0},
 		},
 		{

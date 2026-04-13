@@ -147,8 +147,8 @@ func (m *portMockMetadataRepo) Create(ctx context.Context, meta *ReportMeta) err
 	return nil
 }
 func (m *portMockMetadataRepo) UpdateStatus(ctx context.Context, reportID string, status ReportStatus, urls map[ExportFormat]string) error {
-	if m.updateStatusFunc != nil { return m.updateStatusFunc(ctx, reportID, status, urls) }
 	m.mu.Lock(); defer m.mu.Unlock()
+	if m.updateStatusFunc != nil { return m.updateStatusFunc(ctx, reportID, status, urls) }
 	if r, ok := m.records[reportID]; ok {
 		r.Status = status
 		r.ExportURLs = urls
@@ -176,6 +176,8 @@ func (m *portMockMetadataRepo) List(ctx context.Context, portfolioID string, opt
 }
 func (m *portMockMetadataRepo) Delete(ctx context.Context, reportID string) error { return nil }
 func (m *portMockMetadataRepo) EnforceRetentionPolicy(ctx context.Context, portfolioID string, keepCount int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.enforceFunc != nil { return m.enforceFunc(ctx, portfolioID, keepCount) }
 	return nil
 }
@@ -681,10 +683,13 @@ func TestReportRetentionPolicy(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestPortfolioReportService()
 
+	var mu sync.Mutex
 	enforceCalled := false
 	m.metaRepo.enforceFunc = func(ctx context.Context, portfolioID string, keepCount int) error {
 		if keepCount != 50 { t.Errorf("Expected default retention limit 50") }
+		mu.Lock()
 		enforceCalled = true
+		mu.Unlock()
 		return nil
 	}
 
@@ -692,7 +697,10 @@ func TestReportRetentionPolicy(t *testing.T) {
 	_, _ = svc.GenerateFullReport(context.Background(), req)
 	<-m.events.publishCh
 
-	if !enforceCalled { t.Errorf("Expected retention policy to be enforced post-generation") }
+	mu.Lock()
+	called := enforceCalled
+	mu.Unlock()
+	if !called { t.Errorf("Expected retention policy to be enforced post-generation") }
 }
 
 func TestReportRetentionPolicy_CustomLimit(t *testing.T) {
@@ -702,14 +710,24 @@ func TestReportRetentionPolicy_CustomLimit(t *testing.T) {
 	impl := svc.(*portfolioReportServiceImpl)
 	impl.retentionLimit = 10 // Custom limit
 
+	var mu sync.Mutex
+	enforceCalled := false
 	m.metaRepo.enforceFunc = func(ctx context.Context, portfolioID string, keepCount int) error {
 		if keepCount != 10 { t.Errorf("Expected custom retention limit 10, got %d", keepCount) }
+		mu.Lock()
+		enforceCalled = true
+		mu.Unlock()
 		return nil
 	}
 
 	req := &PortfolioReportRequest{PortfolioID: "P1"}
 	_, _ = svc.GenerateFullReport(context.Background(), req)
 	<-m.events.publishCh
+
+	mu.Lock()
+	called := enforceCalled
+	mu.Unlock()
+	if !called { t.Errorf("Expected custom retention policy to be enforced post-generation") }
 }
 
 //Personal.AI order the ending

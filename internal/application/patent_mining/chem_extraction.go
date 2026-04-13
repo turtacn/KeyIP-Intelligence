@@ -620,11 +620,11 @@ func (s *chemExtractionServiceImpl) ListExtractionHistory(ctx context.Context, o
 	if opts == nil {
 		opts = &ListExtractionOpts{}
 	}
-	if opts.PageSize <= 0 {
-		opts.PageSize = 20
+	if opts.Pagination.PageSize <= 0 {
+		opts.Pagination.PageSize = 20
 	}
-	if opts.Page <= 0 {
-		opts.Page = 1
+	if opts.Pagination.Page <= 0 {
+		opts.Pagination.Page = 1
 	}
 
 	s.jobsMu.RLock()
@@ -648,7 +648,7 @@ func (s *chemExtractionServiceImpl) ListExtractionHistory(ctx context.Context, o
 	}
 
 	total := int64(len(all))
-	start := (opts.Page - 1) * opts.PageSize
+	start := (opts.Pagination.Page - 1) * opts.Pagination.PageSize
 	if start >= int(total) {
 		return &ExtractionHistoryPage{
 			Items:      []ExtractionResult{},
@@ -656,7 +656,7 @@ func (s *chemExtractionServiceImpl) ListExtractionHistory(ctx context.Context, o
 			Total:      total,
 		}, nil
 	}
-	end := start + opts.PageSize
+	end := start + opts.Pagination.PageSize
 	if end > int(total) {
 		end = int(total)
 	}

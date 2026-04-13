@@ -244,7 +244,10 @@ func (b *weightedBalancer) ReportResult(node *ServingNode, success bool, latency
 func filterHealthy(nodes []*ServingNode) []*ServingNode {
 	var out []*ServingNode
 	for _, n := range nodes {
-		if n.Healthy {
+		n.mu.Lock()
+		h := n.Healthy
+		n.mu.Unlock()
+		if h {
 			out = append(out, n)
 		}
 	}

@@ -9,6 +9,7 @@
 //   - 实现 legalStatusServiceImpl 结构体，注入 LifecycleDomainService / LifecycleRepository / PatentRepository / EventPublisher / Cache / Logger / Metrics
 //   - 定义全部请求/响应 DTO 与枚举（LegalStatusCode / AnomalyType / SeverityLevel / NotificationChannel）
 //   - 方法实现流程：参数校验 -> 领域服务调用 -> 持久化 -> 事件发布 -> 缓存管理 -> 指标记录
+//
 // * 业务逻辑：
 //   - 多法域状态码统一映射（CNIPA/USPTO/EPO/JPO/KIPO -> 内部枚举）
 //   - 增量同步为主，Force=true 全量同步
@@ -17,27 +18,31 @@
 //   - 异常检测规则：UnexpectedLapse / MissedDeadline / StatusConflict / SyncFailure
 //   - 健康度评分：1.0 - (critical*0.3 + high*0.15 + medium*0.05) / total，下限0
 //   - 通知去重：同一专利同一变更24h内不重复
+//
 // * 依赖关系：
 //   - 依赖：domain/lifecycle (service, repository, entity), domain/patent (repository), infrastructure/messaging/kafka (producer), infrastructure/database/redis (cache), infrastructure/monitoring (logger, metrics), pkg/errors, pkg/types/common
 //   - 被依赖：interfaces/http/handlers/lifecycle_handler, interfaces/cli/lifecycle, application/reporting/fto_report
+//
 // * 测试要求：Mock全部注入依赖，覆盖同步/批量/缓存/异常检测/健康度/通知去重/对账全路径
 // * 强制约束：文件最后一行必须为 `//Personal.AI order the ending`
 // ---
 package lifecycle
 
+
 import (
+	"sync/atomic"
 	"context"
 	"fmt"
 	"math"
 	"sync"
-	"sync/atomic"
+
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ---------------------------------------------------------------------------
@@ -98,11 +103,11 @@ var ValidLegalStatusCodes = []LegalStatusCode{
 type AnomalyType string
 
 const (
-	AnomalyUnexpectedLapse  AnomalyType = "UNEXPECTED_LAPSE"
-	AnomalyMissedDeadline   AnomalyType = "MISSED_DEADLINE"
-	AnomalyStatusConflict   AnomalyType = "STATUS_CONFLICT"
-	AnomalySyncFailure      AnomalyType = "SYNC_FAILURE"
-	AnomalyUnauthorizedChg  AnomalyType = "UNAUTHORIZED_CHANGE"
+	AnomalyUnexpectedLapse AnomalyType = "UNEXPECTED_LAPSE"
+	AnomalyMissedDeadline  AnomalyType = "MISSED_DEADLINE"
+	AnomalyStatusConflict  AnomalyType = "STATUS_CONFLICT"
+	AnomalySyncFailure     AnomalyType = "SYNC_FAILURE"
+	AnomalyUnauthorizedChg AnomalyType = "UNAUTHORIZED_CHANGE"
 )
 
 func (a AnomalyType) String() string { return string(a) }
@@ -281,10 +286,10 @@ type StatusSummary struct {
 
 // Discrepancy records a single field-level mismatch between local and remote state.
 type Discrepancy struct {
-	Field      string `json:"field"`
-	LocalValue string `json:"local_value"`
+	Field       string `json:"field"`
+	LocalValue  string `json:"local_value"`
 	RemoteValue string `json:"remote_value"`
-	Resolution string `json:"resolution,omitempty"`
+	Resolution  string `json:"resolution,omitempty"`
 }
 
 // ReconcileResult describes the outcome of reconciling local vs remote legal status.
@@ -562,45 +567,45 @@ var jurisdictionStatusMap = map[string]map[string]LegalStatusCode{
 		"LICENSE_RECORDED":  StatusLicenseRecorded,
 	},
 	"EP": {
-		"FILING":        StatusFiled,
-		"PUBLICATION":   StatusPublished,
-		"EXAMINATION":   StatusUnderExam,
-		"GRANT":         StatusGranted,
-		"LAPSE":         StatusLapsed,
-		"WITHDRAWAL":    StatusWithdrawn,
-		"REFUSAL":       StatusRejected,
-		"EXPIRY":        StatusExpired,
-		"REVOCATION":    StatusRevoked,
-		"APPEAL":        StatusUnderAppeal,
-		"TRANSFER":      StatusTransferred,
-		"LICENCE":       StatusLicenseRecorded,
+		"FILING":      StatusFiled,
+		"PUBLICATION": StatusPublished,
+		"EXAMINATION": StatusUnderExam,
+		"GRANT":       StatusGranted,
+		"LAPSE":       StatusLapsed,
+		"WITHDRAWAL":  StatusWithdrawn,
+		"REFUSAL":     StatusRejected,
+		"EXPIRY":      StatusExpired,
+		"REVOCATION":  StatusRevoked,
+		"APPEAL":      StatusUnderAppeal,
+		"TRANSFER":    StatusTransferred,
+		"LICENCE":     StatusLicenseRecorded,
 	},
 	"JP": {
-		"出願":   StatusFiled,
-		"公開":   StatusPublished,
-		"審査中":  StatusUnderExam,
-		"登録":   StatusGranted,
-		"消滅":   StatusLapsed,
-		"取下":   StatusWithdrawn,
-		"拒絶":   StatusRejected,
-		"満了":   StatusExpired,
-		"無効":   StatusRevoked,
-		"審判":   StatusUnderAppeal,
-		"移転":   StatusTransferred,
+		"出願":  StatusFiled,
+		"公開":  StatusPublished,
+		"審査中": StatusUnderExam,
+		"登録":  StatusGranted,
+		"消滅":  StatusLapsed,
+		"取下":  StatusWithdrawn,
+		"拒絶":  StatusRejected,
+		"満了":  StatusExpired,
+		"無効":  StatusRevoked,
+		"審判":  StatusUnderAppeal,
+		"移転":  StatusTransferred,
 		"実施権": StatusLicenseRecorded,
 	},
 	"KR": {
-		"출원":   StatusFiled,
-		"공개":   StatusPublished,
-		"심사중":  StatusUnderExam,
-		"등록":   StatusGranted,
-		"소멸":   StatusLapsed,
-		"취하":   StatusWithdrawn,
-		"거절":   StatusRejected,
-		"만료":   StatusExpired,
-		"무효":   StatusRevoked,
-		"심판":   StatusUnderAppeal,
-		"이전":   StatusTransferred,
+		"출원":  StatusFiled,
+		"공개":  StatusPublished,
+		"심사중": StatusUnderExam,
+		"등록":  StatusGranted,
+		"소멸":  StatusLapsed,
+		"취하":  StatusWithdrawn,
+		"거절":  StatusRejected,
+		"만료":  StatusExpired,
+		"무효":  StatusRevoked,
+		"심판":  StatusUnderAppeal,
+		"이전":  StatusTransferred,
 		"실시권": StatusLicenseRecorded,
 	},
 }
@@ -722,10 +727,10 @@ func (s *legalStatusServiceImpl) BatchSync(ctx context.Context, req *BatchSyncRe
 	sem := make(chan struct{}, concurrency)
 
 	var (
-		mu          sync.Mutex
-		succeeded   int32
-		failed      int32
-		syncErrors  []SyncError
+		mu         sync.Mutex
+		succeeded  int32
+		failed     int32
+		syncErrors []SyncError
 	)
 
 	var wg sync.WaitGroup
@@ -1236,7 +1241,7 @@ func (s *legalStatusServiceImpl) ReconcileStatus(ctx context.Context, patentID s
 		PatentID:      patentID,
 		Consistent:    consistent,
 		LocalStatus:   localEntity.Status,
-		RemoteStatus:		  remoteStatus.Status,
+		RemoteStatus:  remoteStatus.Status,
 		Discrepancies: discrepancies,
 		ReconciledAt:  time.Now().UTC(),
 	}

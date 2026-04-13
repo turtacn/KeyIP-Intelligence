@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -176,6 +177,7 @@ func (m *mockPortfolioLoader) LoadPortfolioClaims(ctx context.Context, portfolio
 }
 
 type mockExplanationStore struct {
+	mu        sync.RWMutex
 	data      map[string]*AssessmentResult
 	storeFn   func(ctx context.Context, result *AssessmentResult) error
 	storeCount atomic.Int32
@@ -190,12 +192,16 @@ func (m *mockExplanationStore) Store(ctx context.Context, result *AssessmentResu
 	if m.storeFn != nil {
 		return m.storeFn(ctx, result)
 	}
+	m.mu.Lock()
 	m.data[result.RequestID] = result
+	m.mu.Unlock()
 	return nil
 }
 
 func (m *mockExplanationStore) Load(ctx context.Context, resultID string) (*AssessmentResult, error) {
+	m.mu.RLock()
 	r, ok := m.data[resultID]
+	m.mu.RUnlock()
 	if !ok {
 		return nil, nil
 	}

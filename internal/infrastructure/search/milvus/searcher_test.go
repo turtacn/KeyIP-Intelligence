@@ -2,6 +2,7 @@ package milvus
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
@@ -133,11 +134,15 @@ func TestSearch_Success(t *testing.T) {
 
 func TestHybridSearch_RRF(t *testing.T) {
 	// Mock 2 calls
+	var mu sync.Mutex
 	callCount := 0
 	mock := &mockSearchClient{
 		searchFunc: func(ctx context.Context, collName string, partitions []string, expr string, outputFields []string, vectors []entity.Vector, vectorField string, metricType entity.MetricType, topK int, sp entity.SearchParam, opts ...client.SearchQueryOptionFunc) ([]client.SearchResult, error) {
+			mu.Lock()
 			callCount++
-			if callCount == 1 {
+			c := callCount
+			mu.Unlock()
+			if c == 1 {
 				return []client.SearchResult{{
 					ResultCount: 2,
 					IDs:         entity.NewColumnInt64("id", []int64{1, 2}),
