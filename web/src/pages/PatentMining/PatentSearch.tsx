@@ -22,7 +22,7 @@ const PatentSearch: React.FC = () => {
     setLoading(true);
     try {
       const q = mode === 'text' ? query : smiles;
-      const response = await patentService.getPatents(page, 20, q, mode);
+      const response = await patentService.getPatents(page, 20, q);
       setResults(response.data);
       if (response.pagination) {
           setPagination({

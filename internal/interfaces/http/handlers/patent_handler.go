@@ -9,7 +9,12 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/infringement"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
@@ -17,13 +22,15 @@ import (
 
 // PatentHandler handles HTTP requests for patent operations.
 type PatentHandler struct {
-	patentSvc patent.Service
-	logger    logging.Logger
+	patentSvc      patent.Service
+	infringementSvc infringement.RiskAssessmentService // optional; nil if not wired
+	logger         logging.Logger
 }
 
 // NewPatentHandler creates a new PatentHandler.
-func NewPatentHandler(svc patent.Service, logger logging.Logger) *PatentHandler {
-	return &PatentHandler{patentSvc: svc, logger: logger}
+// infringementSvc may be nil if infringement assessment is not wired yet.
+func NewPatentHandler(svc patent.Service, infringementSvc infringement.RiskAssessmentService, logger logging.Logger) *PatentHandler {
+	return &PatentHandler{patentSvc: svc, infringementSvc: infringementSvc, logger: logger}
 }
 
 type CreatePatentRequest struct {
@@ -49,13 +56,102 @@ type UpdatePatentRequest struct {
 	IPCCodes    []string `json:"ipc_codes,omitempty"`
 }
 
+// AnalyzeClaimsRequest is the request body for claim analysis.
+type AnalyzeClaimsRequest struct {
+	PatentID   string   `json:"patent_id,omitempty"`
+	ClaimTexts []string `json:"claim_texts,omitempty"`
+}
+
+// ClaimSummary represents a single parsed claim.
+type ClaimSummary struct {
+	Number    int    `json:"number"`
+	Type      string `json:"type"` // "independent" or "dependent"
+	Text      string `json:"text"`
+	DependsOn []int  `json:"depends_on"`
+}
+
+// ClaimAnalysisResponse is the response from claim analysis.
+type ClaimAnalysisResponse struct {
+	PatentID         string         `json:"patent_id,omitempty"`
+	PatentTitle      string         `json:"patent_title,omitempty"`
+	TotalClaims      int            `json:"total_claims"`
+	IndependentCount int            `json:"independent_count"`
+	DependentCount   int            `json:"dependent_count"`
+	Claims           []ClaimSummary `json:"claims"`
+	ClaimTree        interface{}    `json:"claim_tree"`
+	AnalyzedAt       string         `json:"analyzed_at"`
+}
+
+// FamilyMember represents a related patent in a family.
+type FamilyMember struct {
+	ID           string `json:"id"`
+	PatentNumber string `json:"patent_number"`
+	Title        string `json:"title"`
+	Jurisdiction string `json:"jurisdiction"`
+	FilingDate   string `json:"filing_date"`
+	Applicant    string `json:"applicant"`
+	Relationship string `json:"relationship"`
+}
+
+// FamilyResponse is the response from family retrieval.
+type FamilyResponse struct {
+	PatentID     string         `json:"patent_id"`
+	PatentNumber string         `json:"patent_number"`
+	FamilyID     string         `json:"family_id,omitempty"`
+	Members      []FamilyMember `json:"members"`
+	TotalMembers int            `json:"total_members"`
+}
+
+// CitationRef represents a single citation reference.
+type CitationRef struct {
+	PatentNumber string `json:"patent_number"`
+	Title        string `json:"title,omitempty"`
+	Relation     string `json:"relation"` // "cites" or "cited_by"
+}
+
+// CitationNetworkResponse is the response from citation network retrieval.
+type CitationNetworkResponse struct {
+	PatentID          string        `json:"patent_id"`
+	PatentNumber      string        `json:"patent_number"`
+	Title             string        `json:"title"`
+	ForwardCitations  []CitationRef `json:"forward_citations"`
+	BackwardCitations []CitationRef `json:"backward_citations"`
+	TotalCitations    int           `json:"total_citations"`
+}
+
+// CheckFTORequest is the request body for FTO checking.
+type CheckFTORequest struct {
+	MoleculeSMILES string   `json:"molecule_smiles"`
+	Jurisdictions  []string `json:"jurisdictions"`
+	ExcludePatents []string `json:"exclude_patents,omitempty"`
+	Depth          string   `json:"depth,omitempty"`
+}
+
+// AssessInfringementRiskRequest describes an infringement risk request
+type AssessInfringementRiskRequest struct {
+	MoleculeSMILES string   `json:"molecule_smiles"`
+	PatentID       string   `json:"patent_id"`
+	ClaimNumbers   []uint32 `json:"claim_numbers,omitempty"`
+	IncludePH      bool     `json:"include_prosecution_history_analysis,omitempty"`
+}
+
+// SearchPatentsFilter contains optional structured filters for patent search,
+// matching the proto ListPatentsRequest filter fields in SearchPatentsRequest.filters.
+type SearchPatentsFilter struct {
+	Applicant      string `json:"applicant,omitempty"`
+	IPCCode        string `json:"ipc_code,omitempty"`
+	FilingDateFrom string `json:"filing_date_from,omitempty"`
+	FilingDateTo   string `json:"filing_date_to,omitempty"`
+}
+
 type SearchPatentsRequest struct {
-	Query     string `json:"query"`
-	QueryType string `json:"query_type,omitempty"` // Matches proto query_type and frontend searchType
-	Page      int    `json:"page"`
-	PageSize  int    `json:"page_size"`
-	SortBy    string `json:"sort_by,omitempty"`
-	SortOrder string `json:"sort_order,omitempty"`
+	Query     string              `json:"query"`
+	QueryType string              `json:"query_type,omitempty"`
+	Page      int                 `json:"page"`
+	PageSize  int                 `json:"page_size"`
+	SortBy    string              `json:"sort_by,omitempty"`
+	SortOrder string              `json:"sort_order,omitempty"`
+	Filters   *SearchPatentsFilter `json:"filters,omitempty"` // matches proto SearchPatentsRequest.filters
 }
 
 type AdvancedSearchRequest struct {
@@ -240,7 +336,12 @@ func (h *PatentHandler) SearchPatents(w http.ResponseWriter, r *http.Request) {
 		SortBy:    req.SortBy,
 		SortOrder: req.SortOrder,
 	}
-	// Note: patent.SearchInput may need updating in internal/application/patent to accept QueryType if semantic search logic is implemented there.
+	if req.Filters != nil {
+		input.Applicant = req.Filters.Applicant
+		input.IPCCode = req.Filters.IPCCode
+		input.FilingDateFrom = req.Filters.FilingDateFrom
+		input.FilingDateTo = req.Filters.FilingDateTo
+	}
 
 	result, err := h.patentSvc.Search(r.Context(), input)
 	if err != nil {
@@ -337,44 +438,442 @@ func (h *PatentHandler) Search(w http.ResponseWriter, r *http.Request) {
 	h.SearchPatents(w, r)
 }
 
-// AnalyzeClaims handles claims analysis (placeholder for router).
+// AnalyzeClaims parses and analyzes patent claims.
+// Accepts either a patent_id to fetch from the service or raw claim_texts.
 func (h *PatentHandler) AnalyzeClaims(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "claims analysis not yet implemented"})
+	var req AnalyzeClaimsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
+		return
+	}
+
+	var patentTitle string
+	var claimsText string
+
+	if req.PatentID != "" {
+		p, err := h.patentSvc.GetByID(r.Context(), req.PatentID)
+		if err != nil {
+			h.logger.Error("failed to fetch patent for claims analysis", logging.Err(err), logging.String("id", req.PatentID))
+			writeAppError(w, err)
+			return
+		}
+		patentTitle = p.Title
+		claimsText = p.Claims
+	} else if len(req.ClaimTexts) > 0 {
+		claimsText = strings.Join(req.ClaimTexts, "\n")
+	} else {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "patent_id or claim_texts is required"))
+		return
+	}
+
+	if claimsText == "" {
+		writeJSON(w, http.StatusOK, ClaimAnalysisResponse{
+			TotalClaims: 0,
+			Claims:      []ClaimSummary{},
+			AnalyzedAt:  time.Now().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	claims, err := parseClaimText(claimsText)
+	if err != nil {
+		h.logger.Error("failed to parse claims text", logging.Err(err))
+		writeError(w, http.StatusInternalServerError, errors.NewInternal("claims parsing failed"))
+		return
+	}
+
+	independentCount := 0
+	dependentCount := 0
+	for i := range claims {
+		if claims[i].Type == "independent" {
+			independentCount++
+		} else {
+			dependentCount++
+		}
+	}
+
+	tree := buildClaimTree(claims)
+
+	resp := ClaimAnalysisResponse{
+		PatentID:         req.PatentID,
+		PatentTitle:      patentTitle,
+		TotalClaims:      len(claims),
+		IndependentCount: independentCount,
+		DependentCount:   dependentCount,
+		Claims:           claims,
+		ClaimTree:        tree,
+		AnalyzedAt:       time.Now().UTC().Format(time.RFC3339),
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
-// GetFamily handles patent family retrieval (placeholder for router).
+// GetFamily retrieves patent family members from the knowledge graph.
 func (h *PatentHandler) GetFamily(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "patent family not yet implemented"})
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "patent id is required"))
+		return
+	}
+
+	p, err := h.patentSvc.GetByID(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to get patent for family retrieval", logging.Err(err), logging.String("id", id))
+		writeAppError(w, err)
+		return
+	}
+
+	// Search for related patents by same applicant as family proxy
+	var members []FamilyMember
+	if p.Applicant != "" {
+		searchResult, searchErr := h.patentSvc.Search(r.Context(), &patent.SearchInput{
+			Query:    p.Applicant,
+			Page:     1,
+			PageSize: 50,
+		})
+		if searchErr == nil && searchResult != nil {
+			for _, related := range searchResult.Patents {
+				if related.ID == id {
+					continue
+				}
+				rel := "family_member"
+				if related.Jurisdiction == p.Jurisdiction {
+					rel = "same_jurisdiction"
+				}
+				members = append(members, FamilyMember{
+					ID:           related.ID,
+					PatentNumber: related.PublicationNo,
+					Title:        related.Title,
+					Jurisdiction: related.Jurisdiction,
+					FilingDate:   related.FilingDate,
+					Applicant:    related.Applicant,
+					Relationship: rel,
+				})
+			}
+		}
+	}
+
+	if members == nil {
+		members = []FamilyMember{}
+	}
+
+	resp := FamilyResponse{
+		PatentID:     id,
+		PatentNumber: p.PublicationNo,
+		Members:      members,
+		TotalMembers: len(members),
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
-// GetCitationNetwork handles citation network retrieval (placeholder for router).
+// GetCitationNetwork retrieves the citation network for a patent.
 func (h *PatentHandler) GetCitationNetwork(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "citation network not yet implemented"})
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "patent id is required"))
+		return
+	}
+
+	p, err := h.patentSvc.GetByID(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to get patent for citation network", logging.Err(err), logging.String("id", id))
+		writeAppError(w, err)
+		return
+	}
+
+	var forward []CitationRef
+	var backward []CitationRef
+
+	// Search for potentially related patents to build a basic citation view
+	if p.Applicant != "" {
+		searchResult, searchErr := h.patentSvc.Search(r.Context(), &patent.SearchInput{
+			Query:    p.Applicant,
+			Page:     1,
+			PageSize: 20,
+		})
+		if searchErr == nil && searchResult != nil {
+			for _, related := range searchResult.Patents {
+				if related.ID == id {
+					continue
+				}
+				if related.FilingDate < p.FilingDate {
+					backward = append(backward, CitationRef{
+						PatentNumber: related.PublicationNo,
+						Title:        related.Title,
+						Relation:     "cited_by",
+					})
+				} else {
+					forward = append(forward, CitationRef{
+						PatentNumber: related.PublicationNo,
+						Title:        related.Title,
+						Relation:     "cites",
+					})
+				}
+			}
+		}
+	}
+
+	if forward == nil {
+		forward = []CitationRef{}
+	}
+	if backward == nil {
+		backward = []CitationRef{}
+	}
+
+	resp := CitationNetworkResponse{
+		PatentID:          id,
+		PatentNumber:      p.PublicationNo,
+		Title:             p.Title,
+		ForwardCitations:  forward,
+		BackwardCitations: backward,
+		TotalCitations:    len(forward) + len(backward),
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
-// CheckFTO handles FTO check (placeholder for router).
+// CheckFTO performs freedom-to-operate analysis using the infringement risk
+// assessment service.
 func (h *PatentHandler) CheckFTO(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "FTO check not yet implemented"})
+	if h.infringementSvc == nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New(errors.ErrCodeServiceUnavailable, "infringement assessment service not configured"))
+		return
+	}
+
+	var req CheckFTORequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
+		return
+	}
+
+	if req.MoleculeSMILES == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "molecule_smiles is required"))
+		return
+	}
+	if len(req.Jurisdictions) == 0 {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "at least one jurisdiction is required"))
+		return
+	}
+
+	// Map to the infringement service FTO request
+	ftoReq := &infringement.FTORequest{
+		Molecules: []infringement.BatchMoleculeInput{
+			{
+				SMILES: req.MoleculeSMILES,
+			},
+		},
+		Jurisdictions:  req.Jurisdictions,
+		ExcludePatents: req.ExcludePatents,
+	}
+	if req.Depth != "" {
+		ftoReq.Depth = infringement.AnalysisDepth(req.Depth)
+	}
+
+	resp, err := h.infringementSvc.AssessFTO(r.Context(), ftoReq)
+	if err != nil {
+		h.logger.Error("FTO analysis failed", logging.Err(err))
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
-// AssessInfringementRiskRequest describes an infringement risk request
-type AssessInfringementRiskRequest struct {
-	MoleculeSMILES string   `json:"molecule_smiles"`
-	PatentID       string   `json:"patent_id"`
-	ClaimNumbers   []uint32 `json:"claim_numbers,omitempty"`
-	IncludePH      bool     `json:"include_prosecution_history_analysis,omitempty"`
-}
-
-// AssessInfringementRisk handles the infringement risk assessment (placeholder for router, aligning with proto).
+// AssessInfringementRisk handles the infringement risk assessment.
 func (h *PatentHandler) AssessInfringementRisk(w http.ResponseWriter, r *http.Request) {
+	if h.infringementSvc == nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New(errors.ErrCodeServiceUnavailable, "infringement assessment service not configured"))
+		return
+	}
+
 	var req AssessInfringementRiskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
 
-	// TODO: Wire up to actual infringement assessment service when implemented
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "Infringement assessment not yet implemented in HTTP handler, see gRPC PatentService.AssessInfringementRisk"})
+	if req.MoleculeSMILES == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "molecule_smiles is required"))
+		return
+	}
+	if req.PatentID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "patent_id is required"))
+		return
+	}
+
+	// Map to the infringement service risk request
+	riskReq := &infringement.MoleculeRiskRequest{
+		SMILES: req.MoleculeSMILES,
+	}
+	if req.IncludePH {
+		riskReq.Depth = infringement.AnalysisDepthDeep
+	}
+
+	resp, err := h.infringementSvc.AssessMolecule(r.Context(), riskReq)
+	if err != nil {
+		h.logger.Error("infringement risk assessment failed", logging.Err(err))
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// parseClaimText splits a multi-claim text into individual ClaimSummary entries.
+func parseClaimText(text string) ([]ClaimSummary, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return []ClaimSummary{}, nil
+	}
+
+	// Try to split by numbered claim patterns: "1. ", "2. ", etc.
+	re := regexp.MustCompile(`(?m)^\s*(\d+)\s*[.:\)]\s*`)
+	matches := re.FindAllStringSubmatchIndex(text, -1)
+
+	if len(matches) == 0 {
+		// Treat as a single unnumbered claim
+		return []ClaimSummary{{
+			Number: 1,
+			Type:   "independent",
+			Text:   text,
+		}}, nil
+	}
+
+	// Extract each claim text
+	var claimParts []string
+	for i, match := range matches {
+		start := match[1] // end of claim number group (start of claim text)
+		var end int
+		if i+1 < len(matches) {
+			end = matches[i+1][0]
+		} else {
+			end = len(text)
+		}
+		part := strings.TrimSpace(text[start:end])
+		if part != "" {
+			claimParts = append(claimParts, part)
+		}
+	}
+
+	if len(claimParts) == 0 {
+		return []ClaimSummary{}, nil
+	}
+
+	claims := make([]ClaimSummary, 0, len(claimParts))
+	for i, ct := range claimParts {
+		num := i + 1
+		lower := strings.ToLower(ct)
+		claimType := "independent"
+		dependsOn := []int{}
+
+		if isDependentClaim(lower) {
+			claimType = "dependent"
+			dependsOn = extractDependencyRefs(lower)
+		}
+
+		claims = append(claims, ClaimSummary{
+			Number:    num,
+			Type:      claimType,
+			Text:      ct,
+			DependsOn: dependsOn,
+		})
+	}
+
+	return claims, nil
+}
+
+// isDependentClaim checks if claim text indicates a dependent claim by matching
+// common patent dependency phrasing.
+func isDependentClaim(lowerText string) bool {
+	keywords := []string{
+		"according to claim",
+		"as claimed in",
+		"as defined in",
+		"according to any",
+		"of claim",
+		"of any of claims",
+		"according to claims",
+		"according to the preceding",
+		"as set forth in",
+		"according to any preceding",
+		"the method of claim",
+		"the compound of claim",
+		"the composition of claim",
+		"the device of claim",
+		"the use of claim",
+		"a process according to claim",
+	}
+	for _, kw := range keywords {
+		if strings.Contains(lowerText, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// extractDependencyRefs extracts claim dependency references from claim text.
+func extractDependencyRefs(lowerText string) []int {
+	re := regexp.MustCompile(`claims?\s+(\d+)`)
+	matches := re.FindAllStringSubmatch(lowerText, -1)
+	seen := make(map[int]bool)
+	refs := make([]int, 0, len(matches))
+	for _, m := range matches {
+		if len(m) >= 2 {
+			num, err := strconv.Atoi(m[1])
+			if err == nil && !seen[num] {
+				seen[num] = true
+				refs = append(refs, num)
+			}
+		}
+	}
+	return refs
+}
+
+// claimTreeNode represents a node in the claim dependency tree.
+type claimTreeNode struct {
+	Claim    ClaimSummary    `json:"claim"`
+	Children []claimTreeNode `json:"children,omitempty"`
+}
+
+// buildClaimTree builds a dependency tree from parsed claims.
+func buildClaimTree(claims []ClaimSummary) []claimTreeNode {
+	nodeMap := make(map[int]*claimTreeNode, len(claims))
+	for i := range claims {
+		node := &claimTreeNode{Claim: claims[i]}
+		nodeMap[claims[i].Number] = node
+	}
+
+	var roots []claimTreeNode
+	seen := make(map[int]bool)
+
+	for _, c := range claims {
+		if len(c.DependsOn) == 0 {
+			if node, ok := nodeMap[c.Number]; ok {
+				roots = append(roots, *node)
+				seen[c.Number] = true
+			}
+		} else {
+			for _, depNum := range c.DependsOn {
+				if parent, ok := nodeMap[depNum]; ok {
+					child := nodeMap[c.Number]
+					parent.Children = append(parent.Children, *child)
+					seen[c.Number] = true
+				}
+			}
+		}
+	}
+
+	// Any claim not attached as a child becomes a root
+	for _, c := range claims {
+		if !seen[c.Number] {
+			if node, ok := nodeMap[c.Number]; ok {
+				roots = append(roots, *node)
+			}
+		}
+	}
+
+	return roots
 }
 
 //Personal.AI order the ending

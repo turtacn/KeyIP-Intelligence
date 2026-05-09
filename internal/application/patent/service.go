@@ -61,11 +61,15 @@ type ListInput struct {
 
 // SearchInput contains input for searching patents.
 type SearchInput struct {
-	Query     string
-	Page      int
-	PageSize  int
-	SortBy    string
-	SortOrder string
+	Query          string
+	Page           int
+	PageSize       int
+	SortBy         string
+	SortOrder      string
+	Applicant      string
+	IPCCode        string
+	FilingDateFrom string
+	FilingDateTo   string
 }
 
 // AdvancedSearchInput contains input for advanced patent search.
