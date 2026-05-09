@@ -78,8 +78,9 @@ messaging:
     rebalance_timeout: 60s
 
 storage:
+  # Standalone MinIO (shared with Milvus internal MinIO but on different port)
   minio:
-    endpoint: "localhost:9000"
+    endpoint: "localhost:9002"
     access_key: "minioadmin"
     secret_key: "minioadmin"
     use_ssl: false

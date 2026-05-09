@@ -1,0 +1,170 @@
+=============================================================================
+ KeyIP-Intelligence - Local Development Setup
+=============================================================================
+
+This document describes how to set up a local development environment for the
+KeyIP-Intelligence platform. The platform consists of a Go API server, a
+background worker, a web frontend, and several infrastructure services.
+
+PREREQUISITES
+=============================================================================
+- Go 1.22+
+- Docker & Docker Compose (for infrastructure services)
+- Node.js 18+ (for web frontend)
+- jq (optional, for structured data seeding)
+
+QUICK START
+=============================================================================
+
+1. Start all infrastructure services:
+
+   docker compose -f deployments/docker/docker-compose.yml up -d
+
+   This starts the following services:
+   - PostgreSQL 16 on port 5432 (keyip/keyip_dev@keyip_dev)
+   - Neo4j 5 on ports 7687 (Bolt) and 7474 (Browser)
+   - Redis 7 on port 6379
+   - OpenSearch 2 on port 9200 (with Dashboards on 5601)
+   - Milvus 2.4 on port 19530 (vector DB)
+   - MinIO on ports 9002 (S3 API) and 9003 (Console)
+   - Kafka 7.6 on port 9092
+   - MailHog on ports 1025 (SMTP) and 8025 (Web UI)
+
+   To check if all services are healthy:
+
+   docker compose -f deployments/docker/docker-compose.yml ps
+
+   Only the services you actually need are required. For basic development,
+   PostgreSQL + Redis + OpenSearch is a good starting subset.
+
+2. Run database migrations:
+
+   make migrate-up
+
+3. Seed test data:
+
+   ./scripts/seed.sh --target all
+
+   Or seed just one target:
+
+   ./scripts/seed.sh --target postgres
+
+   The seed script reads fixture data from:
+   - test/testdata/fixtures/molecule_fixtures.json   (OLED molecule data)
+   - test/testdata/fixtures/patent_fixtures.json     (patent data)
+   - test/testdata/fixtures/portfolio_fixtures.json  (portfolio data)
+
+   To re-seed from scratch (drop existing data first):
+
+   ./scripts/seed.sh --clean --target all
+
+4. Run unit tests:
+
+   make test
+   # or directly:
+   go test ./...
+
+5. Build and run the API server:
+
+   make build
+   ./bin/apiserver
+
+6. Build and run the web frontend (from a separate terminal):
+
+   docker build -t keyip-webui:demo ./web
+   docker run -d -p 19666:80 --name keyip-demo keyip-webui:demo
+   # Access at http://localhost:19666
+
+   Or to rebuild and restart:
+   docker rm -f keyip-demo && docker run -d -p 19666:80 --name keyip-demo keyip-webui:demo
+
+TEST DATA FIXTURES
+=============================================================================
+
+The project includes comprehensive test fixture files with realistic OLED
+materials chemistry data:
+
+Fixtures directory: test/testdata/fixtures/
+  molecule_fixtures.json     - 50+ molecules (carbazole hosts, Ir complexes,
+                               TADF emitters, spiro compounds, HTL/ETL materials)
+                               with SMILES, InChI, fingerprints, and properties
+  patent_fixtures.json       - 25+ patents from CN/US/EP/JP/KR jurisdictions,
+                               covering valid cases, edge cases, and validation
+                               boundaries
+  portfolio_fixtures.json    - Multi-portfolio lifecycle data with health
+                               scoring and collaboration scenarios
+
+Molecule SMILES datasets: test/testdata/molecules/
+  carbazole.smi              - 30 carbazole-based molecules
+  oled_emitters.smi          - 30 OLED emitter molecules (phosphorescent, TADF,
+                               fluorescent, novel mechanisms)
+  oled_hosts.smi             - 35 functional layer materials (host, HTL, ETL,
+                               HIL, EIL)
+
+Full patent documents: test/testdata/patents/
+  sample_cn_patent.json      - Chinese patent with full specification,
+                               synthesis examples, device data
+  sample_ep_patent.json      - European patent with designated states,
+                               multilingual abstracts
+  sample_us_patent.json      - US patent with family, priority claims,
+                               classification codes
+
+CONFIGURATION
+=============================================================================
+
+- configs/config.yaml           - Local development configuration
+  (all credentials are development-only defaults; never use in production)
+- configs/config.example.yaml   - Reference/config template with annotations
+
+The local config has sensible defaults for all infrastructure services:
+- PostgreSQL: localhost:5432 / keyip / keyip_dev
+- Neo4j: bolt://localhost:7687 / neo4j / neo4j_dev
+- OpenSearch: http://localhost:9200
+- Milvus: localhost:19530
+- Redis: localhost:6379
+- MinIO: localhost:9002 / minioadmin / minioadmin / bucket: keyip-documents
+- Kafka: localhost:9092
+
+MAKEFILE TARGETS
+=============================================================================
+
+  make help              Show all available targets
+  make build             Compile all binaries
+  make test              Run unit tests
+  make lint              Run golangci-lint
+  make migrate-up        Apply database migrations
+  make seed              Seed all databases with fixture data
+  make docker-compose-up Start local services
+  make docker-compose-down Stop local services
+
+TROUBLESHOOTING
+=============================================================================
+
+PostgreSQL connection refused:
+  - Verify it is running: docker ps | grep keyip-postgres
+  - Check logs: docker logs keyip-postgres
+  - Wait for health check to pass
+
+OpenSearch won't start:
+  - If running on Linux, you may need to increase vm.max_map_count:
+    sudo sysctl -w vm.max_map_count=262144
+  - Check logs: docker logs keyip-opensearch
+
+Milvus is slow to start:
+  - Milvus has multiple dependencies (etcd, minio) and takes 30-60s
+  - Check: docker compose -f deployments/docker/docker-compose.yml ps
+
+Port conflicts:
+  - If ports are already in use, edit docker-compose.yml to change host ports
+  - Then update configs/config.yaml to match
+
+Seed script fails:
+  - Ensure the target database/vector store is reachable
+  - Use --target to seed only the available databases
+  - Install jq for the best seeding experience
+
+Web frontend:
+  - The Docker image for the web UI is built from ./web/Dockerfile
+  - Run on port 19666 to avoid conflicts with the API server on port 8080
+
+//Personal.AI order the ending

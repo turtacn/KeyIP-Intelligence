@@ -1,0 +1,324 @@
+# =============================================================================
+# KeyIP-Intelligence - Local Development Infrastructure
+# =============================================================================
+# Start all services:   docker compose up -d
+# Stop all services:    docker compose down
+# View logs:            docker compose logs -f
+#
+# The application reads connection details from configs/config.yaml which
+# points to all these services on their default ports.
+# =============================================================================
+
+version: "3.9"
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - Primary relational database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: keyip-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: keyip
+      POSTGRES_PASSWORD: keyip_dev
+      POSTGRES_DB: keyip_dev
+    volumes:
+      - postgres-data:/var/lib/postgresql/data:delegated
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keyip -d keyip_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # ---------------------------------------------------------------------------
+  # Neo4j - Graph database for patent-molecule relationship networks
+  # ---------------------------------------------------------------------------
+  neo4j:
+    image: neo4j:5-community
+    container_name: keyip-neo4j
+    restart: unless-stopped
+    ports:
+      - "7687:7687"   # Bolt
+      - "7474:7474"   # HTTP browser
+    environment:
+      NEO4J_AUTH: neo4j/neo4j_dev
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_memory_pagecache_size: 512M
+      NEO4J_dbms_memory_heap_max__size: 1G
+    volumes:
+      - neo4j-data:/data:delegated
+      - neo4j-logs:/logs:delegated
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "neo4j_dev", "RETURN 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # ---------------------------------------------------------------------------
+  # Redis - Cache and session store
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: keyip-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --loglevel warning --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # ---------------------------------------------------------------------------
+  # OpenSearch - Full-text and faceted search engine
+  # ---------------------------------------------------------------------------
+  opensearch:
+    image: opensearchproject/opensearch:2.14.0
+    container_name: keyip-opensearch
+    restart: unless-stopped
+    ports:
+      - "9200:9200"   # REST API
+      - "9600:9600"   # Performance Analyzer
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"       # Disable TLS for local dev
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      plugins.security.disabled: "true"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data:delegated
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9200"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # OpenSearch Dashboards (optional - comment out if not needed)
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.14.0
+    container_name: keyip-os-dashboards
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # ---------------------------------------------------------------------------
+  # Milvus - Vector database for molecular fingerprint similarity search
+  # ---------------------------------------------------------------------------
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.14
+    container_name: keyip-milvus-etcd
+    restart: unless-stopped
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    volumes:
+      - milvus-etcd-data:/etcd:delegated
+    command: etcd --data-dir /etcd --advertise-client-urls http://127.0.0.1:2379 --listen-client-urls http://0.0.0.0:2379 --log-level warn
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  milvus-minio:
+    image: minio/minio:RELEASE.2024-08-17T01-24-54Z
+    container_name: keyip-milvus-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"    # S3-compatible API
+      - "9001:9001"    # Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - milvus-minio-data:/minio-data:delegated
+    command: minio server /minio-data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  milvus:
+    image: milvusdb/milvus:v2.4.6
+    container_name: keyip-milvus
+    restart: unless-stopped
+    ports:
+      - "19530:19530"  # gRPC
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      MINIO_ADDRESS: milvus-minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      common__storage__type: minio
+    volumes:
+      - milvus-data:/var/lib/milvus:delegated
+    depends_on:
+      milvus-etcd:
+        condition: service_healthy
+      milvus-minio:
+        condition: service_healthy
+    command: ["milvus", "run", "standalone"]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9091/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # ---------------------------------------------------------------------------
+  # MinIO - S3-compatible object storage for patent documents (standalone)
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:RELEASE.2024-08-17T01-24-54Z
+    container_name: keyip-minio
+    restart: unless-stopped
+    ports:
+      - "9002:9000"     # avoid conflict with milvus-minio on port 9000
+      - "9003:9001"     # Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data:delegated
+    command: minio server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # Create the default bucket on startup
+  minio-init:
+    image: minio/mc:latest
+    container_name: keyip-minio-init
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
+      mc mb local/keyip-documents --ignore-existing;
+      echo 'MinIO bucket keyip-documents ready.';
+      "
+    networks:
+      - keyip-network
+
+  # ---------------------------------------------------------------------------
+  # Kafka - Event streaming / message queue
+  # ---------------------------------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: keyip-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      CLUSTER_ID: "keyip-dev-cluster"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 24
+    volumes:
+      - kafka-data:/var/lib/kafka/data:delegated
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # ---------------------------------------------------------------------------
+  # MailHog - Email testing (catches all outbound emails)
+  # ---------------------------------------------------------------------------
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: keyip-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  postgres-data:
+  neo4j-data:
+  neo4j-logs:
+  opensearch-data:
+  milvus-etcd-data:
+  milvus-minio-data:
+  milvus-data:
+  minio-data:
+  kafka-data:
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  keyip-network:
+    name: keyip-network
+    driver: bridge
