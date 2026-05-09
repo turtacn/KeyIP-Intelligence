@@ -1,8 +1,11 @@
 package strategy_gpt
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"math"
 	"regexp"
@@ -21,8 +24,7 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	ErrEmptyLLMOutput             = fmt.Errorf("empty LLM output")
-	ErrExportFormatNotImplemented = fmt.Errorf("export format not implemented")
+	ErrEmptyLLMOutput = fmt.Errorf("empty LLM output")
 )
 
 // ---------------------------------------------------------------------------
@@ -730,9 +732,9 @@ func (g *reportGeneratorImpl) ExportReport(report *Report, format ExportFormat) 
 	case ExportMarkdown:
 		return exportMarkdown(report)
 	case ExportPDF:
-		return nil, ErrExportFormatNotImplemented
+		return exportPDF(report)
 	case ExportDOCX:
-		return nil, ErrExportFormatNotImplemented
+		return exportDOCX(report)
 	default:
 		return nil, fmt.Errorf("unsupported export format: %d", format)
 	}
@@ -1336,6 +1338,324 @@ func exportMarkdown(report *Report) ([]byte, error) {
 		return nil, fmt.Errorf("template execute: %w", err)
 	}
 	return []byte(buf.String()), nil
+}
+
+// ---------------------------------------------------------------------------
+// Internal: PDF export (structured plain text with form feeds)
+// ---------------------------------------------------------------------------
+
+func exportPDF(report *Report) ([]byte, error) {
+	var buf strings.Builder
+
+	content := report.Content
+	if content == nil {
+		return nil, errors.NewInvalidInputError("report content is nil")
+	}
+
+	buf.WriteString("================================================================================\n")
+	fmt.Fprintf(&buf, "  %s\n", content.Title)
+	buf.WriteString("================================================================================\n\n")
+
+	// Metadata header
+	fmt.Fprintf(&buf, "  Report ID:  %s\n", report.ReportID)
+	fmt.Fprintf(&buf, "  Generated:  %s\n", report.GeneratedAt.Format("2006-01-02 15:04:05"))
+	if report.Metadata != nil {
+		fmt.Fprintf(&buf, "  Model:      %s\n", report.Metadata.ModelID)
+	}
+	buf.WriteString("\n--------------------------------------------------------------------------------\n\n")
+
+	// Executive Summary
+	if content.ExecutiveSummary != "" {
+		buf.WriteString("EXECUTIVE SUMMARY\n")
+		buf.WriteString("--------------------------------------------------------------------------------\n")
+		buf.WriteString(content.ExecutiveSummary)
+		buf.WriteString("\n\n\f\n") // form feed
+	}
+
+	// Sections
+	for _, sec := range content.Sections {
+		buf.WriteString(sec.Title + "\n")
+		buf.WriteString("--------------------------------------------------------------------------------\n")
+		buf.WriteString(sec.Content)
+		buf.WriteString("\n\n")
+
+		// Embedded tables
+		for _, tbl := range sec.Tables {
+			buf.WriteString("  Table: " + tbl.Title + "\n")
+			if len(tbl.Headers) > 0 {
+				buf.WriteString("  " + strings.Join(tbl.Headers, " | ") + "\n")
+				buf.WriteString("  " + strings.Repeat("-", len(strings.Join(tbl.Headers, " | "))) + "\n")
+			}
+			for _, row := range tbl.Rows {
+				buf.WriteString("  " + strings.Join(row, " | ") + "\n")
+			}
+			buf.WriteString("\n")
+		}
+
+		buf.WriteString("\f\n") // form feed between sections
+	}
+
+	// Conclusions
+	if len(content.Conclusions) > 0 {
+		buf.WriteString("CONCLUSIONS\n")
+		buf.WriteString("--------------------------------------------------------------------------------\n")
+		for _, c := range content.Conclusions {
+			fmt.Fprintf(&buf, "  - %s (confidence: %.0f%%)\n", c.Statement, c.Confidence*100)
+		}
+		buf.WriteString("\n\f\n")
+	}
+
+	// Recommendations
+	if len(content.Recommendations) > 0 {
+		buf.WriteString("RECOMMENDATIONS\n")
+		buf.WriteString("--------------------------------------------------------------------------------\n")
+		for _, r := range content.Recommendations {
+			fmt.Fprintf(&buf, "  [%s] %s\n", r.Priority, r.Action)
+			if r.Rationale != "" {
+				fmt.Fprintf(&buf, "       Rationale: %s\n", r.Rationale)
+			}
+			if r.Timeline != "" {
+				fmt.Fprintf(&buf, "       Timeline:  %s\n", r.Timeline)
+			}
+		}
+		buf.WriteString("\n\f\n")
+	}
+
+	// Risk Assessment
+	if content.RiskAssessment != nil {
+		ra := content.RiskAssessment
+		buf.WriteString("RISK ASSESSMENT\n")
+		buf.WriteString("--------------------------------------------------------------------------------\n")
+		fmt.Fprintf(&buf, "  Overall Risk: %s (score: %.2f)\n\n", ra.OverallRiskLevel, ra.OverallRiskScore)
+		for _, rf := range ra.RiskFactors {
+			fmt.Fprintf(&buf, "  - %s (likelihood: %.2f, impact: %.2f, score: %.2f)\n",
+				rf.Factor, rf.Likelihood, rf.Impact, rf.RiskScore)
+		}
+		buf.WriteString("\n\f\n")
+	}
+
+	// Citations
+	if len(content.Citations) > 0 {
+		buf.WriteString("REFERENCES\n")
+		buf.WriteString("--------------------------------------------------------------------------------\n")
+		for _, c := range content.Citations {
+			buf.WriteString(fmt.Sprintf("  [%s] %s (%s) [%s]\n", c.CitationID, c.Source, c.SourceType, c.VerificationStatus))
+		}
+		buf.WriteString("\n")
+	}
+
+	// Footer
+	buf.WriteString("================================================================================\n")
+	buf.WriteString("  End of Report\n")
+	buf.WriteString("================================================================================\n")
+
+	return []byte(buf.String()), nil
+}
+
+// ---------------------------------------------------------------------------
+// Internal: DOCX export (minimal OpenXML Word document)
+// ---------------------------------------------------------------------------
+
+// WordML namespace constants for OpenXML
+const (
+	wordNS  = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+	relsNS  = "http://schemas.openxmlformats.org/package/2006/relationships"
+	docRels = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+)
+
+type wDocument struct {
+	XMLName xml.Name  `xml:"w:document"`
+	W       string    `xml:"xmlns:w,attr"`
+	Body    wBody     `xml:"w:body"`
+}
+
+type wBody struct {
+	Paragraphs []wParagraph `xml:"w:p"`
+}
+
+type wParagraph struct {
+	ParagraphProps *wParagraphProps `xml:"w:pPr,omitempty"`
+	Runs          []wRun           `xml:"w:r,omitempty"`
+}
+
+type wParagraphProps struct {
+	Style *wStyle `xml:"w:pStyle,omitempty"`
+}
+
+type wStyle struct {
+	Val string `xml:"w:val,attr"`
+}
+
+type wRun struct {
+	RunProps *wRunProps `xml:"w:rPr,omitempty"`
+	Text     wText      `xml:"w:t"`
+}
+
+type wRunProps struct {
+	Bold      *wBold      `xml:"w:b,omitempty"`
+	FontSize  *wFontSize  `xml:"w:sz,omitempty"`
+	Underline *wUnderline `xml:"w:u,omitempty"`
+}
+
+type wBold struct{}
+
+type wFontSize struct {
+	Val string `xml:"w:val,attr"`
+}
+
+type wUnderline struct {
+	Val string `xml:"w:val,attr"`
+}
+
+type wText struct {
+	XMLSpace string `xml:"xml:space,attr,omitempty"`
+	Text     string `xml:",chardata"`
+}
+
+func exportDOCX(report *Report) ([]byte, error) {
+	content := report.Content
+	if content == nil {
+		return nil, errors.NewInvalidInputError("report content is nil")
+	}
+
+	var body wBody
+
+	// Helper to add a paragraph
+	addPara := func(text string, style string) {
+		p := wParagraph{}
+		if style != "" {
+			p.ParagraphProps = &wParagraphProps{Style: &wStyle{Val: style}}
+		}
+		run := wRun{Text: wText{XMLSpace: "preserve", Text: text}}
+		p.Runs = append(p.Runs, run)
+		body.Paragraphs = append(body.Paragraphs, p)
+	}
+
+	// Helper to add a bold paragraph
+	addBoldPara := func(text string) {
+		p := wParagraph{}
+		run := wRun{
+			RunProps: &wRunProps{Bold: &wBold{}},
+			Text:     wText{XMLSpace: "preserve", Text: text},
+		}
+		p.Runs = append(p.Runs, run)
+		body.Paragraphs = append(body.Paragraphs, p)
+	}
+
+	// Title
+	addBoldPara(content.Title)
+	body.Paragraphs = append(body.Paragraphs, wParagraph{}) // empty line
+
+	// Executive Summary
+	if content.ExecutiveSummary != "" {
+		addBoldPara("Executive Summary")
+		addPara(content.ExecutiveSummary, "")
+		body.Paragraphs = append(body.Paragraphs, wParagraph{})
+	}
+
+	// Sections
+	for _, sec := range content.Sections {
+		addBoldPara(sec.Title)
+		addPara(sec.Content, "")
+		// Sub-sections
+		for _, sub := range sec.SubSections {
+			addBoldPara(sub.Title)
+			addPara(sub.Content, "")
+		}
+		body.Paragraphs = append(body.Paragraphs, wParagraph{})
+	}
+
+	// Conclusions
+	if len(content.Conclusions) > 0 {
+		addBoldPara("Conclusions")
+		for _, c := range content.Conclusions {
+			addPara(fmt.Sprintf("- %s (confidence: %.0f%%)", c.Statement, c.Confidence*100), "")
+		}
+		body.Paragraphs = append(body.Paragraphs, wParagraph{})
+	}
+
+	// Recommendations
+	if len(content.Recommendations) > 0 {
+		addBoldPara("Recommendations")
+		for _, r := range content.Recommendations {
+			addPara(fmt.Sprintf("[%s] %s", r.Priority, r.Action), "")
+		}
+		body.Paragraphs = append(body.Paragraphs, wParagraph{})
+	}
+
+	// Risk Assessment
+	if content.RiskAssessment != nil {
+		ra := content.RiskAssessment
+		addBoldPara("Risk Assessment")
+		addPara(fmt.Sprintf("Overall Risk: %s (score: %.2f)", ra.OverallRiskLevel, ra.OverallRiskScore), "")
+		for _, rf := range ra.RiskFactors {
+			addPara(fmt.Sprintf("- %s (score: %.2f)", rf.Factor, rf.RiskScore), "")
+		}
+		body.Paragraphs = append(body.Paragraphs, wParagraph{})
+	}
+
+	// Build the XML document
+	doc := wDocument{
+		W:    wordNS,
+		Body: body,
+	}
+
+	docXML, err := xml.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("DOCX: marshal document XML: %w", err)
+	}
+	docXML = append([]byte(xml.Header), docXML...)
+
+	// Build the [Content_Types].xml
+	contentTypesXML := []byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`)
+
+	// Build the _rels/.rels
+	relsXML := []byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="` + relsNS + `">
+  <Relationship Id="rId1" Type="` + docRels + `" Target="word/document.xml"/>
+</Relationships>`)
+
+	// Package into a ZIP
+	var zipBuf bytes.Buffer
+	zw := zip.NewWriter(&zipBuf)
+
+	// [Content_Types].xml
+	ctFile, err := zw.Create("[Content_Types].xml")
+	if err != nil {
+		return nil, fmt.Errorf("DOCX: create [Content_Types].xml: %w", err)
+	}
+	if _, err := ctFile.Write(contentTypesXML); err != nil {
+		return nil, fmt.Errorf("DOCX: write [Content_Types].xml: %w", err)
+	}
+
+	// _rels/.rels
+	relsFile, err := zw.Create("_rels/.rels")
+	if err != nil {
+		return nil, fmt.Errorf("DOCX: create _rels/.rels: %w", err)
+	}
+	if _, err := relsFile.Write(relsXML); err != nil {
+		return nil, fmt.Errorf("DOCX: write _rels/.rels: %w", err)
+	}
+
+	// word/document.xml
+	docFile, err := zw.Create("word/document.xml")
+	if err != nil {
+		return nil, fmt.Errorf("DOCX: create word/document.xml: %w", err)
+	}
+	if _, err := docFile.Write(docXML); err != nil {
+		return nil, fmt.Errorf("DOCX: write word/document.xml: %w", err)
+	}
+
+	if err := zw.Close(); err != nil {
+		return nil, fmt.Errorf("DOCX: close zip writer: %w", err)
+	}
+
+	return zipBuf.Bytes(), nil
 }
 
 // ---------------------------------------------------------------------------

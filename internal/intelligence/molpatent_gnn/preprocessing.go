@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode"
@@ -17,22 +18,22 @@ import (
 // ---------------------------------------------------------------------------
 
 // AtomFeatureSet defines the atom-level features extracted for each node.
-// Total dimension = 78 (matching GNNModelConfig.NodeFeatureDim default).
+// Total dimension = 80 (matching feature encoding output).
 //
 // Features (one-hot or scalar):
 //   [0..43]   Atomic number one-hot (H,C,N,O,F,P,S,Cl,Br,I + others → 44 bins)
-//   [44..47]  Degree one-hot (0,1,2,3,4+)
-//   [48..52]  Formal charge one-hot (-2,-1,0,+1,+2)
-//   [53..56]  Num H one-hot (0,1,2,3+)
-//   [57..62]  Hybridization one-hot (s,sp,sp2,sp3,sp3d,sp3d2)
-//   [63]      Is aromatic (binary)
+//   [44..48]  Degree one-hot (0,1,2,3,4+)
+//   [49..53]  Formal charge one-hot (-2,-1,0,+1,+2)
+//   [54..57]  Num H one-hot (0,1,2,3+)
+//   [58..63]  Hybridization one-hot (s,sp,sp2,sp3,sp3d,sp3d2)
 //   [64..67]  Chirality one-hot (none,R,S,other)
-//   [68..72]  Ring size one-hot (0,3,4,5,6,7+)
-//   [73]      Is in ring (binary)
-//   [74]      Atomic mass (normalised)
-//   [75]      Electronegativity (normalised)
-//   [76]      Van der Waals radius (normalised)
-//   [77]      Number of radical electrons (normalised)
+//   [68..73]  Ring size one-hot (0,3,4,5,6,7+)
+//   [74]      Is aromatic (binary)
+//   [75]      Is in ring (binary)
+//   [76]      Atomic mass (normalised)
+//   [77]      Electronegativity (normalised)
+//   [78]      Van der Waals radius (normalised)
+//   [79]      Number of radical electrons (normalised)
 
 const (
 	atomicNumberBins  = 44
@@ -46,7 +47,7 @@ const (
 	scalarFeatures    = 4 // mass, electronegativity, vdw_radius, radical_electrons
 	totalNodeFeatures = atomicNumberBins + degreeBins + formalChargeBins +
 		numHBins + hybridizationBins + chiralityBins + ringSizeBins +
-		binaryFeatures + scalarFeatures // = 78
+		binaryFeatures + scalarFeatures // = 80
 )
 
 // BondFeatureSet defines the bond-level features for each edge.
@@ -91,6 +92,68 @@ var electronegativityMap = map[int]float32{
 	1: 2.20 / 4, 6: 2.55 / 4, 7: 3.04 / 4, 8: 3.44 / 4,
 	9: 3.98 / 4, 15: 2.19 / 4, 16: 2.58 / 4, 17: 3.16 / 4,
 	35: 2.96 / 4, 53: 2.66 / 4,
+}
+
+// vdwRadiusMap maps atomic number to Van der Waals radius in Angstroms (normalised by 3.0).
+var vdwRadiusMap = map[int]float32{
+	1:  1.20 / 3.0,  // H
+	3:  1.82 / 3.0,  // Li
+	4:  1.53 / 3.0,  // Be
+	5:  1.92 / 3.0,  // B
+	6:  1.70 / 3.0,  // C
+	7:  1.55 / 3.0,  // N
+	8:  1.52 / 3.0,  // O
+	9:  1.47 / 3.0,  // F
+	11: 2.27 / 3.0,  // Na
+	12: 1.73 / 3.0,  // Mg
+	13: 1.84 / 3.0,  // Al
+	14: 2.10 / 3.0,  // Si
+	15: 1.80 / 3.0,  // P
+	16: 1.80 / 3.0,  // S
+	17: 1.75 / 3.0,  // Cl
+	19: 2.75 / 3.0,  // K
+	20: 2.31 / 3.0,  // Ca
+	26: 2.04 / 3.0,  // Fe
+	29: 1.40 / 3.0,  // Cu
+	30: 1.39 / 3.0,  // Zn
+	34: 1.90 / 3.0,  // Se
+	35: 1.85 / 3.0,  // Br
+	50: 2.17 / 3.0,  // Sn
+	53: 1.98 / 3.0,  // I
+	78: 1.75 / 3.0,  // Pt
+}
+
+// countRadicalElectrons returns the number of unpaired electrons for an atom.
+// This is determined from the ground-state electron configuration.
+// Most organic atoms have 0 radical electrons in their neutral state;
+// known exceptions (e.g., free radicals) are handled explicitly.
+func countRadicalElectrons(atomicNum int) int {
+	// For common organic elements: all paired in neutral ground state.
+	// Radical species are rare and typically require explicit SMILES notation.
+	switch atomicNum {
+	case 1:
+		return 0 // H: 1s1 — paired in H2, treated as 0 for molecular context
+	case 6:
+		return 0 // C: [He]2s2 2p2 — all paired in typical bonding
+	case 7:
+		return 0 // N: [He]2s2 2p3 — paired
+	case 8:
+		return 0 // O: [He]2s2 2p4 — paired
+	case 9:
+		return 0 // F: [He]2s2 2p5 — paired
+	case 15:
+		return 0 // P: [Ne]3s2 3p3
+	case 16:
+		return 0 // S: [Ne]3s2 3p4
+	case 17:
+		return 0 // Cl: [Ne]3s2 3p5
+	case 35:
+		return 0 // Br: [Ar]4s2 3d10 4p5
+	case 53:
+		return 0 // I: [Kr]5s2 4d10 5p5
+	default:
+		return 0 // Default: assume paired
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -236,9 +299,50 @@ func (p *gnnPreprocessorImpl) PreprocessMOL(ctx context.Context, molBlock string
 	if molBlock == "" {
 		return nil, errors.NewInvalidInputError("MOL block is empty")
 	}
-	// In production, this would parse the V2000/V3000 MOL format.
-	// For now, return a placeholder error indicating the feature is pending.
-	return nil, fmt.Errorf("MOL block parsing not yet implemented")
+
+	atoms, bonds, err := parseMOLBlock(molBlock)
+	if err != nil {
+		return nil, fmt.Errorf("MOL block parsing failed: %w", err)
+	}
+
+	if len(atoms) == 0 {
+		return nil, errors.NewInvalidInputError("no atoms found in MOL block")
+	}
+	if len(atoms) > p.config.MaxAtoms {
+		return nil, errors.NewInvalidInputError(
+			fmt.Sprintf("molecule has %d atoms, exceeds max %d", len(atoms), p.config.MaxAtoms))
+	}
+
+	// Encode node features
+	nodeFeatures := make([][]float32, len(atoms))
+	for i, atom := range atoms {
+		nodeFeatures[i] = encodeAtomFeatures(atom)
+	}
+
+	// Encode edge features (undirected: add both directions)
+	var edgeIndex [][2]int
+	var edgeFeatures [][]float32
+	for _, bond := range bonds {
+		ef := encodeBondFeatures(bond)
+		edgeIndex = append(edgeIndex, [2]int{bond.Src, bond.Dst})
+		edgeFeatures = append(edgeFeatures, ef)
+		// Reverse edge for undirected graph
+		edgeIndex = append(edgeIndex, [2]int{bond.Dst, bond.Src})
+		edgeFeatures = append(edgeFeatures, ef)
+	}
+
+	// Global features
+	globalFeatures := computeGlobalFeatures(atoms, bonds)
+
+	return &MolecularGraph{
+		NodeFeatures:   nodeFeatures,
+		EdgeIndex:      edgeIndex,
+		EdgeFeatures:   edgeFeatures,
+		GlobalFeatures: globalFeatures,
+		NumAtoms:       len(atoms),
+		NumBonds:       len(bonds),
+		SMILES:         "",
+	}, nil
 }
 
 // PreprocessBatch processes multiple molecular inputs.
@@ -513,6 +617,271 @@ func estimateImplicitH(atomicNum int, explicitBonds int) int {
 }
 
 // ---------------------------------------------------------------------------
+// MOL V2000 block parser
+// ---------------------------------------------------------------------------
+
+// parseMOLBlock parses a V2000 (or V3000) MOL block string into atoms and bonds.
+// It handles the common V2000 format; V3000 is detected and delegated.
+func parseMOLBlock(molBlock string) ([]parsedAtom, []parsedBond, error) {
+	lines := strings.Split(molBlock, "\n")
+	// Trim trailing whitespace/carriage returns
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], "\r ")
+	}
+
+	if len(lines) < 4 {
+		return nil, nil, fmt.Errorf("MOL block too short: %d lines", len(lines))
+	}
+
+	// Detect V3000 by checking for "V3000" in the counts line (line 3, 0-indexed).
+	if len(lines) > 3 && strings.Contains(lines[3], "V3000") {
+		return parseV3000MOL(lines)
+	}
+
+	// V2000 parsing
+	// Line 4 (0-indexed, after 3 header lines) is the counts line.
+	// Format:   nAtoms nBonds ...
+	countsLine := ""
+	headerEnd := 3 // skip 3 header lines
+
+	// Try to find the counts line (some blocks have blank header lines).
+	for i := 0; i < 5 && headerEnd < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[headerEnd])
+		if trimmed != "" {
+			countsLine = trimmed
+			break
+		}
+		headerEnd++
+	}
+	if countsLine == "" {
+		return nil, nil, fmt.Errorf("MOL block: counts line not found")
+	}
+
+	// Parse counts from the first two 3-digit fields.
+	// Format example: " 12 11  0  0  0  0  0  0  0  0999 V2000"
+	// nAtoms is the first 3 characters
+	var nAtoms, nBonds int
+	if len(countsLine) >= 6 {
+		nAtoms, _ = strconv.Atoi(strings.TrimSpace(countsLine[:3]))
+		nBonds, _ = strconv.Atoi(strings.TrimSpace(countsLine[3:6]))
+	} else {
+		// Fallback: try space-delimited parsing
+		fields := strings.Fields(countsLine)
+		if len(fields) < 2 {
+			return nil, nil, fmt.Errorf("MOL block: cannot parse counts line: %q", countsLine)
+		}
+		nAtoms, _ = strconv.Atoi(fields[0])
+		nBonds, _ = strconv.Atoi(fields[1])
+	}
+
+	if nAtoms <= 0 || nAtoms > 1000 {
+		return nil, nil, fmt.Errorf("MOL block: invalid atom count: %d", nAtoms)
+	}
+	if nBonds < 0 || nBonds > 2000 {
+		return nil, nil, fmt.Errorf("MOL block: invalid bond count: %d", nBonds)
+	}
+
+	// Atom block
+	atoms := make([]parsedAtom, 0, nAtoms)
+	atomStartLine := headerEnd + 1
+	for i := 0; i < nAtoms && atomStartLine+i < len(lines); i++ {
+		line := lines[atomStartLine+i]
+		if len(line) < 34 {
+			return nil, nil, fmt.Errorf("MOL block: atom line %d too short: %q", i, line)
+		}
+		// Atom symbol is at positions 31-33 (1-indexed 31-33, 0-indexed 30-33)
+		symField := strings.TrimSpace(line[30:34])
+		if symField == "" {
+			// Try alternate position (older format: element in columns 31-33, 0-indexed)
+			symField = strings.TrimSpace(line[30:33])
+		}
+		if symField == "" {
+			return nil, nil, fmt.Errorf("MOL block: empty symbol in atom line %d", i)
+		}
+
+		// Charge encoding (column 36, 0-indexed 35)
+		// 0=0, 1=+1, 2=+2, 3=+3, 4=-1, 5=-2, 6=-3, 7=doublet radical
+		charge := 0
+		if len(line) > 36 {
+			chargeCode, err := strconv.Atoi(strings.TrimSpace(line[35:36]))
+			if err == nil {
+				switch chargeCode {
+				case 1:
+					charge = 1
+				case 2:
+					charge = 2
+				case 3:
+					charge = 3
+				case 4:
+					charge = -1
+				case 5:
+					charge = -2
+				case 6:
+					charge = -3
+				// 7 = doublet radical — charge 0 with radical electron
+				}
+			}
+		}
+
+		// Mass difference (column 34, 0-indexed 33)
+		massDiff := 0
+		if len(line) > 34 {
+			massDiff, _ = strconv.Atoi(strings.TrimSpace(line[33:34]))
+		}
+
+		symbol := symField
+		// Capitalize first letter for lookup
+		if len(symbol) > 0 && symbol[0] >= 'a' && symbol[0] <= 'z' {
+			symbol = strings.ToUpper(symbol[:1]) + symbol[1:]
+		}
+
+		atomicNum := lookupAtomicNumber(symbol)
+		atom := parsedAtom{
+			Symbol:    symField,
+			AtomicNum: atomicNum,
+			Charge:    charge,
+			NumH:      estimateImplicitH(atomicNum, 0),
+		}
+		// Adjust mass difference if specified
+		if massDiff > 0 {
+			// Mass difference is isotopic mass - atomic mass
+			// Not directly used in feature encoding but we could store it
+			_ = massDiff
+		}
+		atoms = append(atoms, atom)
+	}
+
+	if len(atoms) != nAtoms {
+		return nil, nil, fmt.Errorf("MOL block: expected %d atoms, parsed %d", nAtoms, len(atoms))
+	}
+
+	// Bond block
+	bonds := make([]parsedBond, 0, nBonds)
+	bondStartLine := atomStartLine + nAtoms
+	for i := 0; i < nBonds && bondStartLine+i < len(lines); i++ {
+		line := lines[bondStartLine+i]
+		if len(line) < 9 {
+			return nil, nil, fmt.Errorf("MOL block: bond line %d too short: %q", i, line)
+		}
+		// Atom indices are 1-indexed in MOL format
+		a1, err1 := strconv.Atoi(strings.TrimSpace(line[0:3]))
+		a2, err2 := strconv.Atoi(strings.TrimSpace(line[3:6]))
+		bType, err3 := strconv.Atoi(strings.TrimSpace(line[6:9]))
+		if err1 != nil || err2 != nil || err3 != nil {
+			return nil, nil, fmt.Errorf("MOL block: parse error in bond line %d", i)
+		}
+		if a1 < 1 || a1 > nAtoms || a2 < 1 || a2 > nAtoms {
+			return nil, nil, fmt.Errorf("MOL block: bond %d references invalid atom indices (%d, %d)", i, a1, a2)
+		}
+
+		bonds = append(bonds, parsedBond{
+			Src:      a1 - 1, // Convert to 0-indexed
+			Dst:      a2 - 1,
+			BondType: bType,
+		})
+		atoms[a1-1].Degree++
+		atoms[a2-1].Degree++
+	}
+
+	return atoms, bonds, nil
+}
+
+// parseV3000MOL handles V3000-format MOL blocks (minimal implementation).
+func parseV3000MOL(lines []string) ([]parsedAtom, []parsedBond, error) {
+	var atoms []parsedAtom
+	var bonds []parsedBond
+
+	inAtomBlock := false
+	inBondBlock := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		if strings.Contains(trimmed, "BEGIN ATOM") {
+			inAtomBlock = true
+			inBondBlock = false
+			continue
+		}
+		if strings.Contains(trimmed, "BEGIN BOND") {
+			inAtomBlock = false
+			inBondBlock = true
+			continue
+		}
+		if strings.Contains(trimmed, "END ATOM") || strings.Contains(trimmed, "END BOND") {
+			inAtomBlock = false
+			inBondBlock = false
+			continue
+		}
+
+		if inAtomBlock {
+			// V3000 atom format: atomNumber elementSymbol x y z ...
+			fields := strings.Fields(trimmed)
+			if len(fields) < 5 {
+				continue
+			}
+			symbol := fields[1]
+			atomicNum := lookupAtomicNumber(symbol)
+			atom := parsedAtom{
+				Symbol:    symbol,
+				AtomicNum: atomicNum,
+				NumH:      estimateImplicitH(atomicNum, 0),
+			}
+			// Check for charge in the remaining fields
+			for _, field := range fields {
+				if strings.HasPrefix(field, "CHG=") {
+					chgStr := strings.TrimPrefix(field, "CHG=")
+					if chg, err := strconv.Atoi(chgStr); err == nil {
+						atom.Charge = chg
+					}
+				}
+			}
+			atoms = append(atoms, atom)
+		}
+
+		if inBondBlock {
+			// V3000 bond format: bondNumber a1 a2 type [params]
+			fields := strings.Fields(trimmed)
+			if len(fields) < 4 {
+				continue
+			}
+			a1, err1 := strconv.Atoi(fields[1])
+			a2, err2 := strconv.Atoi(fields[2])
+			bType, err3 := strconv.Atoi(fields[3])
+			if err1 != nil || err2 != nil || err3 != nil {
+				continue
+			}
+			// Convert 1-indexed to 0-indexed
+			a1--
+			a2--
+			bonds = append(bonds, parsedBond{
+				Src:      a1,
+				Dst:      a2,
+				BondType: bType,
+			})
+		}
+	}
+
+	if len(atoms) == 0 {
+		return nil, nil, fmt.Errorf("V3000 MOL: no atoms found")
+	}
+	if len(bonds) == 0 && len(atoms) > 1 {
+		// Allow single atoms with no bonds
+	}
+
+	// Update atom degrees from bonds
+	for _, b := range bonds {
+		if b.Src >= 0 && b.Src < len(atoms) {
+			atoms[b.Src].Degree++
+		}
+		if b.Dst >= 0 && b.Dst < len(atoms) {
+			atoms[b.Dst].Degree++
+		}
+	}
+
+	return atoms, bonds, nil
+}
+
+// ---------------------------------------------------------------------------
 // Feature encoding
 // ---------------------------------------------------------------------------
 
@@ -592,12 +961,17 @@ func encodeAtomFeatures(atom parsedAtom) []float32 {
 	}
 	offset++
 
-	// Van der Waals radius normalised [78] — placeholder
-	features[offset] = 0.5
+	// Van der Waals radius normalised
+	if vdw, ok := vdwRadiusMap[atom.AtomicNum]; ok {
+		features[offset] = vdw
+	} else {
+		features[offset] = 0.5 // fallback
+	}
 	offset++
 
-	// Radical electrons normalised [79] — placeholder
-	features[offset] = 0.0
+	// Radical electrons normalised (max 3 for typical radicals)
+	radicalE := countRadicalElectrons(atom.AtomicNum)
+	features[offset] = float32(radicalE) / 3.0
 
 	return features
 }

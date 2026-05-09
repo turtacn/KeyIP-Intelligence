@@ -1,6 +1,7 @@
 package strategy_gpt
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -1121,9 +1122,18 @@ func TestExportReport_PDF(t *testing.T) {
 		},
 		Metadata: &ReportMetadata{ModelID: "test"},
 	}
-	_, err := gen.ExportReport(report, ExportPDF)
-	if err != ErrExportFormatNotImplemented {
-		t.Errorf("expected ErrExportFormatNotImplemented, got %v", err)
+	data, err := gen.ExportReport(report, ExportPDF)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(data) == 0 {
+		t.Fatal("expected non-empty PDF export data")
+	}
+	if !bytes.Contains(data, []byte("EXECUTIVE SUMMARY")) {
+		t.Error("expected PDF to contain 'EXECUTIVE SUMMARY'")
+	}
+	if !bytes.Contains(data, []byte("Summary.")) {
+		t.Error("expected PDF to contain summary text")
 	}
 }
 
@@ -1136,9 +1146,16 @@ func TestExportReport_DOCX(t *testing.T) {
 		},
 		Metadata: &ReportMetadata{ModelID: "test"},
 	}
-	_, err := gen.ExportReport(report, ExportDOCX)
-	if err != ErrExportFormatNotImplemented {
-		t.Errorf("expected ErrExportFormatNotImplemented, got %v", err)
+	data, err := gen.ExportReport(report, ExportDOCX)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(data) == 0 {
+		t.Fatal("expected non-empty DOCX export data")
+	}
+	// DOCX is a ZIP archive — verify magic bytes
+	if !bytes.HasPrefix(data, []byte("PK\x03\x04")) {
+		t.Error("expected DOCX to be a valid ZIP archive (PK magic bytes)")
 	}
 }
 

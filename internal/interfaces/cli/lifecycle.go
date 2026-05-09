@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/lifecycle"
+	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
@@ -136,13 +137,30 @@ func runLifecycleDeadlines(ctx context.Context, deadlineService lifecycle.Deadli
 		logging.Int("days_ahead", lifecycleDaysAhead),
 		logging.String("status", lifecycleStatus))
 
-	// Build query request
+	// Build query request with all filters
 	req := &lifecycle.DeadlineQuery{
+		PatentID: lifecyclePatentNumber,
+		EndDate:  time.Now().AddDate(0, 0, lifecycleDaysAhead),
 		Page:     1,
 		PageSize: 100,
 	}
+
+	// Parse jurisdiction filter
 	if lifecycleJurisdiction != "" {
-		// Parse jurisdiction
+		jurisStrings := parseJurisdictions(lifecycleJurisdiction)
+		jurisdictions := make([]domainLifecycle.Jurisdiction, len(jurisStrings))
+		for i, j := range jurisStrings {
+			jurisdictions[i] = domainLifecycle.Jurisdiction(j)
+		}
+		req.Jurisdictions = jurisdictions
+	}
+
+	// Map status to query filters
+	switch strings.ToLower(lifecycleStatus) {
+	case "overdue":
+		req.Urgencies = []lifecycle.DeadlineUrgency{lifecycle.UrgencyExpired}
+	case "completed":
+		req.IncludeCompleted = true
 	}
 
 	// Query deadlines

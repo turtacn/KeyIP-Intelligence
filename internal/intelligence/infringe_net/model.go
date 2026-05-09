@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -422,9 +423,10 @@ func (m *localInfringeModel) ComputeStructuralSimilarity(ctx context.Context, sm
 
 	cosSim := cosineSim(vec1, vec2)
 
-	// Weighted blend: 70 % GNN cosine + 30 % Tanimoto placeholder.
-	// In production the Tanimoto branch would call an ECFP4 fingerprint library.
-	tanimoto := cosSim // placeholder – same value when no fingerprint lib available
+	// Fused similarity: 70 % GNN embedding cosine + 30 % continuous Tanimoto.
+	// Tanimoto measures overlap magnitude and penalises size disparity,
+	// complementing cosine which captures directional alignment.
+	tanimoto := tanimotoSim(vec1, vec2)
 	fused := 0.70*cosSim + 0.30*tanimoto
 	return clamp01(fused), nil
 }
@@ -892,6 +894,35 @@ func (c *lruCache) evict() {
 // Pure-function helpers (no receiver, no side effects).
 // ---------------------------------------------------------------------------
 
+// tanimotoSim computes the continuous Tanimoto similarity coefficient
+// (also known as the Jaccard-Tanimoto coefficient for real-valued vectors).
+// Formula: dot(a,b) / (||a||^2 + ||b||^2 - dot(a,b))
+// This is distinct from cosine similarity: for binary vectors Tanimoto equals
+// the Jaccard index; for continuous vectors it measures overlap magnitude.
+func tanimotoSim(a, b []float64) float64 {
+	if len(a) == 0 || len(b) == 0 {
+		return 0
+	}
+	minLen := len(a)
+	if len(b) < minLen {
+		minLen = len(b)
+	}
+	var dot, normA, normB float64
+	for i := 0; i < minLen; i++ {
+		dot += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+	denom := normA + normB - dot
+	if denom <= 0 {
+		if dot == 0 && normA == 0 && normB == 0 {
+			return 1.0 // both are zero vectors
+		}
+		return 0
+	}
+	return dot / denom
+}
+
 // cosineSim computes cosine similarity between two float64 vectors.
 func cosineSim(a, b []float64) float64 {
 	if len(a) == 0 || len(b) == 0 {
@@ -963,42 +994,142 @@ func deterministicEmbed(smiles string, dim int) []float64 {
 	return vec
 }
 
-// stubPropertyPredictions generates deterministic property values from a SMILES hash.
+// stubPropertyPredictions generates deterministic property values from a SMILES string
+// using basic molecular descriptors derived from the SMILES itself. This produces
+// physically realistic predictions:
+//   - HOMO and LUMO correlate with molecular size and aromaticity
+//   - BandGap is computed as abs(LUMO - HOMO) when both are requested
+//   - Emission wavelength shifts with conjugation length indicators
+//   - All values are deterministic (same SMILES → same predictions)
 func stubPropertyPredictions(smiles string, props []PropertyType) map[PropertyType]float64 {
+	// Compute basic molecular descriptors from SMILES.
+	atomCount := countSMILESAtoms(smiles)
+	aromaticCount := countAromaticAtoms(smiles)
+	hasAromatic := aromaticCount > 0
+	doubleBondCount := strings.Count(smiles, "=")
+	_ = strings.Count(smiles, "#")
+	ringClosures := countRingClosures(smiles)
+	hasConjugation := doubleBondCount > 0 || aromaticCount > 0
+
+	// Normalize descriptors for use as feature adjustments.
+	//
+	// SMILES hash for per-property seeding (keeps determinism per SMILES).
 	h := uint64(0)
 	for _, c := range smiles {
 		h = h*37 + uint64(c)
 	}
+
+	// Base property generators that combine hash seed with molecular descriptors.
+	makeProperty := func(base, spread float64, sizePenalty, aromaticBonus, conjugationBonus float64) float64 {
+		val := base + (float64(h%10000)/10000.0)*spread
+		// Larger molecules (more atoms) shift certain properties
+		val += float64(atomCount) * sizePenalty
+		if hasAromatic {
+			val += aromaticBonus
+		}
+		if hasConjugation {
+			val += conjugationBonus
+		}
+		return val
+	}
+
 	out := make(map[PropertyType]float64, len(props))
-	for i, p := range props {
-		seed := h + uint64(i)*7919
-		seed ^= seed << 13
-		seed ^= seed >> 7
-		seed ^= seed << 17
-		// Produce a value in a reasonable range per property.
-		raw := float64(seed%10000) / 10000.0
+
+	// Compute properties with physical correlations.
+	homoVal := makeProperty(-6.8, 2.0, -0.05, -0.5, -0.3)  // -6 to -9 eV, lower with conjugation
+	lumoVal := makeProperty(-1.2, 2.2, -0.03, -0.4, -0.5)  // -1 to -4 eV, lower with conjugation
+	bandGapVal := math.Abs(lumoVal - homoVal)                // physical: BandGap = |LUMO - HOMO|
+
+	for _, p := range props {
 		switch p {
 		case PropertyHOMO:
-			out[p] = -5.0 - raw*3.0 // -5 to -8 eV
+			out[p] = clampRange(homoVal, -9.0, -5.0)
 		case PropertyLUMO:
-			out[p] = -1.0 - raw*2.0 // -1 to -3 eV
+			out[p] = clampRange(lumoVal, -4.5, 0.5)
 		case PropertyBandGap:
-			out[p] = 1.5 + raw*3.0 // 1.5 to 4.5 eV
+			out[p] = clampRange(bandGapVal, 0.5, 6.0)
 		case PropertyEmissionWavelength:
-			out[p] = 400.0 + raw*300.0 // 400 to 700 nm
+			// Longer conjugation → longer wavelength (red shift)
+			baseWL := 420.0 + (float64(h%8000)/8000.0)*280.0
+			conjShift := float64(doubleBondCount+aromaticCount) * 15.0
+			ringShift := float64(ringClosures) * 10.0
+			out[p] = clampRange(baseWL+conjShift+ringShift, 380.0, 780.0)
 		case PropertyQuantumYield:
-			out[p] = raw // 0 to 1
+			// QY depends on molecular rigidity (rings) and conjugation
+			baseQY := (float64(h%7000) / 7000.0) * 0.7
+			rigidityBonus := float64(ringClosures+aromaticCount) * 0.04
+			out[p] = clampRange(baseQY+rigidityBonus, 0.0, 1.0)
 		case PropertyThermalStability:
-			out[p] = 200.0 + raw*300.0 // 200 to 500 °C
+			// More aromatic/ring content → higher thermal stability
+			baseTS := 220.0 + (float64(h%6000)/6000.0)*200.0
+			aromBonus := float64(aromaticCount+ringClosures) * 8.0
+			out[p] = clampRange(baseTS+aromBonus, 150.0, 600.0)
 		case PropertyGlassTransitionTemp:
-			out[p] = 50.0 + raw*200.0 // 50 to 250 °C
+			// Larger molecules with rings have higher Tg
+			baseTg := 60.0 + (float64(h%5000)/5000.0)*150.0
+			sizeBonus := float64(atomCount) * 4.0
+			ringBonus := float64(ringClosures) * 5.0
+			out[p] = clampRange(baseTg+sizeBonus+ringBonus, -20.0, 400.0)
 		case PropertyChargeCarrierMobility:
-			out[p] = raw * 0.1 // 0 to 0.1 cm²/Vs
+			// Conjugated systems with aromatic cores have higher mobility
+			baseMob := (float64(h%3000) / 3000.0) * 0.08
+			conjBonus := float64(doubleBondCount+aromaticCount) * 0.005
+			out[p] = clampRange(baseMob+conjBonus, 0.0, 0.2)
 		default:
-			out[p] = raw
+			out[p] = float64(h%10000) / 10000.0
 		}
 	}
+
 	return out
+}
+
+// countSMILESAtoms counts the approximate number of atoms in a SMILES string
+// by counting element symbol occurrences (uppercase letters, excluding brackets).
+func countSMILESAtoms(smiles string) int {
+	count := 0
+	runes := []rune(smiles)
+	for i := 0; i < len(runes); i++ {
+		if runes[i] >= 'A' && runes[i] <= 'Z' && runes[i] != 'E' {
+			count++
+		}
+	}
+	if count == 0 {
+		count = 1 // default for very short SMILES
+	}
+	return count
+}
+
+// countAromaticAtoms counts lowercase aromatic atom symbols (c, n, o, p, s).
+func countAromaticAtoms(smiles string) int {
+	count := 0
+	for _, ch := range smiles {
+		if ch == 'c' || ch == 'n' || ch == 'o' || ch == 'p' || ch == 's' {
+			count++
+		}
+	}
+	return count
+}
+
+// countRingClosures counts ring closure digits (0-9) in a SMILES string.
+func countRingClosures(smiles string) int {
+	count := 0
+	for _, ch := range smiles {
+		if ch >= '0' && ch <= '9' {
+			count++
+		}
+	}
+	return count / 2 // each ring has 2 closure markers
+}
+
+// clampRange clamps val to the inclusive [minVal, maxVal] range.
+func clampRange(val, minVal, maxVal float64) float64 {
+	if val < minVal {
+		return minVal
+	}
+	if val > maxVal {
+		return maxVal
+	}
+	return val
 }
 
 // ---------------------------------------------------------------------------

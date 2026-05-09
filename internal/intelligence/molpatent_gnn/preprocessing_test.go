@@ -260,11 +260,43 @@ func TestPreprocessSMILES_Branching(t *testing.T) {
 // PreprocessMOL
 // ---------------------------------------------------------------------------
 
-func TestPreprocessMOL_NotImplemented(t *testing.T) {
+func TestPreprocessMOL_InvalidMOLBlock(t *testing.T) {
 	pp, _ := NewGNNPreprocessor(DefaultGNNModelConfig())
-	_, err := pp.PreprocessMOL(context.Background(), "some mol block")
+	_, err := pp.PreprocessMOL(context.Background(), "this is not a valid MOL block")
 	if err == nil {
-		t.Fatal("expected error for unimplemented MOL parsing")
+		t.Fatal("expected error for invalid MOL block")
+	}
+}
+
+func TestPreprocessMOL_ValidV2000(t *testing.T) {
+	pp, err := NewGNNPreprocessor(DefaultGNNModelConfig())
+	if err != nil {
+		t.Fatalf("NewGNNPreprocessor: %v", err)
+	}
+
+	// Minimal valid V2000 MOL block for methane
+	molBlock := "\n" +
+		"  AP03082023142222\n" +
+		"\n" +
+		"  1  0  0  0  0  0  0  0  0  0999 V2000\n" +
+		"    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"M  END\n"
+
+	graph, err := pp.PreprocessMOL(context.Background(), molBlock)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if graph.NumAtoms != 1 {
+		t.Errorf("expected 1 atom, got %d", graph.NumAtoms)
+	}
+	if graph.NumBonds != 0 {
+		t.Errorf("expected 0 bonds, got %d", graph.NumBonds)
+	}
+	if len(graph.NodeFeatures) != 1 {
+		t.Errorf("expected 1 node feature vector, got %d", len(graph.NodeFeatures))
+	}
+	if len(graph.NodeFeatures[0]) != totalNodeFeatures {
+		t.Errorf("node feature dim: expected %d, got %d", totalNodeFeatures, len(graph.NodeFeatures[0]))
 	}
 }
 

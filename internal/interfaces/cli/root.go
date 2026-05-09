@@ -427,16 +427,4 @@ func padRight(s string, width int) string {
 	return s + strings.Repeat(" ", width-len(s))
 }
 
-// createPlaceholderCommand creates a placeholder command for when dependencies are not available.
-func createPlaceholderCommand(name, description string) *cobra.Command {
-	return &cobra.Command{
-		Use:   name,
-		Short: description,
-		Long:  description + "\n\nNote: This command requires service dependencies. Run with proper configuration.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.NewMsg("command requires service dependencies; ensure configuration is complete")
-		},
-	}
-}
-
 //Personal.AI order the ending

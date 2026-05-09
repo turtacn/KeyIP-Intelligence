@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
@@ -369,6 +370,146 @@ func (o *SimilaritySearchOptions) Validate() error {
 		return errors.New(errors.ErrCodeInvalidInput, "limit must be positive")
 	}
 	return nil
+}
+
+// SimilarityMatrix computes a pairwise similarity matrix for a set of fingerprints
+// using the specified similarity metric. The result is an n x n matrix where
+// result[i][j] is the similarity between fingerprints[i] and fingerprints[j].
+// The diagonal is always 1.0 (complete self-similarity).
+func SimilarityMatrix(fingerprints []*Fingerprint, metric SimilarityMetric) ([][]float64, error) {
+	if len(fingerprints) == 0 {
+		return nil, errors.New(errors.ErrCodeInvalidInput, "fingerprints cannot be empty")
+	}
+
+	calc, err := NewSimilarityCalculator(metric)
+	if err != nil {
+		return nil, err
+	}
+
+	n := len(fingerprints)
+	matrix := make([][]float64, n)
+	for i := 0; i < n; i++ {
+		matrix[i] = make([]float64, n)
+		for j := 0; j < n; j++ {
+			if fingerprints[i] == nil || fingerprints[j] == nil {
+				return nil, errors.New(errors.ErrCodeInvalidInput, "fingerprint cannot be nil")
+			}
+			score, err := calc.Calculate(fingerprints[i], fingerprints[j])
+			if err != nil {
+				return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to compute pairwise similarity")
+			}
+			matrix[i][j] = score
+		}
+	}
+
+	return matrix, nil
+}
+
+// SearchSimilar searches for fingerprints similar to a target fingerprint.
+// It computes similarity between the target and each candidate, filters results
+// by the given threshold, and returns up to limit results sorted by similarity
+// score in descending order with ranks assigned.
+func SearchSimilar(target *Fingerprint, candidates []*Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error) {
+	if target == nil {
+		return nil, errors.New(errors.ErrCodeInvalidInput, "target fingerprint cannot be nil")
+	}
+	if threshold < 0.0 || threshold > 1.0 {
+		return nil, errors.New(errors.ErrCodeInvalidInput, "threshold must be between 0.0 and 1.0")
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	if len(candidates) == 0 {
+		return []*SimilarityResult{}, nil
+	}
+
+	calc, err := NewSimilarityCalculator(metric)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []*SimilarityResult
+	for _, cand := range candidates {
+		if cand == nil {
+			continue
+		}
+		score, err := calc.Calculate(target, cand)
+		if err != nil {
+			// Skip candidates that are incompatible
+			continue
+		}
+		if score >= threshold {
+			results = append(results, &SimilarityResult{
+				MoleculeID:      cand.MoleculeID.String(),
+				FingerprintType: cand.Type,
+				Score:           score,
+				Metric:          metric,
+			})
+		}
+	}
+
+	// Sort by score descending
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Score > results[j].Score
+	})
+
+	// Apply limit
+	if len(results) > limit {
+		results = results[:limit]
+	}
+
+	// Assign ranks
+	for i := range results {
+		results[i].Rank = i + 1
+	}
+
+	return results, nil
+}
+
+// RankBySimilarity ranks fingerprints by similarity to a target fingerprint.
+// Returns all candidates sorted by similarity score in descending order with
+// ranks assigned (1 = most similar).
+func RankBySimilarity(target *Fingerprint, candidates []*Fingerprint, metric SimilarityMetric) ([]*SimilarityResult, error) {
+	if target == nil {
+		return nil, errors.New(errors.ErrCodeInvalidInput, "target fingerprint cannot be nil")
+	}
+	if len(candidates) == 0 {
+		return []*SimilarityResult{}, nil
+	}
+
+	calc, err := NewSimilarityCalculator(metric)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]*SimilarityResult, 0, len(candidates))
+	for _, cand := range candidates {
+		if cand == nil {
+			continue
+		}
+		score, err := calc.Calculate(target, cand)
+		if err != nil {
+			continue
+		}
+		results = append(results, &SimilarityResult{
+			MoleculeID:      cand.MoleculeID.String(),
+			FingerprintType: cand.Type,
+			Score:           score,
+			Metric:          metric,
+		})
+	}
+
+	// Sort by score descending
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Score > results[j].Score
+	})
+
+	// Assign ranks
+	for i := range results {
+		results[i].Rank = i + 1
+	}
+
+	return results, nil
 }
 
 //Personal.AI order the ending

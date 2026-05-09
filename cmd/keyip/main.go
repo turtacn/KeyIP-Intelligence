@@ -1,22 +1,21 @@
-// Phase 12 - File #287: cmd/keyip/main.go
 // CLI client entry point for KeyIP-Intelligence.
 package main
 
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
-	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/lifecycle"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/reporting"
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
-	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres"
-	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres/repositories"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/cli"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // Build-time variables injected via ldflags.
@@ -27,7 +26,6 @@ var (
 )
 
 func init() {
-	// Inject build-time variables into the cli package.
 	cli.Version = version
 	cli.GitCommit = commit
 	cli.BuildDate = buildDate
@@ -36,65 +34,17 @@ func init() {
 func main() {
 	rootCmd := cli.NewRootCommand()
 
-	// Initialize dependencies
-	// Note: In a real CLI, we might initialize these based on config or connection to server.
-	// For now, we will create placeholders or connect to remote services via client.
-	// Since the CLI often talks to the API server via HTTP, the "Services" here might actually be
-	// client-side wrappers implementing the Service interfaces, or we use the 'client' package directly.
-	// However, the current CLI design (search.go, assess.go, etc.) imports 'internal/application/...'.
-	// This implies the CLI might be running in "local mode" or the interfaces are shared.
-	// If the CLI is a thin client, it should use 'pkg/client'.
-	// Assuming the CLI tool is designed to potentially run some logic locally or wrap client calls.
-	// Given the imports in 'search.go' use 'patent_mining.SimilaritySearchService', we need to provide that.
-
-	// Create a dummy logger for CLI startup until configured
 	logger := logging.NewDefaultLogger()
 	cfg := config.NewDefaultConfig()
 
-	// Initialize real Postgres connection
-	pgCfg := postgres.PostgresConfig{
-		Host:     cfg.Database.Postgres.Host,
-		Port:     cfg.Database.Postgres.Port,
-		Username: cfg.Database.Postgres.User,
-		Password: cfg.Database.Postgres.Password,
-		Database: cfg.Database.Postgres.DBName,
-		SSLMode:  cfg.Database.Postgres.SSLMode,
-	}
-	conn, err := postgres.NewConnection(pgCfg, logger)
-	if err != nil {
-		logger.Warn("Failed to connect to database. Some commands requiring DB access may fail.", logging.Err(err))
-	} else {
-		defer conn.Close()
-	}
+	logger.Info("KeyIP-Intelligence CLI starting",
+		logging.String("version", version),
+		logging.String("commit", commit))
 
-	// Initialize Repositories
-	var similaritySearchService patent_mining.SimilaritySearchService
-	if conn != nil {
-		molRepo := repositories.NewPostgresMoleculeRepo(conn, logger)
+	// Build all service dependencies -- all use noop/remote-only implementations.
+	// These commands will work when connecting to the KeyIP API server via --server.
+	deps := buildDependencies(logger, cfg)
 
-		// Create a stub implementation of FingerprintEngine directly mapping to the repository
-		fpEngine := &cliMockFPEngine{repo: molRepo}
-
-		// Create a stub implementation of VectorStore directly mapping to the repository
-		vectorStore := &cliMockVectorStore{repo: molRepo}
-
-		// Create a stub implementation of Logger
-		searchLogger := &cliMockSearchLogger{logger: logger}
-
-		// Wiring up the real repository through the SimilaritySearchService
-		similaritySearchService = patent_mining.NewSimilaritySearchService(patent_mining.SimilaritySearchDeps{
-			FPEngine:    fpEngine,
-			VectorStore: vectorStore,
-			Logger:      searchLogger,
-		})
-	}
-
-	deps := cli.CommandDependencies{
-		Logger: logger,
-		SimilaritySearchService: similaritySearchService,
-	}
-
-	// Register subcommands with dependencies
 	cli.RegisterCommands(rootCmd, deps)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -103,98 +53,359 @@ func main() {
 	}
 }
 
-// Ensure imports are used to avoid compilation error if deps are empty
-var _ = patent_mining.SimilaritySearchService(nil)
-var _ = portfolio.ValuationService(nil)
-var _ = lifecycle.DeadlineService(nil)
-var _ = reporting.FTOReportService(nil)
+// buildDependencies constructs CLI command dependencies.
+// All services require the KeyIP API server; the CLI is a thin client.
+func buildDependencies(logger logging.Logger, cfg *config.Config) cli.CommandDependencies {
+	return cli.CommandDependencies{
+		Logger:                  logger,
+		SimilaritySearchService: buildSearchService(logger),
+		ValuationService:        &noopValuationService{},
+		DeadlineService:         &noopDeadlineService{},
+		AnnuityService:          &noopAnnuityService{},
+		LegalStatusService:      &noopLegalStatusService{},
+		CalendarService:         &noopCalendarService{},
+		FTOReportService:        &noopFTOReportService{},
+		InfringementReportService: &noopInfringementReportService{},
+		PortfolioReportService:  &noopPortfolioReportService{},
+		TemplateService:         &noopTemplateService{},
+	}
+}
 
-// -- Stub Implementations for CLI to wire up the real Repository --
+func buildSearchService(logger logging.Logger) patent_mining.SimilaritySearchService {
+	return patent_mining.NewSimilaritySearchService(patent_mining.SimilaritySearchDeps{
+		FPEngine:     &requiresServerFingerprintEngine{},
+		VectorStore:  &requiresServerVectorStore{},
+		PatentIndex:  &requiresServerPatentIndex{},
+		HistoryStore: &inMemorySearchHistoryStore{},
+		Logger:       &searchLoggerAdapter{logger: logger},
+	})
+}
 
-type cliMockSearchLogger struct {
+// ============================================================================
+// SearchLogger adapter -- converts key-value pairs to logging.Field
+// ============================================================================
+
+type searchLoggerAdapter struct {
 	logger logging.Logger
 }
 
-func (m *cliMockSearchLogger) Debug(msg string, args ...interface{}) {
-	m.logger.Debug(msg)
-}
-
-func (m *cliMockSearchLogger) Info(msg string, args ...interface{}) {
-	m.logger.Info(msg)
-}
-
-func (m *cliMockSearchLogger) Warn(msg string, args ...interface{}) {
-	m.logger.Warn(msg)
-}
-
-func (m *cliMockSearchLogger) Error(msg string, args ...interface{}) {
-	m.logger.Error(msg)
-}
-
-type cliMockFPEngine struct {
-	repo interface{}
-}
-
-func (m *cliMockFPEngine) ComputeFingerprint(ctx context.Context, smiles string, fpType string, radius int, nBits int) ([]byte, error) {
-	return []byte("dummy-fp"), nil
-}
-
-func (m *cliMockFPEngine) ComputeSimilarity(ctx context.Context, fp1 []byte, fp2 []byte, metric patent_mining.SimilarityMetric) (float64, error) {
-	return 1.0, nil
-}
-
-func (m *cliMockFPEngine) SearchSimilar(ctx context.Context, queryFP []byte, metric patent_mining.SimilarityMetric, threshold float64, maxResults int) ([]patent_mining.SimilarityHit, error) {
-	// Call the actual repository if implemented, else dummy
-	return []patent_mining.SimilarityHit{}, nil
-}
-
-type VectorSearcher interface {
-	SearchByVectorSimilarity(ctx context.Context, embedding []float32, topK int) ([]*molecule.MoleculeWithScore, error)
-}
-
-type cliMockVectorStore struct {
-	repo interface{}
-}
-
-func (m *cliMockVectorStore) SearchByVector(ctx context.Context, vector []float64, threshold float64, maxResults int, filters map[string]string) ([]patent_mining.SimilarityHit, error) {
-	searcher, ok := m.repo.(VectorSearcher)
-	if !ok {
-		return []patent_mining.SimilarityHit{}, nil
-	}
-
-	f32Vec := make([]float32, len(vector))
-	for i, v := range vector {
-		f32Vec[i] = float32(v)
-	}
-
-	results, err := searcher.SearchByVectorSimilarity(ctx, f32Vec, maxResults)
-	if err != nil {
-		return nil, err
-	}
-
-	var hits []patent_mining.SimilarityHit
-	for _, res := range results {
-		if res.Score >= threshold {
-			hits = append(hits, patent_mining.SimilarityHit{
-				ID:        res.Molecule.GetID(),
-				Type:      "molecule",
-				SMILES:    res.Molecule.GetSMILES(),
-				InChIKey:  res.Molecule.GetInChIKey(),
-				Score:     res.Score,
-				Metric:    patent_mining.MetricCosine,
-			})
+func (a *searchLoggerAdapter) keyvalsToFields(keyvals ...interface{}) []logging.Field {
+	fields := make([]logging.Field, 0, len(keyvals)/2)
+	for i := 0; i+1 < len(keyvals); i += 2 {
+		key, ok := keyvals[i].(string)
+		if !ok {
+			continue
 		}
+		fields = append(fields, logging.Any(key, keyvals[i+1]))
 	}
-
-	return hits, nil
+	if len(keyvals)%2 == 1 {
+		fields = append(fields, logging.Any("extra", keyvals[len(keyvals)-1]))
+	}
+	return fields
 }
 
-func (m *cliMockVectorStore) EmbedText(ctx context.Context, text string, model string) ([]float64, error) {
-	return []float64{0.1, 0.2, 0.3}, nil
+func (a *searchLoggerAdapter) Debug(msg string, keyvals ...interface{}) {
+	a.logger.Debug(msg, a.keyvalsToFields(keyvals...)...)
+}
+func (a *searchLoggerAdapter) Info(msg string, keyvals ...interface{}) {
+	a.logger.Info(msg, a.keyvalsToFields(keyvals...)...)
+}
+func (a *searchLoggerAdapter) Warn(msg string, keyvals ...interface{}) {
+	a.logger.Warn(msg, a.keyvalsToFields(keyvals...)...)
+}
+func (a *searchLoggerAdapter) Error(msg string, keyvals ...interface{}) {
+	a.logger.Error(msg, a.keyvalsToFields(keyvals...)...)
 }
 
-func (m *cliMockVectorStore) EmbedMolecule(ctx context.Context, smiles string) ([]float64, error) {
-	return []float64{0.1, 0.2, 0.3}, nil
+// ============================================================================
+// Adapters that return clear "requires API server" errors
+// ============================================================================
+
+var errNeedsServer = errors.NewMsg("this command requires the KeyIP API server; use --server <addr> to connect")
+
+type requiresServerFingerprintEngine struct{}
+
+func (e *requiresServerFingerprintEngine) ComputeFingerprint(ctx context.Context, smiles string, fpType string, radius int, nBits int) ([]byte, error) {
+	return nil, errNeedsServer
+}
+func (e *requiresServerFingerprintEngine) ComputeSimilarity(ctx context.Context, fp1 []byte, fp2 []byte, metric patent_mining.SimilarityMetric) (float64, error) {
+	return 0, errNeedsServer
+}
+func (e *requiresServerFingerprintEngine) SearchSimilar(ctx context.Context, queryFP []byte, metric patent_mining.SimilarityMetric, threshold float64, maxResults int) ([]patent_mining.SimilarityHit, error) {
+	return nil, errNeedsServer
+}
+
+type requiresServerVectorStore struct{}
+
+func (s *requiresServerVectorStore) SearchByVector(ctx context.Context, vector []float64, threshold float64, maxResults int, filters map[string]string) ([]patent_mining.SimilarityHit, error) {
+	return nil, errNeedsServer
+}
+func (s *requiresServerVectorStore) EmbedText(ctx context.Context, text string, model string) ([]float64, error) {
+	return nil, errNeedsServer
+}
+func (s *requiresServerVectorStore) EmbedMolecule(ctx context.Context, smiles string) ([]float64, error) {
+	return nil, errNeedsServer
+}
+
+type requiresServerPatentIndex struct{}
+
+func (p *requiresServerPatentIndex) GetPatentMolecules(ctx context.Context, patentID string) ([]string, error) {
+	return nil, errNeedsServer
+}
+func (p *requiresServerPatentIndex) GetPatentText(ctx context.Context, patentID string) (string, error) {
+	return "", errNeedsServer
+}
+func (p *requiresServerPatentIndex) SearchByText(ctx context.Context, query string, maxResults int) ([]patent_mining.SimilarityHit, error) {
+	return nil, errNeedsServer
+}
+
+type inMemorySearchHistoryStore struct {
+	entries []patent_mining.SearchHistoryEntry
+}
+
+func (s *inMemorySearchHistoryStore) Save(ctx context.Context, entry *patent_mining.SearchHistoryEntry) error {
+	s.entries = append(s.entries, *entry)
+	return nil
+}
+func (s *inMemorySearchHistoryStore) ListByUser(ctx context.Context, userID string, limit int) ([]patent_mining.SearchHistoryEntry, error) {
+	if len(s.entries) == 0 {
+		return []patent_mining.SearchHistoryEntry{}, nil
+	}
+	if limit <= 0 || limit > len(s.entries) {
+		limit = len(s.entries)
+	}
+	result := make([]patent_mining.SearchHistoryEntry, limit)
+	copy(result, s.entries[:limit])
+	return result, nil
+}
+
+// ============================================================================
+// Noop service implementations -- return "requires API server" error
+// ============================================================================
+
+type noopValuationService struct{}
+
+func (s *noopValuationService) AssessPatent(ctx context.Context, req *portfolio.SinglePatentAssessmentRequest) (*portfolio.SinglePatentAssessmentResponse, error) {
+	return nil, errNeedsServer
+}
+func (s *noopValuationService) Assess(ctx context.Context, req *portfolio.CLIValuationRequest) (*portfolio.CLIValuationResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopValuationService) AssessPortfolioCLI(ctx context.Context, req *portfolio.CLIPortfolioAssessRequest) (*portfolio.CLIPortfolioAssessResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopValuationService) AssessPortfolio(ctx context.Context, req *portfolio.PortfolioAssessmentRequest) (*portfolio.PortfolioAssessmentResponse, error) {
+	return nil, errNeedsServer
+}
+func (s *noopValuationService) AssessPortfolioFull(ctx context.Context, req *portfolio.PortfolioAssessmentRequest) (*portfolio.PortfolioAssessmentResponse, error) {
+	return nil, errNeedsServer
+}
+func (s *noopValuationService) GetAssessmentHistory(ctx context.Context, patentID string, opts ...portfolio.QueryOption) ([]*portfolio.AssessmentRecord, error) {
+	return nil, errNeedsServer
+}
+func (s *noopValuationService) CompareAssessments(ctx context.Context, req *portfolio.CompareAssessmentsRequest) (*portfolio.CompareAssessmentsResponse, error) {
+	return nil, errNeedsServer
+}
+func (s *noopValuationService) ExportAssessment(ctx context.Context, assessmentID string, format portfolio.ExportFormat) ([]byte, error) {
+	return nil, errNeedsServer
+}
+func (s *noopValuationService) GetTierDistribution(ctx context.Context, portfolioID string) (*portfolio.TierDistribution, error) {
+	return nil, errNeedsServer
+}
+func (s *noopValuationService) RecommendActions(ctx context.Context, assessmentID string) ([]*portfolio.ActionRecommendation, error) {
+	return nil, errNeedsServer
+}
+
+type noopDeadlineService struct{}
+
+func (s *noopDeadlineService) ListDeadlines(ctx context.Context, query *lifecycle.DeadlineQuery) (*lifecycle.DeadlineListResponse, error) {
+	return nil, errNeedsServer
+}
+func (s *noopDeadlineService) CreateDeadline(ctx context.Context, req *lifecycle.CreateDeadlineRequest) (*lifecycle.Deadline, error) {
+	return nil, errNeedsServer
+}
+func (s *noopDeadlineService) CompleteDeadline(ctx context.Context, deadlineID string) error {
+	return errNeedsServer
+}
+func (s *noopDeadlineService) ExtendDeadline(ctx context.Context, req *lifecycle.ExtendDeadlineRequest) (*lifecycle.Deadline, error) {
+	return nil, errNeedsServer
+}
+func (s *noopDeadlineService) DeleteDeadline(ctx context.Context, deadlineID string) error {
+	return errNeedsServer
+}
+func (s *noopDeadlineService) GetComplianceDashboard(ctx context.Context, portfolioID string) (*lifecycle.ComplianceDashboard, error) {
+	return nil, errNeedsServer
+}
+func (s *noopDeadlineService) GetOverdueDeadlines(ctx context.Context, portfolioID string) ([]lifecycle.Deadline, error) {
+	return nil, errNeedsServer
+}
+func (s *noopDeadlineService) SyncStatutoryDeadlines(ctx context.Context, patentID string) (int, error) {
+	return 0, errNeedsServer
+}
+
+type noopAnnuityService struct{}
+
+func (s *noopAnnuityService) CalculateAnnuity(ctx context.Context, req *lifecycle.CalculateAnnuityRequest) (*lifecycle.AnnuityResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopAnnuityService) BatchCalculate(ctx context.Context, req *lifecycle.BatchCalculateRequest) (*lifecycle.BatchCalculateResponse, error) {
+	return nil, errNeedsServer
+}
+func (s *noopAnnuityService) GenerateBudget(ctx context.Context, req *lifecycle.GenerateBudgetRequest) (*lifecycle.BudgetReport, error) {
+	return nil, errNeedsServer
+}
+func (s *noopAnnuityService) GetPaymentSchedule(ctx context.Context, req *lifecycle.PaymentScheduleRequest) ([]lifecycle.PaymentScheduleEntry, error) {
+	return nil, errNeedsServer
+}
+func (s *noopAnnuityService) OptimizeCosts(ctx context.Context, req *lifecycle.OptimizeCostsRequest) (*lifecycle.CostOptimizationReport, error) {
+	return nil, errNeedsServer
+}
+func (s *noopAnnuityService) RecordPayment(ctx context.Context, req *lifecycle.RecordPaymentRequest) (*lifecycle.PaymentRecord, error) {
+	return nil, errNeedsServer
+}
+func (s *noopAnnuityService) GetPaymentHistory(ctx context.Context, req *lifecycle.PaymentHistoryRequest) ([]lifecycle.PaymentRecord, int64, error) {
+	return nil, 0, errNeedsServer
+}
+
+type noopLegalStatusService struct{}
+
+func (s *noopLegalStatusService) SyncStatus(ctx context.Context, patentID string) (*lifecycle.SyncResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopLegalStatusService) BatchSync(ctx context.Context, req *lifecycle.BatchSyncRequest) (*lifecycle.BatchSyncResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopLegalStatusService) GetCurrentStatus(ctx context.Context, patentID string) (*lifecycle.LegalStatusDetail, error) {
+	return nil, errNeedsServer
+}
+func (s *noopLegalStatusService) GetStatusHistory(ctx context.Context, patentID string, opts ...lifecycle.QueryOption) ([]*lifecycle.LegalStatusEvent, error) {
+	return nil, errNeedsServer
+}
+func (s *noopLegalStatusService) DetectAnomalies(ctx context.Context, portfolioID string) ([]*lifecycle.StatusAnomaly, error) {
+	return nil, errNeedsServer
+}
+func (s *noopLegalStatusService) SubscribeStatusChange(ctx context.Context, req *lifecycle.SubscriptionRequest) (*lifecycle.Subscription, error) {
+	return nil, errNeedsServer
+}
+func (s *noopLegalStatusService) UnsubscribeStatusChange(ctx context.Context, subscriptionID string) error {
+	return errNeedsServer
+}
+func (s *noopLegalStatusService) GetStatusSummary(ctx context.Context, portfolioID string) (*lifecycle.StatusSummary, error) {
+	return nil, errNeedsServer
+}
+func (s *noopLegalStatusService) ReconcileStatus(ctx context.Context, patentID string) (*lifecycle.ReconcileResult, error) {
+	return nil, errNeedsServer
+}
+
+type noopCalendarService struct{}
+
+func (s *noopCalendarService) GetCalendarView(ctx context.Context, req *lifecycle.CalendarViewRequest) (*lifecycle.CalendarView, error) {
+	return nil, errNeedsServer
+}
+func (s *noopCalendarService) AddEvent(ctx context.Context, req *lifecycle.AddEventRequest) (*lifecycle.CalendarEvent, error) {
+	return nil, errNeedsServer
+}
+func (s *noopCalendarService) UpdateEventStatus(ctx context.Context, eventID string, status lifecycle.EventStatus) error {
+	return errNeedsServer
+}
+func (s *noopCalendarService) DeleteEvent(ctx context.Context, eventID string) error {
+	return errNeedsServer
+}
+func (s *noopCalendarService) ExportICal(ctx context.Context, req *lifecycle.ICalExportRequest) ([]byte, error) {
+	return nil, errNeedsServer
+}
+func (s *noopCalendarService) GetUpcomingDeadlines(ctx context.Context, portfolioID string, withinDays int) ([]lifecycle.CalendarEvent, error) {
+	return nil, errNeedsServer
+}
+
+type noopFTOReportService struct{}
+
+func (s *noopFTOReportService) Generate(ctx context.Context, req *reporting.FTOReportRequest) (*reporting.FTOReportResponse, error) {
+	return nil, errNeedsServer
+}
+func (s *noopFTOReportService) GetStatus(ctx context.Context, reportID string) (*reporting.ReportStatusInfo, error) {
+	return nil, errNeedsServer
+}
+func (s *noopFTOReportService) GetReport(ctx context.Context, reportID string, format reporting.ReportFormat) (io.ReadCloser, error) {
+	return nil, errNeedsServer
+}
+func (s *noopFTOReportService) ListReports(ctx context.Context, filter *reporting.FTOReportFilter, page *common.Pagination) (*common.PaginatedResult[reporting.FTOReportSummary], error) {
+	return nil, errNeedsServer
+}
+func (s *noopFTOReportService) DeleteReport(ctx context.Context, reportID string) error {
+	return errNeedsServer
+}
+
+type noopInfringementReportService struct{}
+
+func (s *noopInfringementReportService) Generate(ctx context.Context, req *reporting.InfringementReportRequest) (*reporting.InfringementReportResponse, error) {
+	return nil, errNeedsServer
+}
+func (s *noopInfringementReportService) GetStatus(ctx context.Context, reportID string) (*reporting.ReportStatusInfo, error) {
+	return nil, errNeedsServer
+}
+func (s *noopInfringementReportService) GetReport(ctx context.Context, reportID string, format reporting.ReportFormat) (io.ReadCloser, error) {
+	return nil, errNeedsServer
+}
+func (s *noopInfringementReportService) ListReports(ctx context.Context, filter *reporting.InfringementReportFilter, page *common.Pagination) (*common.PaginatedResult[reporting.InfringementReportSummary], error) {
+	return nil, errNeedsServer
+}
+func (s *noopInfringementReportService) DeleteReport(ctx context.Context, reportID string) error {
+	return errNeedsServer
+}
+
+type noopPortfolioReportService struct{}
+
+func (s *noopPortfolioReportService) GenerateFullReport(ctx context.Context, req *reporting.PortfolioReportRequest) (*reporting.PortfolioReportResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopPortfolioReportService) GenerateSummaryReport(ctx context.Context, req *reporting.PortfolioSummaryRequest) (*reporting.PortfolioReportResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopPortfolioReportService) GenerateGapReport(ctx context.Context, req *reporting.GapReportRequest) (*reporting.PortfolioReportResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopPortfolioReportService) GenerateCompetitiveReport(ctx context.Context, req *reporting.CompetitiveReportRequest) (*reporting.PortfolioReportResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopPortfolioReportService) GetReportStatus(ctx context.Context, reportID string) (*reporting.ReportStatusInfo, error) {
+	return nil, errNeedsServer
+}
+func (s *noopPortfolioReportService) ListReports(ctx context.Context, portfolioID string, opts *reporting.ListReportOptions) (*common.PaginatedResult[reporting.ReportMeta], error) {
+	return nil, errNeedsServer
+}
+func (s *noopPortfolioReportService) ExportReport(ctx context.Context, reportID string, format reporting.ExportFormat) ([]byte, error) {
+	return nil, errNeedsServer
+}
+
+type noopTemplateService struct{}
+
+func (s *noopTemplateService) Render(ctx context.Context, req *reporting.RenderRequest) (*reporting.RenderResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopTemplateService) RenderToBytes(ctx context.Context, req *reporting.RenderRequest) ([]byte, error) {
+	return nil, errNeedsServer
+}
+func (s *noopTemplateService) ListTemplates(ctx context.Context, opts *reporting.ListTemplateOptions) (*common.PaginatedResult[reporting.TemplateMeta], error) {
+	return nil, errNeedsServer
+}
+func (s *noopTemplateService) GetTemplate(ctx context.Context, templateID string) (*reporting.Template, error) {
+	return nil, errNeedsServer
+}
+func (s *noopTemplateService) RegisterTemplate(ctx context.Context, tmpl *reporting.Template) error {
+	return errNeedsServer
+}
+func (s *noopTemplateService) UpdateTemplate(ctx context.Context, tmpl *reporting.Template) error {
+	return errNeedsServer
+}
+func (s *noopTemplateService) DeleteTemplate(ctx context.Context, templateID string) error {
+	return errNeedsServer
+}
+func (s *noopTemplateService) ValidateTemplate(ctx context.Context, tmpl *reporting.Template) (*reporting.ValidationResult, error) {
+	return nil, errNeedsServer
+}
+func (s *noopTemplateService) PreviewTemplate(ctx context.Context, templateID string, sampleData map[string]interface{}) (*reporting.RenderResult, error) {
+	return nil, errNeedsServer
 }
 
 //Personal.AI order the ending
