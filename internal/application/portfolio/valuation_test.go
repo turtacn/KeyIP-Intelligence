@@ -747,6 +747,7 @@ func buildTestService(
 		assessmentRepo,
 		aiScorerInterface,
 		citationRepoInterface,
+		nil, // familyRepo: optional
 		&mockLogger{},
 		cache,
 		nil, // metrics: will use noopMetrics

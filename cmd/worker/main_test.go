@@ -14,13 +14,13 @@ import (
 
 func TestAllTopics(t *testing.T) {
 	expectedTopics := []string{
-		"patent.document.parse",
-		"molecule.fingerprint.compute",
-		"infringement.batch.analyze",
+		"patent.new",
+		"patent.status_changed",
+		"molecule.indexed",
+		"alert.trigger",
+		"deadline.approaching",
 		"report.generate",
-		"knowledge.graph.build",
-		"vector.index.update",
-		"lifecycle.deadline.check",
+		"infrastructure.health",
 	}
 	require.Len(t, allTopics, len(expectedTopics))
 	for _, topic := range expectedTopics {
@@ -35,33 +35,11 @@ func TestConstants(t *testing.T) {
 	assert.Equal(t, 3, maxRetries)
 }
 
-// --- stubHandler Tests ---
-
-func TestStubHandler_Topic(t *testing.T) {
-	logger := logging.NewNopLogger()
-	h := &stubHandler{topic: "patent.document.parse", logger: logger}
-	assert.Equal(t, "patent.document.parse", h.Topic())
-}
-
-func TestStubHandler_Handle(t *testing.T) {
-	logger := logging.NewNopLogger()
-	h := &stubHandler{topic: "test.topic", logger: logger}
-	msg := &common.Message{
-		Topic:     "test.topic",
-		Partition: 0,
-		Offset:    123,
-		Key:       []byte("test-key"),
-		Value:     []byte("test-value"),
-	}
-	err := h.Handle(context.Background(), msg)
-	assert.NoError(t, err)
-}
-
 // --- buildHandlerRegistry Tests ---
 
 func TestBuildHandlerRegistry_ReturnsAllTopics(t *testing.T) {
 	logger := logging.NewNopLogger()
-	handlers := buildHandlerRegistry(nil, nil, nil, logger)
+	handlers := buildHandlerRegistry(nil, nil, nil, nil, logger)
 
 	require.Len(t, handlers, len(allTopics))
 	for _, topic := range allTopics {
@@ -72,16 +50,15 @@ func TestBuildHandlerRegistry_ReturnsAllTopics(t *testing.T) {
 	}
 }
 
-func TestBuildHandlerRegistry_HandlersAreStubHandlers(t *testing.T) {
-	logger := logging.NewNopLogger()
-	handlers := buildHandlerRegistry(nil, nil, nil, logger)
+// testHandler is a simple MessageHandler implementation for testing.
+type testHandler struct {
+	topic string
+}
 
-	for topic, h := range handlers {
-		// Verify the handler is a stubHandler
-		sh, ok := h.(*stubHandler)
-		assert.True(t, ok, "handler for topic %s should be *stubHandler", topic)
-		assert.Equal(t, topic, sh.topic)
-	}
+func (h *testHandler) Topic() string { return h.topic }
+
+func (h *testHandler) Handle(ctx context.Context, msg *common.Message) error {
+	return nil
 }
 
 // --- workerLoop Tests ---
@@ -116,11 +93,13 @@ func TestWorkerLoop_NilHandlersMap(t *testing.T) {
 
 func TestWorkerLoop_ProcessesMessageSuccessfully(t *testing.T) {
 	logger := logging.NewNopLogger()
-	handlers := buildHandlerRegistry(nil, nil, nil, logger)
+	handlers := map[string]MessageHandler{
+		"test.topic": &testHandler{topic: "test.topic"},
+	}
 	msgChan := make(chan *common.Message, 1)
 
 	msgChan <- &common.Message{
-		Topic:     "patent.document.parse",
+		Topic:     "test.topic",
 		Partition: 0,
 		Offset:    100,
 		Key:       []byte("test-key"),
@@ -146,7 +125,10 @@ func TestWorkerLoop_ProcessesMessageSuccessfully(t *testing.T) {
 
 func TestWorkerLoop_MultipleMessages(t *testing.T) {
 	logger := logging.NewNopLogger()
-	handlers := buildHandlerRegistry(nil, nil, nil, logger)
+	handlers := make(map[string]MessageHandler)
+	for _, topic := range allTopics {
+		handlers[topic] = &testHandler{topic: topic}
+	}
 	msgChan := make(chan *common.Message, len(allTopics))
 
 	// Send one message per topic
@@ -221,10 +203,10 @@ func TestProcessMessage_SuccessfulHandler(t *testing.T) {
 		Offset:    42,
 	}
 	handlers := map[string]MessageHandler{
-		"test.topic": &stubHandler{topic: "test.topic", logger: logger},
+		"test.topic": &testHandler{topic: "test.topic"},
 	}
 
-	// Should handle message without error and not touch dlqProducer
+	// Should handle message without error
 	processMessage(context.Background(), 0, msg, handlers, nil, logger)
 }
 
@@ -239,7 +221,7 @@ func TestProcessMessage_WithCancelledContext(t *testing.T) {
 		Offset:    42,
 	}
 	handlers := map[string]MessageHandler{
-		"test.topic": &stubHandler{topic: "test.topic", logger: logger},
+		"test.topic": &testHandler{topic: "test.topic"},
 	}
 
 	processMessage(ctx, 0, msg, handlers, nil, logger)

@@ -1046,8 +1046,11 @@ func (s *constellationServiceImpl) generateEmbeddings(ctx context.Context, molec
 	return embeddings, nil
 }
 
-// reduceEmbeddings performs dimensionality reduction on the embedding vectors.
-// This delegates to the GNN inference engine's built-in reduction capability.
+// reduceEmbeddings performs dimensionality reduction on the embedding vectors
+// using PCA (Principal Component Analysis). It computes the covariance matrix
+// of the centered embedding vectors, performs eigendecomposition via power
+// iteration to find the top principal components, and projects the data onto
+// those components.
 func (s *constellationServiceImpl) reduceEmbeddings(ctx context.Context, embeddings map[string][]float64, reduction DimensionReduction) ([][]float64, error) {
 	// Collect all vectors in deterministic order.
 	keys := make([]string, 0, len(embeddings))
@@ -1061,23 +1064,186 @@ func (s *constellationServiceImpl) reduceEmbeddings(ctx context.Context, embeddi
 		vectors = append(vectors, embeddings[k])
 	}
 
-	// TODO: Implement proper dimensionality reduction using t-SNE/UMAP
-	// Placeholder: Simple projection to target dimensions
 	targetDim := reduction.Dimensions
 	if targetDim <= 0 {
 		targetDim = 2
 	}
-	
-	reduced := make([][]float64, len(vectors))
-	for i, vec := range vectors {
-		r := make([]float64, targetDim)
-		for j := 0; j < targetDim && j < len(vec); j++ {
-			r[j] = vec[j]
+
+	n := len(vectors)
+	if n == 0 {
+		return [][]float64{}, nil
+	}
+
+	d := len(vectors[0])
+	if d == 0 {
+		reduced := make([][]float64, n)
+		for i := range reduced {
+			reduced[i] = make([]float64, targetDim)
 		}
-		reduced[i] = r
+		return reduced, nil
+	}
+
+	// Clamp target dimension to available dimensions and data points.
+	if targetDim > d {
+		targetDim = d
+	}
+	if targetDim > n {
+		targetDim = n
+	}
+
+	// Step 1: Compute mean of each dimension.
+	mean := make([]float64, d)
+	for _, vec := range vectors {
+		for j := 0; j < d; j++ {
+			mean[j] += vec[j]
+		}
+	}
+	nFloat := float64(n)
+	for j := 0; j < d; j++ {
+		mean[j] /= nFloat
+	}
+
+	// Step 2: Center the data (subtract mean).
+	centered := make([][]float64, n)
+	for i, vec := range vectors {
+		centered[i] = make([]float64, d)
+		for j := 0; j < d; j++ {
+			centered[i][j] = vec[j] - mean[j]
+		}
+	}
+
+	// Single point or zero target dimension: return zeros.
+	if n == 1 || targetDim == 0 {
+		reduced := make([][]float64, n)
+		for i := range reduced {
+			reduced[i] = make([]float64, targetDim)
+		}
+		return reduced, nil
+	}
+
+	// Step 3: Compute covariance matrix (d x d).
+	cov := make([][]float64, d)
+	for i := 0; i < d; i++ {
+		cov[i] = make([]float64, d)
+		for j := 0; j < d; j++ {
+			var sum float64
+			for k := 0; k < n; k++ {
+				sum += centered[k][i] * centered[k][j]
+			}
+			cov[i][j] = sum / (nFloat - 1)
+		}
+	}
+
+	// Step 4: Find top targetDim eigenvectors via power iteration with deflation.
+	eigenVectors := make([][]float64, targetDim)
+	eigenValues := make([]float64, targetDim)
+
+	// Copy covariance matrix for deflation.
+	working := make([][]float64, d)
+	for i := 0; i < d; i++ {
+		working[i] = make([]float64, d)
+		copy(working[i], cov[i])
+	}
+
+	for k := 0; k < targetDim; k++ {
+		vec, val := powerIteration(working, d)
+		eigenValues[k] = val
+		eigenVectors[k] = vec
+
+		// Deflate: working = working - val * vec * vec^T
+		for i := 0; i < d; i++ {
+			for j := 0; j < d; j++ {
+				working[i][j] -= val * vec[i] * vec[j]
+			}
+		}
+	}
+
+	// Step 5: Project centered data onto the top eigenvectors.
+	reduced := make([][]float64, n)
+	for i := 0; i < n; i++ {
+		reduced[i] = make([]float64, targetDim)
+		for j := 0; j < targetDim; j++ {
+			var proj float64
+			for k := 0; k < d; k++ {
+				proj += centered[i][k] * eigenVectors[j][k]
+			}
+			reduced[i][j] = proj
+		}
 	}
 
 	return reduced, nil
+}
+
+// powerIteration finds the dominant eigenvector and eigenvalue of a symmetric
+// matrix using the power iteration method.
+func powerIteration(matrix [][]float64, dim int) ([]float64, float64) {
+	const maxIter = 100
+	const tol = 1e-6
+
+	// Initialize with a non-zero, non-special vector.
+	vec := make([]float64, dim)
+	for j := 0; j < dim; j++ {
+		vec[j] = 1.0 + float64(j%10)
+	}
+	vec = normalizeVector(vec)
+
+	for iter := 0; iter < maxIter; iter++ {
+		// Multiply matrix by vector.
+		newVec := make([]float64, dim)
+		for i := 0; i < dim; i++ {
+			var rowSum float64
+			for j := 0; j < dim; j++ {
+				rowSum += matrix[i][j] * vec[j]
+			}
+			newVec[i] = rowSum
+		}
+		newVec = normalizeVector(newVec)
+
+		// Check convergence (L2 norm of difference).
+		var diff float64
+		for j := 0; j < dim; j++ {
+			d := newVec[j] - vec[j]
+			diff += d * d
+		}
+		copy(vec, newVec)
+		if diff < tol {
+			break
+		}
+	}
+
+	// Rayleigh quotient: eigenvalue = vec^T * matrix * vec.
+	var eval float64
+	temp := make([]float64, dim)
+	for i := 0; i < dim; i++ {
+		var rowSum float64
+		for j := 0; j < dim; j++ {
+			rowSum += matrix[i][j] * vec[j]
+		}
+		temp[i] = rowSum
+	}
+	for j := 0; j < dim; j++ {
+		eval += vec[j] * temp[j]
+	}
+
+	return vec, eval
+}
+
+// normalizeVector scales a vector to unit length.
+func normalizeVector(vec []float64) []float64 {
+	var norm float64
+	for _, v := range vec {
+		norm += v * v
+	}
+	if norm == 0 {
+		result := make([]float64, len(vec))
+		return result
+	}
+	norm = math.Sqrt(norm)
+	result := make([]float64, len(vec))
+	for i, v := range vec {
+		result[i] = v / norm
+	}
+	return result
 }
 
 // buildPoints constructs ConstellationPoint entries from patents, molecules, and reduced coordinates.

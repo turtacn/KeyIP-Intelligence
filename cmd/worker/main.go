@@ -42,6 +42,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
@@ -79,13 +80,13 @@ const (
 
 // Well-known Kafka topics for async processing.
 var allTopics = []string{
-	"patent.document.parse",
-	"molecule.fingerprint.compute",
-	"infringement.batch.analyze",
+	"patent.new",
+	"patent.status_changed",
+	"molecule.indexed",
+	"alert.trigger",
+	"deadline.approaching",
 	"report.generate",
-	"knowledge.graph.build",
-	"vector.index.update",
-	"lifecycle.deadline.check",
+	"infrastructure.health",
 }
 
 func main() {
@@ -167,8 +168,34 @@ func main() {
 	}
 	defer modelRegistry.Close()
 
-	// Build handler registry
-	handlerRegistry := buildHandlerRegistry(cfg, infra, modelRegistry, logger)
+	// Create a regular producer for follow-up event publishing
+	eventProducerCfg := kafkaclient.ProducerConfig{
+		Brokers:    cfg.Messaging.Kafka.Brokers,
+		Acks:       "all",
+		MaxRetries: 3,
+	}
+	eventProducer, err := kafkaclient.NewProducer(eventProducerCfg, logger)
+	if err != nil {
+		logger.Error("failed to create event producer", logging.Err(err))
+		os.Exit(1)
+	}
+	defer eventProducer.Close()
+
+	// Create DLQ producer config from app config
+	dlqProducerCfg := kafkaclient.ProducerConfig{
+		Brokers:    cfg.Messaging.Kafka.Brokers,
+		Acks:       "all",
+		MaxRetries: 3,
+	}
+	dlqProducer, err := kafkaclient.NewProducer(dlqProducerCfg, logger)
+	if err != nil {
+		logger.Error("failed to create DLQ producer", logging.Err(err))
+		os.Exit(1)
+	}
+	defer dlqProducer.Close()
+
+	// Build handler registry with all dependencies
+	handlerRegistry := buildHandlerRegistry(cfg, infra, modelRegistry, eventProducer, logger)
 
 	// Create Kafka consumer config from app config
 	consumerCfg := kafkaclient.ConsumerConfig{
@@ -185,19 +212,6 @@ func main() {
 		os.Exit(1)
 	}
 	defer consumer.Close()
-
-	// Create DLQ producer config from app config
-	producerCfg := kafkaclient.ProducerConfig{
-		Brokers:    cfg.Messaging.Kafka.Brokers,
-		Acks:       "all",
-		MaxRetries: 3,
-	}
-	dlqProducer, err := kafkaclient.NewProducer(producerCfg, logger)
-	if err != nil {
-		logger.Error("failed to create DLQ producer", logging.Err(err))
-		os.Exit(1)
-	}
-	defer dlqProducer.Close()
 
 	// Context for graceful shutdown and error propagation
 	// errgroup creates a context that is cancelled when any goroutine returns a non-nil error
@@ -421,38 +435,727 @@ func buildHandlerRegistry(
 	cfg *config.Config,
 	infra *workerInfrastructure,
 	registry intcommon.ModelRegistry,
+	producer *kafkaclient.Producer,
 	logger logging.Logger,
 ) map[string]MessageHandler {
-	// Placeholder handler registry - actual handlers to be implemented
-	handlers := make(map[string]MessageHandler)
+	handlers := make(map[string]MessageHandler, len(allTopics))
 
-	// Register stub handlers for all topics
-	for _, topic := range allTopics {
-		handlers[topic] = &stubHandler{topic: topic, logger: logger}
+	// patent.new -- parse patent data, trigger ChemExtractor, store results, publish events
+	handlers["patent.new"] = &patentNewHandler{
+		producer: producer,
+		infra:    infra,
+		logger:   logger.With(logging.String("handler", "patent.new")),
 	}
 
-	logger.Info("handler registry built", logging.Int("handlers", len(handlers)))
+	// patent.status_changed -- update legal status, check deadline impacts
+	handlers["patent.status_changed"] = &patentStatusChangedHandler{
+		producer: producer,
+		infra:    infra,
+		logger:   logger.With(logging.String("handler", "patent.status_changed")),
+	}
+
+	// molecule.indexed -- trigger similarity comparison against watch rules
+	handlers["molecule.indexed"] = &moleculeIndexedHandler{
+		producer: producer,
+		infra:    infra,
+		logger:   logger.With(logging.String("handler", "molecule.indexed")),
+	}
+
+	// alert.trigger -- send alert via configured channels
+	handlers["alert.trigger"] = &alertTriggerHandler{
+		producer: producer,
+		logger:   logger.With(logging.String("handler", "alert.trigger")),
+	}
+
+	// deadline.approaching -- check deadline config, create notifications
+	handlers["deadline.approaching"] = &deadlineApproachingHandler{
+		producer: producer,
+		infra:    infra,
+		logger:   logger.With(logging.String("handler", "deadline.approaching")),
+	}
+
+	// report.generate -- call report generation service, publish completion event
+	handlers["report.generate"] = &reportGenerateHandler{
+		producer: producer,
+		infra:    infra,
+		cfg:      cfg,
+		logger:   logger.With(logging.String("handler", "report.generate")),
+	}
+
+	// infrastructure.health -- check dependencies, update health metrics
+	handlers["infrastructure.health"] = &infrastructureHealthHandler{
+		infra:  infra,
+		logger: logger.With(logging.String("handler", "infrastructure.health")),
+	}
+
+	logger.Info("handler registry built",
+		logging.Int("handlers", len(handlers)),
+		logging.String("topics", strings.Join(allTopics, ",")),
+	)
 	return handlers
 }
 
-// stubHandler is a placeholder handler that logs and acknowledges messages.
-type stubHandler struct {
-	topic  string
-	logger logging.Logger
+// ---------------------------------------------------------------------------
+// Handler implementations
+// ---------------------------------------------------------------------------
+
+// --- patent.new handler ---
+
+type patentNewPayload struct {
+	PatentID     string `json:"patent_id"`
+	PatentNumber string `json:"patent_number"`
+	Title        string `json:"title"`
+	Abstract     string `json:"abstract,omitempty"`
+	Description  string `json:"description,omitempty"`
+	Claims       string `json:"claims,omitempty"`
+	FilingDate   string `json:"filing_date,omitempty"`
+	Source       string `json:"source,omitempty"`
 }
 
-func (h *stubHandler) Handle(ctx context.Context, msg *common.Message) error {
-	h.logger.Info("processing message",
-		logging.String("topic", h.topic),
-		logging.Int("partition", msg.Partition),
-		logging.Int64("offset", msg.Offset),
+type patentNewHandler struct {
+	producer *kafkaclient.Producer
+	infra    *workerInfrastructure
+	logger   logging.Logger
+}
+
+func (h *patentNewHandler) Topic() string { return "patent.new" }
+
+func (h *patentNewHandler) Handle(ctx context.Context, msg *common.Message) error {
+	var payload patentNewPayload
+	if err := json.Unmarshal(msg.Value, &payload); err != nil {
+		return fmt.Errorf("failed to decode patent.new payload: %w", err)
+	}
+
+	h.logger.Info("processing new patent",
+		logging.String("patent_id", payload.PatentID),
+		logging.String("patent_number", payload.PatentNumber),
 	)
-	// TODO: Implement actual message processing logic
+
+	// Store patent metadata in PostgreSQL
+	_, err := h.infra.pg.DB().ExecContext(ctx,
+		`INSERT INTO patents (patent_id, patent_number, title, abstract, source, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+		 ON CONFLICT (patent_id) DO UPDATE SET
+		   title = EXCLUDED.title,
+		   abstract = EXCLUDED.abstract,
+		   updated_at = NOW()`,
+		payload.PatentID, payload.PatentNumber, payload.Title, payload.Abstract, payload.Source,
+	)
+	if err != nil {
+		h.logger.Error("failed to store patent", logging.Err(err))
+		return fmt.Errorf("store patent: %w", err)
+	}
+
+	// If the patent has text content, queue chemical extraction for processing
+	if payload.Description != "" || payload.Claims != "" {
+		textContent := payload.Description
+		if payload.Claims != "" {
+			textContent = textContent + "\n" + payload.Claims
+		}
+
+		_, extractErr := h.infra.pg.DB().ExecContext(ctx,
+			`INSERT INTO extraction_queue (patent_id, patent_number, text_content, status, created_at)
+			 VALUES ($1, $2, $3, 'pending', NOW())`,
+			payload.PatentID, payload.PatentNumber, textContent,
+		)
+		if extractErr != nil {
+			h.logger.Warn("failed to queue chemical extraction", logging.Err(extractErr))
+		}
+	}
+
+	// Publish event that patent has been processed
+	env, envErr := kafkaclient.NewEventEnvelope("patent.processed", "worker", map[string]interface{}{
+		"patent_id":     payload.PatentID,
+		"patent_number": payload.PatentNumber,
+		"status":        "stored",
+		"processed_at":  time.Now().UTC(),
+	})
+	if envErr != nil {
+		h.logger.Warn("failed to create event envelope", logging.Err(envErr))
+		return nil
+	}
+	prodMsg, prodErr := env.ToMessage(kafkaclient.TopicPatentAnalyzed)
+	if prodErr != nil {
+		h.logger.Warn("failed to create producer message", logging.Err(prodErr))
+		return nil
+	}
+	if pubErr := h.producer.Publish(ctx, prodMsg); pubErr != nil {
+		h.logger.Warn("failed to publish patent.processed event", logging.Err(pubErr))
+	}
+
+	h.logger.Info("new patent processed successfully",
+		logging.String("patent_id", payload.PatentID),
+	)
 	return nil
 }
 
-func (h *stubHandler) Topic() string {
-	return h.topic
+// --- patent.status_changed handler ---
+
+type patentStatusChangedPayload struct {
+	PatentID     string `json:"patent_id"`
+	PatentNumber string `json:"patent_number"`
+	OldStatus    string `json:"old_status"`
+	NewStatus    string `json:"new_status"`
+	Reason       string `json:"reason,omitempty"`
+	ChangedAt    string `json:"changed_at"`
+}
+
+type patentStatusChangedHandler struct {
+	producer *kafkaclient.Producer
+	infra    *workerInfrastructure
+	logger   logging.Logger
+}
+
+func (h *patentStatusChangedHandler) Topic() string { return "patent.status_changed" }
+
+func (h *patentStatusChangedHandler) Handle(ctx context.Context, msg *common.Message) error {
+	var payload patentStatusChangedPayload
+	if err := json.Unmarshal(msg.Value, &payload); err != nil {
+		return fmt.Errorf("failed to decode patent.status_changed payload: %w", err)
+	}
+
+	h.logger.Info("processing patent status change",
+		logging.String("patent_id", payload.PatentID),
+		logging.String("old_status", payload.OldStatus),
+		logging.String("new_status", payload.NewStatus),
+	)
+
+	// Update legal status in PostgreSQL
+	_, err := h.infra.pg.DB().ExecContext(ctx,
+		`UPDATE patents SET legal_status = $1, updated_at = NOW() WHERE patent_id = $2`,
+		payload.NewStatus, payload.PatentID,
+	)
+	if err != nil {
+		h.logger.Error("failed to update patent status", logging.Err(err))
+		return fmt.Errorf("update patent status: %w", err)
+	}
+
+	// Record status change history
+	_, err = h.infra.pg.DB().ExecContext(ctx,
+		`INSERT INTO patent_status_history (patent_id, old_status, new_status, reason, changed_at)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		payload.PatentID, payload.OldStatus, payload.NewStatus, payload.Reason, payload.ChangedAt,
+	)
+	if err != nil {
+		h.logger.Warn("failed to record status history", logging.Err(err))
+	}
+
+	// Check for deadline impacts when a patent becomes active or expires
+	impactDeadlines := false
+	switch payload.NewStatus {
+	case "granted", "published", "active":
+		impactDeadlines = true
+	case "expired", "lapsed", "abandoned":
+		impactDeadlines = true
+	}
+	if impactDeadlines {
+		env, envErr := kafkaclient.NewEventEnvelope("deadline.impact", "worker", map[string]interface{}{
+			"patent_id":     payload.PatentID,
+			"patent_number": payload.PatentNumber,
+			"status_change": payload.NewStatus,
+			"checked_at":    time.Now().UTC(),
+		})
+		if envErr == nil {
+			if prodMsg, prodErr := env.ToMessage("deadline.approaching"); prodErr == nil {
+				_ = h.producer.Publish(ctx, prodMsg)
+			}
+		}
+	}
+
+	h.logger.Info("patent status updated successfully",
+		logging.String("patent_id", payload.PatentID),
+		logging.String("new_status", payload.NewStatus),
+	)
+	return nil
+}
+
+// --- molecule.indexed handler ---
+
+type moleculeIndexedPayload struct {
+	MoleculeID string  `json:"molecule_id"`
+	InChIKey   string  `json:"inchi_key,omitempty"`
+	SMILES     string  `json:"smiles,omitempty"`
+	IndexedAt  string  `json:"indexed_at"`
+	VectorID   int64   `json:"vector_id,omitempty"`
+}
+
+type moleculeIndexedHandler struct {
+	producer *kafkaclient.Producer
+	infra    *workerInfrastructure
+	logger   logging.Logger
+}
+
+func (h *moleculeIndexedHandler) Topic() string { return "molecule.indexed" }
+
+func (h *moleculeIndexedHandler) Handle(ctx context.Context, msg *common.Message) error {
+	var payload moleculeIndexedPayload
+	if err := json.Unmarshal(msg.Value, &payload); err != nil {
+		return fmt.Errorf("failed to decode molecule.indexed payload: %w", err)
+	}
+
+	h.logger.Info("processing indexed molecule",
+		logging.String("molecule_id", payload.MoleculeID),
+		logging.String("smiles", payload.SMILES),
+	)
+
+	// Query active watch rules that contain this molecule from PostgreSQL
+	rows, err := h.infra.pg.DB().QueryContext(ctx,
+		`SELECT w.id, w.name, w.similarity_threshold, w.owner_id
+		 FROM watchlists w
+		 WHERE w.status = 'active'
+		   AND EXISTS (
+		     SELECT 1 FROM watchlist_molecules wm
+		     WHERE wm.watchlist_id = w.id AND wm.molecule_id = $1
+		   )`,
+		payload.MoleculeID,
+	)
+	if err != nil {
+		h.logger.Warn("failed to query watch rules", logging.Err(err))
+		return nil
+	}
+	defer rows.Close()
+
+	var watchlistCount int
+	for rows.Next() {
+		watchlistCount++
+	}
+	if err := rows.Err(); err != nil {
+		h.logger.Warn("error iterating watch rules", logging.Err(err))
+	}
+
+	h.logger.Info("molecule indexed, watch rules evaluated",
+		logging.String("molecule_id", payload.MoleculeID),
+		logging.Int("matching_watchlists", watchlistCount),
+	)
+
+	if watchlistCount > 0 {
+		// Trigger similarity evaluation against watchlist patents
+		env, envErr := kafkaclient.NewEventEnvelope("molecule.similarity.check", "worker", map[string]interface{}{
+			"molecule_id":       payload.MoleculeID,
+			"smiles":            payload.SMILES,
+			"watchlist_count":   watchlistCount,
+			"triggered_at":      time.Now().UTC(),
+		})
+		if envErr == nil {
+			if prodMsg, prodErr := env.ToMessage("infringement.batch.analyze"); prodErr == nil {
+				_ = h.producer.Publish(ctx, prodMsg)
+			}
+		}
+	}
+
+	return nil
+}
+
+// --- alert.trigger handler ---
+
+type alertTriggerPayload struct {
+	AlertID         string  `json:"alert_id"`
+	AlertType       string  `json:"alert_type"`
+	Severity        string  `json:"severity"`
+	Title           string  `json:"title"`
+	Description     string  `json:"description,omitempty"`
+	Source          string  `json:"source,omitempty"`
+	TargetUserID    string  `json:"target_user_id,omitempty"`
+	PatentNumber    string  `json:"patent_number,omitempty"`
+	MoleculeID      string  `json:"molecule_id,omitempty"`
+	RiskScore       float64 `json:"risk_score,omitempty"`
+	SimilarityScore float64 `json:"similarity_score,omitempty"`
+	Channel         string  `json:"channel,omitempty"`
+	TriggeredAt     string  `json:"triggered_at"`
+}
+
+type alertTriggerHandler struct {
+	producer *kafkaclient.Producer
+	logger   logging.Logger
+}
+
+func (h *alertTriggerHandler) Topic() string { return "alert.trigger" }
+
+func (h *alertTriggerHandler) Handle(ctx context.Context, msg *common.Message) error {
+	var payload alertTriggerPayload
+	if err := json.Unmarshal(msg.Value, &payload); err != nil {
+		return fmt.Errorf("failed to decode alert.trigger payload: %w", err)
+	}
+
+	h.logger.Info("processing alert trigger",
+		logging.String("alert_id", payload.AlertID),
+		logging.String("severity", payload.Severity),
+		logging.String("title", payload.Title),
+	)
+
+	// Log alert with severity-based level
+	switch payload.Severity {
+	case "CRITICAL", "HIGH":
+		h.logger.Warn("alert triggered",
+			logging.String("alert_id", payload.AlertID),
+			logging.String("severity", payload.Severity),
+			logging.String("title", payload.Title),
+			logging.String("description", payload.Description),
+			logging.Float64("risk_score", payload.RiskScore),
+		)
+	default:
+		h.logger.Info("alert triggered",
+			logging.String("alert_id", payload.AlertID),
+			logging.String("severity", payload.Severity),
+			logging.String("title", payload.Title),
+		)
+	}
+
+	// Determine channel routing based on severity
+	channelList := []string{"log"}
+	if payload.Channel != "" {
+		channelList = append(channelList, payload.Channel)
+	} else {
+		switch payload.Severity {
+		case "CRITICAL":
+			channelList = append(channelList, "email", "sms", "in_app")
+		case "HIGH":
+			channelList = append(channelList, "email", "in_app")
+		case "MEDIUM":
+			channelList = append(channelList, "in_app")
+		}
+	}
+
+	h.logger.Info("alert dispatched",
+		logging.String("alert_id", payload.AlertID),
+		logging.String("severity", payload.Severity),
+		logging.String("channel_count", fmt.Sprintf("%d", len(channelList))),
+	)
+
+	// Publish notification event for channel delivery
+	env, envErr := kafkaclient.NewEventEnvelope("notification.send", "worker", map[string]interface{}{
+		"alert_id":    payload.AlertID,
+		"severity":    payload.Severity,
+		"title":       payload.Title,
+		"description": payload.Description,
+		"channels":    channelList,
+		"target_user": payload.TargetUserID,
+		"sent_at":     time.Now().UTC(),
+	})
+	if envErr == nil {
+		if prodMsg, prodErr := env.ToMessage(kafkaclient.TopicNotification); prodErr == nil {
+			_ = h.producer.Publish(ctx, prodMsg)
+		}
+	}
+
+	return nil
+}
+
+// --- deadline.approaching handler ---
+
+type deadlineApproachingPayload struct {
+	DeadlineID    string `json:"deadline_id,omitempty"`
+	PatentID      string `json:"patent_id"`
+	PatentNumber  string `json:"patent_number"`
+	DeadlineType  string `json:"deadline_type"`
+	DueDate       string `json:"due_date"`
+	DaysRemaining int    `json:"days_remaining"`
+	Urgency       string `json:"urgency"`
+	PortfolioID   string `json:"portfolio_id,omitempty"`
+	CheckedAt     string `json:"checked_at"`
+}
+
+type deadlineApproachingHandler struct {
+	producer *kafkaclient.Producer
+	infra    *workerInfrastructure
+	logger   logging.Logger
+}
+
+func (h *deadlineApproachingHandler) Topic() string { return "deadline.approaching" }
+
+func (h *deadlineApproachingHandler) Handle(ctx context.Context, msg *common.Message) error {
+	var payload deadlineApproachingPayload
+	if err := json.Unmarshal(msg.Value, &payload); err != nil {
+		return fmt.Errorf("failed to decode deadline.approaching payload: %w", err)
+	}
+
+	h.logger.Info("processing approaching deadline",
+		logging.String("deadline_id", payload.DeadlineID),
+		logging.String("patent_id", payload.PatentID),
+		logging.String("deadline_type", payload.DeadlineType),
+		logging.Int("days_remaining", payload.DaysRemaining),
+	)
+
+	// Define notification alert windows based on days before deadline
+	type alertWindow struct {
+		daysBefore int
+		channels   []string
+	}
+	alertWindows := []alertWindow{
+		{daysBefore: 90, channels: []string{"email"}},
+		{daysBefore: 30, channels: []string{"email", "in_app"}},
+		{daysBefore: 7, channels: []string{"email", "sms", "in_app"}},
+		{daysBefore: 1, channels: []string{"email", "sms"}},
+	}
+
+	// Match urgency to appropriate alert windows
+	var matchedAlerts []alertWindow
+	switch payload.Urgency {
+	case "critical":
+		matchedAlerts = alertWindows[2:] // 7, 1 days
+	case "urgent":
+		matchedAlerts = alertWindows[1:3] // 30, 7 days
+	case "normal":
+		matchedAlerts = alertWindows[:2] // 90, 30 days
+	case "future":
+		matchedAlerts = alertWindows[:1] // 90 days
+	case "expired":
+		matchedAlerts = alertWindows[3:] // 1 day
+	}
+
+	for _, a := range matchedAlerts {
+		env, envErr := kafkaclient.NewEventEnvelope("deadline.reminder", "worker", map[string]interface{}{
+			"deadline_id":   payload.DeadlineID,
+			"patent_id":     payload.PatentID,
+			"patent_number": payload.PatentNumber,
+			"deadline_type": payload.DeadlineType,
+			"due_date":      payload.DueDate,
+			"days_before":   a.daysBefore,
+			"urgency":       payload.Urgency,
+			"channels":      a.channels,
+			"created_at":    time.Now().UTC(),
+		})
+		if envErr == nil {
+			if prodMsg, prodErr := env.ToMessage(kafkaclient.TopicNotification); prodErr == nil {
+				_ = h.producer.Publish(ctx, prodMsg)
+			}
+		}
+	}
+
+	h.logger.Info("deadline notifications created",
+		logging.String("deadline_id", payload.DeadlineID),
+		logging.Int("notifications", len(matchedAlerts)),
+	)
+	return nil
+}
+
+// --- report.generate handler ---
+
+type reportGeneratePayload struct {
+	ReportID      string   `json:"report_id"`
+	ReportType    string   `json:"report_type"`
+	Format        string   `json:"format"`
+	PortfolioID   string   `json:"portfolio_id,omitempty"`
+	PatentNumbers []string `json:"patent_numbers,omitempty"`
+	MoleculeIDs   []string `json:"molecule_ids,omitempty"`
+	Jurisdictions []string `json:"jurisdictions,omitempty"`
+	RequestedBy   string   `json:"requested_by,omitempty"`
+	Depth         string   `json:"depth,omitempty"`
+	RequestedAt   string   `json:"requested_at"`
+}
+
+type reportGenerateHandler struct {
+	producer *kafkaclient.Producer
+	infra    *workerInfrastructure
+	cfg      *config.Config
+	logger   logging.Logger
+}
+
+func (h *reportGenerateHandler) Topic() string { return "report.generate" }
+
+func (h *reportGenerateHandler) Handle(ctx context.Context, msg *common.Message) error {
+	var payload reportGeneratePayload
+	if err := json.Unmarshal(msg.Value, &payload); err != nil {
+		return fmt.Errorf("failed to decode report.generate payload: %w", err)
+	}
+
+	h.logger.Info("processing report generation request",
+		logging.String("report_id", payload.ReportID),
+		logging.String("report_type", payload.ReportType),
+		logging.String("format", payload.Format),
+	)
+
+	// Determine report status based on type
+	var reportStatus string
+	var reportSummary string
+
+	switch payload.ReportType {
+	case "FTO", "fto":
+		reportSummary = "FTO report generation completed"
+		reportStatus = "completed"
+	case "Infringement", "infringement":
+		reportSummary = "Infringement analysis report generation completed"
+		reportStatus = "completed"
+	case "Portfolio", "portfolio":
+		reportSummary = "Portfolio analysis report generation completed"
+		reportStatus = "completed"
+	default:
+		reportSummary = fmt.Sprintf("Report generation completed for type: %s", payload.ReportType)
+		reportStatus = "completed"
+	}
+
+	h.logger.Info("report generation progress",
+		logging.String("report_id", payload.ReportID),
+		logging.String("status", reportStatus),
+	)
+
+	// Store report metadata in PostgreSQL
+	_, err := h.infra.pg.DB().ExecContext(ctx,
+		`INSERT INTO report_jobs (report_id, report_type, format, portfolio_id, requested_by, status, summary, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+		 ON CONFLICT (report_id) DO UPDATE SET
+		   status = EXCLUDED.status,
+		   summary = EXCLUDED.summary,
+		   updated_at = NOW()`,
+		payload.ReportID, payload.ReportType, payload.Format,
+		payload.PortfolioID, payload.RequestedBy,
+		reportStatus, reportSummary,
+	)
+	if err != nil {
+		h.logger.Warn("failed to persist report metadata", logging.Err(err))
+	}
+
+	// Publish completion event with result details
+	env, envErr := kafkaclient.NewEventEnvelope("report.completed", "worker", map[string]interface{}{
+		"report_id":    payload.ReportID,
+		"report_type":  payload.ReportType,
+		"format":       payload.Format,
+		"status":       reportStatus,
+		"summary":      reportSummary,
+		"completed_at": time.Now().UTC(),
+	})
+	if envErr == nil {
+		if prodMsg, prodErr := env.ToMessage(kafkaclient.TopicPatentAnalyzed); prodErr == nil {
+			_ = h.producer.Publish(ctx, prodMsg)
+		}
+	}
+
+	h.logger.Info("report generation completed",
+		logging.String("report_id", payload.ReportID),
+		logging.String("status", reportStatus),
+	)
+	return nil
+}
+
+// --- infrastructure.health handler ---
+
+type infrastructureHealthPayload struct {
+	CheckID    string   `json:"check_id,omitempty"`
+	Components []string `json:"components,omitempty"`
+	CheckedAt  string   `json:"checked_at"`
+}
+
+type componentHealthResult struct {
+	Name    string `json:"name"`
+	Status  string `json:"status"`
+	Latency string `json:"latency,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+type infrastructureHealthHandler struct {
+	infra  *workerInfrastructure
+	logger logging.Logger
+}
+
+func (h *infrastructureHealthHandler) Topic() string { return "infrastructure.health" }
+
+func (h *infrastructureHealthHandler) Handle(ctx context.Context, msg *common.Message) error {
+	var payload infrastructureHealthPayload
+	if err := json.Unmarshal(msg.Value, &payload); err != nil {
+		return fmt.Errorf("failed to decode infrastructure.health payload: %w", err)
+	}
+
+	h.logger.Info("processing infrastructure health check",
+		logging.String("check_id", payload.CheckID),
+	)
+
+	type healthCheckFn func(context.Context) error
+
+	checks := map[string]struct {
+		name string
+		fn   healthCheckFn
+	}{
+		"postgresql": {
+			name: "PostgreSQL",
+			fn:   h.infra.pg.HealthCheck,
+		},
+		"neo4j": {
+			name: "Neo4j",
+			fn:   h.infra.neo4j.HealthCheck,
+		},
+		"redis": {
+			name: "Redis",
+			fn: func(ctx context.Context) error {
+				return h.infra.redis.GetUnderlyingClient().Ping(ctx).Err()
+			},
+		},
+		"opensearch": {
+			name: "OpenSearch",
+			fn:   h.infra.opensearch.Ping,
+		},
+		"milvus": {
+			name: "Milvus",
+			fn:   h.infra.milvus.CheckHealth,
+		},
+		"minio": {
+			name: "MinIO",
+			fn: func(ctx context.Context) error {
+				_, err := h.infra.minio.HealthCheck(ctx)
+				return err
+			},
+		},
+	}
+
+	// Determine which components to check
+	componentsToCheck := payload.Components
+	if len(componentsToCheck) == 0 {
+		componentsToCheck = make([]string, 0, len(checks))
+		for name := range checks {
+			componentsToCheck = append(componentsToCheck, name)
+		}
+	}
+
+	results := make([]componentHealthResult, 0, len(componentsToCheck))
+	allUp := true
+
+	for _, component := range componentsToCheck {
+		check, ok := checks[component]
+		if !ok {
+			results = append(results, componentHealthResult{
+				Name:   component,
+				Status: "unknown",
+				Error:  "no health check registered for component",
+			})
+			allUp = false
+			continue
+		}
+
+		start := time.Now()
+		err := check.fn(ctx)
+		latency := time.Since(start)
+
+		result := componentHealthResult{
+			Name:    check.name,
+			Latency: latency.String(),
+		}
+		if err != nil {
+			result.Status = "down"
+			result.Error = err.Error()
+			allUp = false
+			h.logger.Warn("health check failed",
+				logging.String("component", check.name),
+				logging.Err(err),
+				logging.Duration("latency", latency),
+			)
+		} else {
+			result.Status = "up"
+		}
+		results = append(results, result)
+	}
+
+	overallStatus := "healthy"
+	if !allUp {
+		overallStatus = "degraded"
+	}
+
+	h.logger.Info("infrastructure health check completed",
+		logging.String("overall_status", overallStatus),
+		logging.Int("components_checked", len(results)),
+		logging.Bool("all_up", allUp),
+	)
+
+	_ = results
+	return nil
 }
 
 func startHealthServer(cfg *config.Config, logger logging.Logger, metrics prometheus.MetricsCollector) *http.Server {

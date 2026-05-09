@@ -219,9 +219,25 @@ func (s *gapAnalysisServiceImpl) AnalyzeGaps(ctx context.Context, req *GapAnalys
 		ownPatents[i] = *p
 	}
 
-	// Load competitor patents.
-	// TODO: Implement competitor loading when repository methods are available
+	// Load competitor patents using the patent repository.
 	competitorPatents := make(map[string][]domainpatent.Patent)
+	for _, compName := range req.CompetitorNames {
+		results, _, err := s.patentRepo.SearchByAssigneeName(ctx, compName, 500, 0)
+		if err != nil {
+			s.logger.Warn("failed to load competitor patents",
+				logging.String("competitor", compName),
+				logging.Error(err))
+			continue
+		}
+		patents := make([]domainpatent.Patent, len(results))
+		for i, p := range results {
+			patents[i] = *p
+		}
+		competitorPatents[compName] = patents
+		s.logger.Debug("loaded competitor patents",
+			logging.String("competitor", compName),
+			logging.Int("count", len(patents)))
+	}
 
 	// Step 1: Identify technology gaps.
 	techGaps := s.identifyTechGaps(ownPatents, competitorPatents, req.TechDomains)

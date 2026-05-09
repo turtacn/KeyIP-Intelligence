@@ -454,6 +454,12 @@ type CitationRepository interface {
 	MaxForwardCitationsInDomain(ctx context.Context, domain string) (int, error)
 }
 
+// FamilyRepository provides family membership data for patent valuation.
+type FamilyRepository interface {
+	// CountFamilyMembers returns the number of members in a patent family.
+	CountFamilyMembers(ctx context.Context, familyID string) (int, error)
+}
+
 // Cache is a minimal cache adapter.
 type Cache interface {
 	Get(ctx context.Context, key string) ([]byte, error)
@@ -685,6 +691,7 @@ type valuationServiceImpl struct {
 	assessmentRepo     AssessmentRepository
 	aiScorer           IntelligenceValueScorer
 	citationRepo       CitationRepository
+	familyRepo         FamilyRepository
 	logger             logging.Logger
 	cache              Cache
 	metrics            MetricsCollector
@@ -700,6 +707,7 @@ func NewValuationService(
 	assessmentRepo AssessmentRepository,
 	aiScorer IntelligenceValueScorer,
 	citationRepo CitationRepository,
+	familyRepo FamilyRepository,
 	logger logging.Logger,
 	cache Cache,
 	metrics MetricsCollector,
@@ -728,6 +736,7 @@ func NewValuationService(
 		assessmentRepo:     assessmentRepo,
 		aiScorer:           aiScorer,
 		citationRepo:       citationRepo,
+		familyRepo:         familyRepo,
 		logger:             logger,
 		cache:              cache,
 		metrics:            metrics,
@@ -1676,12 +1685,28 @@ func (s *valuationServiceImpl) ruleLegalFactor(ctx context.Context, pat *patent.
 		return clampScore(remaining / float64(maxLife) * 100)
 
 	case "family_coverage":
-		// Heuristic: if patent has a family ID, assume moderate family coverage
-		// TODO: Query actual family members from repository for more accurate scoring
-		if pat.FamilyID != "" {
-			return 60 // Moderate score assuming family membership
+		if pat.FamilyID == "" {
+			return 35 // Lower score for standalone patents
 		}
-		return 35 // Lower score for standalone patents
+		// Query actual family members from repository for more accurate scoring.
+		if s.familyRepo != nil {
+			count, err := s.familyRepo.CountFamilyMembers(ctx, pat.FamilyID)
+			if err == nil {
+				switch {
+				case count >= 10:
+					return 95
+				case count >= 5:
+					return 85
+				case count >= 3:
+					return 75
+				case count >= 2:
+					return 65
+				case count >= 1:
+					return 55
+				}
+			}
+		}
+		return 60 // Fallback: moderate score assuming family membership
 
 	default:
 		return 50

@@ -244,30 +244,99 @@ func TestGetMolecule(t *testing.T) {
 	})
 }
 
-func TestUnimplementedMethods(t *testing.T) {
+func TestPredictProperties(t *testing.T) {
 	mockRepo := new(MockMoleculeRepo)
 	mockSearch := new(MockSimilaritySearch)
 	mockLogger := new(MockLogger)
 	service := NewMoleculeServiceServer(mockRepo, mockSearch, mockLogger)
 
-	t.Run("PredictProperties is Unimplemented", func(t *testing.T) {
-		resp, err := service.PredictProperties(context.Background(), &pb.PredictPropertiesRequest{Smiles: "C"})
-		assert.Error(t, err)
-		assert.Nil(t, resp)
-		assert.Equal(t, codes.Unimplemented, status.Code(err))
+	ctx := context.Background()
+
+	t.Run("Success", func(t *testing.T) {
+		mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+
+		resp, err := service.PredictProperties(ctx, &pb.PredictPropertiesRequest{Smiles: "CCO"})
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		// Verify all fields are populated within expected ranges
+		assert.LessOrEqual(t, resp.Homo, float32(-5.0))
+		assert.GreaterOrEqual(t, resp.Homo, float32(-8.0))
+		assert.LessOrEqual(t, resp.Lumo, float32(-1.0))
+		assert.GreaterOrEqual(t, resp.Lumo, float32(-3.0))
+		assert.GreaterOrEqual(t, resp.BandGap, float32(1.5))
+		assert.LessOrEqual(t, resp.BandGap, float32(4.5))
+		assert.GreaterOrEqual(t, resp.EmissionWavelength, float32(400.0))
+		assert.LessOrEqual(t, resp.EmissionWavelength, float32(700.0))
+		assert.GreaterOrEqual(t, resp.QuantumYield, float32(0.0))
+		assert.LessOrEqual(t, resp.QuantumYield, float32(1.0))
+		assert.GreaterOrEqual(t, resp.Stability, float32(0.0))
+		assert.LessOrEqual(t, resp.Stability, float32(1.0))
+		assert.GreaterOrEqual(t, resp.Confidence, float32(0.75))
+		assert.LessOrEqual(t, resp.Confidence, float32(1.0))
+		mockLogger.AssertExpectations(t)
 	})
 
-	t.Run("BatchSimilaritySearch is Unimplemented", func(t *testing.T) {
+	t.Run("MissingSMILES", func(t *testing.T) {
+		resp, err := service.PredictProperties(ctx, &pb.PredictPropertiesRequest{Smiles: ""})
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+
+	t.Run("DeterministicOutput", func(t *testing.T) {
+		resp1, err1 := service.PredictProperties(ctx, &pb.PredictPropertiesRequest{Smiles: "c1ccccc1"})
+		resp2, err2 := service.PredictProperties(ctx, &pb.PredictPropertiesRequest{Smiles: "c1ccccc1"})
+		assert.NoError(t, err1)
+		assert.NoError(t, err2)
+		assert.Equal(t, resp1.Homo, resp2.Homo)
+		assert.Equal(t, resp1.Lumo, resp2.Lumo)
+		assert.Equal(t, resp1.BandGap, resp2.BandGap)
+	})
+}
+
+func TestBatchSimilaritySearch(t *testing.T) {
+	mockRepo := new(MockMoleculeRepo)
+	mockSearch := new(MockSimilaritySearch)
+	mockLogger := new(MockLogger)
+	service := NewMoleculeServiceServer(mockRepo, mockSearch, mockLogger)
+
+	t.Run("EmptyRequests", func(t *testing.T) {
 		err := service.BatchSimilaritySearch(&pb.BatchSimilaritySearchRequest{}, nil)
 		assert.Error(t, err)
-		assert.Equal(t, codes.Unimplemented, status.Code(err))
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
 
-	t.Run("AssessPatentability is Unimplemented", func(t *testing.T) {
-		resp, err := service.AssessPatentability(context.Background(), &pb.AssessPatentabilityRequest{MoleculeId: "test"})
+	t.Run("NilRequests", func(t *testing.T) {
+		err := service.BatchSimilaritySearch(&pb.BatchSimilaritySearchRequest{Requests: nil}, nil)
+		assert.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+}
+
+func TestAssessPatentability(t *testing.T) {
+	mockRepo := new(MockMoleculeRepo)
+	mockSearch := new(MockSimilaritySearch)
+	mockLogger := new(MockLogger)
+	service := NewMoleculeServiceServer(mockRepo, mockSearch, mockLogger)
+
+	ctx := context.Background()
+
+	t.Run("MissingMoleculeID", func(t *testing.T) {
+		resp, err := service.AssessPatentability(ctx, &pb.AssessPatentabilityRequest{MoleculeId: ""})
 		assert.Error(t, err)
 		assert.Nil(t, resp)
-		assert.Equal(t, codes.Unimplemented, status.Code(err))
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		mockRepo.On("FindByID", ctx, "unknown").Return(nil, errors.NewNotFound("molecule not found"))
+		mockLogger.On("Error", mock.Anything, mock.Anything).Return()
+
+		resp, err := service.AssessPatentability(ctx, &pb.AssessPatentabilityRequest{MoleculeId: "unknown"})
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		assert.Equal(t, codes.NotFound, status.Code(err))
+		mockRepo.AssertExpectations(t)
 	})
 }
 
