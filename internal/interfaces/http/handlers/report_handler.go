@@ -127,6 +127,8 @@ func (h *ReportHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/reports/{report_id}/download", h.DownloadReport)
 	mux.HandleFunc("GET /api/v1/reports", h.ListReports)
 	mux.HandleFunc("DELETE /api/v1/reports/{report_id}", h.DeleteReport)
+	mux.HandleFunc("GET /api/v1/reports/templates", h.ListTemplates)
+	mux.HandleFunc("GET /api/v1/reports/templates/{id}", h.GetTemplate)
 }
 
 // GenerateFTOReport handles POST /api/v1/reports/fto.
@@ -606,14 +608,63 @@ func (h *ReportHandler) Generate(w http.ResponseWriter, r *http.Request) {
 	h.GenerateFTOReport(w, r)
 }
 
-// ListTemplates handles template listing (placeholder).
+// ListTemplates handles template listing using the template service.
 func (h *ReportHandler) ListTemplates(w http.ResponseWriter, r *http.Request) {
-	writeReportJSON(w, http.StatusNotImplemented, map[string]string{"message": "list templates not yet implemented"})
+	query := r.URL.Query()
+
+	pageSize, _ := strconv.Atoi(query.Get("page_size"))
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	page, _ := strconv.Atoi(query.Get("page"))
+	if page <= 0 {
+		page = 1
+	}
+
+	opts := &reporting.ListTemplateOptions{
+		Pagination: pkghttp.Pagination{
+			Page:     page,
+			PageSize: pageSize,
+		},
+	}
+
+	if t := query.Get("type"); t != "" {
+		opts.Type = &t
+	}
+	if f := query.Get("format"); f != "" {
+		fmtVal := reporting.TemplateFormat(f)
+		opts.Format = &fmtVal
+	}
+	if q := query.Get("q"); q != "" {
+		opts.Keyword = &q
+	}
+
+	result, err := h.templateSvc.ListTemplates(r.Context(), opts)
+	if err != nil {
+		h.logger.Error("failed to list templates", logging.Err(err))
+		writeReportAppError(w, err)
+		return
+	}
+
+	writeReportJSON(w, http.StatusOK, result)
 }
 
-// GetTemplate handles template retrieval (placeholder).
+// GetTemplate handles template retrieval using the template service.
 func (h *ReportHandler) GetTemplate(w http.ResponseWriter, r *http.Request) {
-	writeReportJSON(w, http.StatusNotImplemented, map[string]string{"message": "get template not yet implemented"})
+	id := r.PathValue("id")
+	if id == "" {
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "template id is required")
+		return
+	}
+
+	tmpl, err := h.templateSvc.GetTemplate(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to get template", logging.Err(err), logging.String("template_id", id))
+		writeReportAppError(w, err)
+		return
+	}
+
+	writeReportJSON(w, http.StatusOK, tmpl)
 }
 
 //Personal.AI order the ending

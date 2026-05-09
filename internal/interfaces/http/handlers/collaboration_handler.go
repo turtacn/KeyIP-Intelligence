@@ -36,6 +36,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/collaboration"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // CollaborationHandler handles HTTP requests for collaboration workspace operations.
@@ -106,6 +107,9 @@ func (h *CollaborationHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workspaces/{id}/members", h.InviteMember)
 	mux.HandleFunc("DELETE /api/v1/workspaces/{id}/members/{memberId}", h.RemoveMember)
 	mux.HandleFunc("PUT /api/v1/workspaces/{id}/members/{memberId}/role", h.UpdateMemberRole)
+	mux.HandleFunc("GET /api/v1/workspaces/{id}/members", h.ListMembers)
+	mux.HandleFunc("GET /api/v1/workspaces/{id}/shared-resource", h.GetSharedResource)
+	mux.HandleFunc("DELETE /api/v1/workspaces/{id}/shares/{shareId}", h.RevokeShareLink)
 }
 
 // CreateWorkspace handles POST /api/v1/workspaces
@@ -410,9 +414,33 @@ func isValidRole(role string) bool {
 
 // Router-compatible aliases for CollaborationHandler
 
-// ListMembers handles member listing (placeholder).
+// ListMembers handles member listing using the workspace service.
 func (h *CollaborationHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "list members not yet implemented"})
+	workspaceID := r.PathValue("id")
+	if workspaceID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id is required"))
+		return
+	}
+
+	page, pageSize := parsePagination(r)
+	pagination := commontypes.Pagination{
+		Page:     page,
+		PageSize: pageSize,
+	}
+
+	members, total, err := h.workspaceSvc.ListMembers(r.Context(), workspaceID, pagination)
+	if err != nil {
+		h.logger.Error("failed to list members", logging.Err(err), logging.String("workspace_id", workspaceID))
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"members": members,
+		"total":   total,
+		"page":    page,
+		"page_size": pageSize,
+	})
 }
 
 // AddMember is an alias for InviteMember.
@@ -425,14 +453,52 @@ func (h *CollaborationHandler) CreateShareLink(w http.ResponseWriter, r *http.Re
 	h.ShareDocument(w, r)
 }
 
-// GetSharedResource handles shared resource retrieval (placeholder).
+// GetSharedResource handles shared resource retrieval using the sharing service.
 func (h *CollaborationHandler) GetSharedResource(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "get shared resource not yet implemented"})
+	workspaceID := r.PathValue("id")
+	if workspaceID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id is required"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+	page, pageSize := parsePagination(r)
+
+	input := &collaboration.ListSharedDocumentsInput{
+		WorkspaceID: workspaceID,
+		UserID:      userID,
+		Page:        page,
+		PageSize:    pageSize,
+	}
+
+	result, err := h.sharingSvc.ListDocuments(r.Context(), input)
+	if err != nil {
+		h.logger.Error("failed to get shared resource", logging.Err(err), logging.String("workspace_id", workspaceID))
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }
 
-// RevokeShareLink handles share link revocation (placeholder).
+// RevokeShareLink handles share link revocation using the sharing service.
 func (h *CollaborationHandler) RevokeShareLink(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "revoke share link not yet implemented"})
+	shareID := r.PathValue("shareId")
+	if shareID == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("shareId", "share id is required"))
+		return
+	}
+
+	userID := getUserIDFromContext(r)
+
+	err := h.sharingSvc.Revoke(r.Context(), shareID, userID)
+	if err != nil {
+		h.logger.Error("failed to revoke share link", logging.Err(err), logging.String("share_id", shareID))
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
 //Personal.AI order the ending

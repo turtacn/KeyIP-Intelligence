@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -104,18 +103,54 @@ func (r *postgresPatentRepo) CountByIPCSection(ctx context.Context) (map[string]
 }
 
 func (r *postgresPatentRepo) CountByOffice(ctx context.Context) (map[patent.PatentOffice]int64, error) {
-	// Dummy implementation to satisfy interface
-	return map[patent.PatentOffice]int64{}, nil
+	query := `SELECT jurisdiction, COUNT(*) FROM patents WHERE deleted_at IS NULL GROUP BY jurisdiction`
+	rows, err := r.executor().QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count by office")
+	}
+	defer rows.Close()
+
+	counts := make(map[patent.PatentOffice]int64)
+	for rows.Next() {
+		var office string
+		var count int64
+		if err := rows.Scan(&office, &count); err != nil {
+			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan office count")
+		}
+		counts[patent.PatentOffice(office)] = count
+	}
+	return counts, nil
 }
 
 func (r *postgresPatentRepo) FindActiveByIPCCode(ctx context.Context, ipcCode string) ([]*patent.Patent, error) {
-	// Dummy implementation
-	return nil, nil
+	query := `SELECT * FROM patents WHERE $1 = ANY(ipc_codes) AND deleted_at IS NULL AND status IN ('granted', 'published', 'under_examination', 'filed')`
+	rows, err := r.executor().QueryContext(ctx, query, ipcCode)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to find active patents by IPC code")
+	}
+	defer rows.Close()
+	return scanPatents(rows)
 }
 
 func (r *postgresPatentRepo) FindWithMarkushStructures(ctx context.Context, offset, limit int) ([]*patent.Patent, error) {
-	// Dummy implementation
-	return nil, nil
+	// Markush structures are stored in patent_claims.markush_structures JSONB column.
+	// Find patents that have at least one claim with a non-empty markush_structures.
+	query := `
+		SELECT DISTINCT p.* FROM patents p
+		JOIN patent_claims pc ON p.id = pc.patent_id
+		WHERE pc.markush_structures IS NOT NULL
+		  AND pc.markush_structures != '[]'::jsonb
+		  AND pc.markush_structures != 'null'::jsonb
+		  AND p.deleted_at IS NULL
+		ORDER BY p.filing_date DESC NULLS LAST
+		LIMIT $1 OFFSET $2
+	`
+	rows, err := r.executor().QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to find patents with Markush structures")
+	}
+	defer rows.Close()
+	return scanPatents(rows)
 }
 
 func (r *postgresPatentRepo) Exists(ctx context.Context, patentNumber string) (bool, error) {
@@ -310,11 +345,13 @@ func (r *postgresPatentRepo) FindByID(ctx context.Context, id string) (*patent.P
 }
 
 func (r *postgresPatentRepo) FindCitedBy(ctx context.Context, patentNumber string) ([]*patent.Patent, error) {
-	return nil, nil
+	// No dedicated citations table exists. Citations tracked via metadata or external.
+	// Return empty result until a citation table is added.
+	return []*patent.Patent{}, nil
 }
 
 func (r *postgresPatentRepo) FindCiting(ctx context.Context, patentNumber string) ([]*patent.Patent, error) {
-	return nil, nil
+	return []*patent.Patent{}, nil
 }
 
 func (r *postgresPatentRepo) FindByApplicant(ctx context.Context, applicantName string) ([]*patent.Patent, error) {
@@ -358,23 +395,107 @@ func (r *postgresPatentRepo) ListByPortfolio(ctx context.Context, portfolioID st
 }
 
 func (r *postgresPatentRepo) GetByAssignee(ctx context.Context, assigneeID uuid.UUID, limit, offset int) ([]*patent.Patent, int64, error) {
-	return nil, 0, nil
+	if limit <= 0 {
+		limit = 20
+	}
+
+	baseQuery := `FROM patents WHERE assignee_id = $1 AND deleted_at IS NULL`
+	var total int64
+	err := r.executor().QueryRowContext(ctx, "SELECT COUNT(*) "+baseQuery, assigneeID).Scan(&total)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count by assignee")
+	}
+
+	query := fmt.Sprintf("SELECT * %s ORDER BY filing_date DESC NULLS LAST LIMIT $2 OFFSET $3", baseQuery)
+	rows, err := r.executor().QueryContext(ctx, query, assigneeID, limit, offset)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get by assignee")
+	}
+	defer rows.Close()
+
+	patents, err := scanPatents(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+	return patents, total, nil
 }
 
 func (r *postgresPatentRepo) GetByJurisdiction(ctx context.Context, jurisdiction string, limit, offset int) ([]*patent.Patent, int64, error) {
-	return nil, 0, nil
+	if limit <= 0 {
+		limit = 20
+	}
+
+	baseQuery := `FROM patents WHERE jurisdiction = $1 AND deleted_at IS NULL`
+	var total int64
+	err := r.executor().QueryRowContext(ctx, "SELECT COUNT(*) "+baseQuery, jurisdiction).Scan(&total)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count by jurisdiction")
+	}
+
+	query := fmt.Sprintf("SELECT * %s ORDER BY filing_date DESC NULLS LAST LIMIT $2 OFFSET $3", baseQuery)
+	rows, err := r.executor().QueryContext(ctx, query, jurisdiction, limit, offset)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get by jurisdiction")
+	}
+	defer rows.Close()
+
+	patents, err := scanPatents(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+	return patents, total, nil
 }
 
 func (r *postgresPatentRepo) FindExpiringBefore(ctx context.Context, date time.Time) ([]*patent.Patent, error) {
-	return nil, nil
+	query := `SELECT * FROM patents WHERE expiry_date IS NOT NULL AND expiry_date < $1 AND deleted_at IS NULL ORDER BY expiry_date ASC`
+	rows, err := r.executor().QueryContext(ctx, query, date)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to find expiring patents")
+	}
+	defer rows.Close()
+	return scanPatents(rows)
 }
 
 func (r *postgresPatentRepo) GetExpiringPatents(ctx context.Context, daysAhead int, limit, offset int) ([]*patent.Patent, int64, error) {
-	return nil, 0, nil
+	if limit <= 0 {
+		limit = 20
+	}
+
+	baseQuery := `FROM patents WHERE expiry_date IS NOT NULL AND expiry_date <= NOW() + ($1 || ' days')::INTERVAL AND expiry_date >= NOW() AND deleted_at IS NULL`
+	// Use a parameterized interval approach
+	args := []interface{}{fmt.Sprintf("%d days", daysAhead)}
+	argIdx := 2
+
+	var total int64
+	err := r.executor().QueryRowContext(ctx, "SELECT COUNT(*) "+baseQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count expiring patents")
+	}
+
+	query := fmt.Sprintf("SELECT * %s ORDER BY expiry_date ASC LIMIT $%d OFFSET $%d", baseQuery, argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.executor().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get expiring patents")
+	}
+	defer rows.Close()
+
+	patents, err := scanPatents(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+	return patents, total, nil
 }
 
 func (r *postgresPatentRepo) FindDuplicates(ctx context.Context, fullTextHash string) ([]*patent.Patent, error) {
-	return nil, nil
+	query := `SELECT * FROM patents WHERE full_text_hash = $1 AND deleted_at IS NULL ORDER BY created_at DESC`
+	rows, err := r.executor().QueryContext(ctx, query, fullTextHash)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to find duplicates")
+	}
+	defer rows.Close()
+	return scanPatents(rows)
 }
 
 func (r *postgresPatentRepo) FindByPatentNumbers(ctx context.Context, numbers []string) ([]*patent.Patent, error) {
@@ -391,7 +512,13 @@ func (r *postgresPatentRepo) FindByPatentNumbers(ctx context.Context, numbers []
 }
 
 func (r *postgresPatentRepo) FindByIPCCode(ctx context.Context, ipcCode string) ([]*patent.Patent, error) {
-	return nil, nil
+	query := `SELECT * FROM patents WHERE $1 = ANY(ipc_codes) AND deleted_at IS NULL`
+	rows, err := r.executor().QueryContext(ctx, query, ipcCode)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to find patents by IPC code")
+	}
+	defer rows.Close()
+	return scanPatents(rows)
 }
 
 func (r *postgresPatentRepo) FindByIDs(ctx context.Context, ids []string) ([]*patent.Patent, error) {
@@ -462,40 +589,241 @@ func (r *postgresPatentRepo) AssociateMolecule(ctx context.Context, patentID str
 	return nil
 }
 
-// Claims
+func parseClaimType(s string) patent.ClaimType {
+	switch s {
+	case "independent":
+		return patent.ClaimTypeIndependent
+	case "dependent":
+		return patent.ClaimTypeDependent
+	default:
+		return patent.ClaimTypeUnknown
+	}
+}
+
+func scanClaim(row scanner) (*patent.Claim, error) {
+	c := &patent.Claim{}
+	var claimTypeStr string
+	var elementsJSON, markushJSON []byte
+
+	err := row.Scan(
+		&c.Number, &claimTypeStr, &c.Text, &elementsJSON, &markushJSON,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan claim")
+	}
+	c.Type = parseClaimType(claimTypeStr)
+	if len(elementsJSON) > 0 {
+		_ = json.Unmarshal(elementsJSON, &c.Elements)
+	}
+	if len(markushJSON) > 0 {
+		_ = json.Unmarshal(markushJSON, &c.MarkushStructures)
+	}
+	c.Language = "en"
+	return c, nil
+}
 
 func (r *postgresPatentRepo) CreateClaim(ctx context.Context, claim *patent.Claim) error {
-	return nil
+	// Claim struct does not carry patent_id. This method requires the caller
+	// to use a repository with transaction context or the parent patent ID.
+	// Consider using GetClaimsByPatent for reads and BatchCreateClaims for bulk writes.
+	return errors.New(errors.ErrCodeInvalidOperation, "CreateClaim requires patent_id; use BatchCreateClaims with explicit patent context")
 }
 
 func (r *postgresPatentRepo) GetClaimsByPatent(ctx context.Context, patentID uuid.UUID) ([]*patent.Claim, error) {
-	query := `SELECT * FROM patent_claims WHERE patent_id = $1 ORDER BY claim_number ASC`
+	query := `SELECT claim_number, claim_type, claim_text, elements, markush_structures FROM patent_claims WHERE patent_id = $1 ORDER BY claim_number ASC`
 	rows, err := r.executor().QueryContext(ctx, query, patentID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get claims by patent")
 	}
 	defer rows.Close()
 
 	var claims []*patent.Claim
 	for rows.Next() {
-		// scan claim
+		c, err := scanClaim(rows)
+		if err != nil {
+			return nil, err
+		}
+		claims = append(claims, c)
 	}
 	return claims, nil
 }
 
-func (r *postgresPatentRepo) UpdateClaim(ctx context.Context, claim *patent.Claim) error { return nil }
-func (r *postgresPatentRepo) DeleteClaimsByPatent(ctx context.Context, patentID uuid.UUID) error { return nil }
-func (r *postgresPatentRepo) BatchCreateClaims(ctx context.Context, claims []*patent.Claim) error { return nil }
-func (r *postgresPatentRepo) GetIndependentClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.Claim, error) { return nil, nil }
+func (r *postgresPatentRepo) UpdateClaim(ctx context.Context, claim *patent.Claim) error {
+	query := `
+		UPDATE patent_claims
+		SET claim_text = $1, elements = $2, markush_structures = $3, updated_at = NOW()
+		WHERE patent_id = $4 AND claim_number = $5
+	`
+	elements, _ := json.Marshal(claim.Elements)
+	markushStructures, _ := json.Marshal(claim.MarkushStructures)
+	res, err := r.executor().ExecContext(ctx, query, claim.Text, elements, markushStructures, claim.Number, claim.Number)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to update claim")
+	}
+	if rows, _ := res.RowsAffected(); rows == 0 {
+		return errors.New(errors.ErrCodeNotFound, "claim not found")
+	}
+	return nil
+}
+
+func (r *postgresPatentRepo) DeleteClaimsByPatent(ctx context.Context, patentID uuid.UUID) error {
+	query := `DELETE FROM patent_claims WHERE patent_id = $1`
+	_, err := r.executor().ExecContext(ctx, query, patentID)
+	return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to delete claims by patent")
+}
+
+func (r *postgresPatentRepo) BatchCreateClaims(ctx context.Context, claims []*patent.Claim) error {
+	if len(claims) == 0 {
+		return nil
+	}
+	// Note: patent_id must be set externally or provided. Not in Claim struct.
+	// This function requires the patentID to be known. For now it returns an error
+	// indicating the caller should use an alternative approach.
+	return errors.New(errors.ErrCodeInvalidOperation, "BatchCreateClaims requires patent_id not available in Claim struct; use SetClaims on the patent entity instead")
+}
+
+func (r *postgresPatentRepo) GetIndependentClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.Claim, error) {
+	query := `SELECT claim_number, claim_type, claim_text, elements, markush_structures FROM patent_claims WHERE patent_id = $1 AND claim_type = 'independent' ORDER BY claim_number ASC`
+	rows, err := r.executor().QueryContext(ctx, query, patentID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get independent claims")
+	}
+	defer rows.Close()
+
+	var claims []*patent.Claim
+	for rows.Next() {
+		c, err := scanClaim(rows)
+		if err != nil {
+			return nil, err
+		}
+		claims = append(claims, c)
+	}
+	return claims, nil
+}
 
 // Inventors
-func (r *postgresPatentRepo) SetInventors(ctx context.Context, patentID uuid.UUID, inventors []*patent.Inventor) error { return nil }
-func (r *postgresPatentRepo) GetInventors(ctx context.Context, patentID uuid.UUID) ([]*patent.Inventor, error) { return nil, nil }
-func (r *postgresPatentRepo) SearchByInventor(ctx context.Context, inventorName string, limit, offset int) ([]*patent.Patent, int64, error) { return nil, 0, nil }
+func (r *postgresPatentRepo) SetInventors(ctx context.Context, patentID uuid.UUID, inventors []*patent.Inventor) error {
+	tx, err := r.conn.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to begin transaction")
+	}
+	defer tx.Rollback()
+
+	// Delete existing inventors
+	if _, err := tx.ExecContext(ctx, `DELETE FROM patent_inventors WHERE patent_id = $1`, patentID); err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to clear inventors")
+	}
+
+	// Insert new inventors
+	for _, inv := range inventors {
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO patent_inventors (patent_id, inventor_name, inventor_name_en, sequence, affiliation)
+			VALUES ($1, $2, $3, $4, $5)
+		`, patentID, inv.Name, "", inv.Sequence, inv.Affiliation)
+		if err != nil {
+			return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to insert inventor")
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (r *postgresPatentRepo) GetInventors(ctx context.Context, patentID uuid.UUID) ([]*patent.Inventor, error) {
+	query := `SELECT inventor_name, sequence, affiliation FROM patent_inventors WHERE patent_id = $1 ORDER BY sequence ASC`
+	rows, err := r.executor().QueryContext(ctx, query, patentID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get inventors")
+	}
+	defer rows.Close()
+
+	var inventors []*patent.Inventor
+	for rows.Next() {
+		inv := &patent.Inventor{}
+		if err := rows.Scan(&inv.Name, &inv.Sequence, &inv.Affiliation); err != nil {
+			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan inventor")
+		}
+		inventors = append(inventors, inv)
+	}
+	return inventors, nil
+}
+
+func (r *postgresPatentRepo) SearchByInventor(ctx context.Context, inventorName string, limit, offset int) ([]*patent.Patent, int64, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	countQuery := `SELECT COUNT(DISTINCT p.id) FROM patents p JOIN patent_inventors pi ON p.id = pi.patent_id WHERE pi.inventor_name ILIKE $1 AND p.deleted_at IS NULL`
+	var total int64
+	err := r.executor().QueryRowContext(ctx, countQuery, "%"+inventorName+"%").Scan(&total)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count by inventor")
+	}
+
+	query := `
+		SELECT DISTINCT p.* FROM patents p
+		JOIN patent_inventors pi ON p.id = pi.patent_id
+		WHERE pi.inventor_name ILIKE $1 AND p.deleted_at IS NULL
+		ORDER BY p.filing_date DESC NULLS LAST
+		LIMIT $2 OFFSET $3
+	`
+	rows, err := r.executor().QueryContext(ctx, query, "%"+inventorName+"%", limit, offset)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to search by inventor")
+	}
+	defer rows.Close()
+
+	patents, err := scanPatents(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+	return patents, total, nil
+}
 
 // Priority
-func (r *postgresPatentRepo) SetPriorityClaims(ctx context.Context, patentID uuid.UUID, claims []*patent.PriorityClaim) error { return nil }
-func (r *postgresPatentRepo) GetPriorityClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.PriorityClaim, error) { return nil, nil }
+func (r *postgresPatentRepo) SetPriorityClaims(ctx context.Context, patentID uuid.UUID, claims []*patent.PriorityClaim) error {
+	tx, err := r.conn.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to begin transaction")
+	}
+	defer tx.Rollback()
+
+	// Delete existing priority claims
+	if _, err := tx.ExecContext(ctx, `DELETE FROM patent_priority_claims WHERE patent_id = $1`, patentID); err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to clear priority claims")
+	}
+
+	// Insert new priority claims
+	for _, pc := range claims {
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO patent_priority_claims (patent_id, priority_number, priority_date, priority_country)
+			VALUES ($1, $2, $3, $4)
+		`, patentID, pc.PriorityNumber, pc.PriorityDate, pc.PriorityCountry)
+		if err != nil {
+			return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to insert priority claim")
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (r *postgresPatentRepo) GetPriorityClaims(ctx context.Context, patentID uuid.UUID) ([]*patent.PriorityClaim, error) {
+	query := `SELECT id, patent_id, priority_number, priority_date, priority_country FROM patent_priority_claims WHERE patent_id = $1 ORDER BY priority_date DESC`
+	rows, err := r.executor().QueryContext(ctx, query, patentID)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get priority claims")
+	}
+	defer rows.Close()
+
+	var claims []*patent.PriorityClaim
+	for rows.Next() {
+		pc := &patent.PriorityClaim{}
+		if err := rows.Scan(&pc.ID, &pc.PatentID, &pc.PriorityNumber, &pc.PriorityDate, &pc.PriorityCountry); err != nil {
+			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan priority claim")
+		}
+		claims = append(claims, pc)
+	}
+	return claims, nil
+}
 
 // Assignee
 func (r *postgresPatentRepo) SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*patent.Patent, int64, error) {
@@ -534,11 +862,60 @@ func (r *postgresPatentRepo) SaveBatch(ctx context.Context, patents []*patent.Pa
 	return err
 }
 
-func (r *postgresPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Patent) (int, error) { return 0, nil }
-func (r *postgresPatentRepo) BatchUpdateStatus(ctx context.Context, ids []uuid.UUID, status patent.PatentStatus) (int64, error) { return 0, nil }
+func (r *postgresPatentRepo) BatchCreate(ctx context.Context, patents []*patent.Patent) (int, error) {
+	if len(patents) == 0 {
+		return 0, nil
+	}
+	created := 0
+	for _, p := range patents {
+		err := r.Create(ctx, p)
+		if err != nil {
+			// Skip duplicates and continue
+			if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+				continue
+			}
+			return created, err
+		}
+		created++
+	}
+	return created, nil
+}
+
+func (r *postgresPatentRepo) BatchUpdateStatus(ctx context.Context, ids []uuid.UUID, status patent.PatentStatus) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	query := `UPDATE patents SET status = $1, updated_at = NOW() WHERE id = ANY($2)`
+	res, err := r.executor().ExecContext(ctx, query, status.String(), pq.Array(ids))
+	if err != nil {
+		return 0, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to batch update status")
+	}
+	rows, _ := res.RowsAffected()
+	return rows, nil
+}
 
 // Stats
-func (r *postgresPatentRepo) CountByStatus(ctx context.Context) (map[patent.PatentStatus]int64, error) { return nil, nil }
+func (r *postgresPatentRepo) CountByStatus(ctx context.Context) (map[patent.PatentStatus]int64, error) {
+	query := `SELECT status, COUNT(*) FROM patents WHERE deleted_at IS NULL GROUP BY status`
+	rows, err := r.executor().QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count by status")
+	}
+	defer rows.Close()
+
+	counts := make(map[patent.PatentStatus]int64)
+	for rows.Next() {
+		var statusStr string
+		var count int64
+		if err := rows.Scan(&statusStr, &count); err != nil {
+			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan status count")
+		}
+		status := parsePatentStatus(statusStr)
+		counts[status] = count
+	}
+	return counts, nil
+}
+
 func (r *postgresPatentRepo) CountByJurisdiction(ctx context.Context) (map[string]int64, error) {
 	query := `
 		SELECT jurisdiction, COUNT(*)
@@ -564,8 +941,99 @@ func (r *postgresPatentRepo) CountByJurisdiction(ctx context.Context) (map[strin
 	return counts, nil
 }
 
-func (r *postgresPatentRepo) CountByYear(ctx context.Context, field string) (map[int]int64, error) { return nil, nil }
-func (r *postgresPatentRepo) GetIPCDistribution(ctx context.Context, level int) (map[string]int64, error) { return nil, nil }
+func (r *postgresPatentRepo) CountByYear(ctx context.Context, field string) (map[int]int64, error) {
+	validFields := map[string]string{
+		"filing_date":      "filing_date",
+		"publication_date": "publication_date",
+		"grant_date":       "grant_date",
+		"priority_date":    "priority_date",
+		"expiry_date":      "expiry_date",
+	}
+	dateField, ok := validFields[field]
+	if !ok {
+		return nil, errors.New(errors.ErrCodeValidation, "invalid date field: "+field)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT EXTRACT(YEAR FROM %s)::int AS year, COUNT(*)
+		FROM patents
+		WHERE deleted_at IS NULL AND %s IS NOT NULL
+		GROUP BY year
+		ORDER BY year ASC
+	`, dateField, dateField)
+
+	rows, err := r.executor().QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to count by year")
+	}
+	defer rows.Close()
+
+	counts := make(map[int]int64)
+	for rows.Next() {
+		var year int
+		var count int64
+		if err := rows.Scan(&year, &count); err != nil {
+			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan year count")
+		}
+		counts[year] = count
+	}
+	return counts, nil
+}
+
+func (r *postgresPatentRepo) GetIPCDistribution(ctx context.Context, level int) (map[string]int64, error) {
+	// IPC code format: "A01B 1/00" where:
+	// level 1 = section (1 char): "A"
+	// level 2 = class (3 chars): "A01"
+	// level 3 = subclass (4 chars): "A01B"
+	// level 4 = group: "A01B 1/00"
+	var substrLen int
+	switch level {
+	case 1:
+		substrLen = 1 // Section
+	case 2:
+		substrLen = 3 // Class
+	case 3:
+		substrLen = 4 // Subclass
+	default:
+		substrLen = 0 // Full IPC code
+	}
+
+	var query string
+	if level >= 1 && level <= 3 {
+		query = fmt.Sprintf(`
+			SELECT SUBSTRING(unnest(ipc_codes) FROM 1 FOR %d) AS code, COUNT(*)
+			FROM patents
+			WHERE deleted_at IS NULL
+			GROUP BY code
+			ORDER BY COUNT(*) DESC
+		`, substrLen)
+	} else {
+		query = `
+			SELECT unnest(ipc_codes) AS code, COUNT(*)
+			FROM patents
+			WHERE deleted_at IS NULL
+			GROUP BY code
+			ORDER BY COUNT(*) DESC
+		`
+	}
+
+	rows, err := r.executor().QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to get IPC distribution")
+	}
+	defer rows.Close()
+
+	dist := make(map[string]int64)
+	for rows.Next() {
+		var code string
+		var count int64
+		if err := rows.Scan(&code, &count); err != nil {
+			return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan IPC distribution")
+		}
+		dist[code] = count
+	}
+	return dist, nil
+}
 
 // Transaction
 func (r *postgresPatentRepo) WithTx(ctx context.Context, fn func(patent.PatentRepository) error) error {
@@ -633,6 +1101,3 @@ func scanPatents(rows *sql.Rows) ([]*patent.Patent, error) {
 	return list, nil
 }
 
-func itoa(i int) string {
-	return strconv.Itoa(i)
-}

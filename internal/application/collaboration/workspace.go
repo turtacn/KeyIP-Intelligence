@@ -482,6 +482,7 @@ type WorkspaceService interface {
 	InviteMember(ctx context.Context, input *InviteMemberInput) (*MemberResponse, error)
 	RemoveMember(ctx context.Context, workspaceID, memberID, userID string) error
 	UpdateMemberRole(ctx context.Context, workspaceID, memberID, role, userID string) error
+	ListMembers(ctx context.Context, workspaceID string, pagination commontypes.Pagination) ([]*MemberResponse, int, error)
 }
 
 // ListWorkspacesInput is the input DTO for listing workspaces.

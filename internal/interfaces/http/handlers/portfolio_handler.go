@@ -56,6 +56,11 @@ func (h *PortfolioHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/portfolios/{id}/patents", h.AddPatents)
 	mux.HandleFunc("DELETE /api/v1/portfolios/{id}/patents", h.RemovePatents)
 	mux.HandleFunc("GET /api/v1/portfolios/{id}/analysis", h.GetAnalysis)
+	mux.HandleFunc("GET /api/v1/portfolios/{id}/valuation", h.GetValuation)
+	mux.HandleFunc("POST /api/v1/portfolios/{id}/valuation/run", h.RunValuation)
+	mux.HandleFunc("GET /api/v1/portfolios/{id}/gap-analysis", h.GetGapAnalysis)
+	mux.HandleFunc("POST /api/v1/portfolios/{id}/gap-analysis/run", h.RunGapAnalysis)
+	mux.HandleFunc("POST /api/v1/portfolios/{id}/optimize", h.Optimize)
 }
 
 func (h *PortfolioHandler) CreatePortfolio(w http.ResponseWriter, r *http.Request) {
@@ -269,24 +274,102 @@ func (h *PortfolioHandler) GetValuation(w http.ResponseWriter, r *http.Request) 
 	h.GetAnalysis(w, r)
 }
 
-// RunValuation triggers portfolio valuation (placeholder).
+// RunValuation triggers portfolio valuation by computing analysis.
 func (h *PortfolioHandler) RunValuation(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "valuation not yet implemented"})
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
+		return
+	}
+
+	analysis, err := h.portfolioSvc.GetAnalysis(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to run valuation", logging.Err(err), logging.String("id", id))
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"portfolio_id":   id,
+		"total_value":    analysis.TotalValue,
+		"by_jurisdiction": analysis.ByJurisdiction,
+		"by_status":      analysis.ByStatus,
+		"recommendations": analysis.Recommendations,
+		"message":        "valuation completed",
+	})
 }
 
-// GetGapAnalysis handles gap analysis retrieval (placeholder).
+// GetGapAnalysis handles gap analysis retrieval using portfolio analysis data.
 func (h *PortfolioHandler) GetGapAnalysis(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "gap analysis not yet implemented"})
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
+		return
+	}
+
+	analysis, err := h.portfolioSvc.GetAnalysis(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to get gap analysis", logging.Err(err), logging.String("id", id))
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"portfolio_id":   id,
+		"total_patents":  analysis.TotalPatents,
+		"by_jurisdiction": analysis.ByJurisdiction,
+		"by_status":      analysis.ByStatus,
+		"by_year":        analysis.ByYear,
+		"top_ipc_codes":  analysis.TopIPCCodes,
+		"recommendations": analysis.Recommendations,
+	})
 }
 
-// RunGapAnalysis triggers gap analysis (placeholder).
+// RunGapAnalysis triggers gap analysis computation.
 func (h *PortfolioHandler) RunGapAnalysis(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "gap analysis not yet implemented"})
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
+		return
+	}
+
+	analysis, err := h.portfolioSvc.GetAnalysis(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to run gap analysis", logging.Err(err), logging.String("id", id))
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"portfolio_id":   id,
+		"total_patents":  analysis.TotalPatents,
+		"gap_findings":   analysis.Recommendations,
+		"message":        "gap analysis completed",
+	})
 }
 
-// Optimize handles portfolio optimization (placeholder).
+// Optimize handles portfolio optimization recommendations.
 func (h *PortfolioHandler) Optimize(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, map[string]string{"message": "optimization not yet implemented"})
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
+		return
+	}
+
+	analysis, err := h.portfolioSvc.GetAnalysis(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to optimize portfolio", logging.Err(err), logging.String("id", id))
+		writeAppError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"portfolio_id":          id,
+		"total_patents":         analysis.TotalPatents,
+		"optimization_suggestions": analysis.Recommendations,
+		"estimated_value":       analysis.TotalValue,
+		"message":               "optimization completed",
+	})
 }
 
 //Personal.AI order the ending
