@@ -956,6 +956,168 @@ func TestDescriptionSimilarity(t *testing.T) {
 }
 
 // =========================================================================
+// determineFailedStep tests
+// =========================================================================
+
+func TestDetermineFailedStep(t *testing.T) {
+	tests := []struct {
+		name     string
+		eq       ElementEquivalence
+		wantStep string
+	}{
+		{
+			name: "function_not_evaluated",
+			eq: ElementEquivalence{
+				functionEvaluated: false,
+				wayEvaluated:      false,
+				resultEvaluated:   false,
+			},
+			wantStep: "function",
+		},
+		{
+			name: "function_failed",
+			eq: ElementEquivalence{
+				FunctionScore:     0.3,
+				functionEvaluated: true,
+				wayEvaluated:      false,
+				resultEvaluated:   false,
+			},
+			wantStep: "function",
+		},
+		{
+			name: "way_failed",
+			eq: ElementEquivalence{
+				FunctionScore:     0.8,
+				WayScore:          0.3,
+				functionEvaluated: true,
+				wayEvaluated:      true,
+				resultEvaluated:   false,
+			},
+			wantStep: "way",
+		},
+		{
+			name: "result_not_evaluated_but_way_was",
+			eq: ElementEquivalence{
+				FunctionScore:     0.8,
+				WayScore:          0.7,
+				functionEvaluated: true,
+				wayEvaluated:      true,
+				resultEvaluated:   false,
+			},
+			wantStep: "way",
+		},
+		{
+			name: "result_failed",
+			eq: ElementEquivalence{
+				FunctionScore:     0.8,
+				WayScore:          0.7,
+				ResultScore:       0.3,
+				functionEvaluated: true,
+				wayEvaluated:      true,
+				resultEvaluated:   true,
+			},
+			wantStep: "result",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := determineFailedStep(&tt.eq)
+			if got != tt.wantStep {
+				t.Errorf("determineFailedStep() = %s, want %s", got, tt.wantStep)
+			}
+		})
+	}
+}
+
+func TestFwrWeight_Default(t *testing.T) {
+	if got := fwrWeight("unknown"); got != 1.0 {
+		t.Errorf("fwrWeight('unknown') = %f, want 1.0", got)
+	}
+}
+
+func TestFwrWeight_AllKnown(t *testing.T) {
+	weights := map[string]float64{
+		"function": 0.40,
+		"way":      0.30,
+		"result":   0.30,
+	}
+	for step, expected := range weights {
+		got := fwrWeight(step)
+		if got != expected {
+			t.Errorf("fwrWeight(%q) = %f, want %f", step, got, expected)
+		}
+	}
+}
+
+func TestElementWeight_AllTypes(t *testing.T) {
+	a := &equivalentsAnalyzer{cfg: defaultEquivalentsConfig()}
+	tests := []struct {
+		et   ElementType
+		want float64
+	}{
+		{ElementTypeCoreScaffold, a.cfg.scaffoldWeight},
+		{ElementTypeSubstituent, 0.8},
+		{ElementTypeFunctionalGroup, 1.0},
+		{ElementTypeLinker, 1.0},
+		{ElementTypeBackbone, 1.0},
+		{ElementTypeElectronicProperty, 1.0},
+		{ElementTypeUnknown, 1.0},
+		{ElementType(999), 1.0}, // invalid enum
+	}
+	for _, tt := range tests {
+		got := a.elementWeight(tt.et)
+		if got != tt.want {
+			t.Errorf("elementWeight(%s) = %f, want %f", tt.et, got, tt.want)
+		}
+	}
+}
+
+func TestTokenize(t *testing.T) {
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		{"", nil},
+		{"  ", nil},
+		{"hello", []string{"hello"}},
+		{"hello world", []string{"hello", "world"}},
+		{"  leading and trailing  ", []string{"leading", "and", "trailing"}},
+	}
+	for _, tt := range tests {
+		got := tokenize(tt.input)
+		if len(got) != len(tt.want) {
+			t.Errorf("tokenize(%q) len=%d, want %d", tt.input, len(got), len(tt.want))
+			continue
+		}
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Errorf("tokenize(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+			}
+		}
+	}
+}
+
+func TestDescriptionSimilarity_EdgeCases(t *testing.T) {
+	// Identical single token.
+	if sim := descriptionSimilarity("phenyl", "phenyl"); sim != 1.0 {
+		t.Errorf("identical single token: expected 1.0, got %f", sim)
+	}
+	// Different single token.
+	if sim := descriptionSimilarity("phenyl", "naphthyl"); sim != 0.0 {
+		t.Errorf("different single token: expected 0.0, got %f", sim)
+	}
+	// Repeated tokens in one side (intersection counts all occurrences).
+	sim := descriptionSimilarity("group group group", "group")
+	if sim <= 0 {
+		t.Errorf("repeated tokens: expected > 0, got %f", sim)
+	}
+	// Completely disjoint descriptions.
+	if sim := descriptionSimilarity("electron donor amine", "alkyl chain spacer"); sim > 0.0 {
+		t.Errorf("completely different: expected 0.0, got %f", sim)
+	}
+}
+
+// =========================================================================
 // Helper: clampScore
 // =========================================================================
 

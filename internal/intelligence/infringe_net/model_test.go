@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1613,6 +1614,157 @@ func TestRemoteModel_ComputeSimilarity_EmptySMILES(t *testing.T) {
 	_, err := m.ComputeStructuralSimilarity(context.Background(), "", "CCO")
 	if err == nil {
 		t.Fatal("expected error for empty smiles1")
+	}
+}
+
+// =========================================================================
+// Helper function unit tests (direct -- pure functions)
+// =========================================================================
+
+func TestCountSMILESAtoms(t *testing.T) {
+	tests := []struct {
+		smiles string
+		want   int
+	}{
+		{"CCO", 3},           // ethanol: C, C, O
+		{"c1ccccc1", 1},      // all lowercase, default=1
+		{"C", 1},             // methane
+		{"", 1},              // default for empty
+		{"[Na]Cl", 2},        // Na, Cl
+	}
+	for _, tt := range tests {
+		got := countSMILESAtoms(tt.smiles)
+		if got != tt.want {
+			t.Errorf("countSMILESAtoms(%q) = %d, want %d", tt.smiles, got, tt.want)
+		}
+	}
+}
+
+func TestCountAromaticAtoms(t *testing.T) {
+	tests := []struct {
+		smiles string
+		want   int
+	}{
+		{"c1ccccc1", 6}, // benzene
+		{"CCO", 0},      // ethanol
+		{"c1ccccc1CCO", 6},
+		{"c1nccc2n1ccc2", 9},
+		{"", 0},
+	}
+	for _, tt := range tests {
+		got := countAromaticAtoms(tt.smiles)
+		if got != tt.want {
+			t.Errorf("countAromaticAtoms(%q) = %d, want %d", tt.smiles, got, tt.want)
+		}
+	}
+}
+
+func TestCountRingClosures_EdgeCases(t *testing.T) {
+	tests := []struct {
+		smiles string
+		want   int
+	}{
+		{"C1CC1", 1},          // cyclopropane
+		{"c1ccccc1", 1},       // benzene
+		{"C1CC2CCCC2C1", 2},  // decalin
+		{"", 0},
+		{"CCO", 0},
+		{"C1CC1C1CC1", 2},    // two separate rings
+		{"C1CC1CC1", 1},      // odd digits: floor(3/2) = 1
+	}
+	for _, tt := range tests {
+		got := countRingClosures(tt.smiles)
+		if got != tt.want {
+			t.Errorf("countRingClosures(%q) = %d, want %d", tt.smiles, got, tt.want)
+		}
+	}
+}
+
+func TestTanimotoSim_EdgeCases(t *testing.T) {
+	// Identical vectors
+	a := []float64{1, 2, 3, 4}
+	assertInDelta(t, 1.0, tanimotoSim(a, a), 0.0001, "identical vectors")
+
+	// Both zero vectors -> 1.0
+	zero := []float64{0, 0, 0}
+	assertInDelta(t, 1.0, tanimotoSim(zero, zero), 0.0001, "both zero vectors")
+
+	// One zero vector -> 0.0
+	nonZero := []float64{1, 2, 3}
+	assertInDelta(t, 0.0, tanimotoSim(zero, nonZero), 0.0001, "one zero vector")
+
+	// Empty / nil
+	assertInDelta(t, 0.0, tanimotoSim(nil, []float64{1, 2}), 0.0001, "nil first")
+	assertInDelta(t, 0.0, tanimotoSim([]float64{1, 2}, nil), 0.0001, "nil second")
+	assertInDelta(t, 0.0, tanimotoSim([]float64{}, []float64{}), 0.0001, "both empty")
+
+	// Different lengths, compatible
+	short := []float64{1, 0}
+	long := []float64{1, 0, 0}
+	assertInDelta(t, 1.0, tanimotoSim(short, long), 0.0001, "different lengths compatible")
+
+	// Orthogonal vectors
+	x := []float64{1, 0, 0}
+	y := []float64{0, 1, 0}
+	assertInDelta(t, 0.0, tanimotoSim(x, y), 0.0001, "orthogonal vectors")
+}
+
+func TestDeterministicEmbed_VeryLongSMILES(t *testing.T) {
+	longSMILES := strings.Repeat("C", 5000)
+	vec := deterministicEmbed(longSMILES, defaultEmbeddingDim)
+	assertVectorDimension(t, vec, defaultEmbeddingDim)
+
+	var norm float64
+	for _, v := range vec {
+		norm += v * v
+	}
+	norm = math.Sqrt(norm)
+	assertInDelta(t, 1.0, norm, 0.0001, "L2 norm of very long SMILES embedding")
+}
+
+func TestStubPropertyPredictions_AllPropertyTypesRange(t *testing.T) {
+	allProps := AllPropertyTypes()
+
+	tests := []struct {
+		name   string
+		smiles string
+	}{
+		{"simple alcohol", "CCO"},
+		{"benzene", "c1ccccc1"},
+		{"long chain", "CCCCCCCCCCCCCCCC"},
+		{"complex aromatic", "c1ccc2c(c1)[nH]c1ccccc12"},
+		{"minimal", "C"},
+	}
+
+	typeRange := map[PropertyType][2]float64{
+		PropertyHOMO:                {-9.0, -5.0},
+		PropertyLUMO:                {-4.5, 0.5},
+		PropertyBandGap:             {0.5, 6.0},
+		PropertyEmissionWavelength:  {380.0, 780.0},
+		PropertyQuantumYield:        {0.0, 1.0},
+		PropertyThermalStability:    {150.0, 600.0},
+		PropertyGlassTransitionTemp: {-20.0, 400.0},
+		PropertyChargeCarrierMobility: {0.0, 0.2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			preds := stubPropertyPredictions(tt.smiles, allProps)
+			if len(preds) != len(allProps) {
+				t.Fatalf("expected %d predictions, got %d", len(allProps), len(preds))
+			}
+			for _, p := range allProps {
+				val, ok := preds[p]
+				if !ok {
+					t.Errorf("missing prediction for %s", p)
+					continue
+				}
+				rng := typeRange[p]
+				if val < rng[0] || val > rng[1] {
+					t.Errorf("%s = %f, want in [%f, %f] for SMILES %q", p, val, rng[0], rng[1], tt.smiles)
+				}
+			}
+		})
 	}
 }
 

@@ -314,6 +314,14 @@ var (
 	reChineseComprising = regexp.MustCompile(
 		`(包含|包括|含有|其特征在于|其中)`)
 
+	// --- Transitional phrases (Japanese) ---
+	reJapaneseConsistingEssentiallyOf = regexp.MustCompile(
+		`(から本質的になる|から実質的になる)`)
+	reJapaneseConsistingOf = regexp.MustCompile(
+		`(からなる)`)
+	reJapaneseComprising = regexp.MustCompile(
+		`(含む|備える|有する|特徴とする)`)
+
 	// --- Dependency references (English) ---
 	reDependencyEN = regexp.MustCompile(
 		`(?i)(?:of|in|according\s+to|as\s+(?:claimed|defined|set\s+forth)\s+in)\s+claims?\s+` +
@@ -323,9 +331,16 @@ var (
 	reDependencyCN = regexp.MustCompile(
 		`(?:如)?权利要求\s*(\d+(?:\s*[、,，和或至到]\s*\d+)*)(?:\s*所述)?`)
 
+	// --- Dependency references (Japanese) ---
+	reDependencyJP = regexp.MustCompile(
+		`請求項\s*(\d+(?:\s*(?:又は|乃至|、|,)\s*\d+)*)`)
+
 	// --- Claim number extraction ---
 	reClaimNumberEN = regexp.MustCompile(`(?i)^(?:claim\s+)?(\d+)\s*[.:\-)\]]\s*`)
 	reClaimNumberCN = regexp.MustCompile(`^(\d+)\s*[、.．:：)\]]\s*`)
+
+	// --- Claim number extraction (Japanese) ---
+	reClaimNumberJP = regexp.MustCompile(`[【［]\s*請求項\s*(\d+)\s*[】］]`)
 
 	// --- Markush group (closed) ---
 	reMarkushClosed = regexp.MustCompile(
@@ -334,6 +349,12 @@ var (
 	// --- Markush group (open-ended) ---
 	reMarkushOpen = regexp.MustCompile(
 		`(?i)(?:including\s+but\s+not\s+limited\s+to|such\s+as|for\s+example)\s+(.+?)(?:\.|;|$)`)
+
+	// --- Markush group (Chinese) ---
+	reChineseMarkushClosed = regexp.MustCompile(
+		`选自由(.+?)组成的组`)
+	reChineseMarkushOpen = regexp.MustCompile(
+		`选自下组[:：](.+?)(?:[。；;]|$)`)
 
 	// --- Numerical ranges ---
 	reRangeFromTo = regexp.MustCompile(
@@ -1089,6 +1110,13 @@ func extractClaimNumber(text string) int {
 		}
 	}
 
+	// Try Japanese pattern: "【請求項1】"
+	if m := reClaimNumberJP.FindStringSubmatch(trimmed); len(m) > 1 {
+		if n, err := strconv.Atoi(m[1]); err == nil {
+			return n
+		}
+	}
+
 	return 0
 }
 
@@ -1127,6 +1155,21 @@ func detectTransitionalPhrase(text string) (string, TransitionalPhraseType) {
 		return m, PhraseComprising
 	}
 
+	// Japanese: "から本質的になる/から実質的になる"
+	if m := reJapaneseConsistingEssentiallyOf.FindString(text); m != "" {
+		return m, PhraseConsistingEssentiallyOf
+	}
+
+	// Japanese: "からなる"
+	if m := reJapaneseConsistingOf.FindString(text); m != "" {
+		return m, PhraseConsistingOf
+	}
+
+	// Japanese: "含む/備える/有する/特徴とする"
+	if m := reJapaneseComprising.FindString(text); m != "" {
+		return m, PhraseComprising
+	}
+
 	// Default: no transitional phrase found — assume comprising (most common)
 	return "", PhraseComprising
 }
@@ -1152,6 +1195,7 @@ func splitPreambleBody(text string, transitionalPhrase string) (string, string) 
 	// Remove leading claim number from preamble
 	preamble = reClaimNumberEN.ReplaceAllString(preamble, "")
 	preamble = reClaimNumberCN.ReplaceAllString(preamble, "")
+	preamble = reClaimNumberJP.ReplaceAllString(preamble, "")
 	preamble = strings.TrimSpace(preamble)
 
 	return preamble, body
@@ -1182,6 +1226,16 @@ func extractDependencyReferences(text string) []int {
 		}
 	}
 
+	// Japanese patterns
+	for _, m := range reDependencyJP.FindAllStringSubmatch(text, -1) {
+		if len(m) > 1 {
+			nums := parseClaimNumberList(m[1])
+			for _, n := range nums {
+				depSet[n] = true
+			}
+		}
+	}
+
 	if len(depSet) == 0 {
 		return nil
 	}
@@ -1200,6 +1254,7 @@ func parseClaimNumberList(s string) []int {
 	s = strings.NewReplacer(
 		"and", ",", "or", ",", "to", "-",
 		"和", ",", "或", ",", "至", "-", "到", "-",
+		"又は", ",", "乃至", "-",
 		"、", ",", "，", ",",
 	).Replace(s)
 
@@ -1303,6 +1358,38 @@ func extractMarkushGroups(text string) []*MarkushGroup {
 		}
 	}
 
+	// Chinese closed Markush: "选自由A、B和C组成的组"
+	for _, m := range reChineseMarkushClosed.FindAllStringSubmatch(text, -1) {
+		if len(m) > 1 {
+			groupIdx++
+			members := parseMarkushMembers(m[1])
+			chemType := inferChemicalType(m[1])
+			groups = append(groups, &MarkushGroup{
+				GroupID:      fmt.Sprintf("markush-%d", groupIdx),
+				LeadPhrase:   "selected from the group consisting of",
+				Members:      members,
+				IsOpenEnded:  false,
+				ChemicalType: chemType,
+			})
+		}
+	}
+
+	// Chinese open Markush: "选自下组：A、B和C"
+	for _, m := range reChineseMarkushOpen.FindAllStringSubmatch(text, -1) {
+		if len(m) > 1 {
+			groupIdx++
+			members := parseMarkushMembers(m[1])
+			chemType := inferChemicalType(m[1])
+			groups = append(groups, &MarkushGroup{
+				GroupID:      fmt.Sprintf("markush-%d", groupIdx),
+				LeadPhrase:   "selected from the group consisting of",
+				Members:      members,
+				IsOpenEnded:  true,
+				ChemicalType: chemType,
+			})
+		}
+	}
+
 	return groups
 }
 
@@ -1316,6 +1403,9 @@ func parseMarkushMembers(s string) []string {
 	// Normalize "and"/"or" to comma
 	s = regexp.MustCompile(`(?i)\s*,?\s+and\s+`).ReplaceAllString(s, ", ")
 	s = regexp.MustCompile(`(?i)\s*,?\s+or\s+`).ReplaceAllString(s, ", ")
+
+	// Normalize Chinese/Japanese separators to comma
+	s = strings.NewReplacer("、", ",", "和", ",").Replace(s)
 
 	parts := strings.Split(s, ",")
 	var members []string
@@ -1594,6 +1684,7 @@ func (p *claimParserImpl) ruleBasedClassification(text string) (ClaimType, float
 		"a method", "a process", "method for", "process for",
 		"method of", "process of", "the method", "the process",
 		"步骤", "方法", "工艺",
+		"方法", "プロセス", "製造方法",
 	}
 	for _, p := range methodPatterns {
 		if strings.Contains(lower, p) {
@@ -1605,6 +1696,7 @@ func (p *claimParserImpl) ruleBasedClassification(text string) (ClaimType, float
 	usePatterns := []string{
 		"use of", "the use of", "a use of",
 		"用途", "应用",
+		"使用", "用途", "応用",
 	}
 	for _, p := range usePatterns {
 		if strings.Contains(lower, p) {
@@ -1617,6 +1709,7 @@ func (p *claimParserImpl) ruleBasedClassification(text string) (ClaimType, float
 		"a composition", "a compound", "a formulation", "a device",
 		"a system", "a kit", "an apparatus", "a pharmaceutical",
 		"组合物", "化合物", "制剂", "装置", "系统", "试剂盒",
+		"組成物", "化合物", "製剤", "装置", "システム", "キット",
 	}
 	for _, p := range productPatterns {
 		if strings.Contains(lower, p) {

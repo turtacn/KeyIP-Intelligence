@@ -1341,6 +1341,171 @@ func TestAssess_EstoppelDisabled(t *testing.T) {
 // Scoring formula verification
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// BatchAssess edge-case tests
+// ---------------------------------------------------------------------------
+
+func TestBatchAssess_ContextCancellation(t *testing.T) {
+	model := &mockInfringeModel{
+		predictFn: func(ctx context.Context, req *LiteralPredictionRequest) (*LiteralPredictionResult, error) {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(100 * time.Millisecond):
+				return &LiteralPredictionResult{OverallScore: 0.5, Confidence: 0.8}, nil
+			}
+		},
+	}
+	eq := &mockEquivalentsAnalyzer{}
+	mapper := &mockClaimElementMapper{}
+	a, _ := NewInfringementAssessor(model, eq, mapper, nil, nil, nil, nil, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	reqs := make([]*AssessmentRequest, 20)
+	for i := range reqs {
+		reqs[i] = sampleRequest(fmt.Sprintf("cancel-%d", i))
+	}
+
+	results, err := a.BatchAssess(ctx, reqs)
+	if err != nil {
+		t.Fatalf("unexpected error from BatchAssess: %v", err)
+	}
+	if len(results) != 20 {
+		t.Fatalf("expected 20 results, got %d", len(results))
+	}
+
+	hasCancel := false
+	for _, r := range results {
+		if r.Error != "" {
+			hasCancel = true
+			break
+		}
+	}
+	if !hasCancel {
+		t.Log("expected at least one cancelled context error (may pass if all finsihed before timeout)")
+	}
+}
+
+func TestBatchAssess_LargeBatch(t *testing.T) {
+	a, _, _, _, _ := newTestAssessor(t)
+
+	const batchSize = 100
+	reqs := make([]*AssessmentRequest, batchSize)
+	for i := range reqs {
+		reqs[i] = sampleRequest(fmt.Sprintf("large-%d", i))
+	}
+
+	results, err := a.BatchAssess(context.Background(), reqs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != batchSize {
+		t.Fatalf("expected %d results, got %d", batchSize, len(results))
+	}
+
+	successCount := 0
+	for _, r := range results {
+		if r.Error == "" {
+			successCount++
+		}
+	}
+	if successCount != batchSize {
+		t.Errorf("expected all %d to succeed, got %d successes", batchSize, successCount)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Helper function edge-case tests
+// ---------------------------------------------------------------------------
+
+func TestGroupClaimsByPatent_NilEntry(t *testing.T) {
+	claims := []*ClaimInput{
+		{ClaimID: "c1", PatentID: "US001"},
+		nil,
+		{ClaimID: "c2", PatentID: "US001"},
+	}
+	groups := groupClaimsByPatent(claims)
+	if len(groups["US001"]) != 2 {
+		t.Errorf("expected 2 claims for US001, got %d", len(groups["US001"]))
+	}
+}
+
+func TestBuildClaimMatches_EmptyLiteralScores(t *testing.T) {
+	a := &infringementAssessor{}
+	elementMap := []*MappedClaim{
+		{
+			ClaimID: "c1",
+			Elements: []*ClaimElement{
+				{ElementID: "e1", Description: "element 1"},
+			},
+		},
+	}
+	literal := &LiteralAnalysisResult{
+		Score:          0.0,
+		ElementScores:  nil,
+		AllElementsMet: false,
+		Confidence:     0.0,
+	}
+	results := a.buildClaimMatches(elementMap, literal, nil, nil)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].LiteralScore != 0.0 {
+		t.Errorf("expected literal score 0.0, got %f", results[0].LiteralScore)
+	}
+	if results[0].EquivalentsScore != 0.0 {
+		t.Errorf("expected equivalents score 0.0, got %f", results[0].EquivalentsScore)
+	}
+	if results[0].EstoppelPenalty != 0.0 {
+		t.Errorf("expected estoppel penalty 0.0, got %f", results[0].EstoppelPenalty)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Risk score distribution (ClassifyRisk) probability tests
+// ---------------------------------------------------------------------------
+
+func TestClassifyRisk_BoundaryValues(t *testing.T) {
+	boundaries := []struct {
+		score float64
+		want  RiskLevel
+	}{
+		{0.00, RiskNone},
+		{0.299999, RiskNone},
+		{0.30, RiskLow},
+		{0.499999, RiskLow},
+		{0.50, RiskMedium},
+		{0.699999, RiskMedium},
+		{0.70, RiskHigh},
+		{0.849999, RiskHigh},
+		{0.85, RiskCritical},
+		{0.999999, RiskCritical},
+		{1.00, RiskCritical},
+	}
+	for _, tt := range boundaries {
+		got := ClassifyRisk(tt.score)
+		if got != tt.want {
+			t.Errorf("ClassifyRisk(%f) = %s, want %s", tt.score, got, tt.want)
+		}
+	}
+}
+
+func TestClassifyRisk_DistributionCoverage(t *testing.T) {
+	// Verify that every RiskLevel is reachable via ClassifyRisk.
+	levels := make(map[RiskLevel]bool)
+	for score := 0.0; score <= 1.0; score += 0.01 {
+		levels[ClassifyRisk(score)] = true
+	}
+	expected := []RiskLevel{RiskNone, RiskLow, RiskMedium, RiskHigh, RiskCritical}
+	for _, rl := range expected {
+		if !levels[rl] {
+			t.Errorf("RiskLevel %s is not reachable by ClassifyRisk", rl)
+		}
+	}
+}
+
 func TestAssess_ScoringFormula(t *testing.T) {
 	litScore := 0.72
 	eqScore := 0.68

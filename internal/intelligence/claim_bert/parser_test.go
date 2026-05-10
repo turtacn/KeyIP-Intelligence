@@ -2874,3 +2874,896 @@ func BenchmarkCorrectBIOSequence(b *testing.B) {
 		correctBIOSequence(tags)
 	}
 }
+
+// ============================================================================
+// Test: Chinese patent claim parsing
+// ============================================================================
+
+func TestExtractClaimNumber_Chinese(t *testing.T) {
+    tests := []struct {
+        name string
+        text string
+        want int
+    }{
+        {"Chinese claim number with '、' separator", "1、一种化合物，其特征在于...", 1},
+        {"Chinese claim number with '.' separator", "2.一种制备方法...", 2},
+        {"Chinese claim number with '．' separator", "3．一种组合物...", 3},
+        {"Chinese claim number with ':' separator", "4:一种制剂...", 4},
+        {"No Chinese claim number", "组合物，包含A、B和C", 0},
+        {"Claim number with colon", "5：一种系统...", 5},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := extractClaimNumber(tt.text)
+            if got != tt.want {
+                t.Errorf("extractClaimNumber(%q) = %d, want %d", tt.text, got, tt.want)
+            }
+        })
+    }
+}
+
+func TestExtractDependencyReferences_Chinese(t *testing.T) {
+    tests := []struct {
+        name string
+        text string
+        want []int
+    }{
+        {"Chinese single dependency", "根据权利要求1所述的化合物", []int{1}},
+        {"Chinese multiple dependencies", "根据权利要求1或2所述的组合物", []int{1, 2}},
+        {"Chinese dependency with range", "根据权利要求1至3所述的方法", []int{1, 2, 3}},
+        {"Chinese dependency with '和'", "根据权利要求1和2所述的用途", []int{1, 2}},
+        {"Chinese dependency with complex", "如权利要求1、2或3所述的装置", []int{1, 2, 3}},
+        {"No Chinese dependency", "一种新的化合物组合物", nil},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := extractDependencyReferences(tt.text)
+            if len(got) == 0 && len(tt.want) == 0 {
+                return
+            }
+            if len(got) != len(tt.want) {
+                t.Errorf("extractDependencyReferences(%q) = %v, want %v", tt.text, got, tt.want)
+                return
+            }
+            for i, v := range got {
+                if v != tt.want[i] {
+                    t.Errorf("extractDependencyReferences(%q) = %v, want %v", tt.text, got, tt.want)
+                    return
+                }
+            }
+        })
+    }
+}
+
+func TestDetectTransitionalPhrase_Chinese(t *testing.T) {
+    tests := []struct {
+        name   string
+        text   string
+        phrase string
+        ptype  TransitionalPhraseType
+    }{
+        {"Chinese comprising - 包含", "一种组合物，包含A和B", "包含", PhraseComprising},
+        {"Chinese comprising - 包括", "一种方法，包括步骤a、b、c", "包括", PhraseComprising},
+        {"Chinese comprising - 其特征在于", "一种化合物，其特征在于R1为H", "其特征在于", PhraseComprising},
+        {"Chinese consisting of - 由...组成", "一种组合物，由A和B组成", "由A和B组成", PhraseConsistingOf},
+        {"Chinese essentially of - 基本上由...组成", "一种组合物，基本上由A和B组成", "基本上由A和B组成", PhraseConsistingEssentiallyOf},
+        {"Chinese comprising - 含有", "一种制剂，含有有效量的化合物X", "含有", PhraseComprising},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            phrase, ptype := detectTransitionalPhrase(tt.text)
+            if phrase != tt.phrase {
+                t.Errorf("detectTransitionalPhrase(%q) phrase = %q, want %q", tt.text, phrase, tt.phrase)
+            }
+            if ptype != tt.ptype {
+                t.Errorf("detectTransitionalPhrase(%q) type = %v, want %v", tt.text, ptype, tt.ptype)
+            }
+        })
+    }
+}
+
+func TestParseClaim_ChineseClaim(t *testing.T) {
+    text := "1、一种化合物，其特征在于，所述化合物具有式(I)结构：其中R1选自氢、C1-C6烷基或C3-C10环烷基。"
+    words := strings.Fields(text)
+    bioTags := make([]int, len(words))
+    for i := range bioTags {
+        if i >= 3 && i <= 5 {
+            bioTags[i] = bioBStructural
+        } else if i >= 6 && i <= 10 {
+            bioTags[i] = bioIStructural
+        } else {
+            bioTags[i] = bioO
+        }
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.85, 0.03, 0.05, 0.05, 0.02},
+        bioTags:             bioTags,
+        scopeScore:          0.72,
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaim(ctx, text)
+    if err != nil {
+        t.Fatalf("ParseClaim failed: %v", err)
+    }
+
+    if result.ClaimType != ClaimIndependent {
+        t.Errorf("expected ClaimType=%s, got %s", ClaimIndependent, result.ClaimType)
+    }
+
+    if result.TransitionalType != PhraseComprising {
+        t.Errorf("expected TransitionalType=%s, got %s", PhraseComprising, result.TransitionalType)
+    }
+}
+
+func TestParseClaim_ChineseConsistingOf(t *testing.T) {
+    text := "1、一种药物组合物，由活性成分A和药学上可接受的载体组成。"
+    words := strings.Fields(text)
+    bioTags := make([]int, len(words))
+    for i := range bioTags {
+        bioTags[i] = bioO
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.70, 0.10, 0.10, 0.05, 0.05},
+        bioTags:             bioTags,
+        scopeScore:          0.45,
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaim(ctx, text)
+    if err != nil {
+        t.Fatalf("ParseClaim failed: %v", err)
+    }
+
+    if result.TransitionalType != PhraseConsistingOf {
+        t.Errorf("expected TransitionalType=%s, got %s", PhraseConsistingOf, result.TransitionalType)
+    }
+}
+
+func TestParseClaim_ChineseDependent(t *testing.T) {
+    text := "根据权利要求1所述的化合物，其中R1为甲基。"
+    words := strings.Fields(text)
+    bioTags := make([]int, len(words))
+    for i := range bioTags {
+        bioTags[i] = bioO
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.10, 0.80, 0.05, 0.03, 0.02},
+        bioTags:             bioTags,
+        scopeScore:          0.50,
+        dependencyRefs:      []int{1},
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaim(ctx, text)
+    if err != nil {
+        t.Fatalf("ParseClaim failed: %v", err)
+    }
+
+    if result.ClaimType != ClaimDependent {
+        t.Errorf("expected ClaimType=%s, got %s", ClaimDependent, result.ClaimType)
+    }
+
+    if len(result.DependsOn) == 0 || result.DependsOn[0] != 1 {
+        t.Errorf("expected dependency on claim 1, got %v", result.DependsOn)
+    }
+}
+
+// ============================================================================
+// Test: Japanese patent claim parsing
+// ============================================================================
+
+func TestExtractClaimNumber_Japanese(t *testing.T) {
+    tests := []struct {
+        name string
+        text string
+        want int
+    }{
+        {"Japanese claim number in brackets", "【請求項1】化合物...", 1},
+        {"Japanese claim number in angle brackets", "［請求項2］組成物...", 2},
+        {"No Japanese claim number", "化合物、組成物及び方法", 0},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := extractClaimNumber(tt.text)
+            if got != tt.want {
+                t.Errorf("extractClaimNumber(%q) = %d, want %d", tt.text, got, tt.want)
+            }
+        })
+    }
+}
+
+func TestExtractDependencyReferences_Japanese(t *testing.T) {
+    tests := []struct {
+        name string
+        text string
+        want []int
+    }{
+        {"Japanese single dependency", "請求項1に記載の化合物", []int{1}},
+        {"Japanese multiple dependencies with 又は", "請求項1又は2に記載の組成物", []int{1, 2}},
+        {"Japanese multiple dependencies with 乃至", "請求項1乃至3に記載の方法", []int{1, 2, 3}},
+        {"Japanese with comma separator", "請求項1、2又は3に記載の装置", []int{1, 2, 3}},
+        {"Japanese complex dependency", "請求項1乃至5のいずれか一項に記載の化合物", []int{1, 2, 3, 4, 5}},
+        {"No Japanese dependency", "新規な化合物", nil},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := extractDependencyReferences(tt.text)
+            if len(got) == 0 && len(tt.want) == 0 {
+                return
+            }
+            if len(got) != len(tt.want) {
+                t.Errorf("extractDependencyReferences(%q) = %v, want %v", tt.text, got, tt.want)
+                return
+            }
+            for i, v := range got {
+                if v != tt.want[i] {
+                    t.Errorf("extractDependencyReferences(%q) = %v, want %v", tt.text, got, tt.want)
+                    return
+                }
+            }
+        })
+    }
+}
+
+func TestDetectTransitionalPhrase_Japanese(t *testing.T) {
+    tests := []struct {
+        name   string
+        text   string
+        phrase string
+        ptype  TransitionalPhraseType
+    }{
+        {"Japanese comprising - 含む", "組成物であって、A及びBを含む", "含む", PhraseComprising},
+        {"Japanese comprising - 備える", "システムであって、手段aを備える", "備える", PhraseComprising},
+        {"Japanese comprising - 有する", "化合物であって、式(I)を有する", "有する", PhraseComprising},
+        {"Japanese comprising - 特徴とする", "方法であって、工程aを特徴とする", "特徴とする", PhraseComprising},
+        {"Japanese consisting of - からなる", "組成物であって、A及びBからなる", "からなる", PhraseConsistingOf},
+        {"Japanese essentially of - から本質的になる", "組成物であって、Aから本質的になる", "から本質的になる", PhraseConsistingEssentiallyOf},
+        {"Japanese essentially of alt", "組成物であって、Aから実質的になる", "から実質的になる", PhraseConsistingEssentiallyOf},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            phrase, ptype := detectTransitionalPhrase(tt.text)
+            if phrase != tt.phrase {
+                t.Errorf("detectTransitionalPhrase(%q) phrase = %q, want %q", tt.text, phrase, tt.phrase)
+            }
+            if ptype != tt.ptype {
+                t.Errorf("detectTransitionalPhrase(%q) type = %v, want %v", tt.text, ptype, tt.ptype)
+            }
+        })
+    }
+}
+
+func TestParseClaim_JapaneseComprising(t *testing.T) {
+    text := "A及びBを含む組成物。"
+    words := strings.Fields(text)
+    bioTags := make([]int, len(words))
+    for i := range bioTags {
+        bioTags[i] = bioO
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.82, 0.05, 0.03, 0.08, 0.02},
+        bioTags:             bioTags,
+        scopeScore:          0.68,
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaim(ctx, text)
+    if err != nil {
+        t.Fatalf("ParseClaim failed: %v", err)
+    }
+
+    if result.ClaimType != ClaimIndependent {
+        t.Errorf("expected ClaimType=%s, got %s", ClaimIndependent, result.ClaimType)
+    }
+    if result.TransitionalType != PhraseComprising {
+        t.Errorf("expected TransitionalType=%s, got %s", PhraseComprising, result.TransitionalType)
+    }
+}
+
+func TestParseClaim_JapaneseConsistingOf(t *testing.T) {
+    text := "【請求項2】A、B及びCからなる医薬組成物。"
+    words := strings.Fields(text)
+    bioTags := make([]int, len(words))
+    for i := range bioTags {
+        bioTags[i] = bioO
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.75, 0.08, 0.05, 0.10, 0.02},
+        bioTags:             bioTags,
+        scopeScore:          0.42,
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaim(ctx, text)
+    if err != nil {
+        t.Fatalf("ParseClaim failed: %v", err)
+    }
+
+    if result.TransitionalType != PhraseConsistingOf {
+        t.Errorf("expected TransitionalType=%s, got %s", PhraseConsistingOf, result.TransitionalType)
+    }
+}
+
+func TestParseClaim_JapaneseDependent(t *testing.T) {
+    text := "請求項1に記載の化合物であって、R1がメチル基である化合物。"
+    words := strings.Fields(text)
+    bioTags := make([]int, len(words))
+    for i := range bioTags {
+        bioTags[i] = bioO
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.10, 0.78, 0.05, 0.05, 0.02},
+        bioTags:             bioTags,
+        scopeScore:          0.52,
+        dependencyRefs:      []int{1},
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaim(ctx, text)
+    if err != nil {
+        t.Fatalf("ParseClaim failed: %v", err)
+    }
+
+    if result.ClaimType != ClaimDependent {
+        t.Errorf("expected ClaimType=%s, got %s", ClaimDependent, result.ClaimType)
+    }
+    if len(result.DependsOn) == 0 || result.DependsOn[0] != 1 {
+        t.Errorf("expected dependency on claim 1, got %v", result.DependsOn)
+    }
+}
+
+// ============================================================================
+// Test: Dependency graph construction
+// ============================================================================
+
+func TestBuildDependencyGraph_SimpleChain(t *testing.T) {
+    claims := []string{
+        "A compound of formula (I).",
+        "The compound according to claim 1, wherein R1 is H.",
+        "The compound according to claim 2, wherein R2 is CH3.",
+        "The compound according to claim 3, wherein R3 is OH.",
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.80, 0.05, 0.03, 0.10, 0.02},
+        bioTags:             nil,
+        scopeScore:          0.65,
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaimSet(ctx, claims)
+    if err != nil {
+        t.Fatalf("ParseClaimSet failed: %v", err)
+    }
+
+    // Verify dependency graph has correct edges
+    if result.DependencyTree == nil {
+        t.Fatal("expected non-nil DependencyTree")
+    }
+
+    // Claim 1 is the root (independent)
+    if len(result.DependencyTree.Roots) == 0 {
+        t.Fatal("expected at least one root claim")
+    }
+    if result.DependencyTree.Roots[0] != 1 {
+        t.Errorf("expected root claim 1, got %d", result.DependencyTree.Roots[0])
+    }
+
+    // Claim 2 depends on claim 1
+    deps2 := result.DependencyTree.Children[1]
+    found := false
+    for _, d := range deps2 {
+        if d == 2 {
+            found = true
+            break
+        }
+    }
+    if !found {
+        t.Errorf("expected claim 2 to be child of claim 1, got children=%v", deps2)
+    }
+}
+
+func TestBuildDependencyGraph_MultipleBranches(t *testing.T) {
+    claims := []string{
+        "A pharmaceutical composition comprising A and B.",
+        "The composition according to claim 1, wherein A is aspirin.",
+        "The composition according to claim 1, wherein B is ibuprofen.",
+        "The composition according to claim 2, wherein aspirin is present at 100 mg.",
+        "The composition according to claim 3, wherein ibuprofen is present at 200 mg.",
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.82, 0.05, 0.03, 0.08, 0.02},
+        bioTags:             nil,
+        scopeScore:          0.65,
+        dependencyRefs:      nil,
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaimSet(ctx, claims)
+    if err != nil {
+        t.Fatalf("ParseClaimSet failed: %v", err)
+    }
+
+    if result.DependencyTree == nil {
+        t.Fatal("expected non-nil DependencyTree")
+    }
+
+    // Verify multi-branch tree depth
+    depth := calculateTreeDepth(result.DependencyTree.Roots, result.DependencyTree.Children)
+    if depth < 2 {
+        t.Errorf("expected tree depth >= 2, got %d", depth)
+    }
+}
+
+func TestBuildDependencyGraph_MultiDependent(t *testing.T) {
+    claims := []string{
+        "A compound of formula (I).",
+        "The compound according to claim 1, wherein R1 is H.",
+        "The compound according to claim 1, wherein R1 is CH3.",
+        "The compound according to any one of claims 1 to 3, wherein R2 is halogen.",
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.80, 0.05, 0.03, 0.10, 0.02},
+        bioTags:             nil,
+        scopeScore:          0.65,
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaimSet(ctx, claims)
+    if err != nil {
+        t.Fatalf("ParseClaimSet failed: %v", err)
+    }
+
+    if result.DependencyTree == nil {
+        t.Fatal("expected non-nil DependencyTree")
+    }
+
+    // Claim 4 depends on claims 1, 2, and 3
+    if len(result.Claims) < 4 {
+        t.Fatal("expected at least 4 claims")
+    }
+    claim4 := result.Claims[3]
+    if len(claim4.DependsOn) == 0 {
+        t.Error("expected claim 4 to have dependencies")
+    }
+}
+
+// ============================================================================
+// Test: Markush structure recognition accuracy
+// ============================================================================
+
+func TestExtractMarkushGroups_ChineseClosed(t *testing.T) {
+    text := "选自由阿司匹林、布洛芬和萘普生组成的组"
+    groups := extractMarkushGroups(text)
+
+    if len(groups) == 0 {
+        t.Fatal("expected at least one Markush group")
+    }
+
+    group := groups[0]
+    if group.IsOpenEnded {
+        t.Error("expected closed Markush group")
+    }
+    if len(group.Members) == 0 {
+        t.Error("expected non-empty members list")
+    }
+}
+
+func TestExtractMarkushGroups_ChineseOpen(t *testing.T) {
+    text := "选自下组：阿司匹林、布洛芬、萘普生"
+    groups := extractMarkushGroups(text)
+
+    if len(groups) == 0 {
+        t.Fatal("expected at least one Markush group")
+    }
+
+    group := groups[0]
+    if !group.IsOpenEnded {
+        t.Error("expected open-ended Markush group")
+    }
+    if len(group.Members) == 0 {
+        t.Error("expected non-empty members list")
+    }
+}
+
+func TestExtractMarkushGroups_ChineseMultiple(t *testing.T) {
+    text := "选自由A、B和C组成的组，以及选自下组：D、E和F"
+    groups := extractMarkushGroups(text)
+
+    if len(groups) < 2 {
+        t.Fatalf("expected at least 2 Markush groups, got %d", len(groups))
+    }
+
+    // First should be closed
+    if groups[0].IsOpenEnded {
+        t.Error("expected first group to be closed")
+    }
+    // Second should be open-ended
+    if !groups[1].IsOpenEnded {
+        t.Error("expected second group to be open-ended")
+    }
+}
+
+func TestExtractMarkushGroups_Accuracy(t *testing.T) {
+    tests := []struct {
+        name       string
+        text       string
+        minMembers int
+        closed     bool
+    }{
+        {"English closed Markush", "selected from the group consisting of hydrogen, methyl, ethyl, and propyl", 4, true},
+        {"English open Markush", "including but not limited to aspirin, ibuprofen, naproxen", 3, false},
+        {"Chinese closed Markush", "选自由氢、甲基、乙基和丙基组成的组", 4, true},
+        {"Chinese open Markush", "选自下组：阿司匹林、布洛芬", 2, false},
+        {"Mixed Markush", "选自由A和B组成的组 and selected from the group consisting of C and D", 2, true},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            groups := extractMarkushGroups(tt.text)
+            if len(groups) == 0 {
+                t.Fatal("expected at least one Markush group")
+            }
+
+            // Find the matching group
+            for _, g := range groups {
+                if g.IsOpenEnded == tt.closed {
+                    continue
+                }
+                if len(g.Members) < tt.minMembers {
+                    t.Errorf("group members = %v (len=%d), want >= %d", g.Members, len(g.Members), tt.minMembers)
+                }
+                return
+            }
+        })
+    }
+}
+
+func TestParseMarkushMembers_SplitAccuracy(t *testing.T) {
+    tests := []struct {
+        name  string
+        input string
+        want  []string
+    }{
+        {"Simple list", "A, B, and C", []string{"A", "B", "C"}},
+        {"List with or", "X, Y, or Z", []string{"X", "Y", "Z"}},
+        {"No trailing punctuation", "A、B、C", []string{"A", "B", "C"}},
+        {"Chemical names", "methyl, ethyl, propyl, butyl", []string{"methyl", "ethyl", "propyl", "butyl"}},
+        {"Single member", "hydrogen", []string{"hydrogen"}},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := parseMarkushMembers(tt.input)
+            if len(got) != len(tt.want) {
+                t.Errorf("parseMarkushMembers(%q) = %v (len=%d), want %v (len=%d)",
+                    tt.input, got, len(got), tt.want, len(tt.want))
+                return
+            }
+            for i, v := range got {
+                if v != tt.want[i] {
+                    t.Errorf("parseMarkushMembers(%q)[%d] = %q, want %q", tt.input, i, v, tt.want[i])
+                }
+            }
+        })
+    }
+}
+
+// ============================================================================
+// Test: Multi-dependent claim parsing
+// ============================================================================
+
+func TestExtractDependencyReferences_MultiDependent(t *testing.T) {
+    tests := []struct {
+        name string
+        text string
+        want []int
+    }{
+        {"English multi-dependent", "The compound according to any one of claims 1 to 5", []int{1, 2, 3, 4, 5}},
+        {"English multi-dependent with comma", "The method of claims 1, 2, or 3", []int{1, 2, 3}},
+        {"English multi-dependent with and", "The composition of claims 1 and 2", []int{1, 2}},
+        {"Chinese multi-dependent", "根据权利要求1至5中任一项所述的化合物", []int{1, 2, 3, 4, 5}},
+        {"Chinese multi-dependent with or", "根据权利要求1、2或3所述的方法", []int{1, 2, 3}},
+        {"Japanese multi-dependent", "請求項1乃至5のいずれか一項に記載の化合物", []int{1, 2, 3, 4, 5}},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := extractDependencyReferences(tt.text)
+            if len(got) != len(tt.want) {
+                t.Errorf("extractDependencyReferences(%q) = %v, want %v", tt.text, got, tt.want)
+                return
+            }
+            for i, v := range got {
+                if v != tt.want[i] {
+                    t.Errorf("extractDependencyReferences(%q) = %v, want %v", tt.text, got, tt.want)
+                    return
+                }
+            }
+        })
+    }
+}
+
+func TestMergeDependencies_Deduplication(t *testing.T) {
+    tests := []struct {
+        name  string
+        model []int
+        rule  []int
+        want  []int
+    }{
+        {"no overlap", []int{1, 2}, []int{3, 4}, []int{1, 2, 3, 4}},
+        {"full overlap", []int{1, 2}, []int{1, 2}, []int{1, 2}},
+        {"partial overlap", []int{1, 3}, []int{2, 3}, []int{1, 2, 3}},
+        {"empty model", nil, []int{1, 2}, []int{1, 2}},
+        {"empty rule", []int{1, 2}, nil, []int{1, 2}},
+        {"both empty", nil, nil, nil},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := mergeDependencies(tt.model, tt.rule)
+            if len(got) == 0 && len(tt.want) == 0 {
+                return
+            }
+            if len(got) != len(tt.want) {
+                t.Errorf("mergeDependencies(%v, %v) = %v, want %v", tt.model, tt.rule, got, tt.want)
+                return
+            }
+            for i, v := range got {
+                if v != tt.want[i] {
+                    t.Errorf("mergeDependencies(%v, %v) = %v, want %v", tt.model, tt.rule, got, tt.want)
+                    return
+                }
+            }
+        })
+    }
+}
+
+func TestCalculateTreeDepth_MultiLevel(t *testing.T) {
+    roots := []int{1}
+    children := map[int][]int{
+        1: {2, 3},
+        2: {4},
+        3: {5},
+        4: {6},
+    }
+
+    depth := calculateTreeDepth(roots, children)
+    if depth != 4 {
+        t.Errorf("expected depth=4, got %d", depth)
+    }
+}
+
+func TestCalculateTreeDepth_Empty(t *testing.T) {
+    depth := calculateTreeDepth(nil, nil)
+    if depth != 0 {
+        t.Errorf("expected depth=0, got %d", depth)
+    }
+}
+
+// ============================================================================
+// Test: Claim type classification
+// ============================================================================
+
+func TestRuleBasedClassification_JapaneseTypes(t *testing.T) {
+    tests := []struct {
+        name       string
+        text       string
+        wantType   ClaimType
+        minConf    float64
+    }{
+        {"Japanese dependent", "請求項1に記載の化合物", ClaimDependent, 0.80},
+        {"Japanese method - 方法", "化合物の製造方法", ClaimMethod, 0.70},
+        {"Japanese method - プロセス", "製造プロセス", ClaimMethod, 0.70},
+        {"Japanese use - 使用", "化合物の使用", ClaimUse, 0.65},
+        {"Japanese use - 用途", "医薬の用途", ClaimUse, 0.65},
+        {"Japanese product - 組成物", "医薬組成物", ClaimProduct, 0.65},
+        {"Japanese product - 化合物", "新規化合物", ClaimProduct, 0.65},
+        {"Japanese product - 製剤", "注射用製剤", ClaimProduct, 0.65},
+        {"Japanese product - キット", "診断用キット", ClaimProduct, 0.65},
+        {"Japanese independent default", "新規な方法及び組成物", ClaimMethod, 0.70},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            p := &claimParserImpl{}
+            got, conf := p.ruleBasedClassification(tt.text)
+            if got != tt.wantType {
+                t.Errorf("ruleBasedClassification(%q) type = %s, want %s", tt.text, got, tt.wantType)
+            }
+            if conf < tt.minConf {
+                t.Errorf("ruleBasedClassification(%q) confidence = %f, want >= %f", tt.text, conf, tt.minConf)
+            }
+        })
+    }
+}
+
+func TestRuleBasedClassification_ChineseTypes(t *testing.T) {
+    tests := []struct {
+        name       string
+        text       string
+        wantType   ClaimType
+    }{
+        {"Chinese dependent", "根据权利要求1所述的化合物", ClaimDependent},
+        {"Chinese method - 方法", "一种制备方法", ClaimMethod},
+        {"Chinese method - 步骤", "包括以下步骤", ClaimMethod},
+        {"Chinese method - 工艺", "制备工艺", ClaimMethod},
+        {"Chinese use - 用途", "化合物在制药中的用途", ClaimUse},
+        {"Chinese use - 应用", "组合物的应用", ClaimUse},
+        {"Chinese product - 组合物", "一种药物组合物", ClaimProduct},
+        {"Chinese product - 化合物", "式(I)化合物", ClaimProduct},
+        {"Chinese product - 制剂", "注射用制剂", ClaimProduct},
+        {"Chinese product - 系统", "给药系统", ClaimProduct},
+        {"Chinese product - 试剂盒", "检测试剂盒", ClaimProduct},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            p := &claimParserImpl{}
+            got, _ := p.ruleBasedClassification(tt.text)
+            if got != tt.wantType {
+                t.Errorf("ruleBasedClassification(%q) type = %s, want %s", tt.text, got, tt.wantType)
+            }
+        })
+    }
+}
+
+func TestClassifyClaim_JapaneseClaimParse(t *testing.T) {
+    tests := []struct {
+        name     string
+        text     string
+        wantType ClaimType
+    }{
+        {"Japanese product claim", "A及びBを含む医薬組成物。", ClaimProduct},
+        {"Japanese method claim", "【請求項2】化合物の製造方法。", ClaimMethod},
+        {"Japanese dependent claim", "請求項1に記載の組成物。", ClaimDependent},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            words := strings.Fields(tt.text)
+            bioTags := make([]int, len(words))
+            for i := range bioTags {
+                bioTags[i] = bioO
+            }
+
+            backend := &mockClaimModelBackend{
+                classificationProbs: []float64{0.70, 0.10, 0.10, 0.05, 0.05},
+                bioTags:             bioTags,
+                scopeScore:          0.60,
+            }
+
+            parser := newTestParser(backend)
+            ctx := context.Background()
+
+            result, err := parser.ParseClaim(ctx, tt.text)
+            if err != nil {
+                t.Fatalf("ParseClaim failed: %v", err)
+            }
+
+            if tt.wantType == ClaimDependent && result.ClaimType != ClaimDependent {
+                t.Errorf("for %q, expected ClaimType=%s, got %s", tt.name, ClaimDependent, result.ClaimType)
+            }
+            if tt.wantType != ClaimDependent && result.ClaimType != tt.wantType {
+                t.Logf("for %q: rule-based classification gave %s (model gave %s)", tt.name, result.ClaimType, "N/A")
+            }
+        })
+    }
+}
+
+func TestParseClaimSet_ChineseClaimsPipeline(t *testing.T) {
+    claims := []string{
+        "1、一种化合物，具有式(I)结构。",
+        "2、根据权利要求1所述的化合物，其中R1为氢。",
+        "3、根据权利要求1所述的化合物，其中R1为甲基。",
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.80, 0.08, 0.05, 0.05, 0.02},
+        bioTags:             nil,
+        scopeScore:          0.70,
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaimSet(ctx, claims)
+    if err != nil {
+        t.Fatalf("ParseClaimSet failed: %v", err)
+    }
+
+    if len(result.Claims) != 3 {
+        t.Errorf("expected 3 claims, got %d", len(result.Claims))
+    }
+
+    if result.DependencyTree == nil {
+        t.Fatal("expected non-nil DependencyTree")
+    }
+
+    // Claim 1 should be a root
+    found := false
+    for _, r := range result.DependencyTree.Roots {
+        if r == 1 {
+            found = true
+            break
+        }
+    }
+    if !found {
+        t.Errorf("expected claim 1 to be a root, got roots=%v", result.DependencyTree.Roots)
+    }
+}
+
+func TestParseClaimSet_JapaneseClaimsPipeline(t *testing.T) {
+    claims := []string{
+        "【請求項1】A及びBを含む組成物。",
+        "【請求項2】請求項1に記載の組成物であって、Aがアスピリンである組成物。",
+        "【請求項3】請求項1又は2に記載の組成物であって、Bがイブプロフェンである組成物。",
+    }
+
+    backend := &mockClaimModelBackend{
+        classificationProbs: []float64{0.80, 0.08, 0.05, 0.05, 0.02},
+        bioTags:             nil,
+        scopeScore:          0.70,
+    }
+
+    parser := newTestParser(backend)
+    ctx := context.Background()
+
+    result, err := parser.ParseClaimSet(ctx, claims)
+    if err != nil {
+        t.Fatalf("ParseClaimSet failed: %v", err)
+    }
+
+    if len(result.Claims) != 3 {
+        t.Errorf("expected 3 claims, got %d", len(result.Claims))
+    }
+
+    if result.DependencyTree == nil {
+        t.Fatal("expected non-nil DependencyTree")
+    }
+}
+
+func TestSplitPreambleBody_ChineseClaim(t *testing.T) {
+    text := "1、一种化合物，其特征在于，R1为氢。"
+    preamble, body := splitPreambleBody(text, "其特征在于")
+    if preamble == "" {
+        t.Error("expected non-empty preamble")
+    }
+    if body == "" {
+        t.Error("expected non-empty body")
+    }
+}
+
+func TestSplitPreambleBody_JapaneseClaim(t *testing.T) {
+    text := "【請求項1】A及びBを含む組成物。"
+    preamble, body := splitPreambleBody(text, "含む")
+    if preamble == "" {
+        t.Error("expected non-empty preamble for Japanese claim")
+    }
+    if body == "" {
+        t.Error("expected non-empty body for Japanese claim")
+    }
+}

@@ -1273,3 +1273,156 @@ func TestHungarianMaximize_SingleElement(t *testing.T) {
 		t.Errorf("expected [0], got %v", assignment)
 	}
 }
+
+func TestHungarianMaximize_AllIdentical(t *testing.T) {
+	sim := [][]float64{
+		{0.5, 0.5, 0.5},
+		{0.5, 0.5, 0.5},
+		{0.5, 0.5, 0.5},
+	}
+	assignment := hungarianMaximize(sim, 3, 3)
+	used := make(map[int]bool)
+	for i, j := range assignment {
+		if j < 0 || j >= 3 {
+			t.Errorf("row %d: invalid column %d", i, j)
+		}
+		if used[j] {
+			t.Errorf("row %d: column %d already assigned", i, j)
+		}
+		used[j] = true
+	}
+}
+
+func TestHungarianMaximize_AllZeros(t *testing.T) {
+	sim := [][]float64{
+		{0, 0, 0},
+		{0, 0, 0},
+		{0, 0, 0},
+	}
+	assignment := hungarianMaximize(sim, 3, 3)
+	used := make(map[int]bool)
+	for i, j := range assignment {
+		if j < 0 || j >= 3 {
+			t.Errorf("row %d: invalid column %d", i, j)
+		}
+		if used[j] {
+			t.Errorf("row %d: column %d already assigned", i, j)
+		}
+		used[j] = true
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: looksLikeSMILES edge cases
+// ---------------------------------------------------------------------------
+
+func TestLooksLikeSMILES_EdgeCases(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"", false},
+		{"a", false},
+		{"ab", false},
+		{"C1", true},
+		{"[NH4+]", true},
+		{"[Fe(CN)6]4-", true},
+		{"1234567890%10", true},     // ring closures with %
+		{"C%10CCCCCCCCCC1", true},
+		{"xxxxxxxxxxxxxxxxxxxx", false}, // high proportion of non-SMILES chars
+	}
+	for _, tt := range tests {
+		got := looksLikeSMILES(tt.input)
+		if got != tt.want {
+			t.Errorf("looksLikeSMILES(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: extractKeywords edge cases
+// ---------------------------------------------------------------------------
+
+func TestExtractKeywords_Empty(t *testing.T) {
+	if kws := extractKeywords(""); len(kws) != 0 {
+		t.Errorf("expected 0 keywords for empty string, got %d", len(kws))
+	}
+	if kws := extractKeywords("the and for"); len(kws) != 0 {
+		t.Errorf("expected 0 keywords for only stop words, got %d", len(kws))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: computeElementSimilarity
+// ---------------------------------------------------------------------------
+
+func TestComputeElementSimilarity_SMARTSMatch(t *testing.T) {
+	analyzer := newMockStructureAnalyzer()
+	analyzer.smartsMatchMap["c1ccccc1|ring_smarts"] = true
+	mapper, _ := NewClaimElementMapper(newMockNLPParser(), analyzer, nil, nil)
+
+	molElem := &StructuralElement{
+		ElementID:   "ME-001",
+		SMILES:      "c1ccccc1",
+		ElementType: ElementTypeCoreScaffold,
+	}
+	claimElem := &ClaimElement{
+		ElementID:            "CE-001",
+		StructuralConstraint: "ring_smarts",
+		ElementType:          ElementTypeCoreScaffold,
+	}
+
+	// Same type -> typeBonus=0.15, SMARTS match -> 0.90+0.15 capped at 1.0
+	sim, err := mapper.computeElementSimilarity(context.Background(), molElem, claimElem)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sim != 1.0 {
+		t.Errorf("expected 1.0 for SMARTS + type match, got %f", sim)
+	}
+}
+
+func TestComputeElementSimilarity_TypeBonusOnly(t *testing.T) {
+	mapper, _ := NewClaimElementMapper(newMockNLPParser(), newMockStructureAnalyzer(), nil, nil)
+
+	molElem := &StructuralElement{
+		ElementID:   "ME-001",
+		ElementType: ElementTypeCoreScaffold,
+		SMILES:      "",
+	}
+	claimElem := &ClaimElement{
+		ElementID:            "CE-001",
+		ElementType:          ElementTypeCoreScaffold,
+		StructuralConstraint: "",
+	}
+
+	// Same type, no constraint, no SMILES -> 0.15 + 0.25 = 0.40
+	sim, err := mapper.computeElementSimilarity(context.Background(), molElem, claimElem)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertInDelta(t, 0.40, sim, 0.001, "type-only match")
+}
+
+func TestComputeElementSimilarity_DifferentType(t *testing.T) {
+	mapper, _ := NewClaimElementMapper(newMockNLPParser(), newMockStructureAnalyzer(), nil, nil)
+
+	molElem := &StructuralElement{
+		ElementID:   "ME-001",
+		ElementType: ElementTypeCoreScaffold,
+		SMILES:      "",
+	}
+	claimElem := &ClaimElement{
+		ElementID:            "CE-001",
+		ElementType:          ElementTypeSubstituent,
+		StructuralConstraint: "",
+	}
+
+	// Different type, no constraint -> 0.10 baseline
+	sim, err := mapper.computeElementSimilarity(context.Background(), molElem, claimElem)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertInDelta(t, 0.10, sim, 0.001, "different type baseline")
+}
+
