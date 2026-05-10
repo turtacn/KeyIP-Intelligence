@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Search, User, Globe, Settings } from 'lucide-react';
+import { Bell, Search, Globe, Settings, LogIn, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { type ApiMode, getApiMode, setApiMode } from '../../utils/apiMode';
+import { type ApiMode, getApiMode, setApiMode, isMockMode } from '../../utils/apiMode';
+import { useAuth } from '../../utils/auth';
 
 const MODE_LABELS: Record<ApiMode, string> = {
   mock: 'Mock',
@@ -97,6 +98,82 @@ const ApiModeSwitcher: React.FC = () => {
   );
 };
 
+const AuthButton: React.FC = () => {
+  const { isAuthenticated: authed, user, login, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Do not show auth UI in mock mode
+  if (isMockMode()) {
+    return null;
+  }
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuOpen]);
+
+  if (!authed || !user) {
+    return (
+      <button
+        onClick={() => login()}
+        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+        title="Sign in with Keycloak"
+      >
+        <LogIn className="w-4 h-4" />
+        <span>Sign In</span>
+      </button>
+    );
+  }
+
+  // Get initials for avatar fallback
+  const initials = (user.name || user.preferred_username || 'U')
+    .split(' ')
+    .map(s => s[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setMenuOpen(!menuOpen)}
+        className="flex items-center gap-2 p-1 pr-3 rounded-full hover:bg-slate-50 transition-colors"
+      >
+        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium">
+          {initials}
+        </div>
+        <span className="text-sm text-slate-700 max-w-[120px] truncate hidden sm:inline">
+          {user.name || user.preferred_username}
+        </span>
+      </button>
+
+      {menuOpen && (
+        <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <p className="text-sm font-medium text-slate-800 truncate">{user.name || user.preferred_username}</p>
+            <p className="text-xs text-slate-500 truncate">{user.email}</p>
+          </div>
+          <button
+            onClick={() => logout()}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sign Out</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TopBar: React.FC = () => {
   const { i18n, t } = useTranslation();
   const navigate = useNavigate();
@@ -160,11 +237,8 @@ const TopBar: React.FC = () => {
 
           <div className="h-8 w-px bg-slate-200 mx-2"></div>
 
-          <button className="flex items-center space-x-2 p-1 pr-3 rounded-full hover:bg-slate-50 transition-colors">
-            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600">
-              <User className="w-5 h-5" />
-            </div>
-          </button>
+          {/* Auth: login/logout button or user avatar */}
+          <AuthButton />
         </div>
       </div>
     </header>

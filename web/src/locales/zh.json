@@ -76,6 +76,7 @@
     "tool_search": "专利检索",
     "tool_priorart": "现有技术分析",
     "tool_drafting": "权利要求撰写",
+    "tool_editor": "分子编辑器",
     "assessment": {
       "title": "新发明详情",
       "smiles_label": "目标分子结构 (SMILES)",

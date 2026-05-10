@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	kerrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -305,6 +307,13 @@ func (c *Client) do(ctx context.Context, method, path string, body interface{}, 
 			}
 			req.Header.Set(k, v)
 		}
+
+		// Inject W3C TraceContext headers (traceparent, tracestate) for
+		// distributed tracing propagation across service boundaries.
+		otel.GetTextMapPropagator().Inject(
+			req.Context(),
+			propagation.HeaderCarrier(req.Header),
+		)
 
 		// Client-side rate limiting.
 		if c.rateLimiter != nil {

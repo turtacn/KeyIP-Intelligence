@@ -4,6 +4,7 @@ import AppShell from './components/layout/AppShell';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 
 // Lazy load pages
+const LoginCallback = React.lazy(() => import('./pages/Login/LoginCallback'));
 const ExecutiveDashboard = React.lazy(() => import('./pages/ExecutiveDashboard'));
 const PatentMining = React.lazy(() => import('./pages/PatentMining'));
 const InfringementWatch = React.lazy(() => import('./pages/InfringementWatch'));
@@ -18,6 +19,14 @@ const MoleculeDetail = React.lazy(() => import('./pages/MoleculeDetail'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
 
 const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: (
+      <ErrorBoundary>
+        <LoginCallback />
+      </ErrorBoundary>
+    ),
+  },
   {
     path: '/',
     element: (

@@ -1,4 +1,5 @@
-import { getBaseUrl } from '../utils/apiMode';
+import { getBaseUrl, isMockMode } from '../utils/apiMode';
+import { getAccessToken } from '../utils/auth';
 
 /** Retry policy for API requests */
 export interface RetryPolicy {
@@ -68,6 +69,18 @@ class FetchAdapter implements ApiAdapter {
    */
   private async request<T>(path: string, options: RequestInit, silent = false): Promise<T> {
     const fullUrl = `${this.baseUrl}${path}`;
+
+    // Attach Bearer token for authenticated requests in non-mock mode
+    if (!isMockMode()) {
+      const token = await getAccessToken();
+      if (token) {
+        options.headers = {
+          ...(options.headers as Record<string, string>),
+          Authorization: `Bearer ${token}`,
+        };
+      }
+    }
+
     console.log(`[API] Requesting: ${fullUrl}`, options);
 
     try {

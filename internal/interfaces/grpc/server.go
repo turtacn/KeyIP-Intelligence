@@ -56,6 +56,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/prometheus"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/tracing"
 )
 
 const (
@@ -202,17 +203,19 @@ func NewServer(cfg *config.GRPCConfig, opts ...Option) (*Server, error) {
 		return nil, fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
 
-	// Build unary interceptor chain: recovery → logging → metrics → validation
+	// Build unary interceptor chain: recovery → tracing → logging → metrics → validation
 	unaryChain := chainUnaryInterceptors(
 		recoveryUnaryInterceptor(sopts.logger),
+		tracing.UnaryServerInterceptor(),
 		loggingUnaryInterceptor(sopts.logger),
 		metricsUnaryInterceptor(sopts.metrics),
 		validationUnaryInterceptor(),
 	)
 
-	// Build stream interceptor chain: recovery → logging → metrics
+	// Build stream interceptor chain: recovery → tracing → logging → metrics
 	streamChain := chainStreamInterceptors(
 		recoveryStreamInterceptor(sopts.logger),
+		tracing.StreamServerInterceptor(),
 		loggingStreamInterceptor(sopts.logger),
 		metricsStreamInterceptor(sopts.metrics),
 	)

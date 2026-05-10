@@ -7,7 +7,8 @@ import PriorArtAnalysis from './PriorArtAnalysis';
 import ClaimDraftAssistant from './ClaimDraftAssistant';
 import ErrorBoundary from '../../components/ui/ErrorBoundary';
 import EmptyState from '../../components/ui/EmptyState';
-import { Search, Map, FileSearch, Scale, PenTool, Wrench } from 'lucide-react';
+import MolecularEditor from '../../components/editor/MolecularEditor';
+import { Search, Map, FileSearch, Scale, PenTool, Beaker, Wrench } from 'lucide-react';
 
 const PatentMining: React.FC = () => {
   const { t } = useTranslation();
@@ -19,6 +20,7 @@ const PatentMining: React.FC = () => {
     { id: 'search', label: t('mining.tool_search'), icon: Search, component: <PatentSearch /> },
     { id: 'priorart', label: t('mining.tool_priorart'), icon: FileSearch, component: <PriorArtAnalysis /> },
     { id: 'drafting', label: t('mining.tool_drafting'), icon: PenTool, component: <ClaimDraftAssistant /> },
+    { id: 'editor', label: t('mining.tool_editor'), icon: Beaker, component: <MolecularEditor /> },
   ], [t]);
 
   const activeToolConfig = tools.find(t => t.id === activeTool);

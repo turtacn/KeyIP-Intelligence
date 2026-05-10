@@ -76,6 +76,7 @@
     "tool_search": "Patent Search",
     "tool_priorart": "Prior Art Analysis",
     "tool_drafting": "Claim Draft Assistant",
+    "tool_editor": "Molecular Editor",
     "assessment": {
       "title": "New Invention Details",
       "smiles_label": "Target Molecule Structure (SMILES)",
