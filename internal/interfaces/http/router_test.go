@@ -190,4 +190,120 @@ func TestChain(t *testing.T) {
 	assert.Equal(t, expected, order)
 }
 
+func TestNewRouter_VersioningMiddleware_SetsHeader(t *testing.T) {
+	// Configure versioning middleware
+	vCfg := middleware.DefaultVersioningConfig()
+	vCfg.CurrentVersion = "1.0-test"
+	vMw := middleware.NewVersioningMiddleware(vCfg)
+
+	cfg := RouterConfig{
+		HealthHandler:       newMinimalHealthHandler(),
+		Logger:              &stubLogger{},
+		VersioningMiddleware: vMw,
+	}
+	router := NewRouter(cfg)
+
+	// Non-API path should still get X-API-Version
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "1.0-test", rec.Header().Get("X-API-Version"))
+
+	// API path should also get header
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/test", nil)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, "1.0-test", rec.Header().Get("X-API-Version"))
+}
+
+func TestNewRouter_VersioningMiddleware_VersionNegotiation(t *testing.T) {
+	vCfg := middleware.DefaultVersioningConfig()
+	vCfg.CurrentVersion = "1.0"
+	vCfg.SupportedVersions = []string{"1.0", "2.0"}
+	vMw := middleware.NewVersioningMiddleware(vCfg)
+
+	cfg := RouterConfig{
+		HealthHandler:       newMinimalHealthHandler(),
+		Logger:              &stubLogger{},
+		VersioningMiddleware: vMw,
+	}
+	router := NewRouter(cfg)
+
+	// Supported version should pass through (header set, mux returns 404 for unregistered path)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/test", nil)
+	req.Header.Set("Accept-Version", "1.0")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, "1.0", rec.Header().Get("X-API-Version"))
+
+	// Unsupported version should return 406 before mux
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/test", nil)
+	req.Header.Set("Accept-Version", "99.0")
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusNotAcceptable, rec.Code)
+
+	// Non-API path should not be affected by Accept-Version
+	req = httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req.Header.Set("Accept-Version", "99.0")
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "1.0", rec.Header().Get("X-API-Version"))
+}
+
+func TestNewRouter_VersioningMiddleware_DeprecationWarnings(t *testing.T) {
+	vCfg := middleware.DefaultVersioningConfig()
+	vCfg.CurrentVersion = "2.0"
+	vCfg.SupportedVersions = []string{"1.0", "2.0"}
+	vCfg.DeprecatedVersions = map[string]string{"1.0": "Sun, 01 Jan 2025 00:00:00 GMT"}
+	vMw := middleware.NewVersioningMiddleware(vCfg)
+
+	cfg := RouterConfig{
+		Logger:              &stubLogger{},
+		VersioningMiddleware: vMw,
+	}
+	router := NewRouter(cfg)
+
+	// Deprecated version should get warning headers
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/test", nil)
+	req.Header.Set("Accept-Version", "1.0")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, "1.0", rec.Header().Get("X-API-Version"))
+	assert.Equal(t, "true", rec.Header().Get("Deprecation"))
+	assert.Equal(t, "Sun, 01 Jan 2025 00:00:00 GMT", rec.Header().Get("Sunset"))
+
+	// Current version should not get deprecation warnings
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/test", nil)
+	req.Header.Set("Accept-Version", "2.0")
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, "2.0", rec.Header().Get("X-API-Version"))
+	assert.Empty(t, rec.Header().Get("Deprecation"))
+	assert.Empty(t, rec.Header().Get("Sunset"))
+}
+
+func TestNewRouter_VersionEndpoint(t *testing.T) {
+	vHandler := handlers.NewVersionHandler("3.0.0", "commit1", "build1", "go1.22")
+	vCfg := middleware.DefaultVersioningConfig()
+	vMw := middleware.NewVersioningMiddleware(vCfg)
+
+	cfg := RouterConfig{
+		VersionHandler:      vHandler,
+		VersioningMiddleware: vMw,
+		Logger:              &stubLogger{},
+	}
+	router := NewRouter(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/version", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "3.0.0")
+	assert.Contains(t, rec.Body.String(), "commit1")
+}
+
 //Personal.AI order the ending

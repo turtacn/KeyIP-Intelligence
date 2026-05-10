@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { patentService } from '../../services/patent.service';
-import { Patent } from '../../types/domain';
+import { Patent, FamilyResponse } from '../../types/domain';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -10,6 +10,7 @@ import Button from '../../components/ui/Button';
 import PageError from '../../components/ui/PageError';
 import { SkeletonCard, SkeletonLine } from '../../components/ui/Skeleton';
 import EmptyState from '../../components/ui/EmptyState';
+import FamilyTree from '../../components/visualization/FamilyTree';
 import { ArrowLeft, ExternalLink, FileText } from 'lucide-react';
 
 const PatentDetail: React.FC = () => {
@@ -19,6 +20,9 @@ const PatentDetail: React.FC = () => {
   const [patent, setPatent] = useState<Patent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [familyResponse, setFamilyResponse] = useState<FamilyResponse | null>(null);
+  const [familyLoading, setFamilyLoading] = useState(false);
+  const [familyError, setFamilyError] = useState<string | null>(null);
 
   const fetchPatent = async () => {
     if (!id) return;
@@ -34,12 +38,27 @@ const PatentDetail: React.FC = () => {
     }
   };
 
+  const fetchFamily = async () => {
+    if (!id) return;
+    setFamilyLoading(true);
+    setFamilyError(null);
+    try {
+      const response = await patentService.getFamily(id);
+      setFamilyResponse(response.data);
+    } catch (err) {
+      setFamilyError(err instanceof Error ? err.message : 'Failed to load family data');
+    } finally {
+      setFamilyLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
     let mounted = true;
     const fetch = async () => {
       await fetchPatent();
       if (!mounted) return;
+      await fetchFamily();
     };
     fetch();
     return () => { mounted = false; };
@@ -220,6 +239,14 @@ const PatentDetail: React.FC = () => {
           </div>
         </Card>
       )}
+
+      {/* Patent Family Tree */}
+      <FamilyTree
+        familyData={familyResponse}
+        loading={familyLoading}
+        error={familyError}
+        onRetry={fetchFamily}
+      />
     </div>
   );
 };

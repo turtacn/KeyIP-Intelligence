@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/metrics"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/prometheus"
 	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/handlers"
 	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/middleware"
@@ -40,9 +41,14 @@ type RouterConfig struct {
 	AuthMiddleware               *middleware.AuthMiddleware
 	CORSMiddleware               *middleware.CORSMiddleware
 	LoggingMiddleware            *middleware.LoggingMiddleware
+	MetricsMiddleware            *metrics.MetricsMiddleware
 	RateLimitMiddleware          *middleware.RateLimitMiddleware
 	SecurityHeadersMiddleware    *middleware.SecurityHeadersMiddleware
 	TenantMiddleware             *middleware.TenantMiddleware
+	VersioningMiddleware         *middleware.VersioningMiddleware
+
+	// Handlers
+	VersionHandler *handlers.VersionHandler
 
 	// Infrastructure
 	Logger           logging.Logger
@@ -109,6 +115,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		mux.Handle("GET /metrics", cfg.MetricsCollector.Handler())
 	}
 
+	// --- API version endpoint (no auth required) ---
+	if cfg.VersionHandler != nil {
+		cfg.VersionHandler.RegisterRoutes(mux)
+	}
+
 	// --- API v1 Routes ---
 	// Create a separate mux for API routes if we wanted to isolate them,
 	// but ServeMux is flat. We register them directly.
@@ -135,7 +146,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 
 	// --- Global Middleware Chain ---
 	// Applied to ALL requests.
-	// Order: Recovery -> RequestID -> Logging -> CORS -> SecurityHeaders -> RateLimit -> [Conditional: Tenant -> Auth] -> Mux
+	// Order: Recovery -> RequestID -> Logging -> Metrics -> CORS -> SecurityHeaders -> Versioning -> RateLimit -> [Conditional: Tenant -> Auth] -> Mux
 
 	// Build the middleware stack.
 	// Since ServeMux matches strictly, we wrap the entire mux.
@@ -155,22 +166,32 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		globalMiddlewares = append(globalMiddlewares, cfg.LoggingMiddleware.Handler)
 	}
 
-	// 4. CORS
+	// 4. Metrics (applied to ALL requests including health and metrics endpoints)
+	if cfg.MetricsMiddleware != nil {
+		globalMiddlewares = append(globalMiddlewares, cfg.MetricsMiddleware.Handler)
+	}
+
+	// 5. CORS
 	if cfg.CORSMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.CORSMiddleware.Handler)
 	}
 
-	// 5. SecurityHeaders (applied to ALL responses)
+	// 6. SecurityHeaders (applied to ALL responses)
 	if cfg.SecurityHeadersMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.SecurityHeadersMiddleware.Handler)
 	}
 
-	// 6. RateLimit
+	// 7. Versioning (X-API-Version header, Accept-Version negotiation, deprecation warnings)
+	if cfg.VersioningMiddleware != nil {
+		globalMiddlewares = append(globalMiddlewares, cfg.VersioningMiddleware.Handler)
+	}
+
+	// 8. RateLimit
 	if cfg.RateLimitMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.RateLimitMiddleware.Handler)
 	}
 
-	// 7. Tenant & Auth (Conditional)
+	// 9. Tenant & Auth (Conditional)
 	// We wrap these to only apply if path starts with /api/.
 	if cfg.TenantMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, conditionalMiddleware("/api/", cfg.TenantMiddleware.Handler))

@@ -51,6 +51,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/redis"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/metrics"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/prometheus"
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/claim_bert"
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/infringe_net"
@@ -842,33 +843,35 @@ type RiskAssessmentService interface {
 // riskAssessmentServiceImpl orchestrates all components required for
 // infringement risk assessment.
 type riskAssessmentServiceImpl struct {
-	moleculeSvc    molecule.MoleculeDomainService
-	patentSvc      *patent.PatentService
-	infringeNet    infringe_net.InfringementAssessor
-	claimParser    claim_bert.ClaimParser
-	gnnInference   molpatent_gnn.GNNInferenceService
-	riskRepo       RiskRecordRepository
-	ftoRepo        FTOReportRepository
-	eventPublisher EventPublisher
-	cache          redis.Cache
-	logger         logging.Logger
-	metrics        *prometheus.AppMetrics
+	moleculeSvc     molecule.MoleculeDomainService
+	patentSvc       *patent.PatentService
+	infringeNet     infringe_net.InfringementAssessor
+	claimParser     claim_bert.ClaimParser
+	gnnInference    molpatent_gnn.GNNInferenceService
+	riskRepo        RiskRecordRepository
+	ftoRepo         FTOReportRepository
+	eventPublisher  EventPublisher
+	cache           redis.Cache
+	logger          logging.Logger
+	metrics         *prometheus.AppMetrics
+	businessMetrics *metrics.BusinessMetrics
 }
 
 // RiskAssessmentServiceConfig holds all dependencies for constructing the
 // risk assessment service.
 type RiskAssessmentServiceConfig struct {
-	MoleculeSvc    molecule.MoleculeDomainService
-	PatentSvc      *patent.PatentService
-	InfringeNet    infringe_net.InfringementAssessor
-	ClaimParser    claim_bert.ClaimParser
-	GNNInference   molpatent_gnn.GNNInferenceService
-	RiskRepo       RiskRecordRepository
-	FTORepo        FTOReportRepository
-	EventPublisher EventPublisher
-	Cache          redis.Cache
-	Logger         logging.Logger
-	Metrics        *prometheus.AppMetrics
+	MoleculeSvc     molecule.MoleculeDomainService
+	PatentSvc       *patent.PatentService
+	InfringeNet     infringe_net.InfringementAssessor
+	ClaimParser     claim_bert.ClaimParser
+	GNNInference    molpatent_gnn.GNNInferenceService
+	RiskRepo        RiskRecordRepository
+	FTORepo         FTOReportRepository
+	EventPublisher  EventPublisher
+	Cache           redis.Cache
+	Logger          logging.Logger
+	Metrics         *prometheus.AppMetrics
+	BusinessMetrics *metrics.BusinessMetrics
 }
 
 // NewRiskAssessmentService constructs a new RiskAssessmentService with all
@@ -906,17 +909,18 @@ func NewRiskAssessmentService(cfg RiskAssessmentServiceConfig) (RiskAssessmentSe
 	}
 
 	return &riskAssessmentServiceImpl{
-		moleculeSvc:    cfg.MoleculeSvc,
-		patentSvc:      cfg.PatentSvc,
-		infringeNet:    cfg.InfringeNet,
-		claimParser:    cfg.ClaimParser,
-		gnnInference:   cfg.GNNInference,
-		riskRepo:       cfg.RiskRepo,
-		ftoRepo:        cfg.FTORepo,
-		eventPublisher: cfg.EventPublisher,
-		cache:          cfg.Cache,
-		logger:         cfg.Logger,
-		metrics:        cfg.Metrics,
+		moleculeSvc:     cfg.MoleculeSvc,
+		patentSvc:       cfg.PatentSvc,
+		infringeNet:     cfg.InfringeNet,
+		claimParser:     cfg.ClaimParser,
+		gnnInference:    cfg.GNNInference,
+		riskRepo:        cfg.RiskRepo,
+		ftoRepo:         cfg.FTORepo,
+		eventPublisher:  cfg.EventPublisher,
+		cache:           cfg.Cache,
+		logger:          cfg.Logger,
+		metrics:         cfg.Metrics,
+		businessMetrics: cfg.BusinessMetrics,
 	}, nil
 }
 
@@ -927,6 +931,11 @@ func NewRiskAssessmentService(cfg RiskAssessmentServiceConfig) (RiskAssessmentSe
 func (s *riskAssessmentServiceImpl) AssessMolecule(ctx context.Context, req *MoleculeRiskRequest) (*MoleculeRiskResponse, error) {
 	startTime := time.Now()
 	s.metrics.RiskAssessmentRequestsTotal.WithLabelValues("AssessMolecule", string(req.Depth)).Inc()
+	if s.businessMetrics != nil {
+		defer func(start time.Time) {
+			s.businessMetrics.RecordInfringementAssessment(ctx, string(req.Depth), time.Since(start))
+		}(startTime)
+	}
 
 	// 1. Validate and apply defaults.
 	if err := req.Validate(); err != nil {

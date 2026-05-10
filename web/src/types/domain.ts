@@ -30,6 +30,25 @@ export interface Claim {
   markushRanges?: string[];
 }
 
+export interface FamilyMember {
+  id: string;
+  patent_number: string;
+  title: string;
+  jurisdiction: string;
+  filing_date: string;
+  applicant: string;
+  relationship: string;
+  legal_status?: string;
+}
+
+export interface FamilyResponse {
+  patent_id: string;
+  patent_number: string;
+  family_id?: string;
+  members: FamilyMember[];
+  total_members: number;
+}
+
 export interface Patent {
   id: string;
   publicationNumber: string;

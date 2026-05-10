@@ -1,5 +1,5 @@
 import { api } from './adapter';
-import { Patent } from '../types/domain';
+import { Patent, FamilyResponse } from '../types/domain';
 import { ApiResponse } from '../types/api';
 
 export const patentService = {
@@ -9,5 +9,9 @@ export const patentService = {
 
   async getPatentById(id: string): Promise<ApiResponse<Patent>> {
     return api.get<ApiResponse<Patent>>(`/patents/${id}`);
+  },
+
+  async getFamily(id: string): Promise<ApiResponse<FamilyResponse>> {
+    return api.get<ApiResponse<FamilyResponse>>(`/patents/${id}/family`);
   }
 };

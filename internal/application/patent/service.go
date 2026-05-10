@@ -8,6 +8,7 @@ import (
 
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/metrics"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -156,15 +157,22 @@ type IPCStat struct {
 
 // serviceImpl implements the Service interface.
 type serviceImpl struct {
-	repo   domainPatent.PatentRepository
-	logger logging.Logger
+	repo            domainPatent.PatentRepository
+	logger          logging.Logger
+	businessMetrics *metrics.BusinessMetrics
 }
 
 // NewService creates a new patent application service.
-func NewService(repo domainPatent.PatentRepository, logger logging.Logger) Service {
+// If businessMetrics is nil, metrics recording is skipped silently.
+func NewService(repo domainPatent.PatentRepository, logger logging.Logger, businessMetrics ...*metrics.BusinessMetrics) Service {
+	var bm *metrics.BusinessMetrics
+	if len(businessMetrics) > 0 {
+		bm = businessMetrics[0]
+	}
 	return &serviceImpl{
-		repo:   repo,
-		logger: logger,
+		repo:            repo,
+		logger:          logger,
+		businessMetrics: bm,
 	}
 }
 
@@ -311,6 +319,11 @@ func (s *serviceImpl) Delete(ctx context.Context, id string, userID string) erro
 }
 
 func (s *serviceImpl) Search(ctx context.Context, input *SearchInput) (*SearchResult, error) {
+	if s.businessMetrics != nil {
+		defer func(start time.Time) {
+			s.businessMetrics.RecordPatentAnalysis(ctx, "search", time.Since(start))
+		}(time.Now())
+	}
 	if input.Page <= 0 {
 		input.Page = 1
 	}
