@@ -1,0 +1,178 @@
+# =============================================================================
+# golangci-lint configuration for KeyIP-Intelligence
+# =============================================================================
+# Go version: 1.22.1
+# golangci-lint version: v1.56.2
+# See: https://golangci-lint.run/usage/configuration/
+# =============================================================================
+
+run:
+  # Timeout for the entire lint run
+  timeout: 5m
+  # Number of CPUs to use; 0 = runtime.NumCPU
+  concurrency: 4
+  # Include test files
+  tests: true
+  # Skip directories
+  skip-dirs:
+    - .claw
+    - .codex
+    - .git
+
+# Output configuration
+output:
+  formats:
+    - format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters:
+  enable:
+    - errcheck      # Check for unchecked errors
+    - gosec         # Security checks
+    - govet         # Go's official static analyzer
+    - ineffassign   # Detect ineffective assignments
+    - staticcheck   # Go's official linter (SA, ST, QF checks)
+    - unused        # Detect unused constants, variables, functions, types
+    - misspell      # Fix commonly misspelled English words
+    - gofmt         # Check code formatting
+    - goimports     # Check import ordering
+  disable:
+    - funlen        # Too noisy; function length limits are project-specific
+    - gocyclo       # Cyclomatic complexity is not enforced
+    - gocognit      # Cognitive complexity is not enforced
+    - lll           # Line length limits are too noisy
+    - gochecknoglobals  # Globals are allowed
+    - gochecknoinits    # Init functions are allowed
+    - dupl          # Code duplication checks are too noisy
+    - wsl           # Whitespace style is overbearing
+    - godox         # TODO comments are allowed
+    - nlreturn      # Return whitespace formatting is too opinionated
+    - gofumpt       # Stricter than gofmt; not needed
+    - exhaustruct   # Requires all struct fields to be initialized; too strict
+    - depguard      # No dependency restrictions needed currently
+
+linters-settings:
+  # ---------------------------------------------------------------------------
+  # errcheck — detect unchecked errors
+  # ---------------------------------------------------------------------------
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+
+  # ---------------------------------------------------------------------------
+  # gofmt — code formatting
+  # ---------------------------------------------------------------------------
+  gofmt:
+    simplify: true
+
+  # ---------------------------------------------------------------------------
+  # goimports — import organization
+  # ---------------------------------------------------------------------------
+  goimports:
+    local-prefixes: github.com/turtacn/KeyIP-Intelligence
+
+  # ---------------------------------------------------------------------------
+  # govet — go vet
+  # ---------------------------------------------------------------------------
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment   # Noisy; struct field alignment is not critical
+      - shadow           # Shadowed variables are often intentional in Go
+    settings:
+      printf:
+        funcs:
+          - Printf
+          - Println
+          - Warnf
+          - Errorf
+          - Infof
+          - Debugf
+
+  # ---------------------------------------------------------------------------
+  # gosec — security inspection
+  # ---------------------------------------------------------------------------
+  gosec:
+    excludes:
+      - G204   # Subprocess launched with a variable (common in CLI/cmd packages)
+      - G304   # File path provided as tainted parameter (config loaders)
+      - G404   # Insecure random number source (tests use math/rand)
+
+  # ---------------------------------------------------------------------------
+  # misspell — correct common misspellings
+  # ---------------------------------------------------------------------------
+  misspell:
+    locale: US
+    ignore-words:
+      - watcher
+
+  # ---------------------------------------------------------------------------
+  # staticcheck — https://staticcheck.io/docs/options
+  # ---------------------------------------------------------------------------
+  staticcheck:
+    checks:
+      - all
+      - -SA9004   # TODO: missing doc for struct; disabled to reduce noise
+      - -ST1000   # Missing package documentation is allowed
+      - -ST1003   # Naming rules are too strict for this codebase
+      - -ST1005   # Error strings may not be properly capitalized
+      - -ST1016   # Methods on the same type should have the same receiver name
+      - -QF1008   # Converting if/else to switch is not always desired
+      - -QF1011   # Omit redundant type in declaration is style preference
+
+  # ---------------------------------------------------------------------------
+  # unused — detect unused code
+  # ---------------------------------------------------------------------------
+  unused:
+    local-variables-are-used: false  # Allow unused local variables in tests
+
+issues:
+  # Maximum issues displayed per linter (0 = unlimited)
+  max-issues-per-linter: 0
+  # Maximum issues displayed with the same text (0 = unlimited)
+  max-same-issues: 0
+
+  # ---------------------------------------------------------------------------
+  # Exclusion rules by file path and/or linter
+  # ---------------------------------------------------------------------------
+  exclude-rules:
+    # Fully exclude protobuf generated code from all linters
+    - path: api/proto/v1/.*\.pb\.go
+      linters:
+        - all
+    - path: api/proto/v1/.*_grpc\.pb\.go
+      linters:
+        - all
+
+    # Relax checks in test files
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+        - unused
+
+    # Relax checks in mock files
+    - path: internal/testutil/mock_.*\.go
+      linters:
+        - errcheck
+        - unused
+        - gosec
+
+    # Integration and e2e tests — less strict
+    - path: test/e2e/.*\.go
+      linters:
+        - errcheck
+        - gosec
+        - unused
+    - path: test/integration/.*\.go
+      linters:
+        - errcheck
+        - gosec
+        - unused
+
+    # Allow deprecated protobuf usage in grpc handlers
+    - path: internal/interfaces/grpc/.*\.go
+      text: "SA1019"
+      linters:
+        - staticcheck

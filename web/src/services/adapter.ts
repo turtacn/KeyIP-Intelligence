@@ -1,19 +1,64 @@
+/** Retry policy for API requests */
+export interface RetryPolicy {
+  /** Maximum number of retry attempts (default: 3) */
+  maxRetries?: number;
+  /** Base delay in milliseconds for exponential backoff (default: 1000) */
+  baseDelayMs?: number;
+  /**
+   * Custom predicate to determine if an error should be retried.
+   * If not provided, the default logic retries on 5xx and network errors only.
+   */
+  shouldRetry?: (error: unknown) => boolean;
+}
+
 export interface ApiAdapter {
   baseUrl: string;
-  get<T>(path: string, params?: Record<string, unknown>): Promise<T>;
-  post<T>(path: string, body: unknown): Promise<T>;
-  put<T>(path: string, body: unknown): Promise<T>;
-  delete<T>(path: string): Promise<T>;
+  get<T>(path: string, params?: Record<string, unknown>, retryPolicy?: RetryPolicy): Promise<T>;
+  post<T>(path: string, body: unknown, retryPolicy?: RetryPolicy): Promise<T>;
+  put<T>(path: string, body: unknown, retryPolicy?: RetryPolicy): Promise<T>;
+  delete<T>(path: string, retryPolicy?: RetryPolicy): Promise<T>;
+}
+
+/** Default retryability check: retry on 5xx and network errors only */
+function isRetryableError(error: unknown): boolean {
+  // Network errors (fetch threw, e.g. TypeError for CORS / DNS / timeout)
+  if (error instanceof TypeError) {
+    return true;
+  }
+  // HTTP 5xx server errors
+  if (error instanceof Error && error.message.startsWith('API Error:')) {
+    const match = error.message.match(/API Error: (\d+)/);
+    if (match) {
+      const status = parseInt(match[1], 10);
+      return status >= 500;
+    }
+  }
+  return false;
 }
 
 class FetchAdapter implements ApiAdapter {
   baseUrl: string;
+  private defaultRetryPolicy: RetryPolicy;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, retryPolicy?: RetryPolicy) {
     this.baseUrl = baseUrl;
+    this.defaultRetryPolicy = retryPolicy ?? {};
   }
 
-  private async request<T>(path: string, options: RequestInit): Promise<T> {
+  /** Update the default retry policy at runtime */
+  setRetryPolicy(policy: RetryPolicy): void {
+    this.defaultRetryPolicy = policy;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Low-level request execution.
+   * @param silent - When true, suppresses console.error on failure (used during retries)
+   */
+  private async request<T>(path: string, options: RequestInit, silent = false): Promise<T> {
     const fullUrl = `${this.baseUrl}${path}`;
     console.log(`[API] Requesting: ${fullUrl}`, options);
 
@@ -37,12 +82,65 @@ class FetchAdapter implements ApiAdapter {
       // Return the full response object, assuming T is ApiResponse<D>
       return result;
     } catch (error) {
-      console.error(`[API] Fetch failed for ${fullUrl}:`, error);
+      if (!silent) {
+        console.error(`[API] Fetch failed for ${fullUrl}:`, error);
+      }
       throw error;
     }
   }
 
-  async get<T>(path: string, params?: Record<string, unknown>): Promise<T> {
+  /**
+   * Executes a request with exponential backoff retry logic.
+   * Retries only on 5xx and network errors (or custom shouldRetry if provided).
+   * Error logging is suppressed during retry attempts and only shown on final failure.
+   */
+  private async requestWithRetry<T>(
+    path: string,
+    options: RequestInit,
+    retryPolicy?: RetryPolicy,
+  ): Promise<T> {
+    const policy = retryPolicy ?? this.defaultRetryPolicy;
+    const maxRetries = policy.maxRetries ?? 3;
+    const baseDelayMs = policy.baseDelayMs ?? 1000;
+    const customShouldRetry = policy.shouldRetry;
+
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Suppress console.error on retry attempts (silent retries)
+        return await this.request<T>(path, options, attempt > 0);
+      } catch (error) {
+        lastError = error;
+
+        const isRetryable = customShouldRetry
+          ? customShouldRetry(error)
+          : isRetryableError(error);
+
+        if (!isRetryable || attempt >= maxRetries) {
+          // Log error on final failure (first attempt is already logged)
+          if (attempt > 0) {
+            console.error(
+              `[API] Request failed after ${attempt + 1} attempt(s) for ${path}:`,
+              error,
+            );
+          }
+          throw error;
+        }
+
+        // Exponential backoff: 1s, 2s, 4s, ...
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        console.log(
+          `[API] Retrying ${path} in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`,
+        );
+        await this.sleep(delay);
+      }
+    }
+
+    throw lastError; // Should never reach here
+  }
+
+  async get<T>(path: string, params?: Record<string, unknown>, retryPolicy?: RetryPolicy): Promise<T> {
     let url = path;
     if (params) {
       const searchParams = new URLSearchParams();
@@ -54,27 +152,27 @@ class FetchAdapter implements ApiAdapter {
       url += `?${searchParams.toString()}`;
     }
 
-    return this.request<T>(url, { method: 'GET' });
+    return this.requestWithRetry<T>(url, { method: 'GET' }, retryPolicy);
   }
 
-  async post<T>(path: string, body: unknown): Promise<T> {
-    return this.request<T>(path, {
+  async post<T>(path: string, body: unknown, retryPolicy?: RetryPolicy): Promise<T> {
+    return this.requestWithRetry<T>(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    }, retryPolicy);
   }
 
-  async put<T>(path: string, body: unknown): Promise<T> {
-    return this.request<T>(path, {
+  async put<T>(path: string, body: unknown, retryPolicy?: RetryPolicy): Promise<T> {
+    return this.requestWithRetry<T>(path, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
+    }, retryPolicy);
   }
 
-  async delete<T>(path: string): Promise<T> {
-    return this.request<T>(path, { method: 'DELETE' });
+  async delete<T>(path: string, retryPolicy?: RetryPolicy): Promise<T> {
+    return this.requestWithRetry<T>(path, { method: 'DELETE' }, retryPolicy);
   }
 }
 

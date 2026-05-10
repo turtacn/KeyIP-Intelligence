@@ -13,6 +13,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/metrics"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -54,6 +55,11 @@ type Connection struct {
 	cfg    PostgresConfig
 	logger logging.Logger
 	once   sync.Once
+
+	// poolMetrics holds the OpenTelemetry instruments for pool monitoring.
+	// Set via AttachPoolMetrics. If non-nil, pool stats are recorded during
+	// HealthCheck and periodic collection.
+	poolMetrics *metrics.PoolMetrics
 }
 
 // NewConnection establishes a connection to the PostgreSQL database.
@@ -124,7 +130,9 @@ func NewConnectionWithDB(db *sql.DB, log logging.Logger) *Connection {
 	}
 }
 
-// HealthCheck verifies the database connection status.
+// HealthCheck verifies the database connection status and records pool metrics.
+// It checks both the basic connectivity (Ping) and connection pool saturation.
+// If pool metrics are attached, a stats snapshot is recorded automatically.
 func (c *Connection) HealthCheck(ctx context.Context) error {
 	if err := c.db.PingContext(ctx); err != nil {
 		return errors.Wrap(err, errors.ErrCodeDatabaseError, "database health check failed")
@@ -143,12 +151,95 @@ func (c *Connection) HealthCheck(ctx context.Context) error {
 		}
 	}
 
+	// Check pool saturation against max connections for capacity issues.
+	if stats.MaxOpenConnections > 0 {
+		saturation := float64(stats.InUse) / float64(stats.MaxOpenConnections)
+		if saturation > 0.9 {
+			c.logger.Error("Database connection pool is saturated",
+				logging.Int("in_use", stats.InUse),
+				logging.Int("max_open", stats.MaxOpenConnections),
+				logging.Float64("saturation", saturation),
+			)
+		} else if saturation > 0.8 {
+			c.logger.Warn("Database connection pool nearing saturation",
+				logging.Int("in_use", stats.InUse),
+				logging.Int("max_open", stats.MaxOpenConnections),
+				logging.Float64("saturation", saturation),
+			)
+		}
+	}
+
+	// Record pool metrics if metrics collector is attached.
+	if c.poolMetrics != nil {
+		c.poolMetrics.RecordPoolStats(ctx, stats)
+	}
+
 	return nil
 }
 
 // Stats returns database statistics.
 func (c *Connection) Stats() sql.DBStats {
 	return c.db.Stats()
+}
+
+// AttachPoolMetrics attaches an OpenTelemetry PoolMetrics instance to this
+// connection. When attached, pool statistics are automatically recorded during
+// HealthCheck calls and periodic metrics collection.
+func (c *Connection) AttachPoolMetrics(pm *metrics.PoolMetrics) {
+	c.poolMetrics = pm
+}
+
+// StartMetricsCollection launches a background goroutine that periodically
+// collects connection pool statistics and records them as OpenTelemetry metrics.
+// The collection runs until the provided context is cancelled. AttachPoolMetrics
+// should be called before this method to set up the metric instruments.
+func (c *Connection) StartMetricsCollection(ctx context.Context, interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				stats := c.Stats()
+				if c.poolMetrics != nil {
+					c.poolMetrics.RecordPoolStats(ctx, stats)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+// PoolSaturation returns the ratio of in-use connections to the maximum
+// allowed open connections. Returns 0 if MaxOpenConns is not configured.
+// A value near 1.0 indicates the pool is approaching capacity.
+func (c *Connection) PoolSaturation() float64 {
+	stats := c.Stats()
+	if stats.MaxOpenConnections > 0 {
+		return float64(stats.InUse) / float64(stats.MaxOpenConnections)
+	}
+	return 0
+}
+
+// PoolHealth checks whether the connection pool is healthy. It returns an
+// error if the pool saturation is at or above 90% or if the database is
+// unreachable. This method is suitable for use with gRPC health checkers.
+func (c *Connection) PoolHealth(ctx context.Context) error {
+	if err := c.db.PingContext(ctx); err != nil {
+		return errors.Wrap(err, errors.ErrCodeDatabaseError, "database pool health check failed")
+	}
+
+	saturation := c.PoolSaturation()
+	if saturation >= 0.9 {
+		return errors.Wrap(
+			fmt.Errorf("pool saturation %.2f exceeds threshold 0.90", saturation),
+			errors.ErrCodeDatabaseError,
+			"database connection pool is saturated",
+		)
+	}
+
+	return nil
 }
 
 // Close closes the database connection.

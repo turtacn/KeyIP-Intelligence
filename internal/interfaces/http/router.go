@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/metrics"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/prometheus"
@@ -46,6 +45,7 @@ type RouterConfig struct {
 	SecurityHeadersMiddleware    *middleware.SecurityHeadersMiddleware
 	TenantMiddleware             *middleware.TenantMiddleware
 	VersioningMiddleware         *middleware.VersioningMiddleware
+	CompressionMiddleware        *middleware.CompressionMiddleware
 
 	// Handlers
 	VersionHandler *handlers.VersionHandler
@@ -66,19 +66,6 @@ func Chain(h http.Handler, middlewares ...MiddlewareFunc) http.Handler {
 		h = middlewares[i](h)
 	}
 	return h
-}
-
-// requestIDMiddleware generates a unique request ID if not present.
-func requestIDMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqID := r.Header.Get("X-Request-ID")
-		if reqID == "" {
-			reqID = uuid.New().String()
-		}
-		w.Header().Set("X-Request-ID", reqID)
-		ctx := middleware.WithRequestID(r.Context(), reqID)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }
 
 // recoveryMiddleware recovers from panics and logs the error.
@@ -165,7 +152,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	globalMiddlewares = append(globalMiddlewares, recoveryMiddleware(cfg.Logger))
 
 	// 2. RequestID
-	globalMiddlewares = append(globalMiddlewares, requestIDMiddleware)
+	globalMiddlewares = append(globalMiddlewares, middleware.RequestID())
 
 	// 3. Logging
 	if cfg.LoggingMiddleware != nil {
@@ -185,6 +172,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	// 6. SecurityHeaders (applied to ALL responses)
 	if cfg.SecurityHeadersMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.SecurityHeadersMiddleware.Handler)
+	}
+
+	// 7. Compression (compress responses before versioning headers propagation)
+	if cfg.CompressionMiddleware != nil {
+		globalMiddlewares = append(globalMiddlewares, cfg.CompressionMiddleware.Handler)
 	}
 
 	// 7. Versioning (X-API-Version header, Accept-Version negotiation, deprecation warnings)
