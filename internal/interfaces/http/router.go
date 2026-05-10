@@ -41,6 +41,7 @@ type RouterConfig struct {
 	AuthMiddleware               *middleware.AuthMiddleware
 	CORSMiddleware               *middleware.CORSMiddleware
 	LoggingMiddleware            *middleware.LoggingMiddleware
+	UsageStatsMiddleware         *middleware.UsageStatsMiddleware
 	MetricsMiddleware            *metrics.MetricsMiddleware
 	RateLimitMiddleware          *middleware.RateLimitMiddleware
 	SecurityHeadersMiddleware    *middleware.SecurityHeadersMiddleware
@@ -50,6 +51,7 @@ type RouterConfig struct {
 
 	// Handlers
 	VersionHandler    *handlers.VersionHandler
+	RuntimeHandler    *handlers.RuntimeHandler
 	DocsHandler       *handlers.DocsHandler
 	CSPReportHandler  *handlers.CSPReportHandler
 
@@ -123,6 +125,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		cfg.VersionHandler.RegisterRoutes(mux)
 	}
 
+	// --- Runtime info endpoint (no auth required) ---
+	if cfg.RuntimeHandler != nil {
+		cfg.RuntimeHandler.RegisterRoutes(mux)
+	}
+
 	// --- Documentation Routes ---
 	if cfg.DocsHandler != nil {
 		cfg.DocsHandler.RegisterRoutes(mux)
@@ -159,7 +166,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 
 	// --- Global Middleware Chain ---
 	// Applied to ALL requests.
-	// Order: Recovery -> RequestID -> Logging -> Metrics -> CORS -> SecurityHeaders -> Versioning -> RateLimit -> [Conditional: Tenant -> Auth] -> Mux
+	// Order: Recovery -> RequestID -> Logging -> UsageStats -> Metrics -> CORS -> SecurityHeaders -> Compression -> Versioning -> RateLimit -> [Conditional: Tenant -> Auth] -> Mux
 
 	// Build the middleware stack.
 	// Since ServeMux matches strictly, we wrap the entire mux.
@@ -179,37 +186,42 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		globalMiddlewares = append(globalMiddlewares, cfg.LoggingMiddleware.Handler)
 	}
 
-	// 4. Metrics (applied to ALL requests including health and metrics endpoints)
+	// 4. Usage Stats (captures request counts by endpoint+method and user/tenant)
+	if cfg.UsageStatsMiddleware != nil {
+		globalMiddlewares = append(globalMiddlewares, cfg.UsageStatsMiddleware.Handler)
+	}
+
+	// 5. Metrics (applied to ALL requests including health and metrics endpoints)
 	if cfg.MetricsMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.MetricsMiddleware.Handler)
 	}
 
-	// 5. CORS
+	// 6. CORS
 	if cfg.CORSMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.CORSMiddleware.Handler)
 	}
 
-	// 6. SecurityHeaders (applied to ALL responses)
+	// 7. SecurityHeaders (applied to ALL responses)
 	if cfg.SecurityHeadersMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.SecurityHeadersMiddleware.Handler)
 	}
 
-	// 7. Compression (compress responses before versioning headers propagation)
+	// 8. Compression (compress responses before versioning headers propagation)
 	if cfg.CompressionMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.CompressionMiddleware.Handler)
 	}
 
-	// 7. Versioning (X-API-Version header, Accept-Version negotiation, deprecation warnings)
+	// 9. Versioning (X-API-Version header, Accept-Version negotiation, deprecation warnings)
 	if cfg.VersioningMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.VersioningMiddleware.Handler)
 	}
 
-	// 8. RateLimit
+	// 10. RateLimit
 	if cfg.RateLimitMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.RateLimitMiddleware.Handler)
 	}
 
-	// 9. Tenant & Auth (Conditional)
+	// 11. Tenant & Auth (Conditional)
 	// We wrap these to only apply if path starts with /api/.
 	if cfg.TenantMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, conditionalMiddleware("/api/", cfg.TenantMiddleware.Handler))

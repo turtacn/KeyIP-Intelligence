@@ -55,6 +55,7 @@ import (
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/metrics"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/prometheus"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/tracing"
 )
@@ -89,6 +90,7 @@ type Option func(*serverOptions)
 type serverOptions struct {
 	logger          logging.Logger
 	metrics         *prometheus.GRPCMetrics
+	grpcMetrics     *metrics.GRPCMetrics
 	tlsConfig       *tls.Config
 	maxRecvMsgSize  int
 	maxSendMsgSize  int
@@ -108,6 +110,13 @@ func WithLogger(l logging.Logger) Option {
 func WithMetrics(m *prometheus.GRPCMetrics) Option {
 	return func(o *serverOptions) {
 		o.metrics = m
+	}
+}
+
+// WithGRPCMetrics sets the OpenTelemetry metrics collector for gRPC.
+func WithGRPCMetrics(m *metrics.GRPCMetrics) Option {
+	return func(o *serverOptions) {
+		o.grpcMetrics = m
 	}
 }
 
@@ -203,21 +212,23 @@ func NewServer(cfg *config.GRPCConfig, opts ...Option) (*Server, error) {
 		return nil, fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
 
-	// Build unary interceptor chain: recovery → tracing → logging → metrics → validation
+	// Build unary interceptor chain: recovery → tracing → logging → metrics → otel_metrics → validation
 	unaryChain := chainUnaryInterceptors(
 		recoveryUnaryInterceptor(sopts.logger),
 		tracing.UnaryServerInterceptor(),
 		loggingUnaryInterceptor(sopts.logger),
 		metricsUnaryInterceptor(sopts.metrics),
+		metrics.UnaryServerInterceptor(sopts.grpcMetrics),
 		validationUnaryInterceptor(),
 	)
 
-	// Build stream interceptor chain: recovery → tracing → logging → metrics
+	// Build stream interceptor chain: recovery → tracing → logging → metrics → otel_metrics
 	streamChain := chainStreamInterceptors(
 		recoveryStreamInterceptor(sopts.logger),
 		tracing.StreamServerInterceptor(),
 		loggingStreamInterceptor(sopts.logger),
 		metricsStreamInterceptor(sopts.metrics),
+		metrics.StreamServerInterceptor(sopts.grpcMetrics),
 	)
 
 	// Assemble grpc.ServerOption slice.

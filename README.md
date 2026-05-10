@@ -20,9 +20,25 @@
 <p align="center">
   <a href="docs/architecture.md">Architecture</a> |
   <a href="docs/apis.md">API Reference</a> |
+  <a href="docs/deployment.md">Deployment</a> |
+  <a href="docs/development.md">Dev Guide</a> |
+  <a href="docs/external-services.md">External Services</a> |
+  <a href="CLAUDE.md">CLAUDE.md</a> |
   <a href="CONTRIBUTING.md">Contributing</a> |
   <a href="LICENSE">License</a>
 </p>
+
+---
+
+## Quick Links
+
+| Resource | Description |
+|:---------|:------------|
+| [CLAUDE.md](CLAUDE.md) | Project conventions and agent instructions for Claude Code |
+| [External Services](docs/external-services.md) | Complete setup guide for all infrastructure services |
+| [Health Check](scripts/health-check.sh) | Docker service health verification script |
+| [Deployment Guide](docs/deployment.md) | Production and staging deployment instructions |
+| [Development Guide](docs/development.md) | Contributor setup, coding standards, and workflows |
 
 ---
 
@@ -128,7 +144,7 @@ KeyIP-Intelligence follows a four-layer architecture with strict separation of c
 |                   Infrastructure Layer                            |
 |  OpenSearch | Milvus | Kafka | MinIO | Keycloak | Prometheus      |
 +-------------------------------------------------------------------+
-````
+```
 
 For the complete architecture design, component breakdown, data flow diagrams, and deployment topology, see **[docs/architecture.md](docs/architecture.md)**.
 
@@ -156,13 +172,19 @@ make build
 
 # Or install directly
 go install github.com/turtacn/KeyIP-Intelligence/cmd/keyip@latest
-````
+```
 
-### Quick Start with Docker Compose
+### Quick Start
 
 ```bash
 # Start all infrastructure services (PostgreSQL, Neo4j, OpenSearch, Redis, Kafka, MinIO)
-docker-compose up -d
+./scripts/start-services.sh
+
+# Verify all services are healthy before proceeding
+./scripts/health-check.sh --wait
+
+# Initialize Keycloak authentication realm (required for API access)
+./scripts/init-keycloak.sh
 
 # Run database migrations
 make migrate
@@ -276,16 +298,35 @@ KeyIP-Intelligence/
 │   ├── application/        # Application services (use cases)
 │   ├── infrastructure/     # External system adapters
 │   ├── interfaces/         # HTTP handlers, gRPC, CLI
-│   └── config/             # Configuration management
+│   ├── intelligence/       # AI/ML models and inference
+│   ├── config/             # Configuration management
+│   └── testutil/           # Test helpers and utilities
 ├── pkg/                    # Public libraries
 │   ├── client/             # Go client SDK
 │   ├── types/              # Shared type definitions
 │   └── errors/             # Error types and codes
-├── api/                    # API specifications (OpenAPI)
-├── deployments/            # Docker, Kubernetes manifests
+├── api/                    # API specifications
+│   ├── openapi/            # OpenAPI specifications
+│   └── proto/              # Protobuf definitions
+├── configs/                # Configuration files
+├── deployments/            # Deployment manifests
+│   ├── docker/             # Dockerfiles & Compose
+│   ├── helm/               # Helm charts
+│   ├── kubernetes/         # Kubernetes manifests
+│   └── prometheus/         # Monitoring configuration
 ├── docs/                   # Documentation
-├── scripts/                # Build and utility scripts
+├── scripts/                # Operational scripts
+│   ├── start-services.sh   # Docker service launcher
+│   ├── health-check.sh     # Service health verification
+│   ├── init-keycloak.sh    # Keycloak realm setup
+│   ├── build.sh            # Cross-platform build
+│   ├── migrate.sh          # Database migrations
+│   ├── seed.sh             # Test data seeding
+│   └── test.sh             # Test execution
 ├── test/                   # Integration and E2E tests
+│   ├── e2e/                # End-to-end tests
+│   ├── integration/        # Integration tests
+│   └── testdata/           # Test fixtures
 └── web/                    # Frontend application (React)
 ```
 
