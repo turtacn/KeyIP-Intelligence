@@ -21,10 +21,17 @@
 package middleware
 
 import (
+	"context"
+	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	goredis "github.com/redis/go-redis/v9"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 )
 
 // RateLimiter defines the interface for rate limiting implementations.
@@ -60,6 +67,23 @@ type RateLimitConfig struct {
 	ExceededHandler http.Handler
 	// CleanupInterval is how often expired entries are cleaned up.
 	CleanupInterval time.Duration
+
+	// TierLimits maps user tiers to their specific rate limits.
+	// If nil or empty, per-tier limits are not enforced and RequestsPerSecond/BurstSize are used.
+	TierLimits map[UserTier]TierLimits
+	// ExpensivePaths are request paths that consume extra tokens per request
+	// (e.g., similarity search, report generation).
+	ExpensivePaths []string
+	// ExpensiveCost is the token cost for each expensive endpoint request.
+	// A value of 0 or less defaults to 5.
+	ExpensiveCost int
+	// RedisAddr is the Redis address for distributed rate limiting.
+	// If empty, only in-memory limiting is used.
+	RedisAddr string
+	// RedisDB is the Redis database number.
+	RedisDB int
+	// RedisPassword is the Redis password.
+	RedisPassword string
 }
 
 // DefaultRateLimitConfig returns a sensible default rate limit configuration.
@@ -320,6 +344,601 @@ func NewRateLimitMiddleware(limiter RateLimiter, config RateLimitConfig) *RateLi
 // Handler returns the middleware handler function.
 func (m *RateLimitMiddleware) Handler(next http.Handler) http.Handler {
 	return m.handler(next)
+}
+
+// --- User Tier Types ---
+
+// Default rate limits for expensive endpoints (used when config values are unavailable).
+const (
+	DefaultExpensiveRPS   = 0.5 // 30 requests/minute
+	DefaultExpensiveBurst = 10
+)
+
+// UserTier represents a user's subscription/access tier for rate limiting.
+type UserTier string
+
+const (
+	// TierUnset indicates no tier information is available (anonymous).
+	TierUnset UserTier = ""
+	// TierFree is the free tier: 60 requests per minute.
+	TierFree UserTier = "free"
+	// TierProfessional is the professional tier: 300 requests per minute.
+	TierProfessional UserTier = "professional"
+	// TierEnterprise is the enterprise tier: 1000 requests per minute.
+	TierEnterprise UserTier = "enterprise"
+)
+
+// TierLimits defines rate limits for a specific user tier.
+type TierLimits struct {
+	// RequestsPerSecond is the sustained request rate for this tier.
+	RequestsPerSecond float64
+	// BurstSize is the maximum burst size for this tier.
+	BurstSize int
+}
+
+// DefaultTierLimits returns the default rate limits for a given tier.
+func DefaultTierLimits(tier UserTier) TierLimits {
+	switch tier {
+	case TierFree:
+		return TierLimits{RequestsPerSecond: 1.0, BurstSize: 60} // 60 requests/minute
+	case TierProfessional:
+		return TierLimits{RequestsPerSecond: 5.0, BurstSize: 300} // ~300 requests/minute
+	case TierEnterprise:
+		return TierLimits{RequestsPerSecond: 17.0, BurstSize: 1000} // ~1000 requests/minute
+	default:
+		return TierLimits{RequestsPerSecond: 10.0, BurstSize: 20} // default (unset/anonymous)
+	}
+}
+
+// ContextGetUserTier extracts the user's rate limit tier from the request context.
+// It checks API key RateLimit field first, then JWT claims roles.
+// Returns TierUnset for anonymous/unauthenticated requests.
+func ContextGetUserTier(ctx context.Context) UserTier {
+	// Check API key info first (APIKeyInfo has an explicit RateLimit field)
+	if info := ContextGetAPIKeyInfo(ctx); info != nil {
+		switch {
+		case info.RateLimit >= 1000:
+			return TierEnterprise
+		case info.RateLimit >= 300:
+			return TierProfessional
+		case info.RateLimit > 0:
+			return TierFree
+		}
+		return TierFree
+	}
+
+	// Check JWT claims roles
+	if claims := ContextGetClaims(ctx); claims != nil {
+		for _, role := range claims.Roles {
+			switch strings.ToLower(role) {
+			case "enterprise", "admin":
+				return TierEnterprise
+			case "professional":
+				return TierProfessional
+			}
+		}
+		// Authenticated but no matching role = free tier
+		return TierFree
+	}
+
+	return TierUnset
+}
+
+// TierKeyFunc returns a key function that encodes the user's rate limit tier
+// into the rate limit key. Falls back to CompositeKeyFunc when no tier is detected.
+func TierKeyFunc(r *http.Request) string {
+	tier := ContextGetUserTier(r.Context())
+	if tier == TierUnset {
+		return CompositeKeyFunc(r)
+	}
+
+	if claims := ContextGetClaims(r.Context()); claims != nil {
+		return "tier:" + string(tier) + ":user:" + claims.UserID
+	}
+	if info := ContextGetAPIKeyInfo(r.Context()); info != nil {
+		return "tier:" + string(tier) + ":apikey:" + info.KeyID
+	}
+	return "tier:" + string(tier) + ":ip:" + defaultKeyFunc(r)
+}
+
+// ExpensiveKeyFunc wraps another key function with an "expensive:" prefix
+// so the rate limiter can apply higher token costs.
+func ExpensiveKeyFunc(base func(r *http.Request) string) func(r *http.Request) string {
+	return func(r *http.Request) string {
+		return "expensive:" + base(r)
+	}
+}
+
+// --- Tier Rate Limiter ---
+
+// TierRateLimiter implements RateLimiter with per-tier token buckets.
+// It manages separate TokenBucketLimiter instances for each tier, plus
+// an optional expensive-endpoint limiter.
+type TierRateLimiter struct {
+	defaultLimiter   *TokenBucketLimiter
+	tierLimiters     map[UserTier]*TokenBucketLimiter
+	expensiveLimiter *TokenBucketLimiter
+	tierLimits       map[UserTier]TierLimits
+}
+
+// NewTierRateLimiter creates a new TierRateLimiter from the given config.
+// It creates per-tier limiters based on config.TierLimits or defaults.
+// If config.ExpensivePaths is non-empty, an additional limiter is created.
+func NewTierRateLimiter(config RateLimitConfig) *TierRateLimiter {
+	// Build tier limiter map
+	tierLimiters := make(map[UserTier]*TokenBucketLimiter)
+	tierLimits := make(map[UserTier]TierLimits)
+
+	tiers := []UserTier{TierFree, TierProfessional, TierEnterprise}
+	for _, tier := range tiers {
+		limits, ok := config.TierLimits[tier]
+		if !ok {
+			limits = DefaultTierLimits(tier)
+		}
+		tierLimits[tier] = limits
+		tierLimiters[tier] = NewTokenBucketLimiter(
+			limits.RequestsPerSecond,
+			limits.BurstSize,
+			config.CleanupInterval,
+		)
+	}
+
+	// Default limiter (for non-tiered keys, e.g., IP-based)
+	defaultLimiter := NewTokenBucketLimiter(
+		config.RequestsPerSecond,
+		config.BurstSize,
+		config.CleanupInterval,
+	)
+
+	var expensiveLimiter *TokenBucketLimiter
+	if len(config.ExpensivePaths) > 0 {
+		expensiveLimiter = NewTokenBucketLimiter(
+			DefaultExpensiveRPS,
+			DefaultExpensiveBurst,
+			config.CleanupInterval,
+		)
+	}
+
+	return &TierRateLimiter{
+		defaultLimiter:   defaultLimiter,
+		tierLimiters:     tierLimiters,
+		expensiveLimiter: expensiveLimiter,
+		tierLimits:       tierLimits,
+	}
+}
+
+// Stop stops all managed limiters' background cleanup goroutines.
+func (l *TierRateLimiter) Stop() {
+	l.defaultLimiter.Stop()
+	for _, limiter := range l.tierLimiters {
+		limiter.Stop()
+	}
+	if l.expensiveLimiter != nil {
+		l.expensiveLimiter.Stop()
+	}
+}
+
+// Allow checks if a request with the given key is allowed.
+// The key can encode tier and expensive endpoint information via prefixes:
+//   - "tier:<tier>:<key>" routes to the per-tier limiter
+//   - "expensive:<inner_key>" routes to the expensive-endpoint limiter
+//   - "expensive:tier:<tier>:<key>" routes to the tiered expensive limiter
+//   - any other key uses the default (non-tiered) limiter
+func (l *TierRateLimiter) Allow(key string) (bool, RateLimitInfo) {
+	// Handle expensive endpoint keys
+	if strings.HasPrefix(key, "expensive:") {
+		innerKey := strings.TrimPrefix(key, "expensive:")
+
+		// Nested tier prefix inside expensive
+		if strings.HasPrefix(innerKey, "tier:") {
+			tier := extractTierFromKey(innerKey)
+			innerKey = stripTierFromKey(innerKey)
+			if limiter, ok := l.tierLimiters[tier]; ok {
+				return l.allowWithCost(limiter, innerKey, 5) // expensive = 5x token cost
+			}
+			return l.allowWithCost(l.defaultLimiter, innerKey, 5)
+		}
+
+		// Expensive but not tiered: apply default limiter with higher cost
+		return l.allowWithCost(l.defaultLimiter, innerKey, 5)
+	}
+
+	// Handle tier-keyed requests
+	if strings.HasPrefix(key, "tier:") {
+		tier := extractTierFromKey(key)
+		innerKey := stripTierFromKey(key)
+		if limiter, ok := l.tierLimiters[tier]; ok {
+			return limiter.Allow(innerKey)
+		}
+		return l.defaultLimiter.Allow(key)
+	}
+
+	// Default: use the default limiter (IP-based, anonymous, etc.)
+	return l.defaultLimiter.Allow(key)
+}
+
+// allowWithCost allows a request consuming the given number of tokens.
+func (l *TierRateLimiter) allowWithCost(limiter *TokenBucketLimiter, key string, cost int) (bool, RateLimitInfo) {
+	var info RateLimitInfo
+	for i := 0; i < cost; i++ {
+		ok, currentInfo := limiter.Allow(key)
+		if !ok {
+			return false, currentInfo
+		}
+		if i == cost-1 {
+			info = currentInfo
+		}
+	}
+	return true, info
+}
+
+// extractTierFromKey extracts the UserTier from a tier-prefixed key.
+// Key format: "tier:<tier>:<rest>"
+// Returns TierUnset if the key does not start with "tier:".
+func extractTierFromKey(key string) UserTier {
+	if !strings.HasPrefix(key, "tier:") {
+		return TierUnset
+	}
+	parts := strings.SplitN(key, ":", 3)
+	if len(parts) >= 2 {
+		return UserTier(parts[1])
+	}
+	return TierUnset
+}
+
+// stripTierFromKey removes the "tier:<tier>:" prefix from a key.
+// Returns the original key if it does not start with "tier:".
+func stripTierFromKey(key string) string {
+	if !strings.HasPrefix(key, "tier:") {
+		return key
+	}
+	parts := strings.SplitN(key, ":", 3)
+	if len(parts) >= 3 {
+		return parts[2]
+	}
+	return ""
+}
+
+// IsExpensivePath checks whether the given request path matches an expensive endpoint.
+func IsExpensivePath(path string, expensivePaths []string) bool {
+	for _, p := range expensivePaths {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// --- Redis Rate Limiter ---
+
+// redisTokenBucketScript is a Lua script implementing the token bucket algorithm in Redis.
+// KEYS[1]: rate_limit:{key} (tokens count)
+// KEYS[2]: rate_limit:{key}:last (last refill timestamp)
+// ARGV[1]: rate (tokens per second)
+// ARGV[2]: burst (maximum tokens)
+// ARGV[3]: now (current Unix timestamp in seconds)
+// ARGV[4]: cost (token cost per request, default 1)
+// Returns: {allowed (1 or 0), remaining (int), reset_in_seconds (int)}
+const redisTokenBucketScript = `
+local key = KEYS[1]
+local last_key = KEYS[2]
+local rate = tonumber(ARGV[1])
+local burst = tonumber(ARGV[2])
+local now = tonumber(ARGV[3])
+local cost = tonumber(ARGV[4])
+
+local t = redis.call('get', key)
+local tokens
+if t then
+	tokens = tonumber(t)
+else
+	tokens = burst
+end
+
+local lt = redis.call('get', last_key)
+local last
+if lt then
+	last = tonumber(lt)
+else
+	last = now
+end
+
+local elapsed = now - last
+tokens = math.min(tokens + elapsed * rate, burst)
+
+if tokens >= cost then
+	tokens = tokens - cost
+	redis.call('set', key, tokens)
+	redis.call('set', last_key, now)
+	redis.call('expire', key, 60)
+	redis.call('expire', last_key, 60)
+	local remaining = math.floor(tokens)
+	local reset_in = 1
+	if rate > 0 then
+		reset_in = math.ceil((burst - tokens) / rate)
+		if reset_in < 1 then reset_in = 1 end
+	end
+	return {1, remaining, reset_in}
+else
+	redis.call('set', key, tokens)
+	redis.call('set', last_key, last)
+	redis.call('expire', key, 60)
+	redis.call('expire', last_key, 60)
+	local reset_in = 1
+	if rate > 0 then
+		reset_in = math.ceil((burst - tokens) / rate)
+		if reset_in < 1 then reset_in = 1 end
+	end
+	return {0, 0, reset_in}
+end
+`
+
+// RedisRateLimiter implements RateLimiter backed by Redis.
+// When Redis is unavailable, it gracefully falls back to an in-memory TokenBucketLimiter.
+type RedisRateLimiter struct {
+	client          *goredis.Client
+	prefix          string
+	fallbackLimiter *TokenBucketLimiter
+	mu              sync.RWMutex
+	fallbackMode    bool
+	rate            float64
+	burstSize       int
+	logger          logging.Logger
+	scriptSHA       string
+}
+
+// NewRedisRateLimiter creates a new Redis-backed rate limiter.
+// If redisAddr is empty or connection fails, it operates in fallback mode using
+// an in-memory TokenBucketLimiter.
+func NewRedisRateLimiter(redisAddr string, config RateLimitConfig, logger logging.Logger) *RedisRateLimiter {
+	l := &RedisRateLimiter{
+		prefix:          "rate_limit:",
+		rate:            config.RequestsPerSecond,
+		burstSize:       config.BurstSize,
+		fallbackLimiter: NewTokenBucketLimiter(config.RequestsPerSecond, config.BurstSize, config.CleanupInterval),
+		logger:          logger,
+	}
+
+	if redisAddr == "" {
+		l.fallbackMode = true
+		if logger != nil {
+			logger.Warn("Redis address empty, rate limiter running in fallback (in-memory) mode")
+		}
+		return l
+	}
+
+	// Attempt Redis connection
+	l.client = goredis.NewClient(&goredis.Options{
+		Addr:         redisAddr,
+		DB:           config.RedisDB,
+		Password:     config.RedisPassword,
+		DialTimeout:  2 * time.Second,
+		ReadTimeout:  1 * time.Second,
+		WriteTimeout: 1 * time.Second,
+		PoolSize:     5,
+		MinIdleConns: 2,
+	})
+
+	// Verify connectivity
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if err := l.client.Ping(ctx).Err(); err != nil {
+		l.fallbackMode = true
+		l.client = nil
+		if logger != nil {
+			logger.Warn("Redis connection failed, rate limiter running in fallback (in-memory) mode",
+				logging.Err(err))
+		}
+		return l
+	}
+
+	// Load the Lua script
+	sha, err := l.client.ScriptLoad(ctx, redisTokenBucketScript).Result()
+	if err != nil {
+		l.fallbackMode = true
+		l.client = nil
+		if logger != nil {
+			logger.Warn("Redis script load failed, rate limiter running in fallback (in-memory) mode",
+				logging.Err(err))
+		}
+		return l
+	}
+	l.scriptSHA = sha
+
+	if logger != nil {
+		logger.Info("Redis rate limiter initialized",
+			logging.String("addr", redisAddr))
+	}
+
+	return l
+}
+
+// Allow checks rate limit via Redis. Falls back to in-memory limiter on Redis errors.
+func (l *RedisRateLimiter) Allow(key string) (bool, RateLimitInfo) {
+	l.mu.RLock()
+	fallbackMode := l.fallbackMode
+	client := l.client
+	l.mu.RUnlock()
+
+	if fallbackMode || client == nil {
+		return l.fallbackLimiter.Allow(key)
+	}
+
+	now := time.Now().Unix()
+	redisKey := l.prefix + key
+	lastKey := redisKey + ":last"
+
+	result, err := client.EvalSha(context.Background(), l.scriptSHA, []string{redisKey, lastKey},
+		l.rate, l.burstSize, now, 1,
+	).Result()
+
+	if err != nil {
+		// Redis error: switch to fallback mode and retry with in-memory
+		l.mu.Lock()
+		l.fallbackMode = true
+		l.mu.Unlock()
+
+		if l.logger != nil {
+			l.logger.Warn("Redis rate limiter error, switching to fallback mode",
+				logging.Err(err))
+		}
+
+		return l.fallbackLimiter.Allow(key)
+	}
+
+	// Parse result from Redis Lua script: [allowed, remaining, reset_in]
+	vals, ok := result.([]any)
+	if !ok || len(vals) < 3 {
+		return l.fallbackLimiter.Allow(key)
+	}
+
+	allowed, _ := vals[0].(int64)
+	remaining, _ := vals[1].(int64)
+	resetIn, _ := vals[2].(int64)
+
+	resetAt := time.Now().Add(time.Duration(resetIn) * time.Second)
+
+	return allowed == 1, RateLimitInfo{
+		Limit:     l.burstSize,
+		Remaining: int(remaining),
+		ResetAt:   resetAt,
+	}
+}
+
+// Stop stops the fallback limiter's background goroutine.
+func (l *RedisRateLimiter) Stop() {
+	l.fallbackLimiter.Stop()
+	if l.client != nil {
+		l.client.Close()
+	}
+}
+
+// IsFallbackMode returns true if the limiter is currently running in fallback (in-memory) mode.
+func (l *RedisRateLimiter) IsFallbackMode() bool {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.fallbackMode
+}
+
+// --- Enhanced Middleware Factory ---
+
+// NewTieredRateLimitMiddleware creates a tier-aware rate limit middleware.
+// It detects the user's tier from context, applies appropriate rate limits,
+// and handles expensive endpoints separately.
+//
+// The returned middleware:
+//   - Extracts user tier from JWT claims or API key info
+//   - Applies per-tier rate limits (Free: 60/min, Professional: 300/min, Enterprise: 1000/min)
+//   - Applies stricter limits for expensive endpoints (similarity search, report generation)
+//   - Sets X-RateLimit-* headers on every response
+//   - Returns 429 with Retry-After when rate limit is exceeded
+//   - Uses Redis when available, falls back to in-memory
+func NewTieredRateLimitMiddleware(config RateLimitConfig) *RateLimitMiddleware {
+	// Apply defaults for expensive cost
+	if config.ExpensiveCost <= 0 {
+		config.ExpensiveCost = 5
+	}
+
+	// Use the tier-aware key function by default in the tiered middleware
+	config.KeyFunc = TierKeyFunc
+
+	// Create the limiter: Redis-backed or in-memory tiered
+	var limiter RateLimiter
+
+	if config.RedisAddr != "" {
+		// Use Redis with a fallback tiered limiter
+		redisLimiter := NewRedisRateLimiter(config.RedisAddr, config, nil)
+		limiter = redisLimiter
+	} else {
+		limiter = NewTierRateLimiter(config)
+	}
+
+	skipSet := make(map[string]bool, len(config.SkipPaths))
+	for _, p := range config.SkipPaths {
+		skipSet[p] = true
+	}
+
+	keyFunc := config.KeyFunc
+	expensivePaths := config.ExpensivePaths
+	expensiveCost := config.ExpensiveCost
+
+	return &RateLimitMiddleware{
+		handler: func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Skip configured paths
+				if skipSet[r.URL.Path] {
+					next.ServeHTTP(w, r)
+					return
+				}
+
+				// Determine key: use expensive key for expensive paths
+				var key string
+				if IsExpensivePath(r.URL.Path, expensivePaths) {
+					// Apply cost multiplier by calling Allow multiple times
+					key = keyFunc(r)
+					// For expensive endpoints, try to consume expensiveCost tokens
+					allowed := true
+					var info RateLimitInfo
+					for i := 0; i < expensiveCost; i++ {
+						var ok bool
+						ok, info = limiter.Allow(key)
+						if !ok {
+							allowed = false
+							break
+						}
+					}
+					if !allowed {
+						writeRateLimitExceeded(w, config, info)
+						return
+					}
+					// Get fresh info after consumption
+					setRateLimitHeaders(w, info)
+					next.ServeHTTP(w, r)
+					return
+				}
+
+				// Standard endpoint
+				key = keyFunc(r)
+				allowed, info := limiter.Allow(key)
+
+				// Always set rate limit headers
+				setRateLimitHeaders(w, info)
+
+				if !allowed {
+					writeRateLimitExceeded(w, config, info)
+					return
+				}
+
+				next.ServeHTTP(w, r)
+			})
+		},
+	}
+}
+
+// setRateLimitHeaders sets standard rate limit response headers.
+func setRateLimitHeaders(w http.ResponseWriter, info RateLimitInfo) {
+	w.Header().Set("X-RateLimit-Limit", strconv.Itoa(info.Limit))
+	w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(info.Remaining))
+	w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(info.ResetAt.Unix(), 10))
+}
+
+// writeRateLimitExceeded writes a 429 Too Many Requests response.
+func writeRateLimitExceeded(w http.ResponseWriter, config RateLimitConfig, info RateLimitInfo) {
+	retryAfter := time.Until(info.ResetAt).Seconds()
+	if retryAfter < 1 {
+		retryAfter = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(retryAfter))))
+
+	if config.ExceededHandler != nil {
+		config.ExceededHandler.ServeHTTP(w, &http.Request{})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusTooManyRequests)
+	w.Write([]byte(`{"error":{"code":"RATE_LIMITED","message":"rate limit exceeded, please retry later"}}`))
 }
 
 //Personal.AI order the ending

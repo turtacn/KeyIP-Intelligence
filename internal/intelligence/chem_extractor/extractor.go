@@ -296,9 +296,10 @@ func NewChemicalExtractor(
 		metrics:    metrics,
 		logger:     logger,
 		casRe:      regexp.MustCompile(`\b\d{2,7}-\d{2}-\d\b`),
-		formulaRe:  regexp.MustCompile(`\b([A-Z][a-z]?\d*){2,}\b`),
-		smilesRe:   regexp.MustCompile(`(?:^|[\s(])([A-Za-z0-9@+\-\[\]\\\/()=#$.%]+)(?:[\s)]|$)`),
-		markushRe:  regexp.MustCompile(`\b(?:R\d{0,2}|X|Y|Z|Ar|Het)\b`),
+		// Used by regexMatch; compiled once to avoid recompilation per Extract call.
+		formulaRe: regexp.MustCompile(`\b((?:[A-Z][a-z]?\d*){2,})\b`),
+		smilesRe:  regexp.MustCompile(`(?:^|[\s,(])([A-Za-z0-9@+\-\[\]\\\/()=#$.%]{5,})(?:[\s,)]|$)`),
+		markushRe: regexp.MustCompile(`\b(R\d{0,2}|X|Y|Z|Ar|Het)\s+(?:is|represents|denotes|=)\s+`),
 	}, nil
 }
 
@@ -646,9 +647,8 @@ func (e *chemicalExtractorImpl) dictionaryMatch(text string) []*RawChemicalEntit
 func (e *chemicalExtractorImpl) regexMatch(text string) []*RawChemicalEntity {
 	var entities []*RawChemicalEntity
 
-	// Molecular formula: e.g. C9H8O4
-	formulaRe := regexp.MustCompile(`\b((?:[A-Z][a-z]?\d*){2,})\b`)
-	for _, loc := range formulaRe.FindAllStringSubmatchIndex(text, -1) {
+	// Molecular formula: e.g. C9H8O4 (uses pre-compiled struct field).
+	for _, loc := range e.formulaRe.FindAllStringSubmatchIndex(text, -1) {
 		candidate := text[loc[2]:loc[3]]
 		if looksLikeMolecularFormula(candidate) {
 			entities = append(entities, &RawChemicalEntity{
@@ -663,8 +663,7 @@ func (e *chemicalExtractorImpl) regexMatch(text string) []*RawChemicalEntity {
 	}
 
 	// SMILES-like strings (heuristic: contains ring digits, branches, bond symbols).
-	smilesRe := regexp.MustCompile(`(?:^|[\s,(])([A-Za-z0-9@+\-\[\]\\\/()=#$.%]{5,})(?:[\s,)]|$)`)
-	for _, loc := range smilesRe.FindAllStringSubmatchIndex(text, -1) {
+	for _, loc := range e.smilesRe.FindAllStringSubmatchIndex(text, -1) {
 		candidate := text[loc[2]:loc[3]]
 		if looksLikeSMILES(candidate) {
 			entities = append(entities, &RawChemicalEntity{
@@ -678,9 +677,8 @@ func (e *chemicalExtractorImpl) regexMatch(text string) []*RawChemicalEntity {
 		}
 	}
 
-	// Markush variables: R1, R2, X, Y, Ar, Het
-	markushRe := regexp.MustCompile(`\b(R\d{0,2}|X|Y|Z|Ar|Het)\s+(?:is|represents|denotes|=)\s+`)
-	for _, loc := range markushRe.FindAllStringSubmatchIndex(text, -1) {
+	// Markush variables: R1, R2, X, Y, Ar, Het (uses pre-compiled struct field).
+	for _, loc := range e.markushRe.FindAllStringSubmatchIndex(text, -1) {
 		varName := text[loc[2]:loc[3]]
 		entities = append(entities, &RawChemicalEntity{
 			Text:        varName,
@@ -700,12 +698,17 @@ func (e *chemicalExtractorImpl) regexMatch(text string) []*RawChemicalEntity {
 // ---------------------------------------------------------------------------
 
 func (e *chemicalExtractorImpl) mergeEntities(sources ...[]*RawChemicalEntity) []*RawChemicalEntity {
-	var all []*RawChemicalEntity
+	// First pass to determine total size for pre-allocation.
+	total := 0
+	for _, src := range sources {
+		total += len(src)
+	}
+	if total == 0 {
+		return nil
+	}
+	all := make([]*RawChemicalEntity, 0, total)
 	for _, src := range sources {
 		all = append(all, src...)
-	}
-	if len(all) == 0 {
-		return nil
 	}
 
 	// Sort by start offset, then by descending length.
@@ -1020,7 +1023,10 @@ func extractContext(text string, start, end, windowSize int) string {
 }
 
 func filterByConfidence(entities []*RawChemicalEntity, minConf float64) []*RawChemicalEntity {
-	var result []*RawChemicalEntity
+	if len(entities) == 0 {
+		return nil
+	}
+	result := make([]*RawChemicalEntity, 0, len(entities))
 	for _, e := range entities {
 		if e.Confidence >= minConf {
 			result = append(result, e)

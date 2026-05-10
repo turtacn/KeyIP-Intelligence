@@ -66,6 +66,19 @@ const (
 	DefaultLogCompress                 = true
 	DefaultTracingSampleRate           = 0.1
 	DefaultTracingServiceName          = "keyip-intelligence"
+	DefaultRateLimitEnabled            = true
+	DefaultRateLimitRequestsPerSecond   = 10.0
+	DefaultRateLimitBurstSize           = 20
+	DefaultRateLimitFreeRPS             = 1.0   // 60 requests/minute
+	DefaultRateLimitFreeBurst           = 60
+	DefaultRateLimitProfessionalRPS     = 5.0   // 300 requests/minute
+	DefaultRateLimitProfessionalBurst   = 300
+	DefaultRateLimitEnterpriseRPS       = 17.0  // ~1000 requests/minute
+	DefaultRateLimitEnterpriseBurst     = 1000
+	DefaultRateLimitExpensiveRPS        = 0.5   // 30 requests/minute
+	DefaultRateLimitExpensiveBurst      = 10
+	DefaultRateLimitRedisEnabled        = true
+	DefaultRateLimitCleanupInterval     = 5 * time.Minute
 	DefaultEmailSMTPPort               = 587
 	DefaultEmailUseTLS                 = true
 	DefaultEmailTimeout                = 10 * time.Second
@@ -309,6 +322,44 @@ func ApplyDefaults(cfg *Config) *Config {
 	if !cfg.Notification.Email.UseTLS {
 		cfg.Notification.Email.UseTLS = DefaultEmailUseTLS
 	}
+
+		// Rate Limit
+		if !cfg.Server.RateLimit.Enabled {
+			cfg.Server.RateLimit.Enabled = DefaultRateLimitEnabled
+		}
+		if cfg.Server.RateLimit.DefaultRequestsPerSecond == 0 {
+			cfg.Server.RateLimit.DefaultRequestsPerSecond = DefaultRateLimitRequestsPerSecond
+		}
+		if cfg.Server.RateLimit.DefaultBurstSize == 0 {
+			cfg.Server.RateLimit.DefaultBurstSize = DefaultRateLimitBurstSize
+		}
+		if cfg.Server.RateLimit.FreeRequestsPerSecond == 0 {
+			cfg.Server.RateLimit.FreeRequestsPerSecond = DefaultRateLimitFreeRPS
+		}
+		if cfg.Server.RateLimit.FreeBurstSize == 0 {
+			cfg.Server.RateLimit.FreeBurstSize = DefaultRateLimitFreeBurst
+		}
+		if cfg.Server.RateLimit.ProfessionalRequestsPerSecond == 0 {
+			cfg.Server.RateLimit.ProfessionalRequestsPerSecond = DefaultRateLimitProfessionalRPS
+		}
+		if cfg.Server.RateLimit.ProfessionalBurstSize == 0 {
+			cfg.Server.RateLimit.ProfessionalBurstSize = DefaultRateLimitProfessionalBurst
+		}
+		if cfg.Server.RateLimit.EnterpriseRequestsPerSecond == 0 {
+			cfg.Server.RateLimit.EnterpriseRequestsPerSecond = DefaultRateLimitEnterpriseRPS
+		}
+		if cfg.Server.RateLimit.EnterpriseBurstSize == 0 {
+			cfg.Server.RateLimit.EnterpriseBurstSize = DefaultRateLimitEnterpriseBurst
+		}
+		if cfg.Server.RateLimit.ExpensiveRequestsPerSecond == 0 {
+			cfg.Server.RateLimit.ExpensiveRequestsPerSecond = DefaultRateLimitExpensiveRPS
+		}
+		if cfg.Server.RateLimit.ExpensiveBurstSize == 0 {
+			cfg.Server.RateLimit.ExpensiveBurstSize = DefaultRateLimitExpensiveBurst
+		}
+		if cfg.Server.RateLimit.CleanupInterval == 0 {
+			cfg.Server.RateLimit.CleanupInterval = DefaultRateLimitCleanupInterval
+		}
 
 	return cfg
 }

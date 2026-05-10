@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -1385,11 +1386,13 @@ func EncodeMolecularGraph(nodeFeatures [][]float32, edgeIndex [][2]int, edgeFeat
 }
 
 func EncodeFloat32Vector(v []float32) []byte {
-	buf := new(bytes.Buffer)
-	for _, f := range v {
-		_ = binary.Write(buf, binary.LittleEndian, f)
+	// Pre-allocate exact-size buffer and write directly (avoids binary.Write reflection).
+	n := len(v)
+	buf := make([]byte, n*4)
+	for i, f := range v {
+		binary.LittleEndian.PutUint32(buf[i*4:], math.Float32bits(f))
 	}
-	return buf.Bytes()
+	return buf
 }
 
 func DecodeFloat32Vector(data []byte) ([]float32, error) {
@@ -1398,11 +1401,8 @@ func DecodeFloat32Vector(data []byte) ([]float32, error) {
 	}
 	n := len(data) / 4
 	result := make([]float32, n)
-	reader := bytes.NewReader(data)
 	for i := 0; i < n; i++ {
-		if err := binary.Read(reader, binary.LittleEndian, &result[i]); err != nil {
-			return nil, fmt.Errorf("decoding float32 at index %d: %w", i, err)
-		}
+		result[i] = math.Float32frombits(binary.LittleEndian.Uint32(data[i*4:]))
 	}
 	return result, nil
 }

@@ -3,7 +3,6 @@ package molpatent_gnn
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -11,6 +10,16 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
 )
+
+// ---------------------------------------------------------------------------
+// sync.Pool for frequently-allocated batch result items
+// ---------------------------------------------------------------------------
+
+var embedResultItemPool = sync.Pool{
+	New: func() interface{} {
+		return &EmbedResultItem{}
+	},
+}
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -277,6 +286,8 @@ func (e *GNNInferenceEngine) BatchEmbed(ctx context.Context, req *BatchEmbedRequ
 	results := make([]*EmbedResultItem, len(req.Items))
 	chunks := splitEmbedRequests(req.Items, maxBatchSize)
 
+	// Limit concurrent embeddings within each chunk via a semaphore.
+	sem := make(chan struct{}, maxBatchSize)
 	offset := 0
 	for _, chunk := range chunks {
 		var wg sync.WaitGroup
@@ -285,6 +296,19 @@ func (e *GNNInferenceEngine) BatchEmbed(ctx context.Context, req *BatchEmbedRequ
 			wg.Add(1)
 			go func(index int, r *EmbedRequest) {
 				defer wg.Done()
+				// Acquire semaphore; bail if context is cancelled.
+				select {
+				case sem <- struct{}{}:
+					defer func() { <-sem }()
+				case <-ctx.Done():
+					ri := embedResultItemPool.Get().(*EmbedResultItem)
+					ri.Index = index
+					ri.Error = ctx.Err().Error()
+					ri.Response = nil
+					results[index] = ri
+					return
+				}
+
 				resp, err := e.Embed(ctx, r)
 				ri := &EmbedResultItem{Index: index}
 				if err != nil {
@@ -417,7 +441,7 @@ func (e *GNNInferenceEngine) predictWithRetry(ctx context.Context, req *common.P
 			return nil, err
 		}
 		if attempt < defaultRetries {
-			delay := retryBaseDelay * time.Duration(math.Pow(2, float64(attempt)))
+			delay := retryBaseDelay * time.Duration(1<<uint(attempt)) // exponential backoff via bit shift
 			select {
 			case <-ctx.Done():
 				return nil, fmt.Errorf("%w: %v", errors.ErrInferenceTimeout, ctx.Err())
@@ -434,11 +458,16 @@ func isTransient(err error) bool {
 }
 
 func splitEmbedRequests(items []*EmbedRequest, chunkSize int) [][]*EmbedRequest {
-	var chunks [][]*EmbedRequest
-	for i := 0; i < len(items); i += chunkSize {
+	n := len(items)
+	if n == 0 {
+		return nil
+	}
+	chunkCount := (n + chunkSize - 1) / chunkSize
+	chunks := make([][]*EmbedRequest, 0, chunkCount)
+	for i := 0; i < n; i += chunkSize {
 		end := i + chunkSize
-		if end > len(items) {
-			end = len(items)
+		if end > n {
+			end = n
 		}
 		chunks = append(chunks, items[i:end])
 	}

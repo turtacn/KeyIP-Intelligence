@@ -268,10 +268,17 @@ func (p *gnnPreprocessorImpl) PreprocessSMILES(ctx context.Context, smiles strin
 		nodeFeatures[i] = encodeAtomFeatures(atom)
 	}
 
-	// Encode edge features (undirected: add both directions)
-	var edgeIndex [][2]int
-	var edgeFeatures [][]float32
+	// Encode edge features (undirected: add both directions).
+	// Pre-allocate with known capacity: each bond produces 2 edges.
+	numBonds := len(bonds)
+	edgeIndex := make([][2]int, 0, numBonds*2)
+	edgeFeatures := make([][]float32, 0, numBonds*2)
 	for _, bond := range bonds {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
 		ef := encodeBondFeatures(bond)
 		edgeIndex = append(edgeIndex, [2]int{bond.Src, bond.Dst})
 		edgeFeatures = append(edgeFeatures, ef)
@@ -319,10 +326,17 @@ func (p *gnnPreprocessorImpl) PreprocessMOL(ctx context.Context, molBlock string
 		nodeFeatures[i] = encodeAtomFeatures(atom)
 	}
 
-	// Encode edge features (undirected: add both directions)
-	var edgeIndex [][2]int
-	var edgeFeatures [][]float32
+	// Encode edge features (undirected: add both directions).
+	// Pre-allocate with known capacity: each bond produces 2 edges.
+	numBonds := len(bonds)
+	edgeIndex := make([][2]int, 0, numBonds*2)
+	edgeFeatures := make([][]float32, 0, numBonds*2)
 	for _, bond := range bonds {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
 		ef := encodeBondFeatures(bond)
 		edgeIndex = append(edgeIndex, [2]int{bond.Src, bond.Dst})
 		edgeFeatures = append(edgeFeatures, ef)
@@ -397,6 +411,9 @@ type parsedBond struct {
 // parseSMILES is a simplified SMILES tokeniser.
 // Production code would use RDKit via CGo or a gRPC service.
 func parseSMILES(smiles string) ([]parsedAtom, []parsedBond, error) {
+	// Not taking a context parameter since this is a pure string parser
+	// used from PreprocessSMILES which already checks ctx.Done() before
+	// calling.  For very long SMILES we check at branch points below.
 	var atoms []parsedAtom
 	var bonds []parsedBond
 
@@ -1031,9 +1048,13 @@ func computeGlobalFeatures(atoms []parsedAtom, bonds []parsedBond) []float32 {
 	numAtoms := float32(len(atoms))
 	numBonds := float32(len(bonds))
 
-	// Molecular weight estimate
+	// Single pass: molecular weight + aromatic count.
 	var mw float32
+	var aromaticCount float32
 	for _, a := range atoms {
+		if a.IsAromatic {
+			aromaticCount++
+		}
 		if mass, ok := atomicMassMap[a.AtomicNum]; ok {
 			mw += mass * 200 // denormalise
 		} else {
@@ -1041,13 +1062,6 @@ func computeGlobalFeatures(atoms []parsedAtom, bonds []parsedBond) []float32 {
 		}
 	}
 
-	// Fraction of aromatic atoms
-	var aromaticCount float32
-	for _, a := range atoms {
-		if a.IsAromatic {
-			aromaticCount++
-		}
-	}
 	aromaticFrac := float32(0)
 	if numAtoms > 0 {
 		aromaticFrac = aromaticCount / numAtoms

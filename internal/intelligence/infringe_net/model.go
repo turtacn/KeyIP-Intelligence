@@ -1087,9 +1087,10 @@ func stubPropertyPredictions(smiles string, props []PropertyType) map[PropertyTy
 // by counting element symbol occurrences (uppercase letters, excluding brackets).
 func countSMILESAtoms(smiles string) int {
 	count := 0
-	runes := []rune(smiles)
-	for i := 0; i < len(runes); i++ {
-		if runes[i] >= 'A' && runes[i] <= 'Z' && runes[i] != 'E' {
+	// SMILES are ASCII; iterate over bytes (avoids rune decoding overhead).
+	for i := 0; i < len(smiles); i++ {
+		b := smiles[i]
+		if b >= 'A' && b <= 'Z' && b != 'E' {
 			count++
 		}
 	}

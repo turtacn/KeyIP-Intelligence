@@ -25,8 +25,9 @@ type Config struct {
 
 // ServerConfig holds server-related settings.
 type ServerConfig struct {
-	HTTP HTTPConfig `mapstructure:"http"`
-	GRPC GRPCConfig `mapstructure:"grpc"`
+	HTTP     HTTPConfig        `mapstructure:"http"`
+	GRPC     GRPCConfig        `mapstructure:"grpc"`
+	RateLimit RateLimitConfig  `mapstructure:"rate_limit"`
 }
 
 type HTTPConfig struct {
@@ -165,6 +166,24 @@ type JWTConfig struct {
 	Expiry        time.Duration `mapstructure:"expiry" validate:"required"`
 	RefreshExpiry time.Duration `mapstructure:"refresh_expiry"`
 	SigningMethod string        `mapstructure:"signing_method"`
+}
+
+// RateLimitConfig holds rate limiting settings.
+type RateLimitConfig struct {
+	Enabled                    bool          `mapstructure:"enabled"`
+	DefaultRequestsPerSecond   float64       `mapstructure:"default_requests_per_second"`
+	DefaultBurstSize           int           `mapstructure:"default_burst_size"`
+	FreeRequestsPerSecond      float64       `mapstructure:"free_requests_per_second"`
+	FreeBurstSize              int           `mapstructure:"free_burst_size"`
+	ProfessionalRequestsPerSecond float64    `mapstructure:"professional_requests_per_second"`
+	ProfessionalBurstSize      int           `mapstructure:"professional_burst_size"`
+	EnterpriseRequestsPerSecond float64      `mapstructure:"enterprise_requests_per_second"`
+	EnterpriseBurstSize        int           `mapstructure:"enterprise_burst_size"`
+	ExpensivePaths             []string      `mapstructure:"expensive_paths"`
+	ExpensiveRequestsPerSecond float64       `mapstructure:"expensive_requests_per_second"`
+	ExpensiveBurstSize         int           `mapstructure:"expensive_burst_size"`
+	RedisEnabled               bool          `mapstructure:"redis_enabled"`
+	CleanupInterval            time.Duration `mapstructure:"cleanup_interval"`
 }
 
 // IntelligenceConfig holds AI engine settings.

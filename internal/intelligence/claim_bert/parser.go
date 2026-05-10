@@ -784,7 +784,8 @@ func (p *claimParserImpl) decodeClassification(resp *common.PredictResponse) (Cl
 	// Find argmax
 	maxIdx := 0
 	maxProb := out.Probabilities[0]
-	probs := make(map[ClaimType]float64)
+	// Pre-allocate with expected size (5 claim types).
+	probs := make(map[ClaimType]float64, len(claimTypeFromIndex))
 	for i, prob := range out.Probabilities {
 		ct, exists := claimTypeFromIndex[i]
 		if exists {
@@ -863,33 +864,31 @@ func (p *claimParserImpl) decodeModelDependency(resp *common.PredictResponse) []
 // Internal: BIO tag processing
 // ============================================================================
 
-// correctBIOSequence fixes inconsistent BIO sequences.
+// correctBIOSequence fixes inconsistent BIO sequences in-place.
 // Rule: an I- tag without a matching preceding B- tag is promoted to B-.
 func correctBIOSequence(tags []int) []int {
 	if len(tags) == 0 {
 		return tags
 	}
-	corrected := make([]int, len(tags))
-	copy(corrected, tags)
 
-	for i := 0; i < len(corrected); i++ {
-		tag := corrected[i]
+	for i := 0; i < len(tags); i++ {
+		tag := tags[i]
 		if !bioTagIsI(tag) {
 			continue
 		}
 		// Check if there's a matching preceding B or I of the same category
 		if i == 0 {
 			// No predecessor — promote to B
-			corrected[i] = bioCorrespondingB(tag)
+			tags[i] = bioCorrespondingB(tag)
 			continue
 		}
-		prev := corrected[i-1]
+		prev := tags[i-1]
 		if !bioSameCategory(prev, tag) {
 			// Previous tag is a different category or O — promote to B
-			corrected[i] = bioCorrespondingB(tag)
+			tags[i] = bioCorrespondingB(tag)
 		}
 	}
-	return corrected
+	return tags
 }
 
 // bioSpan is an intermediate representation of a BIO span.
@@ -906,7 +905,7 @@ func bioTagsToSpans(tags []int, tokenized *EncodedInput, originalText string) []
 	}
 
 	// Collect raw spans
-	var spans []bioSpan
+	spans := make([]bioSpan, 0, len(tags)/2)
 	var current *bioSpan
 
 	for i, tag := range tags {
@@ -1015,7 +1014,7 @@ func spanToCharOffsets(sp bioSpan, tokenized *EncodedInput, originalText string)
 	}
 
 	// Approximate by joining tokens and searching in original text
-	var tokenTexts []string
+	tokenTexts := make([]string, 0, sp.endToken-sp.startToken)
 	for i := sp.startToken; i < sp.endToken && i < len(tokenized.Tokens); i++ {
 		tok := tokenized.Tokens[i]
 		// Strip WordPiece prefix

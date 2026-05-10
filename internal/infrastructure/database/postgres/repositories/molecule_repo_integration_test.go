@@ -1,3 +1,5 @@
+//go:build integration
+
 package repositories_test
 
 import (
@@ -57,7 +59,7 @@ func (s *MoleculeRepoIntegrationTestSuite) SetupSuite() {
 		CREATE TYPE molecule_status AS ENUM ('active', 'archived', 'deleted', 'pending_review', 'pending');
 
 		CREATE TABLE molecules (
-			id UUID PRIMARY KEY,
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			smiles TEXT NOT NULL,
 			canonical_smiles TEXT NOT NULL,
 			inchi TEXT,
