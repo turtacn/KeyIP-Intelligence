@@ -10,11 +10,11 @@ const InfringementWatch = React.lazy(() => import('./pages/InfringementWatch'));
 const PortfolioOptimizer = React.lazy(() => import('./pages/PortfolioOptimizer'));
 const LifecycleConsole = React.lazy(() => import('./pages/LifecycleConsole'));
 const PartnerPortal = React.lazy(() => import('./pages/PartnerPortal'));
+const Search = React.lazy(() => import('./pages/Search'));
+const KnowledgeGraph = React.lazy(() => import('./pages/KnowledgeGraph'));
+const PatentDetail = React.lazy(() => import('./pages/PatentDetail'));
+const MoleculeDetail = React.lazy(() => import('./pages/MoleculeDetail'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
-
-// Placeholders for detail pages (Phase 3)
-const PatentDetail = React.lazy(() => import('./pages/NotFound')); // Stub
-const MoleculeDetail = React.lazy(() => import('./pages/NotFound')); // Stub
 
 const router = createBrowserRouter([
   {
@@ -52,6 +52,14 @@ const router = createBrowserRouter([
       {
         path: 'partners',
         element: <PartnerPortal />,
+      },
+      {
+        path: 'search',
+        element: <Search />,
+      },
+      {
+        path: 'knowledge-graph',
+        element: <KnowledgeGraph />,
       },
       {
         path: 'patents/:id',

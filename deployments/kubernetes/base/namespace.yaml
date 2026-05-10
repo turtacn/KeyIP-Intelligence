@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: keyip
+  labels:
+    app.kubernetes.io/name: keyip-intelligence
+    app.kubernetes.io/part-of: keyip

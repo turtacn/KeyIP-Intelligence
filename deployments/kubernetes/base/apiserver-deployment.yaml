@@ -1,0 +1,186 @@
+# =============================================================================
+# KeyIP-Intelligence API Server Deployment
+# =============================================================================
+# Runs the HTTP/gRPC API server for the KeyIP platform.
+# Exposes HTTP on 8080, gRPC on 9090, Prometheus metrics on 9091.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keyip-apiserver
+  labels:
+    app.kubernetes.io/name: keyip-apiserver
+    app.kubernetes.io/part-of: keyip
+    app.kubernetes.io/component: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keyip-apiserver
+      app.kubernetes.io/part-of: keyip
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keyip-apiserver
+        app.kubernetes.io/part-of: keyip
+        app.kubernetes.io/component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: keyip-apiserver
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1001
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: apiserver
+          image: ghcr.io/turtacn/keyip-apiserver:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--config=/app/configs/config.yaml"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: grpc
+              containerPort: 9090
+              protocol: TCP
+            - name: metrics
+              containerPort: 9091
+              protocol: TCP
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: postgres-password
+                  optional: true
+            - name: NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: neo4j-password
+                  optional: true
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: redis-password
+                  optional: true
+            - name: OPENSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: opensearch-username
+                  optional: true
+            - name: OPENSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: opensearch-password
+                  optional: true
+            - name: MILVUS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: milvus-username
+                  optional: true
+            - name: MILVUS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: milvus-password
+                  optional: true
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: minio-access-key
+                  optional: true
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: minio-secret-key
+                  optional: true
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: keycloak-client-secret
+                  optional: true
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: jwt-secret
+                  optional: true
+            - name: STRATEGY_GPT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: keyip-secrets
+                  key: strategy-gpt-api-key
+                  optional: true
+          envFrom:
+            - configMapRef:
+                name: keyip-env
+                optional: true
+          volumeMounts:
+            - name: config
+              mountPath: /app/configs
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 1001
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: config
+          configMap:
+            name: keyip-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+        - name: tmp
+          emptyDir: {}

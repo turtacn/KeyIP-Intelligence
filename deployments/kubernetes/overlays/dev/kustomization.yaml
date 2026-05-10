@@ -1,0 +1,93 @@
+# =============================================================================
+# KeyIP-Intelligence Dev Overlay
+# =============================================================================
+# Development-specific patches: single replicas, relaxed resources,
+# dev image tags, and a dev hostname for the ingress.
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: keyip
+
+resources:
+  - ../../base
+
+namePrefix: dev-
+
+commonLabels:
+  environment: dev
+
+patches:
+  # Dev: single replica for both services (default, explicit for clarity)
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+
+  # Dev: relax resource limits for local clusters
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 100m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 256Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 512Mi
+    target:
+      kind: Deployment
+      name: keyip-apiserver
+
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 250m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 1000m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1Gi
+    target:
+      kind: Deployment
+      name: keyip-worker
+
+  # Dev: ingress hostname
+  - patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: api.keyip-dev.example.com
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: api.keyip-dev.example.com
+    target:
+      kind: Ingress
+
+  # Dev: use dev config (relaxed logging, etc.)
+  - patch: |-
+      - op: add
+        path: /data/config.yaml
+        value: |
+          monitoring:
+            logging:
+              level: debug
+              format: text
+              output: stdout
+    target:
+      kind: ConfigMap
+      name: keyip-config
+
+images:
+  - name: ghcr.io/turtacn/keyip-apiserver
+    newTag: latest
+  - name: ghcr.io/turtacn/keyip-worker
+    newTag: latest

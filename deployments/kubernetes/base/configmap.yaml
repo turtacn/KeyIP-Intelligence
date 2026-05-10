@@ -1,0 +1,200 @@
+# =============================================================================
+# KeyIP-Intelligence Application Configuration
+# =============================================================================
+# Mounted at /app/configs/config.yaml inside containers.
+# Sensitive values (passwords, API keys, secrets) should be injected via
+# External Secrets Operator, SealedSecrets, or Vault in production.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keyip-config
+  labels:
+    app.kubernetes.io/name: keyip-intelligence
+    app.kubernetes.io/part-of: keyip
+data:
+  config.yaml: |
+    # KeyIP-Intelligence Platform Configuration
+    # ============================================================
+
+    server:
+      http:
+        host: "0.0.0.0"
+        port: 8080
+        read_timeout: 30s
+        write_timeout: 30s
+        max_header_bytes: 1048576
+
+      grpc:
+        host: "0.0.0.0"
+        port: 9090
+        max_recv_msg_size: 52428800
+        max_send_msg_size: 52428800
+
+    database:
+      postgres:
+        host: "keyip-postgres"
+        port: 5432
+        user: "keyip"
+        password: "${POSTGRES_PASSWORD}"
+        dbname: "keyip"
+        sslmode: "disable"
+        max_open_conns: 25
+        max_idle_conns: 10
+        conn_max_lifetime: 5m
+
+      neo4j:
+        uri: "bolt://keyip-neo4j:7687"
+        user: "neo4j"
+        password: "${NEO4J_PASSWORD}"
+        max_connection_pool_size: 50
+        connection_acquisition_timeout: 60s
+
+    cache:
+      redis:
+        addr: "keyip-redis:6379"
+        password: "${REDIS_PASSWORD}"
+        db: 0
+        pool_size: 20
+        min_idle_conns: 5
+        dial_timeout: 5s
+        read_timeout: 3s
+        write_timeout: 3s
+
+    search:
+      opensearch:
+        addresses:
+          - "http://keyip-opensearch:9200"
+        username: "${OPENSEARCH_USERNAME}"
+        password: "${OPENSEARCH_PASSWORD}"
+        max_retries: 3
+        retry_on_status: [502, 503, 504]
+        compress_request_body: true
+
+      milvus:
+        address: "keyip-milvus"
+        port: 19530
+        username: "${MILVUS_USERNAME}"
+        password: "${MILVUS_PASSWORD}"
+        connect_timeout: 10s
+        read_timeout: 10s
+
+    messaging:
+      kafka:
+        brokers:
+          - "keyip-kafka:9092"
+        consumer_group: "keyip-intelligence-group"
+        auto_offset_reset: "earliest"
+        max_bytes: 10485760
+        session_timeout: 30s
+        heartbeat_interval: 3s
+        rebalance_timeout: 60s
+
+    storage:
+      minio:
+        endpoint: "keyip-minio:9000"
+        access_key: "${MINIO_ACCESS_KEY}"
+        secret_key: "${MINIO_SECRET_KEY}"
+        use_ssl: false
+        bucket_name: "keyip-documents"
+        region: "us-east-1"
+        part_size: 67108864
+
+    auth:
+      keycloak:
+        base_url: "http://keyip-keycloak:8080"
+        realm: "keyip"
+        client_id: "keyip-api"
+        client_secret: "${KEYCLOAK_CLIENT_SECRET}"
+        admin_user: "${KEYCLOAK_ADMIN_USER}"
+        admin_password: "${KEYCLOAK_ADMIN_PASSWORD}"
+
+      jwt:
+        secret: "${JWT_SECRET}"
+        issuer: "keyip-api"
+        expiry: 24h
+        refresh_expiry: 168h
+        signing_method: "HS256"
+
+    intelligence:
+      models_dir: "/app/models"
+
+      molpatent_gnn:
+        model_path: "molpatent_gnn.pt"
+        batch_size: 32
+        timeout: 30s
+        device: "cpu"
+        num_workers: 4
+
+      claim_bert:
+        model_path: "claim_bert_v1"
+        max_seq_length: 512
+        timeout: 30s
+        device: "cpu"
+        vocab_path: "vocab.txt"
+
+      strategy_gpt:
+        endpoint: "${STRATEGY_GPT_ENDPOINT}"
+        api_key: "${STRATEGY_GPT_API_KEY}"
+        model_name: "gpt-4"
+        max_tokens: 4096
+        temperature: 0.7
+        top_p: 0.9
+        timeout: 120s
+        retry_count: 3
+        retry_delay: 2s
+
+      chem_extractor:
+        ocr_endpoint: "${CHEM_EXTRACTOR_OCR_ENDPOINT}"
+        ner_model_path: "chem_ner_v1"
+        image_preprocessing: true
+        supported_formats: ["png", "jpg", "pdf"]
+        timeout: 60s
+
+      infringe_net:
+        model_path: "infringe_net.pt"
+        threshold: 0.85
+        batch_size: 16
+        timeout: 30s
+        similarity_metric: "cosine"
+
+    monitoring:
+      prometheus:
+        enabled: true
+        port: 9091
+        path: "/metrics"
+        namespace: "keyip"
+
+      logging:
+        level: "info"
+        format: "json"
+        output: "stdout"
+        file_path: ""
+        max_size: 100
+        max_backups: 3
+        max_age: 28
+        compress: true
+
+      tracing:
+        enabled: false
+        endpoint: ""
+        sample_rate: 0.1
+        service_name: "keyip-intelligence"
+        environment: "production"
+
+    notification:
+      email:
+        smtp_host: "${SMTP_HOST}"
+        smtp_port: 587
+        username: "${SMTP_USERNAME}"
+        password: "${SMTP_PASSWORD}"
+        from: "noreply@keyip.com"
+        use_tls: true
+        timeout: 10s
+
+      wechat_work:
+        corp_id: "${WECHAT_CORP_ID}"
+        agent_id: "${WECHAT_AGENT_ID}"
+        secret: "${WECHAT_SECRET}"
+        token: "${WECHAT_TOKEN}"
+        encoding_aes_key: "${WECHAT_ENCODING_AES_KEY}"

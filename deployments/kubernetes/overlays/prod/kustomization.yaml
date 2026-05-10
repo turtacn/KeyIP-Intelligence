@@ -1,0 +1,145 @@
+# =============================================================================
+# KeyIP-Intelligence Production Overlay
+# =============================================================================
+# Production-specific patches: 3 API server replicas for HA, production
+# resource profiles, production ingress hostname with TLS, and production
+# image tags tied to releases.
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: keyip
+
+resources:
+  - ../../base
+
+namePrefix: prod-
+
+commonLabels:
+  environment: production
+
+patches:
+  # Prod: scale API server to 3 replicas for high availability
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+    target:
+      kind: Deployment
+      name: keyip-apiserver
+
+  # Prod: worker stays at 1-2 replicas (stateful Kafka consumer group)
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: keyip-worker
+
+  # Prod: increase resource limits for API server
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 2000m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 1Gi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 2Gi
+    target:
+      kind: Deployment
+      name: keyip-apiserver
+
+  # Prod: increase resources for worker
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 1000m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 4000m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 2Gi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 4Gi
+    target:
+      kind: Deployment
+      name: keyip-worker
+
+  # Prod: production ingress hostname
+  - patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: api.keyip.example.com
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: api.keyip.example.com
+    target:
+      kind: Ingress
+
+  # Prod: use stable versioned image tags
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: ghcr.io/turtacn/keyip-apiserver:v1.0.0
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+    target:
+      kind: Deployment
+      name: keyip-apiserver
+
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: ghcr.io/turtacn/keyip-worker:v1.0.0
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+    target:
+      kind: Deployment
+      name: keyip-worker
+
+  # Prod: add PodDisruptionBudget for API server HA
+  - patch: |-
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: keyip-apiserver-pdb
+      spec:
+        minAvailable: 2
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: keyip-apiserver
+            app.kubernetes.io/part-of: keyip
+    target:
+      kind: Deployment
+      name: keyip-apiserver
+
+  # Prod: add topology spread constraints
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: DoNotSchedule
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: keyip-apiserver
+    target:
+      kind: Deployment
+      name: keyip-apiserver
+
+images:
+  - name: ghcr.io/turtacn/keyip-apiserver
+    newTag: v1.0.0
+  - name: ghcr.io/turtacn/keyip-worker
+    newTag: v1.0.0

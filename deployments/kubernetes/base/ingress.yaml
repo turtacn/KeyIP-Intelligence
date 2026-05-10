@@ -1,0 +1,35 @@
+# =============================================================================
+# KeyIP-Intelligence Ingress
+# =============================================================================
+# Routes external HTTP traffic to the API server.
+# Override host and TLS settings via overlays.
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keyip-ingress
+  labels:
+    app.kubernetes.io/name: keyip-ingress
+    app.kubernetes.io/part-of: keyip
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.keyip.example.com
+      secretName: keyip-tls
+  rules:
+    - host: api.keyip.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keyip-apiserver
+                port:
+                  name: http

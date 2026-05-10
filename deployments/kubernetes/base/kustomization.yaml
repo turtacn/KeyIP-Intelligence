@@ -1,0 +1,36 @@
+# =============================================================================
+# KeyIP-Intelligence Base Kustomization
+# =============================================================================
+# Shared base configuration consumed by environment overlays.
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: keyip
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - apiserver-deployment.yaml
+  - apiserver-service.yaml
+  - worker-deployment.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/version: latest
+
+images:
+  - name: ghcr.io/turtacn/keyip-apiserver
+    newTag: latest
+  - name: ghcr.io/turtacn/keyip-worker
+    newTag: latest
+
+# ConfigMap generator for kustomize-native config (alternative to static configmap).
+# Uncomment to use auto-generated ConfigMap with hash suffix for rolling updates.
+# configMapGenerator:
+#   - name: keyip-config
+#     files:
+#       - config.yaml=configmap.yaml
+#     options:
+#       disableNameSuffixHash: true

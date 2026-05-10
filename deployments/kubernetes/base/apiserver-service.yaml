@@ -1,0 +1,35 @@
+# =============================================================================
+# KeyIP-Intelligence API Server Service
+# =============================================================================
+# Exposes the HTTP API, gRPC endpoint, and Prometheus metrics.
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: keyip-apiserver
+  labels:
+    app.kubernetes.io/name: keyip-apiserver
+    app.kubernetes.io/part-of: keyip
+    app.kubernetes.io/component: api
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9091"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: keyip-apiserver
+    app.kubernetes.io/part-of: keyip
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: grpc
+      port: 9090
+      targetPort: grpc
+      protocol: TCP
+    - name: metrics
+      port: 9091
+      targetPort: metrics
+      protocol: TCP

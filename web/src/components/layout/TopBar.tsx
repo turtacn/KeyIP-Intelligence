@@ -1,12 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Search, User, Globe } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const TopBar: React.FC = () => {
   const { i18n, t } = useTranslation();
+  const navigate = useNavigate();
+  const [searchValue, setSearchValue] = useState('');
 
   const changeLanguage = (e: React.ChangeEvent<HTMLSelectElement>) => {
     i18n.changeLanguage(e.target.value);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const trimmed = searchValue.trim();
+      if (trimmed) {
+        navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+      } else {
+        navigate('/search');
+      }
+    }
   };
 
   return (
@@ -17,6 +31,9 @@ const TopBar: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input
               type="text"
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               placeholder={t('dashboard.search_placeholder', 'Search patents, molecules, companies...')}
               className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg w-96 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
             />

@@ -7,7 +7,9 @@ import {
   ShieldAlert,
   Briefcase,
   Clock,
-  Users
+  Users,
+  GitBranch,
+  Globe
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
@@ -15,7 +17,9 @@ const Sidebar: React.FC = () => {
 
   const navItems = [
     { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
-    { to: '/patent-mining', label: t('nav.mining'), icon: Search },
+    { to: '/search', label: 'Search', icon: Search },
+    { to: '/knowledge-graph', label: 'Knowledge Graph', icon: GitBranch },
+    { to: '/patent-mining', label: t('nav.mining'), icon: Globe },
     { to: '/infringement-watch', label: t('nav.infringement'), icon: ShieldAlert },
     { to: '/portfolio', label: t('nav.portfolio'), icon: Briefcase },
     { to: '/lifecycle', label: t('nav.lifecycle'), icon: Clock },
