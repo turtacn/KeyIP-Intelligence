@@ -17,9 +17,31 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# ---- docker-machine 检测 ----
+IS_DOCKER_MACHINE=false
+if docker info 2>/dev/null | grep -q "docker-machine\|boot2docker"; then
+  IS_DOCKER_MACHINE=true
+fi
+
 # ---- 公共参数 ----
 LOGGING="--log-driver=json-file --log-opt max-size=10m --log-opt max-file=3"
 RESTART="--restart=unless-stopped"
+
+# 低内存模式（docker-machine 默认 VM 仅 1-2G 内存）
+if $IS_DOCKER_MACHINE; then
+  _warn "检测到 docker-machine，使用低内存配置"
+  NEO4J_HEAP_INIT="128M"
+  NEO4J_HEAP_MAX="256M"
+  NEO4J_PAGECACHE="128M"
+  OS_MEM="256m"
+  MILVUS_MEM="256m"
+else
+  NEO4J_HEAP_INIT="512M"
+  NEO4J_HEAP_MAX="1G"
+  NEO4J_PAGECACHE="512M"
+  OS_MEM="512m"
+  MILVUS_MEM="512m"
+fi
 
 _log()  { echo -e "${GREEN}[INFO]${NC}  $*"; }
 _warn() { echo -e "${YELLOW}[WARN]${NC}  $*"; }
@@ -56,8 +78,9 @@ start_neo4j() {
     -p 7687:7687 -p 7474:7474 \
     -e NEO4J_AUTH=neo4j/neo4j_dev \
     -e NEO4J_PLUGINS='["apoc"]' \
-    -e NEO4J_dbms_memory_pagecache_size=512M \
-    -e NEO4J_dbms_memory_heap_max__size=1G \
+    -e NEO4J_dbms_memory_heap_initial__size=$NEO4J_HEAP_INIT \
+    -e NEO4J_dbms_memory_pagecache_size=$NEO4J_PAGECACHE \
+    -e NEO4J_dbms_memory_heap_max__size=$NEO4J_HEAP_MAX \
     -v keyip-neo4j-data:/data \
     -v keyip-neo4j-logs:/logs \
     neo4j:5-community
@@ -73,6 +96,13 @@ start_redis() {
 }
 
 start_opensearch() {
+  # docker-machine 需要调高 vm.max_map_count
+  if $IS_DOCKER_MACHINE; then
+    _log "设置 vm.max_map_count=262144（docker-machine 环境）"
+    docker-machine ssh default sudo sysctl -w vm.max_map_count=262144 2>/dev/null || \
+      _warn "vm.max_map_count 设置失败，OpenSearch 可能无法启动"
+  fi
+
   _log "启动 OpenSearch 2.14 (REST: 9200, 性能分析: 9600)"
   docker run -d --name keyip-opensearch \
     $RESTART $LOGGING --network "$NETWORK" \
@@ -80,7 +110,7 @@ start_opensearch() {
     -e discovery.type=single-node \
     -e DISABLE_SECURITY_PLUGIN=true \
     -e DISABLE_INSTALL_DEMO_CONFIG=true \
-    -e OPENSEARCH_JAVA_OPTS="-Xms512m -Xmx512m" \
+    -e OPENSEARCH_JAVA_OPTS="-Xms${OS_MEM} -Xmx${OS_MEM}" \
     -e plugins.security.disabled=true \
     -v keyip-opensearch-data:/usr/share/opensearch/data \
     opensearchproject/opensearch:2.14.0
@@ -260,8 +290,14 @@ case "${1:-all}" in
   all)        start_all;;
   stop)       stop_all;;
   status)     show_status;;
+  fix-vm)
+    _log "修复 docker-machine 内核参数..."
+    docker-machine ssh default sudo sysctl -w vm.max_map_count=262144
+    docker-machine ssh default "echo 'vm.max_map_count=262144' | sudo tee -a /etc/sysctl.conf"
+    _log "vm.max_map_count 已设为 262144（持久化）"
+    ;;
   *)
-    echo "用法: $0 {postgres|neo4j|redis|opensearch|milvus|minio|kafka|mailhog|keycloak|minimal|all|stop|status}"
+    echo "用法: $0 {postgres|neo4j|redis|opensearch|milvus|minio|kafka|mailhog|keycloak|minimal|all|stop|status|fix-vm}"
     exit 1
     ;;
 esac
