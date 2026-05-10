@@ -58,7 +58,7 @@ func main() {
 func buildDependencies(logger logging.Logger, cfg *config.Config) cli.CommandDependencies {
 	return cli.CommandDependencies{
 		Logger:                  logger,
-		SimilaritySearchService: buildSearchService(logger),
+		SimilaritySearchService: buildSearchService(logger, cfg),
 		ValuationService:        &noopValuationService{},
 		DeadlineService:         &noopDeadlineService{},
 		AnnuityService:          &noopAnnuityService{},
@@ -71,11 +71,11 @@ func buildDependencies(logger logging.Logger, cfg *config.Config) cli.CommandDep
 	}
 }
 
-func buildSearchService(logger logging.Logger) patent_mining.SimilaritySearchService {
+func buildSearchService(logger logging.Logger, cfg *config.Config) patent_mining.SimilaritySearchService {
 	return patent_mining.NewSimilaritySearchService(patent_mining.SimilaritySearchDeps{
-		FPEngine:     &requiresServerFingerprintEngine{},
-		VectorStore:  &requiresServerVectorStore{},
-		PatentIndex:  &requiresServerPatentIndex{},
+		FPEngine:     newLocalFingerprintEngine(nil), // no local chemistry service; fingerprints require --server
+		VectorStore:  newMilvusVectorStore(cfg, logger),
+		PatentIndex:  newLocalPatentIndex(logger),
 		HistoryStore: &inMemorySearchHistoryStore{},
 		Logger:       &searchLoggerAdapter{logger: logger},
 	})
@@ -117,47 +117,7 @@ func (a *searchLoggerAdapter) Error(msg string, keyvals ...interface{}) {
 	a.logger.Error(msg, a.keyvalsToFields(keyvals...)...)
 }
 
-// ============================================================================
-// Adapters that return clear "requires API server" errors
-// ============================================================================
-
 var errNeedsServer = errors.NewMsg("this command requires the KeyIP API server; use --server <addr> to connect")
-
-type requiresServerFingerprintEngine struct{}
-
-func (e *requiresServerFingerprintEngine) ComputeFingerprint(ctx context.Context, smiles string, fpType string, radius int, nBits int) ([]byte, error) {
-	return nil, errNeedsServer
-}
-func (e *requiresServerFingerprintEngine) ComputeSimilarity(ctx context.Context, fp1 []byte, fp2 []byte, metric patent_mining.SimilarityMetric) (float64, error) {
-	return 0, errNeedsServer
-}
-func (e *requiresServerFingerprintEngine) SearchSimilar(ctx context.Context, queryFP []byte, metric patent_mining.SimilarityMetric, threshold float64, maxResults int) ([]patent_mining.SimilarityHit, error) {
-	return nil, errNeedsServer
-}
-
-type requiresServerVectorStore struct{}
-
-func (s *requiresServerVectorStore) SearchByVector(ctx context.Context, vector []float64, threshold float64, maxResults int, filters map[string]string) ([]patent_mining.SimilarityHit, error) {
-	return nil, errNeedsServer
-}
-func (s *requiresServerVectorStore) EmbedText(ctx context.Context, text string, model string) ([]float64, error) {
-	return nil, errNeedsServer
-}
-func (s *requiresServerVectorStore) EmbedMolecule(ctx context.Context, smiles string) ([]float64, error) {
-	return nil, errNeedsServer
-}
-
-type requiresServerPatentIndex struct{}
-
-func (p *requiresServerPatentIndex) GetPatentMolecules(ctx context.Context, patentID string) ([]string, error) {
-	return nil, errNeedsServer
-}
-func (p *requiresServerPatentIndex) GetPatentText(ctx context.Context, patentID string) (string, error) {
-	return "", errNeedsServer
-}
-func (p *requiresServerPatentIndex) SearchByText(ctx context.Context, query string, maxResults int) ([]patent_mining.SimilarityHit, error) {
-	return nil, errNeedsServer
-}
 
 type inMemorySearchHistoryStore struct {
 	entries []patent_mining.SearchHistoryEntry

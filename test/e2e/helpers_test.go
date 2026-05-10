@@ -150,6 +150,25 @@ t.Fatalf("expected field %q not found in response", field)
 }
 }
 
+// skipIfNoServer skips the test if the API server is not reachable.
+// This allows E2E tests to be skipped gracefully when no server is running.
+func skipIfNoServer(t *testing.T) {
+	t.Helper()
+	if env == nil {
+		t.Skip("test environment not initialized")
+	}
+	// Quick connectivity check.
+	req, err := http.NewRequest("GET", env.baseURL+"/healthz", nil)
+	if err != nil {
+		t.Skipf("server check failed: %v", err)
+	}
+	resp, err := env.httpClient.Do(req)
+	if err != nil {
+		t.Skipf("server not reachable: %v", err)
+	}
+	resp.Body.Close()
+}
+
 // randomSuffix generates a random suffix for test data uniqueness.
 func randomSuffix() string {
 return fmt.Sprintf("test-%d", time.Now().UnixNano())
