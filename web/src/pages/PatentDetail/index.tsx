@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { patentService } from '../../services/patent.service';
 import { Patent } from '../../types/domain';
 import Card from '../../components/ui/Card';
@@ -10,6 +11,7 @@ import Button from '../../components/ui/Button';
 import { ArrowLeft, ExternalLink, AlertCircle, FileText } from 'lucide-react';
 
 const PatentDetail: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [patent, setPatent] = useState<Patent | null>(null);
@@ -55,7 +57,7 @@ const PatentDetail: React.FC = () => {
     return (
       <div className="p-6 text-center text-red-600 bg-red-50 rounded-lg">
         <AlertCircle className="w-8 h-8 mx-auto mb-3" />
-        <p className="font-semibold">Error loading patent</p>
+        <p className="font-semibold">{t('patent.error_loading')}</p>
         <p className="text-sm mt-1">{error}</p>
         <Button
           variant="outline"
@@ -63,7 +65,7 @@ const PatentDetail: React.FC = () => {
           onClick={() => navigate(-1)}
           leftIcon={<ArrowLeft className="w-4 h-4" />}
         >
-          Go Back
+          {t('patent.go_back')}
         </Button>
       </div>
     );
@@ -73,14 +75,14 @@ const PatentDetail: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
         <FileText className="w-16 h-16 mb-4 text-slate-300" />
-        <h2 className="text-xl font-semibold text-slate-700 mb-2">Patent Not Found</h2>
-        <p className="mb-6">The requested patent could not be found.</p>
+        <h2 className="text-xl font-semibold text-slate-700 mb-2">{t('patent.not_found_title')}</h2>
+        <p className="mb-6">{t('patent.not_found_desc')}</p>
         <Button
           variant="outline"
           onClick={() => navigate('/patent-mining')}
           leftIcon={<ArrowLeft className="w-4 h-4" />}
         >
-          Back to Patent Mining
+          {t('patent.back_to_mining')}
         </Button>
       </div>
     );
@@ -94,7 +96,7 @@ const PatentDetail: React.FC = () => {
         className="flex items-center text-sm text-slate-500 hover:text-slate-700 transition-colors"
       >
         <ArrowLeft className="w-4 h-4 mr-1" />
-        Back
+        {t('patent.back')}
       </button>
 
       {/* Header */}
@@ -115,20 +117,20 @@ const PatentDetail: React.FC = () => {
       <Card>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Assignee</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{t('patent.assignee')}</p>
             <p className="text-sm font-semibold text-slate-800">{patent.assignee}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Filing Date</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{t('patent.filing_date')}</p>
             <p className="text-sm font-semibold text-slate-800">{patent.filingDate}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Publication Date</p>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{t('patent.publication_date')}</p>
             <p className="text-sm font-semibold text-slate-800">{patent.publicationDate}</p>
           </div>
           {patent.grantDate && (
             <div>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Grant Date</p>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{t('patent.grant_date')}</p>
               <p className="text-sm font-semibold text-slate-800">{patent.grantDate}</p>
             </div>
           )}
@@ -136,13 +138,13 @@ const PatentDetail: React.FC = () => {
       </Card>
 
       {/* Abstract */}
-      <Card header={<span className="font-semibold text-slate-800">Abstract</span>}>
+      <Card header={<span className="font-semibold text-slate-800">{t('patent.abstract')}</span>}>
         <p className="text-slate-700 leading-relaxed">{patent.abstract}</p>
       </Card>
 
       {/* Inventors & IPC */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card header={<span className="font-semibold text-slate-800">Inventors</span>}>
+        <Card header={<span className="font-semibold text-slate-800">{t('patent.inventors')}</span>}>
           {patent.inventors.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {patent.inventors.map((inventor, idx) => (
@@ -150,11 +152,11 @@ const PatentDetail: React.FC = () => {
               ))}
             </div>
           ) : (
-            <p className="text-slate-400 text-sm">No inventor data available</p>
+            <p className="text-slate-400 text-sm">{t('patent.no_inventors')}</p>
           )}
         </Card>
 
-        <Card header={<span className="font-semibold text-slate-800">IPC Classifications</span>}>
+        <Card header={<span className="font-semibold text-slate-800">{t('patent.ipc_codes')}</span>}>
           {patent.ipcCodes.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {patent.ipcCodes.map((code, idx) => (
@@ -162,22 +164,22 @@ const PatentDetail: React.FC = () => {
               ))}
             </div>
           ) : (
-            <p className="text-slate-400 text-sm">No IPC codes available</p>
+            <p className="text-slate-400 text-sm">{t('patent.no_ipc_codes')}</p>
           )}
         </Card>
       </div>
 
       {/* Claims */}
       {patent.claims && patent.claims.length > 0 && (
-        <Card header={<span className="font-semibold text-slate-800">Claims ({patent.claims.length})</span>}>
+        <Card header={<span className="font-semibold text-slate-800">{t('patent.claims')} ({patent.claims.length})</span>}>
           <div className="space-y-4">
             {patent.claims.map((claim, idx) => (
               <div key={claim.id} className="pb-4 border-b border-slate-100 last:border-b-0 last:pb-0">
                 <div className="flex items-center gap-2 mb-2">
                   <Badge variant={claim.type === 'independent' ? 'info' : 'default'}>
-                    {claim.type === 'independent' ? 'Independent' : 'Dependent'}
+                    {claim.type === 'independent' ? t('patent.claim_independent') : t('patent.claim_dependent')}
                   </Badge>
-                  <span className="text-xs text-slate-400">Claim {idx + 1}</span>
+                  <span className="text-xs text-slate-400">{t('patent.claim_label')} {idx + 1}</span>
                 </div>
                 <p className="text-sm text-slate-700 leading-relaxed">{claim.text}</p>
                 {claim.elements && claim.elements.length > 0 && (
@@ -195,7 +197,7 @@ const PatentDetail: React.FC = () => {
 
       {/* Citations */}
       {patent.citations && patent.citations.length > 0 && (
-        <Card header={<span className="font-semibold text-slate-800">Citations ({patent.citations.length})</span>}>
+        <Card header={<span className="font-semibold text-slate-800">{t('patent.citations')} ({patent.citations.length})</span>}>
           <div className="flex flex-wrap gap-2">
             {patent.citations.map((citation, idx) => (
               <Badge key={idx} variant="default" size="sm">{citation}</Badge>

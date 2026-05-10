@@ -1,0 +1,559 @@
+{
+  "app": {
+    "title": "KeyIP Intelligence",
+    "role": "IP Manager"
+  },
+  "search": {
+    "global_placeholder": "Search across platform...",
+    "title": "Search",
+    "tabs_all": "All",
+    "tabs_patents": "Patents",
+    "tabs_molecules": "Molecules",
+    "no_results": "No results found",
+    "adjust_query": "Try adjusting your search query.",
+    "no_patents": "No patents found",
+    "try_different_keywords": "Try different keywords or browse Patent Mining.",
+    "no_molecules": "No molecules found",
+    "try_different_query": "Try searching with a different query.",
+    "empty_title": "Search across the platform",
+    "empty_desc": "Enter a query to search patents, molecules, and more.",
+    "error_title": "Search Error",
+    "retry": "Retry",
+    "publication_no": "Publication No.",
+    "title_column": "Title",
+    "assignee": "Assignee",
+    "status": "Status",
+    "filing_date": "Filing Date",
+    "id": "ID",
+    "name": "Name",
+    "smiles": "SMILES",
+    "mol_weight": "Mol. Weight",
+    "type": "Type",
+    "identifier": "Identifier",
+    "detail": "Detail",
+    "placeholder": "Search patents, molecules, companies..."
+  },
+  "knowledge_graph": {
+    "search_placeholder": "Search graph...",
+    "title": "Knowledge Graph",
+    "patent_id_placeholder": "Patent ID for network",
+    "load": "Load",
+    "reset": "Reset",
+    "loading_network": "Loading citation network...",
+    "network_error": "Failed to load citation network",
+    "zoom_in": "Zoom In",
+    "zoom_out": "Zoom Out",
+    "fit_screen": "Fit to Screen",
+    "legend": "Legend",
+    "patent": "Patent",
+    "citation": "Citation",
+    "click_to_focus": "Click a node to focus",
+    "demo_view": "Demo View",
+    "citation_network": "Citation Network",
+    "total_citations": "Total Citations",
+    "forward": "Forward",
+    "backward": "Backward"
+  },
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "search": "Search",
+    "knowledge_graph": "Knowledge Graph",
+    "mining": "Patent Mining",
+    "infringement": "Infringement Watch",
+    "portfolio": "Portfolio Optimizer",
+    "lifecycle": "Lifecycle Mgmt",
+    "partners": "Partner Portal"
+  },
+  "dashboard": {
+    "title": "Executive Dashboard",
+    "subtitle": "Real-time overview of your patent portfolio and strategic KPIs.",
+    "search_placeholder": "Search patents, molecules, companies...",
+    "nl_query_placeholder": "Ask about your patent portfolio, e.g., 'How many US patents were filed last year?'",
+    "export": "Export Report",
+    "add_patent": "Add New Patent",
+    "kpi": {
+      "total_patents": "Total Patents",
+      "active_patents": "Active Patents",
+      "high_risk": "High Risk Alerts",
+      "due_month": "Due This Month",
+      "vs_last_month": "vs last month",
+      "portfolio_size": "Portfolio Size",
+      "citation_index": "Citation Index",
+      "tech_coverage": "Tech Coverage",
+      "grant_rate": "Grant Rate",
+      "filing_rate": "Filing Rate"
+    },
+    "trend": {
+      "title": "Monthly Application Trend",
+      "filed": "Filed",
+      "granted": "Granted"
+    },
+    "jurisdiction": {
+      "title": "Jurisdiction Breakdown"
+    },
+    "deadlines": {
+      "title": "Upcoming Deadlines",
+      "patent_id": "Patent No.",
+      "event": "Event Type",
+      "jurisdiction": "Jurisdiction",
+      "due_date": "Due Date",
+      "status": "Status"
+    },
+    "alerts": {
+      "title": "Recent Infringement Alerts",
+      "id": "Alert ID",
+      "risk": "Risk Level",
+      "target": "Target Patent",
+      "detected": "Detected",
+      "action": "Action",
+      "view": "View"
+    },
+    "radar": {
+      "title": "Competitive Radar",
+      "my_org": "My Organization",
+      "leader": "Market Leader"
+    }
+  },
+  "mining": {
+    "title": "Patent Mining Workbench",
+    "tools_nav": "Mining Tools",
+    "tool_assessment": "Patentability Assessment",
+    "tool_whitespace": "White Space Discovery",
+    "tool_search": "Patent Search",
+    "tool_priorart": "Prior Art Analysis",
+    "tool_drafting": "Claim Draft Assistant",
+    "assessment": {
+      "title": "New Invention Details",
+      "smiles_label": "Target Molecule Structure (SMILES)",
+      "smiles_placeholder": "e.g., c1ccc2c(c1)c3ccccc3n2-c4ccc(cc4)N(c5ccccc5)c6ccccc6",
+      "desc_label": "Technical Description",
+      "desc_placeholder": "Describe technical problem, solution and advantages...",
+      "btn_assess": "Assess Patentability",
+      "report_title": "Assessment Report",
+      "novelty": "Novelty",
+      "inventive": "Inventive Step",
+      "utility": "Utility Assessment",
+      "similar": "Similar Prior Art",
+      "recommendation": "Recommendation",
+      "enter_molecule_hint": "Enter molecule structure to begin assessment."
+    },
+    "draft": {
+      "scope_title": "Invention Scope",
+      "desc_label": "Detailed Description",
+      "desc_placeholder": "Describe the invention in detail...",
+      "features_label": "Key Differentiating Features (comma-separated)",
+      "keywords_placeholder": "e.g., deuterated core, high T1 energy, thermally stable",
+      "btn_generate": "Generate Claim Draft",
+      "draft_title": "Draft Claims",
+      "synthesizing": "Synthesizing legal language...",
+      "independent": "Independent Claim",
+      "dependent": "Dependent Claim",
+      "empty_state": "Enter details to generate patent claims.",
+      "export_filename": "draft_claims.txt"
+    },
+    "prior_art": {
+      "input_title": "Input Claim",
+      "claim_placeholder": "Paste your claim text here for prior art analysis...",
+      "btn_analyze": "Analyze Prior Art",
+      "report_title": "Analysis Report",
+      "scanning": "Scanning 50M+ documents...",
+      "overall_assessment": "Overall Novelty Assessment",
+      "closest_docs": "Closest Prior Art Documents",
+      "match": "Match",
+      "overlaps": "Overlaps",
+      "differs": "Differs",
+      "empty_state": "Enter claim text to see analysis results."
+    },
+    "whitespace": {
+      "params_title": "Discovery Parameters",
+      "domain_label": "Technology Domain",
+      "scaffold_label": "Core Scaffold (Optional)",
+      "search_placeholder": "e.g., Anthracene",
+      "properties_title": "Target Properties",
+      "btn_identify": "Identify White Spaces",
+      "map_title": "Molecular Space Map",
+      "map_desc": "Visualizing patented vs. potential candidate space based on electronic properties.",
+      "axis_homo": "HOMO Level (eV)",
+      "axis_eqe": "External Quantum Efficiency (%)",
+      "legend_patented": "Patented",
+      "legend_candidate": "Candidate",
+      "legend_whitespace": "White Space",
+      "empty_state": "Select domain and click Analyze to visualize molecular space."
+    },
+    "search": {
+      "mode_text": "Text Search",
+      "mode_structure": "Structure Search",
+      "btn_search": "Search",
+      "placeholder_text": "e.g., Blue OLED Host Material",
+      "placeholder_smiles": "Enter SMILES string...",
+      "similarity": "Similarity Threshold",
+      "label_keywords": "Keywords / Patent Number",
+      "label_smiles": "SMILES Structure"
+    }
+  },
+  "infringement": {
+    "title": "Infringement Watch Center",
+    "list_title": "Monitoring Alerts",
+    "alerts_label": "Alerts",
+    "search_placeholder": "Search patent or molecule...",
+    "refresh": "Refresh",
+    "filter_risk": "Risk Level",
+    "detail": {
+      "assignee": "Assignee",
+      "filing_date": "Filing Date",
+      "risk_assess": "Risk Assessment",
+      "literal": "Literal Infringement",
+      "doctrine": "Doctrine of Equivalents",
+      "abstract": "Abstract"
+    },
+    "comparison": {
+      "title": "Molecular Structure Comparison",
+      "trigger": "Trigger Molecule",
+      "patent_coverage": "Patent Coverage",
+      "extracted": "Extracted from Claim"
+    },
+    "claims": {
+      "title": "Claim Analysis",
+      "claim_label": "Claim",
+      "match": "Element Match"
+    },
+    "actions": {
+      "title": "Risk Mitigation Actions",
+      "report": "Generate FTO Report",
+      "design": "Design Around",
+      "assign": "Assign to Legal",
+      "reviewed": "Mark as Reviewed",
+      "reviewed_done": "Reviewed"
+    },
+    "feed": {
+      "title": "Global Patent Live Feed",
+      "new": "New",
+      "high_risk_detected": "HIGH RISK DETECTED",
+      "waiting": "Waiting for new patent publications...",
+      "pause": "Pause Feed",
+      "resume": "Resume Feed"
+    }
+  },
+  "portfolio": {
+    "title": "Portfolio Optimizer",
+    "nav": {
+      "panorama": "Portfolio Panorama",
+      "gap": "Competitive Gap",
+      "scoring": "Value Scoring",
+      "budget": "Budget Optimizer",
+      "simulator": "What-If Simulator"
+    },
+    "panorama": {
+      "title": "Portfolio Panorama",
+      "desc": "Overview of portfolio health, value, and domain coverage.",
+      "total_patents": "TOTAL PATENTS",
+      "granted": "GRANTED",
+      "pending": "PENDING",
+      "lapsed": "LAPSED",
+      "est_value": "EST. VALUE",
+      "health_grade": "HEALTH GRADE",
+      "domain_analysis": "Domain Coverage Analysis",
+      "compare_desc": "Compare patent coverage against key competitors across technology domains.",
+      "citation_impact": "Citation Impact",
+      "radar_depth": "Depth",
+      "radar_breadth": "Breadth",
+      "radar_quality": "Quality",
+      "radar_freshness": "Freshness"
+    },
+    "treemap": {
+      "title": "Technology Coverage Map"
+    },
+    "gap": {
+      "title": "Competitive Gap Matrix",
+      "select_comp": "Select Competitors",
+      "domain": "TECHNOLOGY DOMAIN",
+      "my_org": "MY ORG"
+    },
+    "scoring": {
+      "title": "Patent Value Scoring",
+      "desc": "AI-driven valuation of individual patent assets based on technical, legal, and commercial factors.",
+      "rank": "Rank",
+      "composite": "Composite Score",
+      "recommendation": "Recommendation",
+      "details": "Details",
+      "tech_val": "Technical Value",
+      "legal_val": "Legal Value",
+      "comm_val": "Commercial Value"
+    },
+    "budget": {
+      "title": "Budget Optimizer",
+      "desc": "Analyze maintenance costs and identify savings opportunities.",
+      "chart_title": "Annual Maintenance Cost by Jurisdiction",
+      "rec_title": "Optimization Recommendations",
+      "savings": "Potential Annual Savings",
+      "analysis_note": "Based on value-to-cost analysis",
+      "apply_btn": "Apply Optimization Plan",
+      "confirm_title": "Confirm Portfolio Optimization",
+      "confirm_desc": "This action will mark {{count}} patents for abandonment.",
+      "confirm_warning": "Once confirmed, instructions will be sent to external counsel to stop annuity payments. This action cannot be easily undone after the deadline passes.",
+      "cancel": "Cancel",
+      "confirm_apply": "Confirm & Apply",
+      "abandon": "Abandon",
+      "review": "Review",
+      "year_suffix": "/ year"
+    },
+    "simulator": {
+      "title": "What-If Simulator",
+      "desc": "Simulate strategic moves and their impact on portfolio metrics.",
+      "builder_title": "Scenario Builder",
+      "name_label": "Scenario Name",
+      "name_placeholder": "e.g., Acquisition of Startup X",
+      "action_label": "Simulate Action",
+      "run_btn": "Run Simulation",
+      "hint": "Configure scenario and run simulation to see impact.",
+      "results_title": "Simulation Results",
+      "coverage": "Portfolio Coverage",
+      "value": "Total Value",
+      "risk": "Risk Exposure",
+      "current": "Current",
+      "improved": "Improved",
+      "ai_analysis_title": "AI Analysis"
+    }
+  },
+  "lifecycle": {
+    "title": "Lifecycle Management",
+    "tabs": {
+      "calendar": "Deadline Calendar",
+      "annuity": "Annuity Management",
+      "status": "Legal Status Monitor"
+    },
+    "filters": {
+      "title": "Filters",
+      "jurisdiction": "Jurisdiction",
+      "type": "Event Type",
+      "date_range": "Due Date Range",
+      "urgency": "Urgency",
+      "reset": "Reset",
+      "overdue": "Overdue",
+      "all": "All",
+      "due_7d": "Due 7d",
+      "due_30d": "Due 30d",
+      "due_90d": "Due 90d",
+      "apply": "Apply Filters"
+    },
+    "calendar": {
+      "title": "Deadline Calendar",
+      "upcoming": "upcoming events",
+      "select_all": "Select All",
+      "deselect_all": "Deselect All",
+      "mark_handled": "Mark as Handled",
+      "export": "Export CSV"
+    },
+    "table": {
+      "select": "SELECT",
+      "structure": "STRUCTURE",
+      "relevance": "RELEVANCE",
+      "patent_no": "PATENT NO.",
+      "title": "TITLE",
+      "assignee": "ASSIGNEE",
+      "pub_date": "PUB. DATE",
+      "patent_id": "PATENT ID",
+      "event_type": "EVENT TYPE",
+      "jurisdiction": "JURISDICTION",
+      "due_date": "DUE DATE",
+      "fee": "FEE",
+      "status": "STATUS",
+      "no_data": "No data available"
+    },
+    "pagination": {
+      "showing": "Showing page"
+    },
+    "annuity": {
+      "total_due": "Total Due This Year",
+      "completed": "Completed Payments",
+      "pending": "Pending Payments",
+      "projected": "Projected Next Year",
+      "table_title": "Annuity Payments",
+      "pay_btn": "Pay",
+      "year": "YEAR",
+      "fee_amount": "FEE AMOUNT",
+      "usd_equiv": "USD EQUIVALENT",
+      "other": "Other"
+    },
+    "status": {
+      "active_family": "Active Family",
+      "last_sync": "Last Sync",
+      "today": "Today"
+    }
+  },
+  "partners": {
+    "nav": {
+      "admin": "Partner Management (Admin)",
+      "agency": "Agency Workspace",
+      "counsel": "Legal Counsel Review",
+      "api": "API & Developer Portal"
+    },
+    "admin": {
+      "title": "Partner Management",
+      "add_btn": "Add Partner",
+      "table": {
+        "name": "PARTNER NAME",
+        "type": "TYPE",
+        "country": "COUNTRY",
+        "projects": "ACTIVE PROJECTS",
+        "performance": "PERFORMANCE",
+        "status": "STATUS",
+        "actions": "ACTIONS"
+      }
+    },
+    "agency": {
+      "tasks_title": "Active Tasks",
+      "files_title": "File Exchange",
+      "comm_title": "Communication",
+      "chat_placeholder": "Type a message...",
+      "upload_hint": "Drag & Drop files here or click to upload",
+      "upload_subhint": "PDF, DOCX, ZIP up to 50MB",
+      "recent_files": "Recent Files",
+      "table": {
+        "task_id": "TASK ID",
+        "patent_no": "PATENT NO.",
+        "type": "TYPE",
+        "deadline": "DEADLINE",
+        "priority": "PRIORITY",
+        "status": "STATUS"
+      }
+    },
+    "counsel": {
+      "title": "External Legal Counsel Reviews",
+      "submit_btn": "Submit Review Opinion",
+      "opinion_label": "Legal Opinion",
+      "opinion_placeholder": "Enter your legal assessment, recommendations, and risk mitigation strategies...",
+      "rating_label": "Final Risk Rating",
+      "table": {
+        "review_id": "REVIEW ID",
+        "report_title": "REPORT TITLE",
+        "created": "CREATED",
+        "deadline": "DEADLINE",
+        "status": "STATUS",
+        "action": "ACTION"
+      },
+      "actions": {
+        "review": "Review",
+        "view": "View"
+      }
+    },
+    "api": {
+      "doc_title": "API Documentation",
+      "intro_title": "Introduction",
+      "intro_desc": "Welcome to the KeyIP Intelligence API. Integrate patent data, molecular analysis, and risk alerts directly into your internal systems.",
+      "endpoints_title": "Endpoints",
+      "auth_title": "Authentication",
+      "key_label": "API Key",
+      "key_warning": "Keep this key secret. Do not share it in client-side code.",
+      "gen_key_btn": "Generate New Key",
+      "limits_title": "Rate Limits",
+      "limit_rpm": "Requests / Minute",
+      "limit_quota": "Daily Quota"
+    },
+    "common": {
+      "download": "Download",
+      "copy": "Copy",
+      "copied": "Copied"
+    }
+  },
+  "table": {
+    "select": "SELECT",
+    "structure": "STRUCTURE",
+    "relevance": "RELEVANCE",
+    "patent_no": "PATENT NO.",
+    "title": "TITLE",
+    "assignee": "ASSIGNEE",
+    "pub_date": "PUB. DATE",
+    "patent_id": "PATENT ID",
+    "event_type": "EVENT TYPE",
+    "jurisdiction": "JURISDICTION",
+    "due_date": "DUE DATE",
+    "fee": "FEE",
+    "status": "STATUS",
+    "no_data": "No data available"
+  },
+  "pagination": {
+    "showing": "Showing page"
+  },
+  "patent": {
+    "title": "Patent Detail",
+    "error_loading": "Error loading patent",
+    "go_back": "Go Back",
+    "not_found_title": "Patent Not Found",
+    "not_found_desc": "The requested patent could not be found.",
+    "back_to_mining": "Back to Patent Mining",
+    "back": "Back",
+    "assignee": "Assignee",
+    "filing_date": "Filing Date",
+    "publication_date": "Publication Date",
+    "grant_date": "Grant Date",
+    "abstract": "Abstract",
+    "inventors": "Inventors",
+    "no_inventors": "No inventor data available",
+    "ipc_codes": "IPC Classifications",
+    "no_ipc_codes": "No IPC codes available",
+    "claims": "Claims",
+    "claim_independent": "Independent",
+    "claim_dependent": "Dependent",
+    "claim_label": "Claim",
+    "citations": "Citations",
+    "publication_number": "Publication Number"
+  },
+  "molecule": {
+    "title": "Molecule Detail",
+    "error_loading": "Error loading molecule",
+    "go_back": "Go Back",
+    "not_found_title": "Molecule Not Found",
+    "not_found_desc": "The requested molecule could not be found.",
+    "back_to_mining": "Back to Patent Mining",
+    "back": "Back",
+    "structure": "Structure",
+    "no_structure": "No structure data",
+    "properties": "Properties",
+    "molecular_weight": "Molecular Weight",
+    "no_properties": "No property data available",
+    "material_properties": "Material Properties",
+    "smiles": "SMILES",
+    "inchikey": "InChI",
+    "fingerprint": "Fingerprint",
+    "type": "Type",
+    "value": "Value",
+    "unit": "Unit",
+    "condition": "Condition",
+    "source": "Source"
+  },
+  "not_found": {
+    "title": "Page Not Found",
+    "description": "The page you are looking for doesn't exist or has been moved.",
+    "return_home": "Return Home"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "submit": "Submit",
+    "close": "Close",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "download": "Download",
+    "upload": "Upload",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "no_data": "No data available",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "view_all": "View All",
+    "show_more": "Show More",
+    "show_less": "Show Less"
+  }
+}

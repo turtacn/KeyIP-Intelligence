@@ -235,7 +235,7 @@ const KnowledgeGraph: React.FC = () => {
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
       <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">Knowledge Graph</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t('knowledge_graph.title')}</h1>
         <div className="flex flex-wrap items-center gap-2">
           {/* Search within graph */}
           <form onSubmit={handleSearch} className="relative">
@@ -253,19 +253,19 @@ const KnowledgeGraph: React.FC = () => {
           <form onSubmit={handleLoadPatentNetwork} className="flex items-center gap-1">
             <input
               type="text"
-              placeholder="Patent ID for network"
+              placeholder={t('knowledge_graph.patent_id_placeholder')}
               value={inputPatentId}
               onChange={(e) => setInputPatentId(e.target.value)}
               className="pl-3 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 w-40"
             />
             <Button type="submit" size="sm" variant="outline" isLoading={citationLoading}>
-              Load
+              {t('knowledge_graph.load')}
             </Button>
           </form>
 
           {mode === 'realtime' && (
             <Button size="sm" variant="ghost" onClick={handleResetMock} leftIcon={<RotateCcw className="w-4 h-4" />}>
-              Reset
+              {t('knowledge_graph.reset')}
             </Button>
           )}
         </div>
@@ -277,7 +277,7 @@ const KnowledgeGraph: React.FC = () => {
           <div className="absolute inset-0 bg-white/70 z-10 flex items-center justify-center">
             <div className="text-center">
               <LoadingSpinner size="lg" />
-              <p className="mt-2 text-sm text-slate-500">Loading citation network...</p>
+              <p className="mt-2 text-sm text-slate-500">{t('knowledge_graph.loading_network')}</p>
             </div>
           </div>
         )}
@@ -285,7 +285,7 @@ const KnowledgeGraph: React.FC = () => {
         {/* Error overlay for real-time mode */}
         {mode === 'realtime' && citationError && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg shadow-md text-sm">
-            Failed to load citation network: {citationError}
+            {t('knowledge_graph.network_error')}: {citationError}
           </div>
         )}
 
@@ -294,31 +294,31 @@ const KnowledgeGraph: React.FC = () => {
 
         {/* Graph Controls */}
         <div className="absolute bottom-4 right-4 flex flex-col gap-2 bg-white p-2 rounded-lg shadow-md border border-slate-200">
-          <button onClick={handleZoomIn} className="p-2 hover:bg-slate-100 rounded text-slate-600" title="Zoom In">
+          <button onClick={handleZoomIn} className="p-2 hover:bg-slate-100 rounded text-slate-600" title={t('knowledge_graph.zoom_in')}>
             <ZoomIn className="w-5 h-5" />
           </button>
-          <button onClick={handleZoomOut} className="p-2 hover:bg-slate-100 rounded text-slate-600" title="Zoom Out">
+          <button onClick={handleZoomOut} className="p-2 hover:bg-slate-100 rounded text-slate-600" title={t('knowledge_graph.zoom_out')}>
             <ZoomOut className="w-5 h-5" />
           </button>
-          <button onClick={handleFit} className="p-2 hover:bg-slate-100 rounded text-slate-600" title="Fit to Screen">
+          <button onClick={handleFit} className="p-2 hover:bg-slate-100 rounded text-slate-600" title={t('knowledge_graph.fit_screen')}>
             <Maximize className="w-5 h-5" />
           </button>
         </div>
 
         {/* Legend */}
         <div className="absolute top-4 left-4 bg-white/90 p-3 rounded-lg shadow-sm border border-slate-200 text-xs">
-          <div className="font-semibold mb-2 text-slate-700">Legend</div>
+          <div className="font-semibold mb-2 text-slate-700">{t('knowledge_graph.legend')}</div>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-              <span>Patent</span>
+              <span>{t('knowledge_graph.patent')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 bg-green-500" style={{ clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' }}></span>
-              <span>Citation</span>
+              <span>{t('knowledge_graph.citation')}</span>
             </div>
             <div className="flex items-center gap-2 mt-2 text-slate-400">
-              <span className="text-[10px]">Click a node to focus</span>
+              <span className="text-[10px]">{t('knowledge_graph.click_to_focus')}</span>
             </div>
           </div>
         </div>
@@ -326,7 +326,7 @@ const KnowledgeGraph: React.FC = () => {
         {/* Mode indicator */}
         <div className="absolute top-4 right-4">
           <Badge variant={mode === 'realtime' ? 'info' : 'default'} size="sm">
-            {mode === 'realtime' ? 'Citation Network' : 'Demo View'}
+            {mode === 'realtime' ? t('knowledge_graph.citation_network') : t('knowledge_graph.demo_view')}
           </Badge>
         </div>
       </Card>
@@ -334,10 +334,10 @@ const KnowledgeGraph: React.FC = () => {
       {/* Stats bar for realtime mode */}
       {isRealtimeLoaded && (
         <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
-          <span>Patent: <strong>{citationData.patent_number}</strong></span>
-          <span>Total Citations: <strong>{citationData.total_citations}</strong></span>
-          <span>Forward: <strong>{citationData.forward_citations.length}</strong></span>
-          <span>Backward: <strong>{citationData.backward_citations.length}</strong></span>
+          <span>{t('knowledge_graph.patent')}: <strong>{citationData.patent_number}</strong></span>
+          <span>{t('knowledge_graph.total_citations')}: <strong>{citationData.total_citations}</strong></span>
+          <span>{t('knowledge_graph.forward')}: <strong>{citationData.forward_citations.length}</strong></span>
+          <span>{t('knowledge_graph.backward')}: <strong>{citationData.backward_citations.length}</strong></span>
         </div>
       )}
     </div>

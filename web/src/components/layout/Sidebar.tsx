@@ -17,8 +17,8 @@ const Sidebar: React.FC = () => {
 
   const navItems = [
     { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
-    { to: '/search', label: 'Search', icon: Search },
-    { to: '/knowledge-graph', label: 'Knowledge Graph', icon: GitBranch },
+    { to: '/search', label: t('nav.search'), icon: Search },
+    { to: '/knowledge-graph', label: t('nav.knowledge_graph'), icon: GitBranch },
     { to: '/patent-mining', label: t('nav.mining'), icon: Globe },
     { to: '/infringement-watch', label: t('nav.infringement'), icon: ShieldAlert },
     { to: '/portfolio', label: t('nav.portfolio'), icon: Briefcase },

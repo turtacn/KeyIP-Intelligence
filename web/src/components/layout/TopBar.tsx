@@ -49,12 +49,8 @@ const TopBar: React.FC = () => {
               className="pl-10 pr-4 py-2 bg-transparent rounded-lg hover:bg-slate-100 text-slate-600 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               title="Switch Language"
             >
-              <option value="zh">中文</option>
+              <option value="zh-CN">中文 (简体)</option>
               <option value="en">English</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
-              <option value="ja">日本語</option>
-              <option value="ko">한국어</option>
             </select>
           </div>
 

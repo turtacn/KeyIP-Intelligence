@@ -10,6 +10,8 @@ const Breadcrumb: React.FC = () => {
 
   const routeNameMap: Record<string, string> = {
     'dashboard': 'nav.dashboard',
+    'search': 'nav.search',
+    'knowledge-graph': 'nav.knowledge_graph',
     'patent-mining': 'nav.mining',
     'infringement-watch': 'nav.infringement',
     'portfolio': 'nav.portfolio',
