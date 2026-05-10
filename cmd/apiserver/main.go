@@ -6,13 +6,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"google.golang.org/grpc"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/collaboration"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/lifecycle"
@@ -32,6 +29,7 @@ import (
 	search_os "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/search/opensearch"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/storage/minio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/grpc/services"
+	csgrpc "github.com/turtacn/KeyIP-Intelligence/internal/interfaces/grpc"
 	httpserver "github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http"
 	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/handlers"
 	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
@@ -238,7 +236,24 @@ func main() {
 	httpServer := httpserver.NewServer(httpSrvCfg, httpRouter, logger)
 
 	// gRPC Server
-	grpcSrv := grpc.NewServer()
+	// Build dependency health checkers for the gRPC health service.
+	var healthCheckers []csgrpc.Checker
+	healthCheckers = append(healthCheckers, csgrpc.NewChecker("postgres", func(ctx context.Context) error {
+		return pgConn.HealthCheck(ctx)
+	}))
+	if redisClient != nil {
+		healthCheckers = append(healthCheckers, csgrpc.NewChecker("redis", func(ctx context.Context) error {
+			return redisClient.GetUnderlyingClient().Ping(ctx).Err()
+		}))
+	}
+
+	grpcSrv, err := csgrpc.NewServer(&cfg.Server.GRPC,
+		csgrpc.WithLogger(logger),
+		csgrpc.WithHealthCheckers(healthCheckers...),
+	)
+	if err != nil {
+		logger.Fatal("failed to create gRPC server", logging.Err(err))
+	}
 
 	// Register gRPC services - only the available vertical slices
 	pb.RegisterMoleculeServiceServer(grpcSrv, services.NewMoleculeServiceServer(moleculeRepo, similaritySvc, logger))
@@ -252,13 +267,8 @@ func main() {
 
 	// Start gRPC Server
 	go func() {
-		addr := fmt.Sprintf("%s:%d", cfg.Server.GRPC.Host, cfg.Server.GRPC.Port)
-		lis, err := net.Listen("tcp", addr)
-		if err != nil {
-			logger.Fatal("failed to listen for gRPC", logging.Err(err))
-		}
-		logger.Info("gRPC server listening", logging.String("address", addr))
-		if err := grpcSrv.Serve(lis); err != nil {
+		logger.Info("gRPC server starting", logging.String("address", grpcSrv.Addr()))
+		if err := grpcSrv.Start(); err != nil {
 			logger.Fatal("gRPC server failed", logging.Err(err))
 		}
 	}()
@@ -277,7 +287,9 @@ func main() {
 	if err := httpServer.Shutdown(ctx); err != nil {
 		logger.Error("HTTP server shutdown error", logging.Err(err))
 	}
-	grpcSrv.GracefulStop()
+	if err := grpcSrv.Stop(ctx); err != nil {
+		logger.Error("gRPC server shutdown error", logging.Err(err))
+	}
 
 	logger.Info("servers stopped")
 }

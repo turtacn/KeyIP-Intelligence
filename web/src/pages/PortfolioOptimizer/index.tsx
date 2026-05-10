@@ -8,17 +8,21 @@ import GapAnalysis from './GapAnalysis';
 import ValueScoring from './ValueScoring';
 import BudgetOptimizer from './BudgetOptimizer';
 import WhatIfSimulator from './WhatIfSimulator';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import PageError from '../../components/ui/PageError';
+import EmptyState from '../../components/ui/EmptyState';
+import { SkeletonCard } from '../../components/ui/Skeleton';
+import { BarChart3 } from 'lucide-react';
 
 const PortfolioOptimizer: React.FC = () => {
   const { t } = useTranslation();
   const { summary, scores, coverage } = usePortfolio();
-  const { data: companies } = usePartners();
-  const { data: patents } = usePatents();
+  const { data: companies, loading: partnersLoading, error: partnersError } = usePartners();
+  const { data: patents, loading: patentsLoading, error: patentsError } = usePatents();
 
   const [activeSection, setActiveSection] = useState('panorama');
 
-  const isLoading = summary.loading || scores.loading || coverage.loading;
+  const isLoading = summary.loading || scores.loading || coverage.loading || partnersLoading || patentsLoading;
+  const error = summary.error || scores.error || coverage.error || partnersError || patentsError;
 
   const scrollToSection = (id: string) => {
     setActiveSection(id);
@@ -30,9 +34,56 @@ const PortfolioOptimizer: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-full">
-        <LoadingSpinner size="lg" />
+      <div className="space-y-6 pb-12">
+        {/* Sub-nav skeleton */}
+        <div className="bg-white border-b border-slate-200 rounded-lg p-4 animate-pulse">
+          <div className="flex gap-8">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-4 w-20 bg-slate-200 rounded" />
+            ))}
+          </div>
+        </div>
+
+        {/* Section skeletons */}
+        {[1, 2, 3].map((section) => (
+          <div key={section} className="space-y-4">
+            <div className="animate-pulse space-y-2">
+              <div className="h-6 w-48 bg-slate-200 rounded" />
+              <div className="h-4 w-72 bg-slate-200 rounded" />
+            </div>
+            <SkeletonCard rows={4} className="h-64" />
+          </div>
+        ))}
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageError
+        error={error}
+        onRetry={summary.refetch}
+        title={t('portfolio.error_title', 'Failed to load portfolio data')}
+        description={t('portfolio.error_desc', 'There was a problem fetching your portfolio. Please try again.')}
+      />
+    );
+  }
+
+  if (!summary.data) {
+    return (
+      <EmptyState
+        icon={BarChart3}
+        title={t('portfolio.empty_title', 'No portfolio data')}
+        description={t('portfolio.empty_desc', 'No portfolio metrics are available.')}
+        action={
+          <button
+            onClick={summary.refetch}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            {t('portfolio.refetch', 'Refresh')}
+          </button>
+        }
+      />
     );
   }
 
@@ -79,7 +130,7 @@ const PortfolioOptimizer: React.FC = () => {
             </div>
             <PanoramaView
               summary={summary.data}
-              loading={summary.loading}
+              loading={false}
               coverageData={coverageData}
               scoresData={scoresData}
             />

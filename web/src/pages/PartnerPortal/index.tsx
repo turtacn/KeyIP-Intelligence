@@ -5,21 +5,47 @@ import AdminView from './AdminView';
 import AgencyView from './AgencyView';
 import CounselView from './CounselView';
 import APIPortal from './APIPortal';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import PageError from '../../components/ui/PageError';
+import { SkeletonCard } from '../../components/ui/Skeleton';
 
 type ViewMode = 'admin' | 'agency' | 'counsel' | 'api';
 
 const PartnerPortal: React.FC = () => {
   const { t } = useTranslation();
-  const { data: partners, loading, error } = usePartners();
+  const { data: partners, loading, error, refetch } = usePartners();
   const [activeView, setActiveView] = useState<ViewMode>('admin');
 
   if (loading) {
-    return <div className="h-full flex items-center justify-center"><LoadingSpinner size="lg" /></div>;
+    return (
+      <div className="space-y-6 pb-12">
+        {/* Sub-nav skeleton */}
+        <div className="bg-white border-b border-slate-200 rounded-lg p-4 animate-pulse">
+          <div className="flex gap-8">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-4 w-24 bg-slate-200 rounded" />
+            ))}
+          </div>
+        </div>
+
+        {/* Content skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonCard key={i} rows={4} className="h-48" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="p-8 text-center text-red-600">Error loading partner data: {error}</div>;
+    return (
+      <PageError
+        error={error}
+        onRetry={refetch}
+        title={t('partners.error_title', 'Failed to load partner data')}
+        description={t('partners.error_desc', 'There was a problem fetching partner information.')}
+      />
+    );
   }
 
   return (
@@ -50,7 +76,7 @@ const PartnerPortal: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto pb-8">
-        {activeView === 'admin' && <AdminView partners={partners || []} loading={loading} />}
+        {activeView === 'admin' && <AdminView partners={partners || []} loading={false} />}
         {activeView === 'agency' && <AgencyView />}
         {activeView === 'counsel' && <CounselView />}
         {activeView === 'api' && <APIPortal />}

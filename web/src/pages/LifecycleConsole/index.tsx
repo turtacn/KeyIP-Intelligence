@@ -6,8 +6,9 @@ import DeadlineTable from './DeadlineTable';
 import AnnuityManager from './AnnuityManager';
 import LegalStatusMonitor from './LegalStatusMonitor';
 import Button from '../../components/ui/Button';
+import PageError from '../../components/ui/PageError';
+import { SkeletonTable } from '../../components/ui/Skeleton';
 import { Download } from 'lucide-react';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { Jurisdiction } from '../../types/domain';
 
 type Tab = 'calendar' | 'annuity' | 'status';
@@ -89,7 +90,14 @@ const LifecycleConsole: React.FC = () => {
   };
 
   if (error) {
-    return <div className="text-red-600 p-8">Error: {error}</div>;
+    return (
+      <PageError
+        error={error}
+        onRetry={refetch}
+        title={t('lifecycle.error_title', 'Failed to load lifecycle data')}
+        description={t('lifecycle.error_desc', 'There was a problem fetching lifecycle events.')}
+      />
+    );
   }
 
   return (
@@ -142,30 +150,30 @@ const LifecycleConsole: React.FC = () => {
         {/* Tab Content */}
         <div className="flex-1 overflow-auto pb-8">
           {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <LoadingSpinner size="lg" />
+            <div className="space-y-4">
+              <SkeletonTable columns={5} rows={8} />
             </div>
           ) : (
             <>
               {activeTab === 'calendar' && (
                 <DeadlineTable
                   events={filteredEvents}
-                  loading={loading}
+                  loading={false}
                   onMarkHandled={handleMarkHandled}
                   onExport={handleExport}
                 />
               )}
               {activeTab === 'annuity' && (
                 <AnnuityManager
-                  events={filteredEvents} // Should we pass all events or just filtered? Filtered for consistency
-                  loading={loading}
+                  events={filteredEvents}
+                  loading={false}
                   onPay={handlePayAnnuity}
                 />
               )}
               {activeTab === 'status' && (
                 <LegalStatusMonitor
-                  events={events || []} // Monitor uses all events to aggregate status
-                  loading={loading}
+                  events={events || []}
+                  loading={false}
                 />
               )}
             </>

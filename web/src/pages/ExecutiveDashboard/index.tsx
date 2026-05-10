@@ -9,12 +9,14 @@ import UpcomingDeadlines from './UpcomingDeadlines';
 import RecentAlerts from './RecentAlerts';
 import NLQueryWidget from './NLQueryWidget';
 import Button from '../../components/ui/Button';
-import { Download } from 'lucide-react';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import PageError from '../../components/ui/PageError';
+import EmptyState from '../../components/ui/EmptyState';
+import { SkeletonDashboard } from '../../components/ui/Skeleton';
+import { Download, BarChart3 } from 'lucide-react';
 
 const ExecutiveDashboard: React.FC = () => {
   const { t } = useTranslation();
-  const { data, loading, error } = useDashboard();
+  const { data, loading, error, refetch } = useDashboard();
   const [reportGenerating, setReportGenerating] = useState(false);
 
   const handleGenerateReport = () => {
@@ -28,17 +30,35 @@ const ExecutiveDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <LoadingSpinner size="lg" />
+      <div className="pb-12">
+        <SkeletonDashboard />
       </div>
     );
   }
 
-  if (error || !data) {
+  if (error) {
     return (
-      <div className="p-6 text-center text-red-600 bg-red-50 rounded-lg">
-        Error loading dashboard data: {error}
-      </div>
+      <PageError
+        error={error}
+        onRetry={refetch}
+        title={t('dashboard.error_title', 'Failed to load dashboard')}
+        description={t('dashboard.error_desc', 'There was a problem fetching your dashboard data. Please try again.')}
+      />
+    );
+  }
+
+  if (!data) {
+    return (
+      <EmptyState
+        icon={BarChart3}
+        title={t('dashboard.empty_title', 'No dashboard data')}
+        description={t('dashboard.empty_desc', 'No metrics are available at this time.')}
+        action={
+          <Button variant="outline" onClick={refetch}>
+            {t('dashboard.refetch', 'Refresh')}
+          </Button>
+        }
+      />
     );
   }
 
@@ -75,20 +95,20 @@ const ExecutiveDashboard: React.FC = () => {
 
       <NLQueryWidget />
 
-      <KPICards metrics={data} loading={loading} />
+      <KPICards metrics={data} loading={false} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TrendChart data={data.monthlyApplicationTrend} loading={loading} />
-        <JurisdictionPie data={data.jurisdictionBreakdown} loading={loading} />
+        <TrendChart data={data.monthlyApplicationTrend} loading={false} />
+        <JurisdictionPie data={data.jurisdictionBreakdown} loading={false} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <UpcomingDeadlines events={data.upcomingDeadlines} loading={loading} />
-        <RecentAlerts alerts={data.recentAlerts} loading={loading} />
+        <UpcomingDeadlines events={data.upcomingDeadlines} loading={false} />
+        <RecentAlerts alerts={data.recentAlerts} loading={false} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CompetitorRadar data={radarData} loading={loading} />
+        <CompetitorRadar data={radarData} loading={false} />
         {/* Placeholder for future widget */}
       </div>
     </div>

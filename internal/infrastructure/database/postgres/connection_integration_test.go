@@ -150,12 +150,14 @@ func setupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 	}
 
 	cfg := config.DatabaseConfig{
-		Host:     "localhost",
-		Port:     5432,
-		User:     "test",
-		Password: "test",
-		DBName:   "test_keyip",
-		SSLMode:  "disable",
+		Postgres: config.PostgresConfig{
+			Host:     "localhost",
+			Port:     5432,
+			User:     "test",
+			Password: "test",
+			DBName:   "test_keyip",
+			SSLMode:  "disable",
+		},
 	}
 
 	logger := logging.NewNopLogger()

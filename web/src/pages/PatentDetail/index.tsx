@@ -6,9 +6,11 @@ import { Patent } from '../../types/domain';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import StatusBadge from '../../components/ui/StatusBadge';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
-import { ArrowLeft, ExternalLink, AlertCircle, FileText } from 'lucide-react';
+import PageError from '../../components/ui/PageError';
+import { SkeletonCard, SkeletonLine } from '../../components/ui/Skeleton';
+import EmptyState from '../../components/ui/EmptyState';
+import { ArrowLeft, ExternalLink, FileText } from 'lucide-react';
 
 const PatentDetail: React.FC = () => {
   const { t } = useTranslation();
@@ -18,73 +20,86 @@ const PatentDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchPatent = async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await patentService.getPatentById(id);
+      setPatent(response.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load patent');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
     let mounted = true;
-
-    const fetchPatent = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await patentService.getPatentById(id);
-        if (mounted) {
-          setPatent(response.data);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to load patent');
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
+    const fetch = async () => {
+      await fetchPatent();
+      if (!mounted) return;
     };
-
-    fetchPatent();
+    fetch();
     return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <LoadingSpinner size="lg" />
+      <div className="space-y-6 pb-12">
+        {/* Back button skeleton */}
+        <div className="animate-pulse h-4 w-16 bg-slate-200 rounded" />
+
+        {/* Header skeleton */}
+        <div className="animate-pulse space-y-3">
+          <div className="h-8 w-3/4 bg-slate-200 rounded" />
+          <SkeletonLine width="40%" />
+        </div>
+
+        {/* Summary card skeleton */}
+        <SkeletonCard rows={2} className="h-32" />
+
+        {/* Abstract skeleton */}
+        <SkeletonCard rows={4} className="h-40" />
+
+        {/* Two-column skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SkeletonCard rows={3} className="h-32" />
+          <SkeletonCard rows={3} className="h-32" />
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-6 text-center text-red-600 bg-red-50 rounded-lg">
-        <AlertCircle className="w-8 h-8 mx-auto mb-3" />
-        <p className="font-semibold">{t('patent.error_loading')}</p>
-        <p className="text-sm mt-1">{error}</p>
-        <Button
-          variant="outline"
-          className="mt-4"
-          onClick={() => navigate(-1)}
-          leftIcon={<ArrowLeft className="w-4 h-4" />}
-        >
-          {t('patent.go_back')}
-        </Button>
-      </div>
+      <PageError
+        error={error}
+        onRetry={fetchPatent}
+        title={t('patent.error_loading')}
+        description={t('patent.error_loading_desc', 'There was a problem loading this patent.')}
+      />
     );
   }
 
   if (!patent) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
-        <FileText className="w-16 h-16 mb-4 text-slate-300" />
-        <h2 className="text-xl font-semibold text-slate-700 mb-2">{t('patent.not_found_title')}</h2>
-        <p className="mb-6">{t('patent.not_found_desc')}</p>
-        <Button
-          variant="outline"
-          onClick={() => navigate('/patent-mining')}
-          leftIcon={<ArrowLeft className="w-4 h-4" />}
-        >
-          {t('patent.back_to_mining')}
-        </Button>
-      </div>
+      <EmptyState
+        icon={FileText}
+        title={t('patent.not_found_title')}
+        description={t('patent.not_found_desc')}
+        action={
+          <Button
+            variant="outline"
+            onClick={() => navigate('/patent-mining')}
+            leftIcon={<ArrowLeft className="w-4 h-4" />}
+          >
+            {t('patent.back_to_mining')}
+          </Button>
+        }
+      />
     );
   }
 

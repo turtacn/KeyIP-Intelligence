@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
@@ -22,9 +23,9 @@ describe('ErrorBoundary', () => {
   });
 
   it('renders error UI when a child component throws', () => {
-    function ThrowComponent() {
+    const ThrowComponent: React.FC = () => {
       throw new Error('Test error message');
-    }
+    };
 
     render(
       <ErrorBoundary>
@@ -36,10 +37,10 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Test error message')).toBeInTheDocument();
   });
 
-  it('renders a reload button in the error state', () => {
-    function ThrowComponent() {
+  it('renders a retry button in the error state', () => {
+    const ThrowComponent: React.FC = () => {
       throw new Error('Oops');
-    }
+    };
 
     render(
       <ErrorBoundary>
@@ -47,14 +48,14 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
 
-    const reloadButton = screen.getByRole('button', { name: /reload page/i });
-    expect(reloadButton).toBeInTheDocument();
+    const retryButton = screen.getByRole('button', { name: /try again/i });
+    expect(retryButton).toBeInTheDocument();
   });
 
   it('shows generic error message when error has no message', () => {
-    function ThrowComponent() {
+    const ThrowComponent: React.FC = () => {
       throw new Error();
-    }
+    };
 
     render(
       <ErrorBoundary>

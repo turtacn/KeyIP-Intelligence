@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
@@ -240,6 +242,18 @@ func (s *infringementReportServiceImpl) validateRequest(req *InfringementReportR
 }
 
 func (s *infringementReportServiceImpl) Generate(ctx context.Context, req *InfringementReportRequest) (*InfringementReportResponse, error) {
+	// OpenTelemetry tracing span
+	tracer := otel.Tracer("reporting")
+	ctx, span := tracer.Start(ctx, "InfringementReportService.Generate")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.Int("owned_patent_count", len(req.OwnedPatentNumbers)),
+		attribute.Int("suspected_molecule_count", len(req.SuspectedMolecules)),
+		attribute.Int("suspected_patent_count", len(req.SuspectedPatentNumbers)),
+		attribute.String("analysis_mode", string(req.AnalysisMode)),
+	)
+
 	startTime := time.Now()
 	if err := s.validateRequest(req); err != nil {
 		return nil, err

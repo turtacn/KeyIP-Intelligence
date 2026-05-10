@@ -42,6 +42,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
@@ -404,9 +407,19 @@ func NewAnnuityService(
 
 // CalculateAnnuity computes the next annuity fee for a single patent.
 func (s *annuityServiceImpl) CalculateAnnuity(ctx context.Context, req *CalculateAnnuityRequest) (*AnnuityResult, error) {
+	// OpenTelemetry tracing span
+	tracer := otel.Tracer("annuity")
+	ctx, span := tracer.Start(ctx, "AnnuityService.CalculateAnnuity")
+	defer span.End()
+
 	if req == nil {
 		return nil, errors.NewValidationOp("annuity.calculate", "request must not be nil")
 	}
+
+	span.SetAttributes(
+		attribute.String("patent_id", req.PatentID),
+		attribute.String("jurisdiction", string(req.Jurisdiction)),
+	)
 	if req.PatentID == "" {
 		return nil, errors.NewValidationOp("annuity.calculate", "patent_id is required")
 	}

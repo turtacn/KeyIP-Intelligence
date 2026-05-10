@@ -27,6 +27,8 @@ import (
 
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -321,6 +323,16 @@ func NewKGSearchService(
 // 1. SearchEntities
 // ----------------------------------------------------------------------------
 func (s *kgSearchServiceImpl) SearchEntities(ctx context.Context, req *EntitySearchRequest) (*EntitySearchResponse, error) {
+	// OpenTelemetry tracing span
+	tracer := otel.Tracer("kg_search")
+	ctx, span := tracer.Start(ctx, "SearchEntities")
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("entity_type", string(req.EntityType)),
+		attribute.Int("request_limit", req.Limit),
+	)
+
 	start := time.Now()
 	defer func() {
 		s.metrics.ObserveHistogram("kg_search_entities_latency", time.Since(start).Seconds(), map[string]string{"type": string(req.EntityType)})

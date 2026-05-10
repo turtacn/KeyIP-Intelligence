@@ -4,10 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { moleculeService } from '../../services/molecule.service';
 import { Molecule } from '../../types/domain';
 import Card from '../../components/ui/Card';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
 import MoleculeViewer from '../../components/ui/MoleculeViewer';
-import { ArrowLeft, AlertCircle, Beaker } from 'lucide-react';
+import PageError from '../../components/ui/PageError';
+import { SkeletonCard, SkeletonLine } from '../../components/ui/Skeleton';
+import EmptyState from '../../components/ui/EmptyState';
+import { ArrowLeft, Beaker } from 'lucide-react';
 
 const MoleculeDetail: React.FC = () => {
   const { t } = useTranslation();
@@ -17,73 +19,80 @@ const MoleculeDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchMolecule = async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await moleculeService.getMoleculeById(id);
+      setMolecule(response.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load molecule');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
     let mounted = true;
-
-    const fetchMolecule = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await moleculeService.getMoleculeById(id);
-        if (mounted) {
-          setMolecule(response.data);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to load molecule');
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
+    const fetch = async () => {
+      await fetchMolecule();
+      if (!mounted) return;
     };
-
-    fetchMolecule();
+    fetch();
     return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <LoadingSpinner size="lg" />
+      <div className="space-y-6 pb-12">
+        {/* Back button skeleton */}
+        <div className="animate-pulse h-4 w-16 bg-slate-200 rounded" />
+
+        {/* Header skeleton */}
+        <div className="animate-pulse space-y-3">
+          <div className="h-8 w-1/2 bg-slate-200 rounded" />
+          <SkeletonLine width="30%" />
+        </div>
+
+        {/* Two-column skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <SkeletonCard rows={3} className="h-80 lg:col-span-1" />
+          <SkeletonCard rows={5} className="h-80 lg:col-span-2" />
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-6 text-center text-red-600 bg-red-50 rounded-lg">
-        <AlertCircle className="w-8 h-8 mx-auto mb-3" />
-        <p className="font-semibold">{t('molecule.error_loading')}</p>
-        <p className="text-sm mt-1">{error}</p>
-        <Button
-          variant="outline"
-          className="mt-4"
-          onClick={() => navigate(-1)}
-          leftIcon={<ArrowLeft className="w-4 h-4" />}
-        >
-          {t('molecule.go_back')}
-        </Button>
-      </div>
+      <PageError
+        error={error}
+        onRetry={fetchMolecule}
+        title={t('molecule.error_loading')}
+        description={t('molecule.error_loading_desc', 'There was a problem loading this molecule.')}
+      />
     );
   }
 
   if (!molecule) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
-        <Beaker className="w-16 h-16 mb-4 text-slate-300" />
-        <h2 className="text-xl font-semibold text-slate-700 mb-2">{t('molecule.not_found_title')}</h2>
-        <p className="mb-6">{t('molecule.not_found_desc')}</p>
-        <Button
-          variant="outline"
-          onClick={() => navigate('/patent-mining')}
-          leftIcon={<ArrowLeft className="w-4 h-4" />}
-        >
-          {t('molecule.back_to_mining')}
-        </Button>
-      </div>
+      <EmptyState
+        icon={Beaker}
+        title={t('molecule.not_found_title')}
+        description={t('molecule.not_found_desc')}
+        action={
+          <Button
+            variant="outline"
+            onClick={() => navigate('/patent-mining')}
+            leftIcon={<ArrowLeft className="w-4 h-4" />}
+          >
+            {t('molecule.back_to_mining')}
+          </Button>
+        }
+      />
     );
   }
 

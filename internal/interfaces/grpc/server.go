@@ -48,7 +48,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
@@ -94,6 +93,7 @@ type serverOptions struct {
 	maxSendMsgSize  int
 	keepaliveParams keepalive.ServerParameters
 	gracefulTimeout time.Duration
+	healthCheckers  []Checker
 }
 
 // WithLogger sets the logger for the gRPC server.
@@ -151,6 +151,15 @@ func WithGracefulTimeout(d time.Duration) Option {
 	}
 }
 
+// WithHealthCheckers sets health checkers for dynamic dependency health verification.
+// Each Checker is called on every health check request to verify the corresponding
+// dependency (e.g. database, cache) is reachable.
+func WithHealthCheckers(checkers ...Checker) Option {
+	return func(o *serverOptions) {
+		o.healthCheckers = checkers
+	}
+}
+
 // Server wraps a gRPC server with lifecycle management, interceptor chains,
 // health checking, and graceful shutdown.
 type Server struct {
@@ -158,7 +167,7 @@ type Server struct {
 	listener     net.Listener
 	cfg          *config.GRPCConfig
 	opts         *serverOptions
-	healthServer *health.Server
+	healthServer *HealthService
 	mu           sync.Mutex
 	started      bool
 }
@@ -224,10 +233,9 @@ func NewServer(cfg *config.GRPCConfig, opts ...Option) (*Server, error) {
 
 	gs := grpc.NewServer(grpcOpts...)
 
-	// Register health service.
-	hs := health.NewServer()
+	// Register health service with optional dependency checkers.
+	hs := NewHealthService(sopts.healthCheckers...)
 	healthpb.RegisterHealthServer(gs, hs)
-	hs.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 
 	// Register reflection service in debug mode only.
 	if cfg.Debug {

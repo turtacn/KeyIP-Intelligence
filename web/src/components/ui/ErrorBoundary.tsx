@@ -1,9 +1,9 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
-import Button from './Button';
+import ErrorFallback from './ErrorFallback';
 
 interface Props {
   children?: ReactNode;
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -24,25 +24,21 @@ class ErrorBoundary extends Component<Props, State> {
     console.error("Uncaught error:", error, errorInfo);
   }
 
+  private handleReset = () => {
+    this.setState({ hasError: false, error: undefined });
+  };
+
   public render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
       return (
-        <div className="min-h-[400px] flex flex-col items-center justify-center p-8 text-center bg-white rounded-lg border border-slate-200 shadow-sm">
-          <div className="bg-red-50 p-4 rounded-full mb-4">
-            <AlertTriangle className="w-10 h-10 text-red-500" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-900 mb-2">Something went wrong</h2>
-          <p className="text-slate-600 mb-6 max-w-md">
-            {this.state.error?.message || "An unexpected error occurred while rendering this component."}
-          </p>
-          <Button
-            onClick={() => window.location.reload()}
-            variant="outline"
-            leftIcon={<RotateCcw className="w-4 h-4" />}
-          >
-            Reload Page
-          </Button>
-        </div>
+        <ErrorFallback
+          error={this.state.error || null}
+          resetErrorBoundary={this.handleReset}
+        />
       );
     }
 

@@ -1,23 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import PatentabilityAssessor from './PatentabilityAssessor';
 import WhiteSpaceDiscovery from './WhiteSpaceDiscovery';
 import PatentSearch from './PatentSearch';
 import PriorArtAnalysis from './PriorArtAnalysis';
 import ClaimDraftAssistant from './ClaimDraftAssistant';
-import { Search, Map, FileSearch, Scale, PenTool } from 'lucide-react';
+import ErrorBoundary from '../../components/ui/ErrorBoundary';
+import EmptyState from '../../components/ui/EmptyState';
+import { Search, Map, FileSearch, Scale, PenTool, Wrench } from 'lucide-react';
 
 const PatentMining: React.FC = () => {
   const { t } = useTranslation();
   const [activeTool, setActiveTool] = useState('assessment');
 
-  const tools = [
+  const tools = useMemo(() => [
     { id: 'assessment', label: t('mining.tool_assessment'), icon: Scale, component: <PatentabilityAssessor /> },
     { id: 'whitespace', label: t('mining.tool_whitespace'), icon: Map, component: <WhiteSpaceDiscovery /> },
     { id: 'search', label: t('mining.tool_search'), icon: Search, component: <PatentSearch /> },
     { id: 'priorart', label: t('mining.tool_priorart'), icon: FileSearch, component: <PriorArtAnalysis /> },
     { id: 'drafting', label: t('mining.tool_drafting'), icon: PenTool, component: <ClaimDraftAssistant /> },
-  ];
+  ], [t]);
+
+  const activeToolConfig = tools.find(t => t.id === activeTool);
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
@@ -48,7 +52,35 @@ const PatentMining: React.FC = () => {
 
       {/* Workspace */}
       <div className="flex-1 min-w-0 h-full overflow-y-auto">
-        {tools.find(t => t.id === activeTool)?.component}
+        {activeToolConfig ? (
+          <ErrorBoundary
+            fallback={
+              <div className="flex items-center justify-center h-full p-8">
+                <EmptyState
+                  icon={Wrench}
+                  title={t('mining.tool_error_title', 'Tool Error')}
+                  description={t('mining.tool_error_desc', 'This tool encountered an error. Please try selecting it again.')}
+                  action={
+                    <button
+                      onClick={() => setActiveTool(activeTool === 'assessment' ? 'whitespace' : 'assessment')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      {t('mining.switch_tool', 'Switch Tool')}
+                    </button>
+                  }
+                />
+              </div>
+            }
+          >
+            {activeToolConfig.component}
+          </ErrorBoundary>
+        ) : (
+          <EmptyState
+            icon={Search}
+            title={t('mining.no_tool_title', 'Select a tool')}
+            description={t('mining.no_tool_desc', 'Choose a patent mining tool from the sidebar to get started.')}
+          />
+        )}
       </div>
     </div>
   );
