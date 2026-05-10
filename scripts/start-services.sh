@@ -96,11 +96,19 @@ start_redis() {
 }
 
 start_opensearch() {
-  # docker-machine 需要调高 vm.max_map_count
   if $IS_DOCKER_MACHINE; then
-    _log "设置 vm.max_map_count=262144（docker-machine 环境）"
-    docker-machine ssh default sudo sysctl -w vm.max_map_count=262144 2>/dev/null || \
-      _warn "vm.max_map_count 设置失败，OpenSearch 可能无法启动"
+    # docker-machine 旧内核 + OpenSearch 捆绑 JDK 不兼容，用 Elasticsearch 替代
+    _warn "docker-machine: 使用 Elasticsearch 8.11 替代 OpenSearch（API 兼容）"
+    docker rm -f keyip-opensearch 2>/dev/null || true
+    docker run -d --name keyip-opensearch \
+      $RESTART $LOGGING --network "$NETWORK" \
+      -p 9200:9200 -p 9600:9600 \
+      -e "discovery.type=single-node" \
+      -e "xpack.security.enabled=false" \
+      -e "ES_JAVA_OPTS=-Xms${OS_MEM} -Xmx${OS_MEM}" \
+      -v keyip-opensearch-data:/usr/share/elasticsearch/data \
+      docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    return 0
   fi
 
   _log "启动 OpenSearch 2.14 (REST: 9200, 性能分析: 9600)"
