@@ -13,16 +13,16 @@ import (
 type SubstituentType uint8
 
 const (
-	SubstituentTypeUnknown   SubstituentType = 0
-	SubstituentTypeAlkyl     SubstituentType = 1
-	SubstituentTypeAryl      SubstituentType = 2
+	SubstituentTypeUnknown    SubstituentType = 0
+	SubstituentTypeAlkyl      SubstituentType = 1
+	SubstituentTypeAryl       SubstituentType = 2
 	SubstituentTypeHeteroaryl SubstituentType = 3
-	SubstituentTypeHalogen   SubstituentType = 4
-	SubstituentTypeAlkoxy    SubstituentType = 5
-	SubstituentTypeAmino     SubstituentType = 6
-	SubstituentTypeCyano     SubstituentType = 7
-	SubstituentTypeHydrogen  SubstituentType = 8
-	SubstituentTypeCustom    SubstituentType = 9
+	SubstituentTypeHalogen    SubstituentType = 4
+	SubstituentTypeAlkoxy     SubstituentType = 5
+	SubstituentTypeAmino      SubstituentType = 6
+	SubstituentTypeCyano      SubstituentType = 7
+	SubstituentTypeHydrogen   SubstituentType = 8
+	SubstituentTypeCustom     SubstituentType = 9
 )
 
 func (t SubstituentType) String() string {
@@ -292,14 +292,14 @@ func (m *MarkushStructure) Validate() error {
 
 // MoleculeMatchResult represents the result of matching a molecule against a Markush.
 type MoleculeMatchResult struct {
-	MarkushID           string            `json:"markush_id"`
-	MoleculeSMILES      string            `json:"molecule_smiles"`
-	IsMatch             bool              `json:"is_match"`
-	Confidence          float64           `json:"confidence"`
-	MatchedPositions    map[string]string `json:"matched_positions"` // Symbol -> Substituent ID
-	UnmatchedPositions  []string          `json:"unmatched_positions"`
+	MarkushID            string            `json:"markush_id"`
+	MoleculeSMILES       string            `json:"molecule_smiles"`
+	IsMatch              bool              `json:"is_match"`
+	Confidence           float64           `json:"confidence"`
+	MatchedPositions     map[string]string `json:"matched_positions"` // Symbol -> Substituent ID
+	UnmatchedPositions   []string          `json:"unmatched_positions"`
 	ConstraintViolations []string          `json:"constraint_violations"`
-	MatchedAt           time.Time         `json:"matched_at"`
+	MatchedAt            time.Time         `json:"matched_at"`
 }
 
 // MarkushMatcher defines the interface for chemical matching engines.

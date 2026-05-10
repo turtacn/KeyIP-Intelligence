@@ -10,8 +10,8 @@ import (
 	domainmol "github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
-	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/molpatent_gnn"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/molpatent_gnn"
 	"github.com/turtacn/KeyIP-Intelligence/internal/testutil"
 )
 
@@ -21,15 +21,15 @@ import (
 
 type mockLoggerConstellation struct{}
 
-func (m *mockLoggerConstellation) Debug(msg string, fields ...logging.Field) {}
-func (m *mockLoggerConstellation) Info(msg string, fields ...logging.Field)  {}
-func (m *mockLoggerConstellation) Warn(msg string, fields ...logging.Field)  {}
-func (m *mockLoggerConstellation) Error(msg string, fields ...logging.Field) {}
-func (m *mockLoggerConstellation) Fatal(msg string, fields ...logging.Field) {}
-func (m *mockLoggerConstellation) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockLoggerConstellation) Debug(msg string, fields ...logging.Field)      {}
+func (m *mockLoggerConstellation) Info(msg string, fields ...logging.Field)       {}
+func (m *mockLoggerConstellation) Warn(msg string, fields ...logging.Field)       {}
+func (m *mockLoggerConstellation) Error(msg string, fields ...logging.Field)      {}
+func (m *mockLoggerConstellation) Fatal(msg string, fields ...logging.Field)      {}
+func (m *mockLoggerConstellation) With(fields ...logging.Field) logging.Logger    { return m }
 func (m *mockLoggerConstellation) WithContext(ctx context.Context) logging.Logger { return m }
-func (m *mockLoggerConstellation) WithError(err error) logging.Logger { return m }
-func (m *mockLoggerConstellation) Sync() error { return nil }
+func (m *mockLoggerConstellation) WithError(err error) logging.Logger             { return m }
+func (m *mockLoggerConstellation) Sync() error                                    { return nil }
 
 var _ logging.Logger = (*mockLoggerConstellation)(nil)
 
@@ -82,8 +82,8 @@ func (m *mockConstellationCache) Delete(ctx context.Context, key string) error {
 // -----------------------------------------------------------------------
 
 type mockPortfolioService struct {
-	portfolio   *domainportfolio.Portfolio
-	getByIDErr  error
+	portfolio  *domainportfolio.Portfolio
+	getByIDErr error
 }
 
 // Implement all methods from PortfolioService interface
@@ -435,17 +435,17 @@ func (m *mockPatent) toPatent() *domainpatent.Patent {
 	}
 
 	return &domainpatent.Patent{
-		ID:               patentID,
-		PatentNumber:     m.number,
-		Title:            "Test Patent",
-		Office:           domainpatent.OfficeUSPTO,
-		Status:           status,
-		AssigneeName:     m.assignee,
-		FilingDate:       &filingDate,
-		IPCCodes:         []string{m.techDomain},
-		KeyIPTechCodes:   []string{m.techDomain},
-		MoleculeIDs:      m.moleculeIDs,
-		Metadata:         metadata,
+		ID:             patentID,
+		PatentNumber:   m.number,
+		Title:          "Test Patent",
+		Office:         domainpatent.OfficeUSPTO,
+		Status:         status,
+		AssigneeName:   m.assignee,
+		FilingDate:     &filingDate,
+		IPCCodes:       []string{m.techDomain},
+		KeyIPTechCodes: []string{m.techDomain},
+		MoleculeIDs:    m.moleculeIDs,
+		Metadata:       metadata,
 	}
 }
 
@@ -586,20 +586,44 @@ func (m *mockMoleculeService) CreateFromSMILES(ctx context.Context, smiles strin
 	return nil, nil
 }
 
-func (m *mockMoleculeService) RegisterMolecule(ctx context.Context, smiles string, source domainmol.MoleculeSource, sourceRef string) (*domainmol.Molecule, error) { return nil, nil }
-func (m *mockMoleculeService) BatchRegisterMolecules(ctx context.Context, requests []domainmol.MoleculeRegistrationRequest) (*domainmol.BatchRegistrationResult, error) { return nil, nil }
-func (m *mockMoleculeService) GetMolecule(ctx context.Context, id string) (*domainmol.Molecule, error) { return nil, nil }
-func (m *mockMoleculeService) GetMoleculeByInChIKey(ctx context.Context, inchiKey string) (*domainmol.Molecule, error) { return nil, nil }
-func (m *mockMoleculeService) SearchMolecules(ctx context.Context, query *domainmol.MoleculeQuery) (*domainmol.MoleculeSearchResult, error) { return nil, nil }
-func (m *mockMoleculeService) CalculateFingerprints(ctx context.Context, moleculeID string, fpTypes []domainmol.FingerprintType) error { return nil }
-func (m *mockMoleculeService) FindSimilarMolecules(ctx context.Context, targetSMILES string, fpType domainmol.FingerprintType, threshold float64, limit int) ([]*domainmol.SimilarityResult, error) { return nil, nil }
-func (m *mockMoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2 string, fpTypes []domainmol.FingerprintType) (*domainmol.MoleculeComparisonResult, error) { return nil, nil }
+func (m *mockMoleculeService) RegisterMolecule(ctx context.Context, smiles string, source domainmol.MoleculeSource, sourceRef string) (*domainmol.Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeService) BatchRegisterMolecules(ctx context.Context, requests []domainmol.MoleculeRegistrationRequest) (*domainmol.BatchRegistrationResult, error) {
+	return nil, nil
+}
+func (m *mockMoleculeService) GetMolecule(ctx context.Context, id string) (*domainmol.Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeService) GetMoleculeByInChIKey(ctx context.Context, inchiKey string) (*domainmol.Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeService) SearchMolecules(ctx context.Context, query *domainmol.MoleculeQuery) (*domainmol.MoleculeSearchResult, error) {
+	return nil, nil
+}
+func (m *mockMoleculeService) CalculateFingerprints(ctx context.Context, moleculeID string, fpTypes []domainmol.FingerprintType) error {
+	return nil
+}
+func (m *mockMoleculeService) FindSimilarMolecules(ctx context.Context, targetSMILES string, fpType domainmol.FingerprintType, threshold float64, limit int) ([]*domainmol.SimilarityResult, error) {
+	return nil, nil
+}
+func (m *mockMoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2 string, fpTypes []domainmol.FingerprintType) (*domainmol.MoleculeComparisonResult, error) {
+	return nil, nil
+}
 func (m *mockMoleculeService) ArchiveMolecule(ctx context.Context, id string) error { return nil }
-func (m *mockMoleculeService) DeleteMolecule(ctx context.Context, id string) error { return nil }
-func (m *mockMoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID string, properties []*domainmol.MolecularProperty) error { return nil }
-func (m *mockMoleculeService) TagMolecule(ctx context.Context, moleculeID string, tags []string) error { return nil }
-func (m *mockMoleculeService) Canonicalize(ctx context.Context, smiles string) (string, string, error) { return "", "", nil }
-func (m *mockMoleculeService) CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error) { return "", "", nil }
+func (m *mockMoleculeService) DeleteMolecule(ctx context.Context, id string) error  { return nil }
+func (m *mockMoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID string, properties []*domainmol.MolecularProperty) error {
+	return nil
+}
+func (m *mockMoleculeService) TagMolecule(ctx context.Context, moleculeID string, tags []string) error {
+	return nil
+}
+func (m *mockMoleculeService) Canonicalize(ctx context.Context, smiles string) (string, string, error) {
+	return "", "", nil
+}
+func (m *mockMoleculeService) CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error) {
+	return "", "", nil
+}
 
 var _ domainmol.Service = (*mockMoleculeService)(nil)
 
@@ -644,9 +668,9 @@ func (m *mockGNNInference) ComputeSimilarity(ctx context.Context, req *molpatent
 
 func (m *mockGNNInference) SearchSimilar(ctx context.Context, req *molpatent_gnn.SimilarSearchRequest) (*molpatent_gnn.SimilarSearchResponse, error) {
 	return &molpatent_gnn.SimilarSearchResponse{
-		Matches:      nil,
-		QuerySMILES:  req.SMILES,
-		InferenceMs:  10,
+		Matches:     nil,
+		QuerySMILES: req.SMILES,
+		InferenceMs: 10,
 	}, nil
 }
 
@@ -657,12 +681,12 @@ func createTestPortfolioWithID(id, name string) *domainportfolio.Portfolio {
 	now := time.Now()
 	// Since we are using string IDs now, we keep it as string
 	p := &domainportfolio.Portfolio{
-		ID:           id,
-		Name:         name,
-		OwnerID:      uuid.New().String(),
-		TechDomains:  []string{"C07D"},
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:          id,
+		Name:        name,
+		OwnerID:     uuid.New().String(),
+		TechDomains: []string{"C07D"},
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	return p
 }
@@ -710,23 +734,23 @@ func createTestPatentWithMolecules(id, number, techDomain, assignee string, fili
 	now := time.Now()
 	expiryDate := filingDate.AddDate(20, 0, 0)
 	return &domainpatent.Patent{
-		ID:              patentID,
-		PatentNumber:    number,
-		Title:           "Test Patent",
-		Abstract:        "Test abstract",
-		AssigneeName:    assignee,
-		FilingDate:      &filingDate,
-		GrantDate:       &now,
-		ExpiryDate:      &expiryDate,
-		Status:          domainpatent.PatentStatusGranted,
-		Office:          domainpatent.OfficeUSPTO,
-		IPCCodes:        []string{techDomain},
-		KeyIPTechCodes:  []string{techDomain},
-		MoleculeIDs:     moleculeIDs,
-		Metadata:        map[string]any{"value_score": valueScore},
-		CreatedAt:       now,
-		UpdatedAt:       now,
-		Version:         1,
+		ID:             patentID,
+		PatentNumber:   number,
+		Title:          "Test Patent",
+		Abstract:       "Test abstract",
+		AssigneeName:   assignee,
+		FilingDate:     &filingDate,
+		GrantDate:      &now,
+		ExpiryDate:     &expiryDate,
+		Status:         domainpatent.PatentStatusGranted,
+		Office:         domainpatent.OfficeUSPTO,
+		IPCCodes:       []string{techDomain},
+		KeyIPTechCodes: []string{techDomain},
+		MoleculeIDs:    moleculeIDs,
+		Metadata:       map[string]any{"value_score": valueScore},
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		Version:        1,
 	}
 }
 

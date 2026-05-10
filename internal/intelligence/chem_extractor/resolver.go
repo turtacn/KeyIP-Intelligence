@@ -176,7 +176,6 @@ func DefaultResolverConfig() ResolverConfig {
 
 // Noop logger
 
-
 // Rate limiter
 type rateLimiter struct {
 	tokens   chan struct{}
@@ -474,17 +473,17 @@ func (r *entityResolverImpl) resolveInChI(ctx context.Context, inchi string) (*R
 
 func (r *entityResolverImpl) resolveGenericStructure(_ context.Context, text string) (*ResolvedChemicalEntity, error) {
 	return &ResolvedChemicalEntity{
-		IsResolved:     false,
+		IsResolved:       false,
 		ResolutionMethod: "generic_structure",
-		CanonicalName: text,
+		CanonicalName:    text,
 	}, nil
 }
 
 func (r *entityResolverImpl) resolveMarkush(_ context.Context, text string) (*ResolvedChemicalEntity, error) {
 	return &ResolvedChemicalEntity{
-		IsResolved:     false,
+		IsResolved:       false,
 		ResolutionMethod: "markush_variable",
-		CanonicalName: fmt.Sprintf("variable: %s", text),
+		CanonicalName:    fmt.Sprintf("variable: %s", text),
 	}, nil
 }
 
@@ -501,15 +500,15 @@ func (r *entityResolverImpl) resolveBrandName(ctx context.Context, brand string)
 	}
 
 	return &ResolvedChemicalEntity{
-		IsResolved:     false,
+		IsResolved:       false,
 		ResolutionMethod: "brand_not_found",
 	}, nil
 }
 
 func (r *entityResolverImpl) resolvePolymerOrBiological(_ context.Context, text string, eType ChemicalEntityType) (*ResolvedChemicalEntity, error) {
 	return &ResolvedChemicalEntity{
-		CanonicalName:     text,
-		IsResolved:     false,
+		CanonicalName:    text,
+		IsResolved:       false,
 		ResolutionMethod: string(eType),
 	}, nil
 }

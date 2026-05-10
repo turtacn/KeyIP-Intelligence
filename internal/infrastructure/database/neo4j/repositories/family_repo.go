@@ -235,9 +235,9 @@ func (r *neo4jFamilyRepo) AddMember(ctx context.Context, familyID string, patent
 		ON CREATE SET r.added_at = datetime()
 	`
 	params := map[string]interface{}{
-		"familyId":  familyID,
-		"patentId":  patentID,
-		"role":      memberRole,
+		"familyId": familyID,
+		"patentId": patentID,
+		"role":     memberRole,
 	}
 	_, err := r.driver.ExecuteWrite(ctx, func(tx driver.Transaction) (interface{}, error) {
 		_, err := tx.Run(ctx, query, params)
@@ -252,8 +252,8 @@ func (r *neo4jFamilyRepo) RemoveMember(ctx context.Context, familyID string, pat
 		DELETE r
 	`
 	params := map[string]interface{}{
-		"familyId":  familyID,
-		"patentId":  patentID,
+		"familyId": familyID,
+		"patentId": patentID,
 	}
 	_, err := r.driver.ExecuteWrite(ctx, func(tx driver.Transaction) (interface{}, error) {
 		_, err := tx.Run(ctx, query, params)

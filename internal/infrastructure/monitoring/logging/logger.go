@@ -30,17 +30,17 @@ type Logger interface {
 type Field zap.Field
 
 // Field constructors
-func String(key, val string) Field      { return Field(zap.String(key, val)) }
-func Int(key string, val int) Field        { return Field(zap.Int(key, val)) }
-func Int64(key string, val int64) Field    { return Field(zap.Int64(key, val)) }
-func Float64(key string, val float64) Field { return Field(zap.Float64(key, val)) }
-func Bool(key string, val bool) Field      { return Field(zap.Bool(key, val)) }
+func String(key, val string) Field                 { return Field(zap.String(key, val)) }
+func Int(key string, val int) Field                { return Field(zap.Int(key, val)) }
+func Int64(key string, val int64) Field            { return Field(zap.Int64(key, val)) }
+func Float64(key string, val float64) Field        { return Field(zap.Float64(key, val)) }
+func Bool(key string, val bool) Field              { return Field(zap.Bool(key, val)) }
 func Duration(key string, val time.Duration) Field { return Field(zap.Duration(key, val)) }
-func Time(key string, val time.Time) Field { return Field(zap.Time(key, val)) }
-func Error(err error) Field                { return Field(zap.Error(err)) }
-func Err(err error) Field                  { return Error(err) }
-func Any(key string, val interface{}) Field { return Field(zap.Any(key, val)) }
-func Stringer(key string, val fmt.Stringer) Field { return Field(zap.Stringer(key, val)) }
+func Time(key string, val time.Time) Field         { return Field(zap.Time(key, val)) }
+func Error(err error) Field                        { return Field(zap.Error(err)) }
+func Err(err error) Field                          { return Error(err) }
+func Any(key string, val interface{}) Field        { return Field(zap.Any(key, val)) }
+func Stringer(key string, val fmt.Stringer) Field  { return Field(zap.Stringer(key, val)) }
 
 // LogLevel defines the severity of a log message.
 type LogLevel int8
@@ -81,20 +81,20 @@ func ParseLevel(s string) (LogLevel, error) {
 
 // LogConfig defines the configuration for the logger.
 type LogConfig struct {
-	Level             LogLevel `json:"level"`
-	Format            string   `json:"format"` // json or console
-	OutputPaths       []string `json:"output_paths"`
-	ErrorOutputPaths  []string `json:"error_output_paths"`
-	EnableCaller      bool     `json:"enable_caller"`
-	EnableStacktrace  bool     `json:"enable_stacktrace"`
-	SamplingInitial   int      `json:"sampling_initial"`
+	Level              LogLevel `json:"level"`
+	Format             string   `json:"format"` // json or console
+	OutputPaths        []string `json:"output_paths"`
+	ErrorOutputPaths   []string `json:"error_output_paths"`
+	EnableCaller       bool     `json:"enable_caller"`
+	EnableStacktrace   bool     `json:"enable_stacktrace"`
+	SamplingInitial    int      `json:"sampling_initial"`
 	SamplingThereafter int      `json:"sampling_thereafter"`
-	MaxSize           int      `json:"max_size"`
-	MaxBackups        int      `json:"max_backups"`
-	MaxAge            int      `json:"max_age"`
-	Compress          bool     `json:"compress"`
-	ServiceName       string   `json:"service_name"`
-	Environment       string   `json:"environment"`
+	MaxSize            int      `json:"max_size"`
+	MaxBackups         int      `json:"max_backups"`
+	MaxAge             int      `json:"max_age"`
+	Compress           bool     `json:"compress"`
+	ServiceName        string   `json:"service_name"`
+	Environment        string   `json:"environment"`
 }
 
 // Validate checks if the LogConfig is valid.
@@ -299,9 +299,9 @@ func NewLogger(cfg LogConfig) (Logger, error) {
 				Initial:    cfg.SamplingInitial,
 				Thereafter: cfg.SamplingThereafter,
 			},
-			Encoding:      cfg.Format,
-			EncoderConfig: encoderConfig,
-			OutputPaths:   cfg.OutputPaths,
+			Encoding:         cfg.Format,
+			EncoderConfig:    encoderConfig,
+			OutputPaths:      cfg.OutputPaths,
 			ErrorOutputPaths: cfg.ErrorOutputPaths,
 		}
 		if zCfg.Encoding == "" {
@@ -358,15 +358,15 @@ func NewDevelopmentLogger() Logger {
 
 type nopLogger struct{}
 
-func (n *nopLogger) Debug(msg string, fields ...Field) {}
-func (n *nopLogger) Info(msg string, fields ...Field)  {}
-func (n *nopLogger) Warn(msg string, fields ...Field)  {}
-func (n *nopLogger) Error(msg string, fields ...Field) {}
-func (n *nopLogger) Fatal(msg string, fields ...Field) {}
-func (n *nopLogger) With(fields ...Field) Logger      { return n }
+func (n *nopLogger) Debug(msg string, fields ...Field)      {}
+func (n *nopLogger) Info(msg string, fields ...Field)       {}
+func (n *nopLogger) Warn(msg string, fields ...Field)       {}
+func (n *nopLogger) Error(msg string, fields ...Field)      {}
+func (n *nopLogger) Fatal(msg string, fields ...Field)      {}
+func (n *nopLogger) With(fields ...Field) Logger            { return n }
 func (n *nopLogger) WithContext(ctx context.Context) Logger { return n }
-func (n *nopLogger) WithError(err error) Logger        { return n }
-func (n *nopLogger) Sync() error                      { return nil }
+func (n *nopLogger) WithError(err error) Logger             { return n }
+func (n *nopLogger) Sync() error                            { return nil }
 
 func NewNopLogger() Logger {
 	return &nopLogger{}
@@ -467,29 +467,29 @@ func LogAIInference(logger Logger, model string, operation string, inputSize int
 
 // Field constants
 const (
-	FieldRequestID      = "request_id"
-	FieldTraceID        = "trace_id"
-	FieldSpanID         = "span_id"
-	FieldUserID         = "user_id"
-	FieldSessionID      = "session_id"
-	FieldModule         = "module"
-	FieldOperation      = "operation"
-	FieldDurationMs     = "duration_ms"
-	FieldErrorCode      = "error_code"
-	FieldHTTPMethod     = "http_method"
-	FieldHTTPPath       = "http_path"
-	FieldHTTPStatus     = "http_status"
-	FieldMoleculeID     = "molecule_id"
-	FieldPatentNumber   = "patent_number"
-	FieldSMILES         = "smiles"
+	FieldRequestID       = "request_id"
+	FieldTraceID         = "trace_id"
+	FieldSpanID          = "span_id"
+	FieldUserID          = "user_id"
+	FieldSessionID       = "session_id"
+	FieldModule          = "module"
+	FieldOperation       = "operation"
+	FieldDurationMs      = "duration_ms"
+	FieldErrorCode       = "error_code"
+	FieldHTTPMethod      = "http_method"
+	FieldHTTPPath        = "http_path"
+	FieldHTTPStatus      = "http_status"
+	FieldMoleculeID      = "molecule_id"
+	FieldPatentNumber    = "patent_number"
+	FieldSMILES          = "smiles"
 	FieldFingerprintType = "fingerprint_type"
 	FieldSimilarityScore = "similarity_score"
-	FieldRiskLevel      = "risk_level"
-	FieldQuery          = "query"
-	FieldRowsAffected   = "rows_affected"
-	FieldService        = "service"
-	FieldModel          = "model"
-	FieldInputSize      = "input_size"
+	FieldRiskLevel       = "risk_level"
+	FieldQuery           = "query"
+	FieldRowsAffected    = "rows_affected"
+	FieldService         = "service"
+	FieldModel           = "model"
+	FieldInputSize       = "input_size"
 )
 
 //Personal.AI order the ending

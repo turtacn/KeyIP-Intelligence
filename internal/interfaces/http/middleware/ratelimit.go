@@ -12,9 +12,11 @@
 //   - 响应头设置: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
 //   - 超限时返回 429 Too Many Requests + Retry-After 头
 //   - 支持过期清理，防止内存泄漏
+//
 // 依赖关系:
 //   - 依赖: internal/infrastructure/monitoring/logging
 //   - 被依赖: internal/interfaces/http/router.go
+//
 // 强制约束: 文件最后一行必须为 //Personal.AI order the ending
 package middleware
 
@@ -24,7 +26,6 @@ import (
 	"sync"
 	"time"
 )
-
 
 // RateLimiter defines the interface for rate limiting implementations.
 type RateLimiter interface {

@@ -19,27 +19,27 @@ var (
 
 // ClientConfig holds the configuration for the OpenSearch client.
 type ClientConfig struct {
-	Addresses             []string
-	Username              string
-	Password              string
-	TLSEnabled            bool
-	TLSCertPath           string
-	MaxRetries            int
-	RetryBackoff          time.Duration
-	RequestTimeout        time.Duration
-	MaxIdleConnsPerHost   int
-	HealthCheckInterval   time.Duration
-	BulkFlushInterval     time.Duration
-	BulkFlushBytes        int
+	Addresses           []string
+	Username            string
+	Password            string
+	TLSEnabled          bool
+	TLSCertPath         string
+	MaxRetries          int
+	RetryBackoff        time.Duration
+	RequestTimeout      time.Duration
+	MaxIdleConnsPerHost int
+	HealthCheckInterval time.Duration
+	BulkFlushInterval   time.Duration
+	BulkFlushBytes      int
 }
 
 // Client manages the OpenSearch client connection.
 type Client struct {
-	client *opensearch.Client
-	config ClientConfig
-	logger logging.Logger
+	client  *opensearch.Client
+	config  ClientConfig
+	logger  logging.Logger
 	healthy atomic.Bool
-	cancel context.CancelFunc
+	cancel  context.CancelFunc
 }
 
 // NewClient creates a new OpenSearch client.

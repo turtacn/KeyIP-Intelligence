@@ -34,9 +34,9 @@ type ClaimElementMapper interface {
 
 // RawElement is the output of NLP-based claim text parsing before classification.
 type RawElement struct {
-	Text       string `json:"text"`
-	StartPos   int    `json:"start_pos"`
-	EndPos     int    `json:"end_pos"`
+	Text       string  `json:"text"`
+	StartPos   int     `json:"start_pos"`
+	EndPos     int     `json:"end_pos"`
 	Confidence float64 `json:"confidence"`
 }
 
@@ -169,7 +169,7 @@ type AlignedPair struct {
 
 // ElementAlignment is the full result of aligning molecule elements to claim elements.
 type ElementAlignment struct {
-	Pairs                     []*AlignedPair      `json:"pairs"`
+	Pairs                     []*AlignedPair       `json:"pairs"`
 	UnmatchedMoleculeElements []*StructuralElement `json:"unmatched_molecule_elements"`
 	UnmatchedClaimElements    []*ClaimElement      `json:"unmatched_claim_elements"`
 	AlignmentScore            float64              `json:"alignment_score"`
@@ -228,18 +228,18 @@ type ProsecutionHistory struct {
 
 // EstoppelDetail describes a single estoppel constraint.
 type EstoppelDetail struct {
-	AffectedElementID    string `json:"affected_element_id"`
-	AmendmentRef         string `json:"amendment_ref"`
-	SurrenderDescription string `json:"surrender_description"`
+	AffectedElementID     string `json:"affected_element_id"`
+	AmendmentRef          string `json:"amendment_ref"`
+	SurrenderDescription  string `json:"surrender_description"`
 	BlockedEquivalentType string `json:"blocked_equivalent_type"`
 }
 
 // EstoppelResult is the output of prosecution-history estoppel analysis.
 type EstoppelResult struct {
-	HasEstoppel        bool              `json:"has_estoppel"`
-	EstoppelPenalty    float64           `json:"estoppel_penalty"` // 0-1
-	BlockedEquivalences []string         `json:"blocked_equivalences"`
-	EstoppelDetails    []*EstoppelDetail `json:"estoppel_details"`
+	HasEstoppel         bool              `json:"has_estoppel"`
+	EstoppelPenalty     float64           `json:"estoppel_penalty"` // 0-1
+	BlockedEquivalences []string          `json:"blocked_equivalences"`
+	EstoppelDetails     []*EstoppelDetail `json:"estoppel_details"`
 }
 
 // ---------------------------------------------------------------------------
@@ -673,8 +673,8 @@ func hungarianMaximize(sim [][]float64, nRows, nCols int) []int {
 	const inf = math.MaxFloat64 / 2
 	u := make([]float64, n+1)
 	v := make([]float64, n+1)
-	p := make([]int, n+1)    // p[j] = row assigned to column j
-	way := make([]int, n+1)  // way[j] = previous column in augmenting path
+	p := make([]int, n+1)   // p[j] = row assigned to column j
+	way := make([]int, n+1) // way[j] = previous column in augmenting path
 
 	for i := 1; i <= n; i++ {
 		p[0] = i
@@ -953,4 +953,3 @@ func (l *noopLogger) Info(msg string, keysAndValues ...interface{})  {}
 func (l *noopLogger) Warn(msg string, keysAndValues ...interface{})  {}
 func (l *noopLogger) Error(msg string, keysAndValues ...interface{}) {}
 func (l *noopLogger) Debug(msg string, keysAndValues ...interface{}) {}
-

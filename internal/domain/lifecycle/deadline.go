@@ -30,25 +30,25 @@ const (
 
 // Deadline represents a critical date.
 type Deadline struct {
-	ID              string         `json:"id"`
-	PatentID        string         `json:"patent_id"`
-	DeadlineType    string         `json:"deadline_type"`
-	Title           string         `json:"title"`
-	Description     string         `json:"description,omitempty"`
-	DueDate         time.Time      `json:"due_date"`
-	OriginalDueDate time.Time      `json:"original_due_date"`
-	Status          DeadlineStatus `json:"status"`
-	Priority        string         `json:"priority"`
-	AssigneeID      *string        `json:"assignee_id,omitempty"`
-	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
-	CompletedBy     *string        `json:"completed_by,omitempty"`
-	ExtensionCount  int            `json:"extension_count"`
+	ID               string           `json:"id"`
+	PatentID         string           `json:"patent_id"`
+	DeadlineType     string           `json:"deadline_type"`
+	Title            string           `json:"title"`
+	Description      string           `json:"description,omitempty"`
+	DueDate          time.Time        `json:"due_date"`
+	OriginalDueDate  time.Time        `json:"original_due_date"`
+	Status           DeadlineStatus   `json:"status"`
+	Priority         string           `json:"priority"`
+	AssigneeID       *string          `json:"assignee_id,omitempty"`
+	CompletedAt      *time.Time       `json:"completed_at,omitempty"`
+	CompletedBy      *string          `json:"completed_by,omitempty"`
+	ExtensionCount   int              `json:"extension_count"`
 	ExtensionHistory []map[string]any `json:"extension_history,omitempty"`
-	ReminderConfig  map[string]any `json:"reminder_config,omitempty"`
-	LastReminderAt  *time.Time     `json:"last_reminder_at,omitempty"`
-	Metadata        map[string]any `json:"metadata,omitempty"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	ReminderConfig   map[string]any   `json:"reminder_config,omitempty"`
+	LastReminderAt   *time.Time       `json:"last_reminder_at,omitempty"`
+	Metadata         map[string]any   `json:"metadata,omitempty"`
+	CreatedAt        time.Time        `json:"created_at"`
+	UpdatedAt        time.Time        `json:"updated_at"`
 }
 
 // NewDeadline creates a new deadline.

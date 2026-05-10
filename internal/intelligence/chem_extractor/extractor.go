@@ -81,17 +81,17 @@ type MoleculeLink struct {
 
 // ExtractionResult is the output of a single Extract call.
 type ExtractionResult struct {
-	Entities        []*RawChemicalEntity `json:"entities"`
-	EntityCount     int                  `json:"entity_count"`
-	ProcessingTimeMs int64              `json:"processing_time_ms"`
-	TextLength      int                  `json:"text_length"`
-	Coverage        float64              `json:"coverage"`
+	Entities         []*RawChemicalEntity `json:"entities"`
+	EntityCount      int                  `json:"entity_count"`
+	ProcessingTimeMs int64                `json:"processing_time_ms"`
+	TextLength       int                  `json:"text_length"`
+	Coverage         float64              `json:"coverage"`
 }
 
 // ParsedClaim is a simplified representation of a patent claim (from claim_bert).
 type ParsedClaim struct {
-	ClaimNumber       int                `json:"claim_number"`
-	ClaimText         string             `json:"claim_text"`
+	ClaimNumber       int                 `json:"claim_number"`
+	ClaimText         string              `json:"claim_text"`
 	TechnicalFeatures []*TechnicalFeature `json:"technical_features,omitempty"`
 }
 
@@ -105,10 +105,10 @@ type TechnicalFeature struct {
 
 // ClaimExtractionResult is the output of ExtractFromClaim.
 type ClaimExtractionResult struct {
-	ClaimNumber            int                                       `json:"claim_number"`
-	Entities               []*RawChemicalEntity                      `json:"entities"`
-	FeatureEntityMapping   map[string][]*RawChemicalEntity           `json:"feature_entity_mapping"`
-	MarkushVariableMapping map[string][]*ResolvedChemicalEntity      `json:"markush_variable_mapping"`
+	ClaimNumber            int                                  `json:"claim_number"`
+	Entities               []*RawChemicalEntity                 `json:"entities"`
+	FeatureEntityMapping   map[string][]*RawChemicalEntity      `json:"feature_entity_mapping"`
+	MarkushVariableMapping map[string][]*ResolvedChemicalEntity `json:"markush_variable_mapping"`
 }
 
 // ---------------------------------------------------------------------------
@@ -195,11 +195,11 @@ type ExternalChemDB interface {
 
 // MoleculeRecord is a row from the internal molecule database.
 type MoleculeRecord struct {
-	MoleculeID string  `json:"molecule_id"`
-	SMILES     string  `json:"smiles"`
-	InChIKey   string  `json:"inchi_key"`
-	CASNumber  string  `json:"cas_number"`
-	Name       string  `json:"name"`
+	MoleculeID string `json:"molecule_id"`
+	SMILES     string `json:"smiles"`
+	InChIKey   string `json:"inchi_key"`
+	CASNumber  string `json:"cas_number"`
+	Name       string `json:"name"`
 }
 
 // ExternalMoleculeRecord is a row from an external database.
@@ -254,10 +254,10 @@ type chemicalExtractorImpl struct {
 	metrics    Metrics
 	logger     Logger
 
-	casRe      *regexp.Regexp
-	formulaRe  *regexp.Regexp
-	smilesRe   *regexp.Regexp
-	markushRe  *regexp.Regexp
+	casRe     *regexp.Regexp
+	formulaRe *regexp.Regexp
+	smilesRe  *regexp.Regexp
+	markushRe *regexp.Regexp
 }
 
 // NewChemicalExtractor constructs a fully-wired extractor.
@@ -1112,16 +1112,16 @@ func looksLikeSMILES(s string) bool {
 		return false
 	}
 
-    for _, r := range s {
-        if unicode.IsLower(r) {
-            // aromatic: b, c, n, o, p, s, se, as.
-            if !strings.ContainsRune("bcnopse", r) && r != 'a' {
-                if strings.ContainsRune("mugtqjvdkyzwxfh", r) {
-                    return false
-                }
-            }
-        }
-    }
+	for _, r := range s {
+		if unicode.IsLower(r) {
+			// aromatic: b, c, n, o, p, s, se, as.
+			if !strings.ContainsRune("bcnopse", r) && r != 'a' {
+				if strings.ContainsRune("mugtqjvdkyzwxfh", r) {
+					return false
+				}
+			}
+		}
+	}
 
 	// Reject if it contains spaces (SMILES never have spaces).
 	if strings.Contains(s, " ") {
@@ -1148,4 +1148,3 @@ func (n *noopMetrics) RecordResolution(ctx context.Context, method string, succe
 func (n *noopMetrics) RecordLinkage(ctx context.Context, exact bool)                             {}
 
 //Personal.AI order the ending
-

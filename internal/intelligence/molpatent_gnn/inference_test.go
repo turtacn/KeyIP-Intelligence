@@ -164,13 +164,19 @@ type mockInferenceMetrics struct {
 func (m *mockInferenceMetrics) RecordInference(ctx context.Context, p *common.InferenceMetricParams) {
 	m.inferenceCount.Add(1)
 }
-func (m *mockInferenceMetrics) RecordBatchProcessing(ctx context.Context, p *common.BatchMetricParams) {}
-func (m *mockInferenceMetrics) RecordCacheAccess(ctx context.Context, hit bool, modelName string)     {}
-func (m *mockInferenceMetrics) RecordCircuitBreakerStateChange(ctx context.Context, modelName, from, to string) {}
-func (m *mockInferenceMetrics) RecordRiskAssessment(ctx context.Context, riskLevel string, durationMs float64) {}
-func (m *mockInferenceMetrics) RecordModelLoad(ctx context.Context, modelName, version string, durationMs float64, success bool) {}
+func (m *mockInferenceMetrics) RecordBatchProcessing(ctx context.Context, p *common.BatchMetricParams) {
+}
+func (m *mockInferenceMetrics) RecordCacheAccess(ctx context.Context, hit bool, modelName string) {}
+func (m *mockInferenceMetrics) RecordCircuitBreakerStateChange(ctx context.Context, modelName, from, to string) {
+}
+func (m *mockInferenceMetrics) RecordRiskAssessment(ctx context.Context, riskLevel string, durationMs float64) {
+}
+func (m *mockInferenceMetrics) RecordModelLoad(ctx context.Context, modelName, version string, durationMs float64, success bool) {
+}
 func (m *mockInferenceMetrics) GetInferenceLatencyHistogram() common.LatencyHistogram { return nil }
-func (m *mockInferenceMetrics) GetCurrentStats() *common.IntelligenceStats            { return &common.IntelligenceStats{} }
+func (m *mockInferenceMetrics) GetCurrentStats() *common.IntelligenceStats {
+	return &common.IntelligenceStats{}
+}
 
 // ---------------------------------------------------------------------------
 // Helper

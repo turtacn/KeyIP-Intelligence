@@ -22,9 +22,9 @@ import (
 
 // PatentHandler handles HTTP requests for patent operations.
 type PatentHandler struct {
-	patentSvc      patent.Service
+	patentSvc       patent.Service
 	infringementSvc infringement.RiskAssessmentService // optional; nil if not wired
-	logger         logging.Logger
+	logger          logging.Logger
 }
 
 // NewPatentHandler creates a new PatentHandler.
@@ -145,12 +145,12 @@ type SearchPatentsFilter struct {
 }
 
 type SearchPatentsRequest struct {
-	Query     string              `json:"query"`
-	QueryType string              `json:"query_type,omitempty"`
-	Page      int                 `json:"page"`
-	PageSize  int                 `json:"page_size"`
-	SortBy    string              `json:"sort_by,omitempty"`
-	SortOrder string              `json:"sort_order,omitempty"`
+	Query     string               `json:"query"`
+	QueryType string               `json:"query_type,omitempty"`
+	Page      int                  `json:"page"`
+	PageSize  int                  `json:"page_size"`
+	SortBy    string               `json:"sort_by,omitempty"`
+	SortOrder string               `json:"sort_order,omitempty"`
 	Filters   *SearchPatentsFilter `json:"filters,omitempty"` // matches proto SearchPatentsRequest.filters
 }
 

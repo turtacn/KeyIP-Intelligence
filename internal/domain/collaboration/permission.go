@@ -39,15 +39,15 @@ const (
 type Action string
 
 const (
-	ActionCreate        Action = "create"
-	ActionRead          Action = "read"
-	ActionUpdate        Action = "update"
-	ActionDelete        Action = "delete"
-	ActionExport        Action = "export"
-	ActionShare         Action = "share"
-	ActionManageMembers Action = "manage_members"
+	ActionCreate         Action = "create"
+	ActionRead           Action = "read"
+	ActionUpdate         Action = "update"
+	ActionDelete         Action = "delete"
+	ActionExport         Action = "export"
+	ActionShare          Action = "share"
+	ActionManageMembers  Action = "manage_members"
 	ActionManageSettings Action = "manage_settings"
-	ActionAnalyze       Action = "analyze"
+	ActionAnalyze        Action = "analyze"
 )
 
 // Permission represents a single authorization grant.

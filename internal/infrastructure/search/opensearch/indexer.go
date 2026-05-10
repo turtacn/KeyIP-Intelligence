@@ -383,12 +383,12 @@ func (i *Indexer) handleErrorResponse(resp *opensearchapi.Response, defaultErr e
 func PatentIndexMapping() common.IndexMapping {
 	return common.IndexMapping{
 		Settings: map[string]interface{}{
-			"number_of_shards": 3,
+			"number_of_shards":   3,
 			"number_of_replicas": 1,
 			"analysis": map[string]interface{}{
 				"analyzer": map[string]interface{}{
 					"ik_max_word": map[string]interface{}{
-						"type": "custom",
+						"type":      "custom",
 						"tokenizer": "ik_max_word", // Assuming IK plugin installed
 					},
 				},
@@ -398,23 +398,23 @@ func PatentIndexMapping() common.IndexMapping {
 			"properties": map[string]interface{}{
 				"patent_number": map[string]interface{}{"type": "keyword"},
 				"title": map[string]interface{}{
-					"type": "text",
-					"analyzer": "ik_max_word",
+					"type":            "text",
+					"analyzer":        "ik_max_word",
 					"search_analyzer": "ik_max_word",
 				},
 				"abstract": map[string]interface{}{
-					"type": "text",
-					"analyzer": "ik_max_word",
+					"type":            "text",
+					"analyzer":        "ik_max_word",
 					"search_analyzer": "ik_max_word",
 				},
-				"claims": map[string]interface{}{"type": "text"}, // Usually long text, maybe also analyzed
-				"assignee": map[string]interface{}{"type": "keyword"},
-				"inventors": map[string]interface{}{"type": "keyword"},
-				"filing_date": map[string]interface{}{"type": "date"},
-				"ipc_codes": map[string]interface{}{"type": "keyword"},
+				"claims":       map[string]interface{}{"type": "text"}, // Usually long text, maybe also analyzed
+				"assignee":     map[string]interface{}{"type": "keyword"},
+				"inventors":    map[string]interface{}{"type": "keyword"},
+				"filing_date":  map[string]interface{}{"type": "date"},
+				"ipc_codes":    map[string]interface{}{"type": "keyword"},
 				"legal_status": map[string]interface{}{"type": "keyword"},
-				"full_text": map[string]interface{}{"type": "text"},
-				"tech_domain": map[string]interface{}{"type": "keyword"},
+				"full_text":    map[string]interface{}{"type": "text"},
+				"tech_domain":  map[string]interface{}{"type": "keyword"},
 			},
 		},
 	}
@@ -423,19 +423,19 @@ func PatentIndexMapping() common.IndexMapping {
 func MoleculeIndexMapping() common.IndexMapping {
 	return common.IndexMapping{
 		Settings: map[string]interface{}{
-			"number_of_shards": 3,
+			"number_of_shards":   3,
 			"number_of_replicas": 1,
 		},
 		Mappings: map[string]interface{}{
 			"properties": map[string]interface{}{
-				"smiles": map[string]interface{}{"type": "keyword"},
-				"inchi": map[string]interface{}{"type": "keyword"},
-				"inchi_key": map[string]interface{}{"type": "keyword"},
+				"smiles":            map[string]interface{}{"type": "keyword"},
+				"inchi":             map[string]interface{}{"type": "keyword"},
+				"inchi_key":         map[string]interface{}{"type": "keyword"},
 				"molecular_formula": map[string]interface{}{"type": "keyword"},
-				"molecular_weight": map[string]interface{}{"type": "float"},
-				"name": map[string]interface{}{"type": "text"},
-				"synonyms": map[string]interface{}{"type": "text"},
-				"source_patents": map[string]interface{}{"type": "keyword"},
+				"molecular_weight":  map[string]interface{}{"type": "float"},
+				"name":              map[string]interface{}{"type": "text"},
+				"synonyms":          map[string]interface{}{"type": "text"},
+				"source_patents":    map[string]interface{}{"type": "keyword"},
 			},
 		},
 	}

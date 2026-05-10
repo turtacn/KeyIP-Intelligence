@@ -26,7 +26,9 @@ func (r *mockRegistry) Register(ctx context.Context, meta *common.ModelMetadata)
 	return nil
 }
 
-func (r *mockRegistry) Unregister(ctx context.Context, modelID string, version string) error { return nil }
+func (r *mockRegistry) Unregister(ctx context.Context, modelID string, version string) error {
+	return nil
+}
 func (r *mockRegistry) GetModel(ctx context.Context, modelID string) (*common.RegisteredModel, error) {
 	return nil, nil
 }
@@ -834,4 +836,3 @@ func TestClaimBERTConfig_Validate_MinimalValidConfig(t *testing.T) {
 		t.Fatalf("minimal valid config should pass: %v", err)
 	}
 }
-

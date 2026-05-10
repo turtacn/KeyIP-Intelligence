@@ -122,12 +122,12 @@ type LandscapeData struct {
 
 // LandscapeCluster represents a cluster in the patent landscape.
 type LandscapeCluster struct {
-	ID          string   `json:"id"`
-	Label       string   `json:"label"`
-	PatentCount int      `json:"patent_count"`
-	Density     float64  `json:"density"`
+	ID          string    `json:"id"`
+	Label       string    `json:"label"`
+	PatentCount int       `json:"patent_count"`
+	Density     float64   `json:"density"`
 	Center      []float64 `json:"center,omitempty"`
-	PatentIDs   []string `json:"patent_ids,omitempty"`
+	PatentIDs   []string  `json:"patent_ids,omitempty"`
 }
 
 // MoleculeSpaceAnalyzer analyzes molecular space for gaps.
@@ -170,10 +170,10 @@ type WhiteSpaceService interface {
 
 // WhiteSpaceDeps holds all dependencies for the white space service.
 type WhiteSpaceDeps struct {
-	Landscape     PatentLandscapeProvider
-	MolAnalyzer   MoleculeSpaceAnalyzer
-	ReportStore   WhiteSpaceReportStore
-	Logger        WhiteSpaceLogger
+	Landscape   PatentLandscapeProvider
+	MolAnalyzer MoleculeSpaceAnalyzer
+	ReportStore WhiteSpaceReportStore
+	Logger      WhiteSpaceLogger
 }
 
 // ---------------------------------------------------------------------------
@@ -445,4 +445,3 @@ func generateWhiteSpaceID() string {
 }
 
 //Personal.AI order the ending
-

@@ -15,9 +15,9 @@ import (
 
 func newTestCollector(t *testing.T) MetricsCollector {
 	cfg := CollectorConfig{
-		Namespace:       "test",
-		Subsystem:       "unit",
-		EnableGoMetrics: false,
+		Namespace:            "test",
+		Subsystem:            "unit",
+		EnableGoMetrics:      false,
 		EnableProcessMetrics: false,
 	}
 	c, err := NewMetricsCollector(cfg, logging.NewNopLogger())
@@ -173,7 +173,7 @@ func TestNoopCounter_NoError(t *testing.T) {
 	c.RegisterCounter("conflict", "help").WithLabelValues().Inc()
 
 	gauge := c.RegisterGauge("conflict", "help") // Should return noop
-	gauge.WithLabelValues().Set(10) // Should not panic
+	gauge.WithLabelValues().Set(10)              // Should not panic
 
 	// And metric should still be counter
 	output := scrapeMetrics(t, c)
@@ -200,4 +200,5 @@ func TestUnregister_Success(t *testing.T) {
 	output := scrapeMetrics(t, c)
 	assert.NotContains(t, output, "to_unregister")
 }
+
 //Personal.AI order the ending

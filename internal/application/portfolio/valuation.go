@@ -179,7 +179,7 @@ type AssessmentContext struct {
 	TechFocusAreas   []string `json:"tech_focus_areas"`
 	Competitors      []string `json:"competitors"`
 	BusinessGoals    []string `json:"business_goals"`
-	CurrencyCode     string   `json:"currency_code"`     // ISO 4217, default "CNY"
+	CurrencyCode     string   `json:"currency_code"`       // ISO 4217, default "CNY"
 	MaxPatentLifeYrs int      `json:"max_patent_life_yrs"` // default 20
 }
 
@@ -232,10 +232,10 @@ type FactorScore struct {
 
 // DimensionScore holds the aggregated score for one assessment dimension.
 type DimensionScore struct {
-	Score       float64                `json:"score"`     // 0-100
-	MaxScore    float64                `json:"max_score"` // always 100
+	Score       float64                 `json:"score"`     // 0-100
+	MaxScore    float64                 `json:"max_score"` // always 100
 	Factors     map[string]*FactorScore `json:"factors"`
-	Explanation string                 `json:"explanation"`
+	Explanation string                  `json:"explanation"`
 }
 
 // OverallValuation is the final composite valuation.
@@ -248,22 +248,22 @@ type OverallValuation struct {
 
 // ActionRecommendation is a suggested action for a patent.
 type ActionRecommendation struct {
-	Type            ActionType     `json:"type"`
-	Priority        ActionPriority `json:"priority"`
-	Action          string         `json:"action"`
-	Reason          string         `json:"reason"`
-	RelatedPatentIDs []string      `json:"related_patent_ids,omitempty"`
+	Type             ActionType     `json:"type"`
+	Priority         ActionPriority `json:"priority"`
+	Action           string         `json:"action"`
+	Reason           string         `json:"reason"`
+	RelatedPatentIDs []string       `json:"related_patent_ids,omitempty"`
 }
 
 // SinglePatentAssessmentResponse is the output for one patent assessment.
 type SinglePatentAssessmentResponse struct {
-	PatentID        string                                `json:"patent_id"`
-	PatentTitle     string                                `json:"patent_title"`
+	PatentID        string                                  `json:"patent_id"`
+	PatentTitle     string                                  `json:"patent_title"`
 	Scores          map[AssessmentDimension]*DimensionScore `json:"scores"`
-	OverallScore    *OverallValuation                     `json:"overall_score"`
-	Recommendations []*ActionRecommendation               `json:"recommendations"`
-	AssessedAt      time.Time                             `json:"assessed_at"`
-	AssessorType    AssessorType                          `json:"assessor_type"`
+	OverallScore    *OverallValuation                       `json:"overall_score"`
+	Recommendations []*ActionRecommendation                 `json:"recommendations"`
+	AssessedAt      time.Time                               `json:"assessed_at"`
+	AssessorType    AssessorType                            `json:"assessor_type"`
 }
 
 // PortfolioAssessmentRequest is the input for assessing an entire portfolio.
@@ -313,20 +313,20 @@ type CostOptimizationResult struct {
 
 // PortfolioSummary aggregates portfolio-level statistics.
 type PortfolioSummary struct {
-	TotalAssessed            int                   `json:"total_assessed"`
-	TierDistribution         map[PatentTier]int    `json:"tier_distribution"`
-	AverageScore             float64               `json:"average_score"`
-	TotalMaintenanceCost     float64               `json:"total_maintenance_cost"`
-	CostOptimizationPotential float64              `json:"cost_optimization_potential"`
-	Currency                 string                `json:"currency"`
-	StrategicGapsIdentified  int                   `json:"strategic_gaps_identified"`
-	RecommendedNewFilings    int                   `json:"recommended_new_filings"`
+	TotalAssessed             int                `json:"total_assessed"`
+	TierDistribution          map[PatentTier]int `json:"tier_distribution"`
+	AverageScore              float64            `json:"average_score"`
+	TotalMaintenanceCost      float64            `json:"total_maintenance_cost"`
+	CostOptimizationPotential float64            `json:"cost_optimization_potential"`
+	Currency                  string             `json:"currency"`
+	StrategicGapsIdentified   int                `json:"strategic_gaps_identified"`
+	RecommendedNewFilings     int                `json:"recommended_new_filings"`
 }
 
 // PortfolioAssessmentResponse is the output for a portfolio assessment.
 type PortfolioAssessmentResponse struct {
 	PortfolioID      string                            `json:"portfolio_id"`
-	Assessments      []*SinglePatentAssessmentResponse  `json:"assessments"`
+	Assessments      []*SinglePatentAssessmentResponse `json:"assessments"`
 	Summary          *PortfolioSummary                 `json:"summary"`
 	CostOptimization *CostOptimizationResult           `json:"cost_optimization,omitempty"`
 	AssessedAt       time.Time                         `json:"assessed_at"`
@@ -366,7 +366,7 @@ type DeltaAnalysis struct {
 	ImprovedCount      int                  `json:"improved_count"`
 	DeclinedCount      int                  `json:"declined_count"`
 	StableCount        int                  `json:"stable_count"`
-	SignificantChanges []*SignificantChange  `json:"significant_changes"`
+	SignificantChanges []*SignificantChange `json:"significant_changes"`
 }
 
 // CompareAssessmentsResponse is the output for assessment comparison.
@@ -377,14 +377,14 @@ type CompareAssessmentsResponse struct {
 
 // AssessmentRecord is a persisted assessment snapshot.
 type AssessmentRecord struct {
-	ID           string       `json:"id"`
-	PatentID     string       `json:"patent_id"`
-	PortfolioID  string       `json:"portfolio_id,omitempty"`
-	OverallScore float64      `json:"overall_score"`
-	Tier         PatentTier   `json:"tier"`
+	ID              string                          `json:"id"`
+	PatentID        string                          `json:"patent_id"`
+	PortfolioID     string                          `json:"portfolio_id,omitempty"`
+	OverallScore    float64                         `json:"overall_score"`
+	Tier            PatentTier                      `json:"tier"`
 	DimensionScores map[AssessmentDimension]float64 `json:"dimension_scores"`
-	AssessedAt   time.Time    `json:"assessed_at"`
-	AssessorType AssessorType `json:"assessor_type"`
+	AssessedAt      time.Time                       `json:"assessed_at"`
+	AssessorType    AssessorType                    `json:"assessor_type"`
 }
 
 // TierDistribution is a simple tier count map.
@@ -477,15 +477,15 @@ type MetricsCollector interface {
 // noopMetrics is a no-op implementation used when no collector is provided.
 type noopMetrics struct{}
 
-func (noopMetrics) IncCounter(string, map[string]string)              {}
+func (noopMetrics) IncCounter(string, map[string]string)                {}
 func (noopMetrics) ObserveHistogram(string, float64, map[string]string) {}
 
 // noopCache is a no-op cache used when no cache is provided.
 type noopCache struct{}
 
-func (noopCache) Get(context.Context, string) ([]byte, error)                  { return nil, fmt.Errorf("cache miss") }
-func (noopCache) Set(context.Context, string, []byte, time.Duration) error     { return nil }
-func (noopCache) Delete(context.Context, string) error                         { return nil }
+func (noopCache) Get(context.Context, string) ([]byte, error)              { return nil, fmt.Errorf("cache miss") }
+func (noopCache) Set(context.Context, string, []byte, time.Duration) error { return nil }
+func (noopCache) Delete(context.Context, string) error                     { return nil }
 
 // ---------------------------------------------------------------------------
 // Dimension & Factor Weight Configuration
@@ -1031,12 +1031,12 @@ func (s *valuationServiceImpl) AssessPortfolioFull(ctx context.Context, req *Por
 		if parseErr != nil {
 			return nil, errors.Wrap(parseErr, errors.ErrCodeValidation, "invalid portfolio ID")
 		}
-		
+
 		_, fetchErr := s.portfolioRepo.GetByID(ctx, portfolioUUID.String())
 		if fetchErr != nil {
 			return nil, errors.NewNotFound("portfolio %s not found", req.PortfolioID)
 		}
-		
+
 		// Get patents from portfolio
 		patents, err := s.patentRepo.ListByPortfolio(ctx, req.PortfolioID)
 		if err != nil {
@@ -2203,4 +2203,3 @@ func clampScore(v float64) float64 {
 var _ ValuationService = (*valuationServiceImpl)(nil)
 
 //Personal.AI order the ending
-

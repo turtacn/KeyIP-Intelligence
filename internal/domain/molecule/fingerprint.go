@@ -340,19 +340,19 @@ func (c *RemoteFingerprintCalculator) Standardize(ctx context.Context, smiles st
 
 // FingerprintCalcOptions defines configuration for fingerprint calculation.
 type FingerprintCalcOptions struct {
-	Radius      int
-	NumBits     int
+	Radius       int
+	NumBits      int
 	UseChirality bool
-	UseFeatures bool
+	UseFeatures  bool
 }
 
 // DefaultFingerprintCalcOptions returns default options.
 func DefaultFingerprintCalcOptions() *FingerprintCalcOptions {
 	return &FingerprintCalcOptions{
-		Radius:      2,
-		NumBits:     2048,
+		Radius:       2,
+		NumBits:      2048,
 		UseChirality: false,
-		UseFeatures: false,
+		UseFeatures:  false,
 	}
 }
 
@@ -396,8 +396,12 @@ func (s *WeightedAverageFusion) Fuse(scores map[FingerprintType]float64, weights
 	}
 
 	result := totalScore / totalWeight
-	if result > 1.0 { result = 1.0 }
-	if result < 0.0 { result = 0.0 }
+	if result > 1.0 {
+		result = 1.0
+	}
+	if result < 0.0 {
+		result = 0.0
+	}
 	return result, nil
 }
 

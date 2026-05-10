@@ -43,16 +43,16 @@ const (
 type ChartType string
 
 const (
-	Bar      ChartType = "Bar"
-	Line     ChartType = "Line"
-	Radar    ChartType = "Radar"
-	Pie      ChartType = "Pie"
-	Heatmap  ChartType = "Heatmap"
-	Scatter  ChartType = "Scatter"
-	Treemap  ChartType = "Treemap"
-	Sankey   ChartType = "Sankey"
-	Funnel   ChartType = "Funnel"
-	Gauge    ChartType = "Gauge"
+	Bar     ChartType = "Bar"
+	Line    ChartType = "Line"
+	Radar   ChartType = "Radar"
+	Pie     ChartType = "Pie"
+	Heatmap ChartType = "Heatmap"
+	Scatter ChartType = "Scatter"
+	Treemap ChartType = "Treemap"
+	Sankey  ChartType = "Sankey"
+	Funnel  ChartType = "Funnel"
+	Gauge   ChartType = "Gauge"
 )
 
 type PageSize string
@@ -131,15 +131,15 @@ type CoverPageConfig struct {
 }
 
 type RenderOptions struct {
-	PageSize     PageSize
-	Orientation  Orientation
-	Margins      *Margins
-	HeaderHTML   string
-	FooterHTML   string
-	Watermark    *WatermarkConfig
-	TOC          bool
-	PageNumbers  bool
-	CoverPage    *CoverPageConfig
+	PageSize    PageSize
+	Orientation Orientation
+	Margins     *Margins
+	HeaderHTML  string
+	FooterHTML  string
+	Watermark   *WatermarkConfig
+	TOC         bool
+	PageNumbers bool
+	CoverPage   *CoverPageConfig
 }
 
 type ChartData struct {
@@ -186,20 +186,20 @@ type AppendixData struct {
 }
 
 type ReportData struct {
-	Title      string
-	Subtitle   string
-	Author     string
+	Title       string
+	Subtitle    string
+	Author      string
 	GeneratedAt time.Time
-	Sections   []SectionData
-	Charts     []ChartData
-	Tables     []TableData
-	Appendices []AppendixData
-	Metadata   map[string]interface{}
+	Sections    []SectionData
+	Charts      []ChartData
+	Tables      []TableData
+	Appendices  []AppendixData
+	Metadata    map[string]interface{}
 }
 
 type RenderRequest struct {
 	TemplateID   string
-	Data         interface{} // Commonly *ReportData or map
+	Data         interface{}  // Commonly *ReportData or map
 	OutputFormat ReportFormat // From fto_report definitions
 	Options      *RenderOptions
 }
@@ -551,7 +551,7 @@ func (s *templateEngineImpl) RegisterTemplate(ctx context.Context, tmpl *Templat
 
 	exists, _ := s.repo.CheckExists(ctx, tmpl.ID)
 	if exists {
-		return errors.Conflict( "template ID already exists")
+		return errors.Conflict("template ID already exists")
 	}
 
 	valRes, err := s.ValidateTemplate(ctx, tmpl)
@@ -582,8 +582,12 @@ func (s *templateEngineImpl) UpdateTemplate(ctx context.Context, tmpl *Template)
 	}
 
 	valRes, err := s.ValidateTemplate(ctx, tmpl)
-	if err != nil { return err }
-	if !valRes.Valid { return errors.NewValidation("template validation failed") }
+	if err != nil {
+		return err
+	}
+	if !valRes.Valid {
+		return errors.NewValidation("template validation failed")
+	}
 
 	// Clear AST cache for old version
 	s.astCache.Delete(tmpl.ID + ":" + existing.Version) // Simple eviction

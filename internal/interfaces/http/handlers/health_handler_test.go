@@ -31,8 +31,8 @@ type mockHealthChecker struct {
 	err  error
 }
 
-func (m *mockHealthChecker) Name() string                    { return m.name }
-func (m *mockHealthChecker) Check(_ context.Context) error   { return m.err }
+func (m *mockHealthChecker) Name() string                  { return m.name }
+func (m *mockHealthChecker) Check(_ context.Context) error { return m.err }
 
 func TestLiveness_AlwaysOK(t *testing.T) {
 	h := NewHealthHandler("v1.0.0")

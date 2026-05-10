@@ -1,7 +1,7 @@
 /*
  * batch.go 实现了完整的泛型批量处理引擎（信号量并发控制、指数退避重试、嵌入式熔断器、背压机制、优先级堆调度、优雅关闭），
  * batch_test.go 覆盖了需求中列出的全部测试用例，包括并发限制验证、超时/取消传播、熔断器状态机转换、背压拒绝、重试退避精度、优先级队列排序以及 -race 安全性。
-*/
+ */
 package common
 
 import (
@@ -768,8 +768,8 @@ func (bp *batchProcessor[T, R]) processOneItem(
 			return &ItemResult[R]{
 				Index:      idx,
 				Result:     result,
-					Status:     ItemStatusSuccess,
-					DurationMs: msSince(itemStart),
+				Status:     ItemStatusSuccess,
+				DurationMs: msSince(itemStart),
 			}
 		}
 
@@ -903,4 +903,3 @@ func classifyError(batchCtx context.Context, err error) ItemStatus {
 	}
 	return ItemStatusFailed
 }
-

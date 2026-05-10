@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	ErrLockNotAcquired = errors.New(errors.ErrCodeConflict, "failed to acquire lock")
-	ErrLockNotHeld     = errors.New(errors.ErrCodeConflict, "lock not held by this owner")
+	ErrLockNotAcquired  = errors.New(errors.ErrCodeConflict, "failed to acquire lock")
+	ErrLockNotHeld      = errors.New(errors.ErrCodeConflict, "lock not held by this owner")
 	ErrLockExtendFailed = errors.New(errors.ErrCodeInternal, "failed to extend lock")
 )
 
@@ -354,10 +354,13 @@ func (m *redisReentrantLock) startWatchdog() {
 		defer ticker.Stop()
 		for {
 			select {
-			case <-ctx.Done(): return
+			case <-ctx.Done():
+				return
 			case <-ticker.C:
 				ok, err := m.Extend(ctx, m.config.ttl)
-				if err != nil || !ok { return }
+				if err != nil || !ok {
+					return
+				}
 			}
 		}
 	}()

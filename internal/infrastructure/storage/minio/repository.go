@@ -245,7 +245,9 @@ func (r *minioRepository) Download(ctx context.Context, bucket, objectKey string
 
 func (r *minioRepository) DownloadToWriter(ctx context.Context, bucket, objectKey string, writer io.Writer) error {
 	obj, err := r.client.GetClient().GetObject(ctx, bucket, objectKey, minio.GetObjectOptions{})
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer obj.Close()
 
 	if _, err := io.Copy(writer, obj); err != nil {
@@ -300,7 +302,9 @@ func (r *minioRepository) GetMetadata(ctx context.Context, bucket, objectKey str
 }
 
 func (r *minioRepository) List(ctx context.Context, bucket, prefix string, opts *ListOptions) (*ListResult, error) {
-	if opts == nil { opts = &ListOptions{MaxKeys: 1000, Recursive: true} }
+	if opts == nil {
+		opts = &ListOptions{MaxKeys: 1000, Recursive: true}
+	}
 
 	options := minio.ListObjectsOptions{
 		Prefix:    prefix,
@@ -319,12 +323,16 @@ func (r *minioRepository) List(ctx context.Context, bucket, prefix string, opts 
 	var objects []*ObjectMetadata
 	count := 0
 	for obj := range ch {
-		if obj.Err != nil { return nil, obj.Err }
+		if obj.Err != nil {
+			return nil, obj.Err
+		}
 		objects = append(objects, &ObjectMetadata{
 			ObjectKey: obj.Key, Size: obj.Size, LastModified: obj.LastModified,
 		})
 		count++
-		if count >= opts.MaxKeys { break }
+		if count >= opts.MaxKeys {
+			break
+		}
 	}
 
 	return &ListResult{Objects: objects, TotalCount: count}, nil
@@ -359,7 +367,9 @@ func (r *minioRepository) SetTags(ctx context.Context, bucket, objectKey string,
 
 func (r *minioRepository) GetTags(ctx context.Context, bucket, objectKey string) (map[string]string, error) {
 	ot, err := r.client.GetClient().GetObjectTagging(ctx, bucket, objectKey, minio.GetObjectTaggingOptions{})
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return ot.ToMap(), nil
 }
 
@@ -378,7 +388,9 @@ func (r *minioRepository) Get(ctx context.Context, path string) ([]byte, error) 
 }
 
 func min(a, b int) int {
-	if a < b { return a }
+	if a < b {
+		return a
+	}
 	return b
 }
 

@@ -353,3 +353,133 @@ func TestCalculateProperties(t *testing.T) {
 	assert.Error(t, errInv)
 	assert.Nil(t, resultInv)
 }
+
+func TestList_DefaultPagination(t *testing.T) {
+	mockRepo := new(mockMoleculeRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	// Page=0 and PageSize=0 should default to Page=1, PageSize=20
+	searchResult := &domainMol.MoleculeSearchResult{
+		Molecules: []*domainMol.Molecule{},
+		Total:     0,
+	}
+
+	mockRepo.On("Search", mock.Anything, mock.MatchedBy(func(q *domainMol.MoleculeQuery) bool {
+		return q.Offset == 0 && q.Limit == 20
+	})).Return(searchResult, nil)
+
+	result, err := service.List(context.Background(), &ListInput{})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 1, result.Page)
+	assert.Equal(t, 20, result.PageSize)
+}
+
+func TestList_PageSizeClamping(t *testing.T) {
+	mockRepo := new(mockMoleculeRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	// PageSize > 100 should be clamped to 100
+	searchResult := &domainMol.MoleculeSearchResult{
+		Molecules: []*domainMol.Molecule{},
+		Total:     0,
+	}
+
+	mockRepo.On("Search", mock.Anything, mock.MatchedBy(func(q *domainMol.MoleculeQuery) bool {
+		return q.Offset == 0 && q.Limit == 100
+	})).Return(searchResult, nil)
+
+	result, err := service.List(context.Background(), &ListInput{PageSize: 200})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 100, result.PageSize)
+}
+
+func TestList_EmptyResult(t *testing.T) {
+	mockRepo := new(mockMoleculeRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	searchResult := &domainMol.MoleculeSearchResult{
+		Molecules: []*domainMol.Molecule{},
+		Total:     0,
+	}
+
+	mockRepo.On("Search", mock.Anything, mock.Anything).Return(searchResult, nil)
+
+	result, err := service.List(context.Background(), &ListInput{Page: 1, PageSize: 10})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Empty(t, result.Molecules)
+	assert.Equal(t, int64(0), result.Total)
+	assert.Equal(t, 0, result.TotalPages)
+}
+
+func TestCreate_InvalidSMILES(t *testing.T) {
+	mockRepo := new(mockMoleculeRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	// Invalid SMILES that fails domain validation
+	_, err := service.Create(context.Background(), &CreateInput{
+		SMILES: "invalid_smiles_12345",
+	})
+	assert.Error(t, err)
+}
+
+func TestUpdate_NotFound(t *testing.T) {
+	mockRepo := new(mockMoleculeRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	mockRepo.On("FindByID", mock.Anything, "nonexistent").Return(nil, errors.New("not found"))
+
+	result, err := service.Update(context.Background(), &UpdateInput{ID: "nonexistent"})
+	assert.Error(t, err)
+	assert.Nil(t, result)
+}
+
+func TestDomainToDTO_Nil(t *testing.T) {
+	result := domainToDTO(nil)
+	assert.Nil(t, result)
+}
+
+func TestGetByID_EmptyID(t *testing.T) {
+	mockRepo := new(mockMoleculeRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	mockRepo.On("FindByID", mock.Anything, "").Return(nil, errors.New("not found"))
+
+	result, err := service.GetByID(context.Background(), "")
+	assert.Error(t, err)
+	assert.Nil(t, result)
+}
+
+func TestCreate_NilInput(t *testing.T) {
+	mockRepo := new(mockMoleculeRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	// Nil input should panic or error - Create dereferences input
+	result, err := service.Create(context.Background(), nil)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+}
+
+func TestCalculateProperties_ValidSMILESWithProperties(t *testing.T) {
+	mockRepo := new(mockMoleculeRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	result, err := service.CalculateProperties(context.Background(), &CalculatePropertiesInput{
+		SMILES:     "CCO",
+		Properties: []string{"mol_weight", "logP"},
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "CCO", result.SMILES)
+	assert.NotNil(t, result.Properties)
+}

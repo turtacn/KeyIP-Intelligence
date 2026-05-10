@@ -172,14 +172,17 @@ func (n *noopLogger) Debug(msg string, keysAndValues ...interface{}) {}
 
 type noopMetrics struct{}
 
-func (n *noopMetrics) RecordInference(ctx context.Context, params *common.InferenceMetricParams) {}
+func (n *noopMetrics) RecordInference(ctx context.Context, params *common.InferenceMetricParams)   {}
 func (n *noopMetrics) RecordBatchProcessing(ctx context.Context, params *common.BatchMetricParams) {}
-func (n *noopMetrics) RecordCacheAccess(ctx context.Context, hit bool, modelName string) {}
-func (n *noopMetrics) RecordCircuitBreakerStateChange(ctx context.Context, modelName string, fromState, toState string) {}
-func (n *noopMetrics) RecordRiskAssessment(ctx context.Context, riskLevel string, durationMs float64) {}
-func (n *noopMetrics) RecordModelLoad(ctx context.Context, modelName, version string, durationMs float64, success bool) {}
+func (n *noopMetrics) RecordCacheAccess(ctx context.Context, hit bool, modelName string)           {}
+func (n *noopMetrics) RecordCircuitBreakerStateChange(ctx context.Context, modelName string, fromState, toState string) {
+}
+func (n *noopMetrics) RecordRiskAssessment(ctx context.Context, riskLevel string, durationMs float64) {
+}
+func (n *noopMetrics) RecordModelLoad(ctx context.Context, modelName, version string, durationMs float64, success bool) {
+}
 func (n *noopMetrics) GetInferenceLatencyHistogram() common.LatencyHistogram { return nil }
-func (n *noopMetrics) GetCurrentStats() *common.IntelligenceStats { return &common.IntelligenceStats{} }
+func (n *noopMetrics) GetCurrentStats() *common.IntelligenceStats            { return &common.IntelligenceStats{} }
 
 // ============================================================================
 // Helper: create parser with mocks
@@ -828,9 +831,9 @@ func TestCorrectBIOSequence(t *testing.T) {
 
 func TestClassifyClaim_AllTypes(t *testing.T) {
 	testCases := []struct {
-		name        string
-		text        string
-		probs       []float64
+		name         string
+		text         string
+		probs        []float64
 		expectedType ClaimType
 	}{
 		{
@@ -1268,7 +1271,7 @@ func TestParseClaimSet_FullPipeline(t *testing.T) {
 func TestParseClaimSet_PartialFailures(t *testing.T) {
 	claims := []string{
 		"1. A valid composition comprising X.",
-		"",  // empty — should fail
+		"", // empty — should fail
 		"3. Another valid composition comprising Y.",
 	}
 

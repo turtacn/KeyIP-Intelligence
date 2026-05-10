@@ -53,9 +53,9 @@ type StructureSearchRequest struct {
 
 // SimilaritySearchRequest is the request body for similarity search.
 type SimilaritySearchRequest struct {
-	SMILES             string  `json:"smiles"`
+	SMILES              string  `json:"smiles"`
 	SimilarityThreshold float64 `json:"similarity_threshold"` // matches proto similarity_threshold
-	MaxResults         int    `json:"max_results"`
+	MaxResults          int     `json:"max_results"`
 }
 
 // CalculatePropertiesRequest is the request body for property calculation.

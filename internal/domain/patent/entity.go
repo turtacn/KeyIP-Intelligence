@@ -22,7 +22,7 @@ const (
 	PatentStatusRejected         PatentStatus = 6
 	PatentStatusWithdrawn        PatentStatus = 7
 	PatentStatusExpired          PatentStatus = 8
-	PatentStatusInvalidated       PatentStatus = 9
+	PatentStatusInvalidated      PatentStatus = 9
 	PatentStatusLapsed           PatentStatus = 10
 )
 
@@ -99,11 +99,11 @@ type Inventor struct {
 
 // PriorityClaim represents a priority claim.
 type PriorityClaim struct {
-	ID             uuid.UUID `json:"id"`
-	PatentID       uuid.UUID `json:"patent_id"`
-	PriorityNumber string    `json:"priority_number"`
-	PriorityDate   time.Time `json:"priority_date"`
-	PriorityCountry string   `json:"priority_country"`
+	ID              uuid.UUID `json:"id"`
+	PatentID        uuid.UUID `json:"patent_id"`
+	PriorityNumber  string    `json:"priority_number"`
+	PriorityDate    time.Time `json:"priority_date"`
+	PriorityCountry string    `json:"priority_country"`
 }
 
 // PatentDate encapsulates important lifecycle dates.
@@ -136,45 +136,45 @@ func (d PatentDate) Validate() error {
 
 // Patent is the aggregate root for a patent.
 type Patent struct {
-	ID              uuid.UUID           `json:"id"`
-	PatentNumber    string              `json:"patent_number"`
-	Title           string              `json:"title"`
-	TitleEn         string              `json:"title_en,omitempty"`
-	Abstract        string              `json:"abstract"`
-	AbstractEn      string              `json:"abstract_en,omitempty"`
-	Type            string              `json:"patent_type"`
-	Status          PatentStatus        `json:"status"`
-	Office          PatentOffice        `json:"office"`
-	Dates           PatentDate          `json:"dates"`
-	FilingDate      *time.Time          `json:"filing_date,omitempty"` // Kept for DB compat
-	PublicationDate *time.Time          `json:"publication_date,omitempty"`
-	GrantDate       *time.Time          `json:"grant_date,omitempty"`
-	ExpiryDate      *time.Time          `json:"expiry_date,omitempty"`
-	PriorityDate    *time.Time          `json:"priority_date,omitempty"`
-	AssigneeID      *uuid.UUID          `json:"assignee_id,omitempty"`
-	AssigneeName    string              `json:"assignee_name,omitempty"`
-	Jurisdiction    string              `json:"jurisdiction"`
-	IPCCodes        []string            `json:"ipc_codes"`
-	CPCCodes        []string            `json:"cpc_codes"`
-	KeyIPTechCodes  []string            `json:"keyip_tech_codes"`
-	FamilyID        string              `json:"family_id,omitempty"`
-	ApplicationNumber string            `json:"application_number,omitempty"`
-	FullTextHash    string              `json:"full_text_hash,omitempty"`
-	Source          string              `json:"source"`
-	RawData         map[string]any      `json:"raw_data,omitempty"`
-	Metadata        map[string]any      `json:"metadata,omitempty"`
-	Claims          ClaimSet            `json:"claims,omitempty"`
-	Inventors       []*Inventor         `json:"inventors,omitempty"`
-	PriorityClaims  []*PriorityClaim    `json:"priority_claims,omitempty"`
-	CreatedAt       time.Time           `json:"created_at"`
-	UpdatedAt       time.Time           `json:"updated_at"`
-	DeletedAt       *time.Time          `json:"deleted_at,omitempty"`
-	Version         int                 `json:"version"`
+	ID                uuid.UUID        `json:"id"`
+	PatentNumber      string           `json:"patent_number"`
+	Title             string           `json:"title"`
+	TitleEn           string           `json:"title_en,omitempty"`
+	Abstract          string           `json:"abstract"`
+	AbstractEn        string           `json:"abstract_en,omitempty"`
+	Type              string           `json:"patent_type"`
+	Status            PatentStatus     `json:"status"`
+	Office            PatentOffice     `json:"office"`
+	Dates             PatentDate       `json:"dates"`
+	FilingDate        *time.Time       `json:"filing_date,omitempty"` // Kept for DB compat
+	PublicationDate   *time.Time       `json:"publication_date,omitempty"`
+	GrantDate         *time.Time       `json:"grant_date,omitempty"`
+	ExpiryDate        *time.Time       `json:"expiry_date,omitempty"`
+	PriorityDate      *time.Time       `json:"priority_date,omitempty"`
+	AssigneeID        *uuid.UUID       `json:"assignee_id,omitempty"`
+	AssigneeName      string           `json:"assignee_name,omitempty"`
+	Jurisdiction      string           `json:"jurisdiction"`
+	IPCCodes          []string         `json:"ipc_codes"`
+	CPCCodes          []string         `json:"cpc_codes"`
+	KeyIPTechCodes    []string         `json:"keyip_tech_codes"`
+	FamilyID          string           `json:"family_id,omitempty"`
+	ApplicationNumber string           `json:"application_number,omitempty"`
+	FullTextHash      string           `json:"full_text_hash,omitempty"`
+	Source            string           `json:"source"`
+	RawData           map[string]any   `json:"raw_data,omitempty"`
+	Metadata          map[string]any   `json:"metadata,omitempty"`
+	Claims            ClaimSet         `json:"claims,omitempty"`
+	Inventors         []*Inventor      `json:"inventors,omitempty"`
+	PriorityClaims    []*PriorityClaim `json:"priority_claims,omitempty"`
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
+	DeletedAt         *time.Time       `json:"deleted_at,omitempty"`
+	Version           int              `json:"version"`
 
 	domainEvents []common.DomainEvent
-	CitedBy []string // Added for service
-	Cites []string // Added for service
-	MoleculeIDs []string // Added for service
+	CitedBy      []string // Added for service
+	Cites        []string // Added for service
+	MoleculeIDs  []string // Added for service
 }
 
 // NewPatent creates a new patent instance.

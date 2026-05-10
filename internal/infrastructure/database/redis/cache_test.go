@@ -19,7 +19,7 @@ func TestCache_GetSet(t *testing.T) {
 	cache := NewRedisCache(client, logging.NewNopLogger())
 
 	ctx := context.Background()
-	type Data struct { Name string }
+	type Data struct{ Name string }
 
 	// Set
 	err = cache.Set(ctx, "key", &Data{Name: "test"}, 0)

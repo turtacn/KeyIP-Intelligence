@@ -70,11 +70,11 @@ func (m *mockLogger) record(level, msg string, fields ...logging.Field) {
 	m.entries = append(m.entries, logEntry{level: level, msg: msg, fields: fields})
 }
 
-func (m *mockLogger) Info(msg string, fields ...logging.Field)  { m.record("info", msg, fields...) }
-func (m *mockLogger) Warn(msg string, fields ...logging.Field)  { m.record("warn", msg, fields...) }
-func (m *mockLogger) Error(msg string, fields ...logging.Field) { m.record("error", msg, fields...) }
-func (m *mockLogger) Debug(msg string, fields ...logging.Field) { m.record("debug", msg, fields...) }
-func (m *mockLogger) Fatal(msg string, fields ...logging.Field) { m.record("fatal", msg, fields...) }
+func (m *mockLogger) Info(msg string, fields ...logging.Field)       { m.record("info", msg, fields...) }
+func (m *mockLogger) Warn(msg string, fields ...logging.Field)       { m.record("warn", msg, fields...) }
+func (m *mockLogger) Error(msg string, fields ...logging.Field)      { m.record("error", msg, fields...) }
+func (m *mockLogger) Debug(msg string, fields ...logging.Field)      { m.record("debug", msg, fields...) }
+func (m *mockLogger) Fatal(msg string, fields ...logging.Field)      { m.record("fatal", msg, fields...) }
 func (m *mockLogger) With(fields ...logging.Field) logging.Logger    { return m }
 func (m *mockLogger) WithContext(ctx context.Context) logging.Logger { return m }
 func (m *mockLogger) WithError(err error) logging.Logger             { return m }

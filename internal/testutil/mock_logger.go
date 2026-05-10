@@ -106,15 +106,15 @@ func (m *MockLogger) HasMessage(level, msg string) bool {
 // NopLogger is a logger that discards all output, useful for tests that don't need logging verification.
 type NopLogger struct{}
 
-func NewNopLogger() *NopLogger                                   { return &NopLogger{} }
-func (n *NopLogger) Debug(msg string, fields ...logging.Field)   {}
-func (n *NopLogger) Info(msg string, fields ...logging.Field)    {}
-func (n *NopLogger) Warn(msg string, fields ...logging.Field)    {}
-func (n *NopLogger) Error(msg string, fields ...logging.Field)   {}
-func (n *NopLogger) Fatal(msg string, fields ...logging.Field)   {}
-func (n *NopLogger) With(fields ...logging.Field) logging.Logger { return n }
+func NewNopLogger() *NopLogger                                      { return &NopLogger{} }
+func (n *NopLogger) Debug(msg string, fields ...logging.Field)      {}
+func (n *NopLogger) Info(msg string, fields ...logging.Field)       {}
+func (n *NopLogger) Warn(msg string, fields ...logging.Field)       {}
+func (n *NopLogger) Error(msg string, fields ...logging.Field)      {}
+func (n *NopLogger) Fatal(msg string, fields ...logging.Field)      {}
+func (n *NopLogger) With(fields ...logging.Field) logging.Logger    { return n }
 func (n *NopLogger) WithContext(ctx context.Context) logging.Logger { return n }
-func (n *NopLogger) WithError(err error) logging.Logger          { return n }
-func (n *NopLogger) Sync() error                                 { return nil }
+func (n *NopLogger) WithError(err error) logging.Logger             { return n }
+func (n *NopLogger) Sync() error                                    { return nil }
 
 //Personal.AI order the ending

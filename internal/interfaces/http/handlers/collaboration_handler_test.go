@@ -20,15 +20,15 @@ import (
 
 // mockWorkspaceService implements collaboration.WorkspaceService for testing.
 type mockWorkspaceService struct {
-	createFn          func(context.Context, *collaboration.CreateWorkspaceRequest) (*collaboration.WorkspaceResponse, error)
-	getByIDFn         func(context.Context, string) (*collaboration.WorkspaceResponse, error)
-	listFn            func(context.Context, *collaboration.ListWorkspacesInput) (*collaboration.ListWorkspacesResult, error)
-	updateFn          func(context.Context, *collaboration.UpdateWorkspaceRequest) (*collaboration.WorkspaceResponse, error)
-	deleteFn          func(context.Context, string, string) error
-	inviteMemberFn    func(context.Context, *collaboration.InviteMemberInput) (*collaboration.MemberResponse, error)
-	removeMemberFn    func(context.Context, string, string, string) error
+	createFn           func(context.Context, *collaboration.CreateWorkspaceRequest) (*collaboration.WorkspaceResponse, error)
+	getByIDFn          func(context.Context, string) (*collaboration.WorkspaceResponse, error)
+	listFn             func(context.Context, *collaboration.ListWorkspacesInput) (*collaboration.ListWorkspacesResult, error)
+	updateFn           func(context.Context, *collaboration.UpdateWorkspaceRequest) (*collaboration.WorkspaceResponse, error)
+	deleteFn           func(context.Context, string, string) error
+	inviteMemberFn     func(context.Context, *collaboration.InviteMemberInput) (*collaboration.MemberResponse, error)
+	removeMemberFn     func(context.Context, string, string, string) error
 	updateMemberRoleFn func(context.Context, string, string, string, string) error
-	listMembersFn     func(context.Context, string, commontypes.Pagination) ([]*collaboration.MemberResponse, int, error)
+	listMembersFn      func(context.Context, string, commontypes.Pagination) ([]*collaboration.MemberResponse, int, error)
 }
 
 func (m *mockWorkspaceService) Create(ctx context.Context, req *collaboration.CreateWorkspaceRequest) (*collaboration.WorkspaceResponse, error) {

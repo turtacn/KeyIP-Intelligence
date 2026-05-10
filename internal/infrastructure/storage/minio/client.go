@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
-	"io"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/minio/minio-go/v7/pkg/lifecycle"
 	"github.com/minio/minio-go/v7/pkg/tags"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"io"
 )
 
 type MinIOAPI interface {
@@ -284,8 +284,8 @@ func (c *MinIOClient) HealthCheck(ctx context.Context) (*HealthStatus, error) {
 }
 
 type BucketStats struct {
-	ObjectCount int64
-	TotalSize   int64
+	ObjectCount  int64
+	TotalSize    int64
 	LastModified time.Time
 }
 

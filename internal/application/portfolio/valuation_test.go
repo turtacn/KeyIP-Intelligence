@@ -3,14 +3,13 @@
 
 package portfolio
 
-
 import (
-	"sync/atomic"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"testing"
 	"time"

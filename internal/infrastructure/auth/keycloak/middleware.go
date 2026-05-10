@@ -20,21 +20,21 @@ const (
 
 // AuthMiddlewareConfig configuration for AuthMiddleware.
 type AuthMiddlewareConfig struct {
-	SkipPaths          []string
-	SkipPrefixes       []string
+	SkipPaths            []string
+	SkipPrefixes         []string
 	RequireIntrospection bool
 	TenantClaimKey       string
 }
 
 // AuthMiddleware is the authentication middleware.
 type AuthMiddleware struct {
-	authProvider    AuthProvider
-	logger          logging.Logger
-	skipPaths       map[string]bool
-	skipPrefixes    []string
+	authProvider         AuthProvider
+	logger               logging.Logger
+	skipPaths            map[string]bool
+	skipPrefixes         []string
 	requireIntrospection bool
-	tenantExtractor func(*TokenClaims) string
-	onAuthFailure   func(w http.ResponseWriter, r *http.Request, err error)
+	tenantExtractor      func(*TokenClaims) string
+	onAuthFailure        func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // MiddlewareOption is a function option for configuring AuthMiddleware.
@@ -73,10 +73,10 @@ func WithAuthFailureHandler(handler func(http.ResponseWriter, *http.Request, err
 // NewAuthMiddleware creates a new AuthMiddleware.
 func NewAuthMiddleware(provider AuthProvider, logger logging.Logger, cfg AuthMiddlewareConfig, opts ...MiddlewareOption) *AuthMiddleware {
 	m := &AuthMiddleware{
-		authProvider:    provider,
-		logger:          logger,
-		skipPaths:       make(map[string]bool),
-		skipPrefixes:    cfg.SkipPrefixes,
+		authProvider:         provider,
+		logger:               logger,
+		skipPaths:            make(map[string]bool),
+		skipPrefixes:         cfg.SkipPrefixes,
 		requireIntrospection: cfg.RequireIntrospection,
 		tenantExtractor: func(claims *TokenClaims) string {
 			return claims.TenantID

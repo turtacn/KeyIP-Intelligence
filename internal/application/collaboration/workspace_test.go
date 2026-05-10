@@ -203,15 +203,15 @@ func (m *mockMemberRepo) CountByRole(ctx context.Context, workspaceID string) (m
 
 type mockWsLogger struct{}
 
-func (m *mockWsLogger) Debug(msg string, fields ...logging.Field) {}
-func (m *mockWsLogger) Info(msg string, fields ...logging.Field)  {}
-func (m *mockWsLogger) Warn(msg string, fields ...logging.Field)  {}
-func (m *mockWsLogger) Error(msg string, fields ...logging.Field) {}
-func (m *mockWsLogger) Fatal(msg string, fields ...logging.Field) {}
-func (m *mockWsLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockWsLogger) Debug(msg string, fields ...logging.Field)      {}
+func (m *mockWsLogger) Info(msg string, fields ...logging.Field)       {}
+func (m *mockWsLogger) Warn(msg string, fields ...logging.Field)       {}
+func (m *mockWsLogger) Error(msg string, fields ...logging.Field)      {}
+func (m *mockWsLogger) Fatal(msg string, fields ...logging.Field)      {}
+func (m *mockWsLogger) With(fields ...logging.Field) logging.Logger    { return m }
 func (m *mockWsLogger) WithContext(ctx context.Context) logging.Logger { return m }
-func (m *mockWsLogger) WithError(err error) logging.Logger { return m }
-func (m *mockWsLogger) Sync() error { return nil }
+func (m *mockWsLogger) WithError(err error) logging.Logger             { return m }
+func (m *mockWsLogger) Sync() error                                    { return nil }
 
 func newTestWorkspaceAppService(
 	domainSvc *mockWsDomainService,

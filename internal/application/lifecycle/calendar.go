@@ -26,8 +26,8 @@ import (
 	"github.com/google/uuid"
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
-	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	"github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ---------------------------------------------------------------------------
@@ -50,22 +50,22 @@ const (
 
 // CalendarEvent represents a single event on the patent lifecycle calendar.
 type CalendarEvent struct {
-	ID           string                      `json:"id"`
-	PatentID     string                      `json:"patent_id"`
-	PatentNumber string                      `json:"patent_number"`
-	Title        string                      `json:"title"`
-	Description  string                      `json:"description"`
-	EventType    CalendarEventType           `json:"event_type"`
+	ID           string                       `json:"id"`
+	PatentID     string                       `json:"patent_id"`
+	PatentNumber string                       `json:"patent_number"`
+	Title        string                       `json:"title"`
+	Description  string                       `json:"description"`
+	EventType    CalendarEventType            `json:"event_type"`
 	Jurisdiction domainLifecycle.Jurisdiction `json:"jurisdiction"`
-	EventDate    time.Time                   `json:"event_date"`
-	DueDate      time.Time                   `json:"due_date"`
-	Timezone     string                      `json:"timezone"`
-	Priority     EventPriority               `json:"priority"`
-	Status       EventStatus                 `json:"status"`
-	Reminders    []ReminderConfig            `json:"reminders,omitempty"`
-	Metadata     map[string]string           `json:"metadata,omitempty"`
-	CreatedAt    time.Time                   `json:"created_at"`
-	UpdatedAt    time.Time                   `json:"updated_at"`
+	EventDate    time.Time                    `json:"event_date"`
+	DueDate      time.Time                    `json:"due_date"`
+	Timezone     string                       `json:"timezone"`
+	Priority     EventPriority                `json:"priority"`
+	Status       EventStatus                  `json:"status"`
+	Reminders    []ReminderConfig             `json:"reminders,omitempty"`
+	Metadata     map[string]string            `json:"metadata,omitempty"`
+	CreatedAt    time.Time                    `json:"created_at"`
+	UpdatedAt    time.Time                    `json:"updated_at"`
 }
 
 // EventPriority indicates urgency.
@@ -98,24 +98,24 @@ type ReminderConfig struct {
 
 // CalendarViewRequest defines the query for a calendar view.
 type CalendarViewRequest struct {
-	PortfolioID   string                        `json:"portfolio_id,omitempty"`
-	PatentIDs     []string                      `json:"patent_ids,omitempty"`
-	Jurisdictions []domainLifecycle.Jurisdiction `json:"jurisdictions,omitempty"`
-	EventTypes    []CalendarEventType           `json:"event_types,omitempty"`
-	StartDate     time.Time                     `json:"start_date" validate:"required"`
-	EndDate       time.Time                     `json:"end_date" validate:"required"`
-	Timezone      string                        `json:"timezone,omitempty"`
-	IncludeCompleted bool                       `json:"include_completed,omitempty"`
+	PortfolioID      string                         `json:"portfolio_id,omitempty"`
+	PatentIDs        []string                       `json:"patent_ids,omitempty"`
+	Jurisdictions    []domainLifecycle.Jurisdiction `json:"jurisdictions,omitempty"`
+	EventTypes       []CalendarEventType            `json:"event_types,omitempty"`
+	StartDate        time.Time                      `json:"start_date" validate:"required"`
+	EndDate          time.Time                      `json:"end_date" validate:"required"`
+	Timezone         string                         `json:"timezone,omitempty"`
+	IncludeCompleted bool                           `json:"include_completed,omitempty"`
 }
 
 // CalendarView is the response for a calendar query.
 type CalendarView struct {
-	Events       []CalendarEvent          `json:"events"`
-	TotalCount   int                      `json:"total_count"`
-	Period       DateRange                `json:"period"`
-	ByMonth      map[string]int           `json:"by_month"`
-	ByType       map[CalendarEventType]int `json:"by_type"`
-	ByPriority   map[EventPriority]int    `json:"by_priority"`
+	Events     []CalendarEvent           `json:"events"`
+	TotalCount int                       `json:"total_count"`
+	Period     DateRange                 `json:"period"`
+	ByMonth    map[string]int            `json:"by_month"`
+	ByType     map[CalendarEventType]int `json:"by_type"`
+	ByPriority map[EventPriority]int     `json:"by_priority"`
 }
 
 // AddEventRequest creates a custom milestone event.

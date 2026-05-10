@@ -119,6 +119,7 @@ func (m *mockKGSearchService) HybridSearch(ctx context.Context, req *HybridSearc
 type mockSimilaritySearchService struct {
 	findSimilarFunc func(ctx context.Context, smiles string, threshold float64, limit int) (interface{}, error)
 }
+
 func (m *mockSimilaritySearchService) FindSimilar(ctx context.Context, smiles string, threshold float64, limit int) (interface{}, error) {
 	if m.findSimilarFunc != nil {
 		return m.findSimilarFunc(ctx, smiles, threshold, limit)
@@ -130,13 +131,14 @@ type mockPatentRepository struct{}
 type mockMoleculeRepository struct{}
 
 // Re-use mockCache, mockLogger, mockMetricsCollector from kg_search_test.go context
-// (Assuming they are available in the same package for testing purposes. 
+// (Assuming they are available in the same package for testing purposes.
 //  For completeness here, simplified versions are provided)
 
 type localMockCache struct {
 	data map[string]interface{}
 	mu   sync.RWMutex
 }
+
 func newLocalMockCache() *localMockCache {
 	return &localMockCache{data: make(map[string]interface{})}
 }
@@ -158,20 +160,23 @@ func (m *localMockCache) Set(ctx context.Context, key string, val interface{}, t
 }
 
 type localMockLogger struct{}
+
 func (l *localMockLogger) Info(ctx context.Context, msg string, keysAndValues ...interface{})  {}
 func (l *localMockLogger) Error(ctx context.Context, msg string, keysAndValues ...interface{}) {}
 func (l *localMockLogger) Warn(ctx context.Context, msg string, keysAndValues ...interface{})  {}
 func (l *localMockLogger) Debug(ctx context.Context, msg string, keysAndValues ...interface{}) {}
 
 type localMockMetricsCollector struct{}
+
 func (m *localMockMetricsCollector) IncCounter(name string, labels map[string]string) {}
-func (m *localMockMetricsCollector) ObserveHistogram(name string, value float64, labels map[string]string) {}
+func (m *localMockMetricsCollector) ObserveHistogram(name string, value float64, labels map[string]string) {
+}
 
 type nlTestMocks struct {
-	llm      *mockStrategyGPTModel
-	kgSearch *mockKGSearchService
+	llm       *mockStrategyGPTModel
+	kgSearch  *mockKGSearchService
 	simSearch *mockSimilaritySearchService
-	cache    *localMockCache
+	cache     *localMockCache
 }
 
 // ============================================================================
@@ -180,10 +185,10 @@ type nlTestMocks struct {
 
 func newTestNLQueryService() (NLQueryService, *nlTestMocks) {
 	m := &nlTestMocks{
-		llm:      &mockStrategyGPTModel{},
-		kgSearch: &mockKGSearchService{},
+		llm:       &mockStrategyGPTModel{},
+		kgSearch:  &mockKGSearchService{},
 		simSearch: &mockSimilaritySearchService{},
-		cache:    newLocalMockCache(),
+		cache:     newLocalMockCache(),
 	}
 	svc := NewNLQueryService(
 		m.llm,
@@ -327,8 +332,12 @@ func TestQuery_Aggregation_Success(t *testing.T) {
 	req := &NLQueryRequest{Question: "UDC去年在蓝光材料领域申请了多少专利"}
 	resp, err := svc.Query(context.Background(), req)
 
-	if err != nil { t.Fatalf("Unexpected err: %v", err) }
-	if resp.DataType != DataTypeAggregation { t.Errorf("Expected Aggregation data type") }
+	if err != nil {
+		t.Fatalf("Unexpected err: %v", err)
+	}
+	if resp.DataType != DataTypeAggregation {
+		t.Errorf("Expected Aggregation data type")
+	}
 }
 
 func TestQuery_SimilaritySearch_Success(t *testing.T) {
@@ -348,8 +357,12 @@ func TestQuery_SimilaritySearch_Success(t *testing.T) {
 	req := &NLQueryRequest{Question: "列出与分子X结构相似度大于0.8的所有已授权专利"}
 	_, err := svc.Query(context.Background(), req)
 
-	if err != nil { t.Fatalf("Unexpected err: %v", err) }
-	if !simCalled { t.Errorf("Similarity search not called") }
+	if err != nil {
+		t.Fatalf("Unexpected err: %v", err)
+	}
+	if !simCalled {
+		t.Errorf("Similarity search not called")
+	}
 }
 
 func TestQuery_PathFinding_Success(t *testing.T) {
@@ -376,7 +389,9 @@ func TestQuery_PathFinding_Success(t *testing.T) {
 	req := &NLQueryRequest{Question: "UDC和三星SDI之间有什么专利引用关系"}
 	_, _ = svc.Query(context.Background(), req)
 
-	if !pathCalled { t.Errorf("FindPaths not called") }
+	if !pathCalled {
+		t.Errorf("FindPaths not called")
+	}
 }
 
 func TestQuery_RelationQuery_Success(t *testing.T) {
@@ -391,14 +406,18 @@ func TestQuery_RelationQuery_Success(t *testing.T) {
 	traverseCalled := false
 	m.kgSearch.traverseRelationsFunc = func(ctx context.Context, req *RelationTraverseRequest) (*RelationTraverseResponse, error) {
 		traverseCalled = true
-		if req.StartNodeID != "M1" { t.Errorf("Traverse start node mismatch") }
+		if req.StartNodeID != "M1" {
+			t.Errorf("Traverse start node mismatch")
+		}
 		return &RelationTraverseResponse{}, nil
 	}
 
 	req := &NLQueryRequest{Question: "分子ABC-123被哪些专利引用了"}
 	_, _ = svc.Query(context.Background(), req)
 
-	if !traverseCalled { t.Errorf("TraverseRelations not called") }
+	if !traverseCalled {
+		t.Errorf("TraverseRelations not called")
+	}
 }
 
 func TestQuery_TrendAnalysis_Success(t *testing.T) {
@@ -579,18 +598,26 @@ func TestQuery_IntentClassification_ParseFailure_Retry(t *testing.T) {
 	m.llm.inferIntentFunc = func(ctx context.Context, p string, temp float64) (string, error) {
 		callCount++
 		if callCount == 1 {
-			if temp != 0.3 { t.Errorf("First call temp should be 0.3") }
+			if temp != 0.3 {
+				t.Errorf("First call temp should be 0.3")
+			}
 			return "{invalid json", nil
 		}
-		if temp != 0.1 { t.Errorf("Retry temp should be 0.1") }
+		if temp != 0.1 {
+			t.Errorf("Retry temp should be 0.1")
+		}
 		return buildIntentJSON(IntentEntitySearch, nil, 0.9), nil
 	}
 
 	req := &NLQueryRequest{Question: "test"}
 	_, err := svc.Query(context.Background(), req)
 
-	if err != nil { t.Fatalf("Expected retry to succeed") }
-	if callCount != 2 { t.Errorf("Expected exactly 2 calls to InferIntent") }
+	if err != nil {
+		t.Fatalf("Expected retry to succeed")
+	}
+	if callCount != 2 {
+		t.Errorf("Expected exactly 2 calls to InferIntent")
+	}
 }
 
 func TestQuery_IntentClassification_ParseFailure_BothFail(t *testing.T) {
@@ -604,7 +631,9 @@ func TestQuery_IntentClassification_ParseFailure_BothFail(t *testing.T) {
 	req := &NLQueryRequest{Question: "test"}
 	_, err := svc.Query(context.Background(), req)
 
-	if err == nil { t.Fatalf("Expected error after all retries fail") }
+	if err == nil {
+		t.Fatalf("Expected error after all retries fail")
+	}
 }
 
 func TestQuery_AnswerGeneration_Failure_Retry(t *testing.T) {
@@ -615,10 +644,14 @@ func TestQuery_AnswerGeneration_Failure_Retry(t *testing.T) {
 	m.llm.generateAnswerFunc = func(ctx context.Context, p string, temp float64) (string, error) {
 		callCount++
 		if callCount == 1 {
-			if temp != 0.4 { t.Errorf("First call temp should be 0.4") }
+			if temp != 0.4 {
+				t.Errorf("First call temp should be 0.4")
+			}
 			return "", errors.NewInternal("LLM timeout")
 		}
-		if temp != 0.2 { t.Errorf("Retry temp should be 0.2") }
+		if temp != 0.2 {
+			t.Errorf("Retry temp should be 0.2")
+		}
 		return "Retry success", nil
 	}
 
@@ -671,7 +704,7 @@ func TestQuery_PromptInjection(t *testing.T) {
 func TestQuery_EmptyQuestion(t *testing.T) {
 	t.Parallel()
 	// Validation check assuming empty handled either by checkPromptInjection or step 1
-	// The provided implementation doesn't strictly block empty in Query method header yet, 
+	// The provided implementation doesn't strictly block empty in Query method header yet,
 	// but normally it should. Let's assume we expect it to fail gracefully.
 	svc, m := newTestNLQueryService()
 	m.llm.inferIntentFunc = func(ctx context.Context, p string, temp float64) (string, error) {
@@ -679,7 +712,9 @@ func TestQuery_EmptyQuestion(t *testing.T) {
 	}
 	req := &NLQueryRequest{Question: ""}
 	_, err := svc.Query(context.Background(), req)
-	if err == nil { t.Errorf("Expected error for empty question") }
+	if err == nil {
+		t.Errorf("Expected error for empty question")
+	}
 }
 
 // ============================================================================
@@ -729,7 +764,9 @@ func TestExplainQuery_Success(t *testing.T) {
 	req := &ExplainRequest{Question: "UDC专利"}
 	resp, err := svc.ExplainQuery(context.Background(), req)
 
-	if err != nil { t.Fatalf("Unexpected err: %v", err) }
+	if err != nil {
+		t.Fatalf("Unexpected err: %v", err)
+	}
 
 	// Should have exactly 3 steps: Intent, Entity, QueryGen
 	if len(resp.Steps) != 3 {
@@ -750,14 +787,20 @@ func TestSuggestQuestions_RoleFiltering(t *testing.T) {
 	// CTO Role
 	reqCTO := &SuggestRequest{UserContext: UserQueryContext{Role: "CTO"}, Count: 5}
 	respCTO, _ := svc.SuggestQuestions(context.Background(), reqCTO)
-	if len(respCTO.Questions) == 0 { t.Errorf("Expected questions for CTO") }
+	if len(respCTO.Questions) == 0 {
+		t.Errorf("Expected questions for CTO")
+	}
 
 	// Ensure CTO sees Trend/Competitor
 	foundTrend := false
 	for _, q := range respCTO.Questions {
-		if q.Category == "Technology" || q.Category == "Competitor" { foundTrend = true }
+		if q.Category == "Technology" || q.Category == "Competitor" {
+			foundTrend = true
+		}
 	}
-	if !foundTrend { t.Errorf("CTO should see tech/competitor trends") }
+	if !foundTrend {
+		t.Errorf("CTO should see tech/competitor trends")
+	}
 
 	// IP Manager Role
 	reqIP := &SuggestRequest{UserContext: UserQueryContext{Role: "IP Manager"}, Count: 5}
@@ -765,9 +808,13 @@ func TestSuggestQuestions_RoleFiltering(t *testing.T) {
 
 	foundRisk := false
 	for _, q := range respIP.Questions {
-		if q.Category == "Risk" { foundRisk = true }
+		if q.Category == "Risk" {
+			foundRisk = true
+		}
 	}
-	if !foundRisk { t.Errorf("IP Manager should see risk questions") }
+	if !foundRisk {
+		t.Errorf("IP Manager should see risk questions")
+	}
 }
 
 //Personal.AI order the ending

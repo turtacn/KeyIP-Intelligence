@@ -6,9 +6,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
 )
 
 // domainToProto converts domain molecule to protobuf message

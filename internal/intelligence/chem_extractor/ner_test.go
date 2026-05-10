@@ -2,7 +2,7 @@ package chem_extractor
 
 import (
 	"context"
-			"strings"
+	"strings"
 	"testing"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"

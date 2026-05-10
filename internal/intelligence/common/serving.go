@@ -1,6 +1,6 @@
 /*
  * serving.go 和 serving_test.go 两个文件现在完整了。测试文件覆盖了所有核心组件：gRPC/HTTP/Mock 三种 ServingClient 实现、三种负载均衡策略（Round-Robin、Least-Connections、Weighted）、拦截器链（Tracing/Logging/Auth/Metrics）、编解码工具函数、并发安全性，以及所有 sentinel error 和配置选项。
-*/
+ */
 
 package common
 
@@ -50,11 +50,11 @@ const (
 )
 
 type ServingVersionStatus struct {
-	Version         string                   `json:"version"`
+	Version         string                    `json:"version"`
 	Status          ServingVersionStatusState `json:"status"`
-	LastInferenceAt time.Time                `json:"last_inference_at"`
-	InferenceCount  int64                    `json:"inference_count"`
-	AvgLatencyMs    float64                  `json:"avg_latency_ms"`
+	LastInferenceAt time.Time                 `json:"last_inference_at"`
+	InferenceCount  int64                     `json:"inference_count"`
+	AvgLatencyMs    float64                   `json:"avg_latency_ms"`
 }
 
 type ServingModelStatus struct {
@@ -404,18 +404,18 @@ func (mi *metricsInterceptor) AfterResponse(ctx context.Context, resp *PredictRe
 // -------------------------------------------------------------------------
 
 type servingOptions struct {
-	tlsCertFile         string
-	tlsKeyFile          string
-	tlsCAFile           string
-	connectionTimeout   time.Duration
-	requestTimeout      time.Duration
-	maxRetries          int
+	tlsCertFile          string
+	tlsKeyFile           string
+	tlsCAFile            string
+	connectionTimeout    time.Duration
+	requestTimeout       time.Duration
+	maxRetries           int
 	loadBalancerStrategy string
-	connectionPoolSize  int
-	interceptors        []RequestInterceptor
-	metrics             IntelligenceMetrics
-	logger              Logger
-	healthCheckInterval time.Duration
+	connectionPoolSize   int
+	interceptors         []RequestInterceptor
+	metrics              IntelligenceMetrics
+	logger               Logger
+	healthCheckInterval  time.Duration
 }
 
 func defaultServingOptions() *servingOptions {
@@ -503,14 +503,14 @@ func runAfterInterceptors(ctx context.Context, resp *PredictResponse, err error,
 // -------------------------------------------------------------------------
 
 type grpcServingClient struct {
-	addresses  []string
-	nodes      []*ServingNode
-	balancer   LoadBalancer
-	opts       *servingOptions
-	closed     atomic.Bool
-	closeCh    chan struct{}
-	wg         sync.WaitGroup
-	mu         sync.RWMutex
+	addresses []string
+	nodes     []*ServingNode
+	balancer  LoadBalancer
+	opts      *servingOptions
+	closed    atomic.Bool
+	closeCh   chan struct{}
+	wg        sync.WaitGroup
+	mu        sync.RWMutex
 }
 
 func NewGRPCServingClient(addresses []string, opts ...ServingOption) (*grpcServingClient, error) {
@@ -1431,4 +1431,3 @@ var (
 	_ LoadBalancer  = (*leastConnectionsBalancer)(nil)
 	_ LoadBalancer  = (*weightedBalancer)(nil)
 )
-

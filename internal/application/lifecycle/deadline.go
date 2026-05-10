@@ -37,15 +37,15 @@ import (
 type DeadlineType string
 
 const (
-	DeadlineTypeStatutory       DeadlineType = "statutory"
-	DeadlineTypeOfficeAction    DeadlineType = "office_action"
-	DeadlineTypePCTNational     DeadlineType = "pct_national_phase"
-	DeadlineTypeParisPriority   DeadlineType = "paris_priority"
-	DeadlineTypeAnnuityPayment  DeadlineType = "annuity_payment"
-	DeadlineTypeExamRequest     DeadlineType = "examination_request"
-	DeadlineTypeClaimAmendment  DeadlineType = "claim_amendment"
-	DeadlineTypeAppeal          DeadlineType = "appeal"
-	DeadlineTypeCustom          DeadlineType = "custom"
+	DeadlineTypeStatutory      DeadlineType = "statutory"
+	DeadlineTypeOfficeAction   DeadlineType = "office_action"
+	DeadlineTypePCTNational    DeadlineType = "pct_national_phase"
+	DeadlineTypeParisPriority  DeadlineType = "paris_priority"
+	DeadlineTypeAnnuityPayment DeadlineType = "annuity_payment"
+	DeadlineTypeExamRequest    DeadlineType = "examination_request"
+	DeadlineTypeClaimAmendment DeadlineType = "claim_amendment"
+	DeadlineTypeAppeal         DeadlineType = "appeal"
+	DeadlineTypeCustom         DeadlineType = "custom"
 )
 
 // DeadlineUrgency classifies how urgent a deadline is.
@@ -53,103 +53,103 @@ type DeadlineUrgency string
 
 const (
 	UrgencyExpired  DeadlineUrgency = "expired"
-	UrgencyCritical DeadlineUrgency = "critical"  // <= 7 days
-	UrgencyUrgent   DeadlineUrgency = "urgent"    // <= 30 days
-	UrgencyNormal   DeadlineUrgency = "normal"    // <= 90 days
-	UrgencyFuture   DeadlineUrgency = "future"    // > 90 days
+	UrgencyCritical DeadlineUrgency = "critical" // <= 7 days
+	UrgencyUrgent   DeadlineUrgency = "urgent"   // <= 30 days
+	UrgencyNormal   DeadlineUrgency = "normal"   // <= 90 days
+	UrgencyFuture   DeadlineUrgency = "future"   // > 90 days
 )
 
 // Deadline represents a tracked patent deadline.
 type Deadline struct {
-	ID             string                      `json:"id"`
-	PatentID       string                      `json:"patent_id"`
-	PatentNumber   string                      `json:"patent_number"`
-	Title          string                      `json:"title"`
-	Description    string                      `json:"description"`
-	DeadlineType   DeadlineType                `json:"deadline_type"`
+	ID             string                       `json:"id"`
+	PatentID       string                       `json:"patent_id"`
+	PatentNumber   string                       `json:"patent_number"`
+	Title          string                       `json:"title"`
+	Description    string                       `json:"description"`
+	DeadlineType   DeadlineType                 `json:"deadline_type"`
 	Jurisdiction   domainLifecycle.Jurisdiction `json:"jurisdiction"`
-	DueDate        time.Time                   `json:"due_date"`
-	ExtendedDate   *time.Time                  `json:"extended_date,omitempty"`
-	DaysRemaining  int                         `json:"days_remaining"`
-	Urgency        DeadlineUrgency             `json:"urgency"`
-	IsExtensible   bool                        `json:"is_extensible"`
-	MaxExtensions  int                         `json:"max_extensions"`
-	ExtensionsUsed int                         `json:"extensions_used"`
-	AssignedTo     string                      `json:"assigned_to,omitempty"`
-	CompletedAt    *time.Time                  `json:"completed_at,omitempty"`
-	Alerts         []AlertConfig               `json:"alerts,omitempty"`
-	Metadata       map[string]string           `json:"metadata,omitempty"`
-	CreatedAt      time.Time                   `json:"created_at"`
-	UpdatedAt      time.Time                   `json:"updated_at"`
+	DueDate        time.Time                    `json:"due_date"`
+	ExtendedDate   *time.Time                   `json:"extended_date,omitempty"`
+	DaysRemaining  int                          `json:"days_remaining"`
+	Urgency        DeadlineUrgency              `json:"urgency"`
+	IsExtensible   bool                         `json:"is_extensible"`
+	MaxExtensions  int                          `json:"max_extensions"`
+	ExtensionsUsed int                          `json:"extensions_used"`
+	AssignedTo     string                       `json:"assigned_to,omitempty"`
+	CompletedAt    *time.Time                   `json:"completed_at,omitempty"`
+	Alerts         []AlertConfig                `json:"alerts,omitempty"`
+	Metadata       map[string]string            `json:"metadata,omitempty"`
+	CreatedAt      time.Time                    `json:"created_at"`
+	UpdatedAt      time.Time                    `json:"updated_at"`
 }
 
 // AlertConfig defines an alert trigger for a deadline.
 type AlertConfig struct {
-	DaysBefore  int      `json:"days_before"`
-	Channels    []string `json:"channels"`
-	Recipients  []string `json:"recipients,omitempty"`
-	Enabled     bool     `json:"enabled"`
-	SentAt      *time.Time `json:"sent_at,omitempty"`
+	DaysBefore int        `json:"days_before"`
+	Channels   []string   `json:"channels"`
+	Recipients []string   `json:"recipients,omitempty"`
+	Enabled    bool       `json:"enabled"`
+	SentAt     *time.Time `json:"sent_at,omitempty"`
 }
 
 // DeadlineQuery defines search parameters for deadlines.
 type DeadlineQuery struct {
-	PatentID      string                        `json:"patent_id,omitempty"`
-	PortfolioID   string                        `json:"portfolio_id,omitempty"`
-	Types         []DeadlineType                `json:"types,omitempty"`
-	Jurisdictions []domainLifecycle.Jurisdiction `json:"jurisdictions,omitempty"`
-	Urgencies     []DeadlineUrgency             `json:"urgencies,omitempty"`
-	AssignedTo    string                        `json:"assigned_to,omitempty"`
-	StartDate     time.Time                     `json:"start_date,omitempty"`
-	EndDate       time.Time                     `json:"end_date,omitempty"`
-	IncludeCompleted bool                       `json:"include_completed,omitempty"`
-	Page          int                           `json:"page,omitempty"`
-	PageSize      int                           `json:"page_size,omitempty"`
-	SortBy        string                        `json:"sort_by,omitempty"`
-	SortOrder     string                        `json:"sort_order,omitempty"`
+	PatentID         string                         `json:"patent_id,omitempty"`
+	PortfolioID      string                         `json:"portfolio_id,omitempty"`
+	Types            []DeadlineType                 `json:"types,omitempty"`
+	Jurisdictions    []domainLifecycle.Jurisdiction `json:"jurisdictions,omitempty"`
+	Urgencies        []DeadlineUrgency              `json:"urgencies,omitempty"`
+	AssignedTo       string                         `json:"assigned_to,omitempty"`
+	StartDate        time.Time                      `json:"start_date,omitempty"`
+	EndDate          time.Time                      `json:"end_date,omitempty"`
+	IncludeCompleted bool                           `json:"include_completed,omitempty"`
+	Page             int                            `json:"page,omitempty"`
+	PageSize         int                            `json:"page_size,omitempty"`
+	SortBy           string                         `json:"sort_by,omitempty"`
+	SortOrder        string                         `json:"sort_order,omitempty"`
 }
 
 // DeadlineListResponse is a paginated list of deadlines.
 type DeadlineListResponse struct {
-	Deadlines  []Deadline `json:"deadlines"`
-	Total      int64      `json:"total"`
-	Page       int        `json:"page"`
-	PageSize   int        `json:"page_size"`
+	Deadlines []Deadline `json:"deadlines"`
+	Total     int64      `json:"total"`
+	Page      int        `json:"page"`
+	PageSize  int        `json:"page_size"`
 }
 
 // CreateDeadlineRequest creates a new tracked deadline.
 type CreateDeadlineRequest struct {
-	PatentID     string                      `json:"patent_id" validate:"required"`
-	Title        string                      `json:"title" validate:"required"`
-	Description  string                      `json:"description,omitempty"`
-	DeadlineType DeadlineType                `json:"deadline_type" validate:"required"`
-	Jurisdiction domainLifecycle.Jurisdiction `json:"jurisdiction,omitempty"`
-	DueDate      time.Time                   `json:"due_date" validate:"required"`
-	IsExtensible bool                        `json:"is_extensible,omitempty"`
-	MaxExtensions int                        `json:"max_extensions,omitempty"`
-	AssignedTo   string                      `json:"assigned_to,omitempty"`
-	Alerts       []AlertConfig               `json:"alerts,omitempty"`
-	Metadata     map[string]string           `json:"metadata,omitempty"`
+	PatentID      string                       `json:"patent_id" validate:"required"`
+	Title         string                       `json:"title" validate:"required"`
+	Description   string                       `json:"description,omitempty"`
+	DeadlineType  DeadlineType                 `json:"deadline_type" validate:"required"`
+	Jurisdiction  domainLifecycle.Jurisdiction `json:"jurisdiction,omitempty"`
+	DueDate       time.Time                    `json:"due_date" validate:"required"`
+	IsExtensible  bool                         `json:"is_extensible,omitempty"`
+	MaxExtensions int                          `json:"max_extensions,omitempty"`
+	AssignedTo    string                       `json:"assigned_to,omitempty"`
+	Alerts        []AlertConfig                `json:"alerts,omitempty"`
+	Metadata      map[string]string            `json:"metadata,omitempty"`
 }
 
 // ExtendDeadlineRequest extends a deadline's due date.
 type ExtendDeadlineRequest struct {
-	DeadlineID  string    `json:"deadline_id" validate:"required"`
-	NewDueDate  time.Time `json:"new_due_date" validate:"required"`
-	Reason      string    `json:"reason,omitempty"`
+	DeadlineID string    `json:"deadline_id" validate:"required"`
+	NewDueDate time.Time `json:"new_due_date" validate:"required"`
+	Reason     string    `json:"reason,omitempty"`
 }
 
 // ComplianceDashboard summarizes deadline compliance status.
 type ComplianceDashboard struct {
-	GeneratedAt     time.Time                    `json:"generated_at"`
-	TotalDeadlines  int                          `json:"total_deadlines"`
-	ByUrgency       map[DeadlineUrgency]int      `json:"by_urgency"`
-	ByType          map[DeadlineType]int         `json:"by_type"`
-	ByJurisdiction  map[string]int               `json:"by_jurisdiction"`
-	OverdueCount    int                          `json:"overdue_count"`
-	DueSoonCount    int                          `json:"due_soon_count"`
-	ComplianceRate  float64                      `json:"compliance_rate"`
-	UpcomingCritical []Deadline                  `json:"upcoming_critical"`
+	GeneratedAt      time.Time               `json:"generated_at"`
+	TotalDeadlines   int                     `json:"total_deadlines"`
+	ByUrgency        map[DeadlineUrgency]int `json:"by_urgency"`
+	ByType           map[DeadlineType]int    `json:"by_type"`
+	ByJurisdiction   map[string]int          `json:"by_jurisdiction"`
+	OverdueCount     int                     `json:"overdue_count"`
+	DueSoonCount     int                     `json:"due_soon_count"`
+	ComplianceRate   float64                 `json:"compliance_rate"`
+	UpcomingCritical []Deadline              `json:"upcoming_critical"`
 }
 
 // ---------------------------------------------------------------------------
@@ -792,4 +792,3 @@ func urgencyOrder(u DeadlineUrgency) int {
 }
 
 //Personal.AI order the ending
-

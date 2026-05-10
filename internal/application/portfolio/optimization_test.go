@@ -22,10 +22,10 @@ const (
 
 func TestNewOptimizationService_Success(t *testing.T) {
 	cfg := OptimizationServiceConfig{
-		PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-		PatentRepository: newMockPatentRepo(),
-		Logger:           &mockLogger{},
+		PortfolioService:    &mockPortfolioService{portfolio: createTestPortfolio("p1")},
+		PortfolioRepository: newMockPortfolioRepoConstellation(),
+		PatentRepository:    newMockPatentRepo(),
+		Logger:              &mockLogger{},
 	}
 	svc, err := NewOptimizationService(cfg)
 	if err != nil {
@@ -48,10 +48,10 @@ func TestNewOptimizationService_MissingDeps(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := OptimizationServiceConfig{
-				PortfolioService: &mockPortfolioService{portfolio: createTestPortfolio("p1")},
-PortfolioRepository: newMockPortfolioRepoConstellation(),
-				PatentRepository: newMockPatentRepo(),
-				Logger:           &mockLogger{},
+				PortfolioService:    &mockPortfolioService{portfolio: createTestPortfolio("p1")},
+				PortfolioRepository: newMockPortfolioRepoConstellation(),
+				PatentRepository:    newMockPatentRepo(),
+				Logger:              &mockLogger{},
 			}
 			tt.mod(&cfg)
 			_, err := NewOptimizationService(cfg)
@@ -285,8 +285,8 @@ func TestOptimize_EmptyPortfolio(t *testing.T) {
 	cfg := OptimizationServiceConfig{
 		PortfolioService:    &mockPortfolioService{portfolio: testPortfolio},
 		PortfolioRepository: newMockPortfolioRepoWithData(testPortfolio),
-		PatentRepository: repo,
-		Logger:           &mockLogger{},
+		PatentRepository:    repo,
+		Logger:              &mockLogger{},
 	}
 	svc, _ := NewOptimizationService(cfg)
 
@@ -531,17 +531,17 @@ func createTestPatentSimple(number string, filingDate time.Time) *domainpatent.P
 	now := time.Now()
 	expiryDate := filingDate.AddDate(20, 0, 0)
 	return &domainpatent.Patent{
-		ID:              uuid.New(),
-		PatentNumber:    number,
-		Title:           "Test Patent",
-		FilingDate:      &filingDate,
-		GrantDate:       &now,
-		ExpiryDate:      &expiryDate,
-		Status:          domainpatent.PatentStatusGranted,
-		Office:          domainpatent.OfficeUSPTO,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-		Version:         1,
+		ID:           uuid.New(),
+		PatentNumber: number,
+		Title:        "Test Patent",
+		FilingDate:   &filingDate,
+		GrantDate:    &now,
+		ExpiryDate:   &expiryDate,
+		Status:       domainpatent.PatentStatusGranted,
+		Office:       domainpatent.OfficeUSPTO,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		Version:      1,
 	}
 }
 

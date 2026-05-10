@@ -7,10 +7,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	importUUID "github.com/google/uuid"
 	domainLifecycle "github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/testutil"
-	importUUID "github.com/google/uuid"
 	importCommon "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
@@ -19,8 +19,8 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockLifecycleService struct {
-	calculateFn       func(ctx context.Context, patentID string, j domainLifecycle.Jurisdiction, asOf time.Time) (*domainLifecycle.AnnuityCalcResult, error)
-	scheduleFn        func(ctx context.Context, patentID string, j domainLifecycle.Jurisdiction, start, end time.Time) ([]domainLifecycle.ScheduleEntry, error)
+	calculateFn         func(ctx context.Context, patentID string, j domainLifecycle.Jurisdiction, asOf time.Time) (*domainLifecycle.AnnuityCalcResult, error)
+	scheduleFn          func(ctx context.Context, patentID string, j domainLifecycle.Jurisdiction, start, end time.Time) ([]domainLifecycle.ScheduleEntry, error)
 	fetchRemoteStatusFn func(ctx context.Context, patentID string) (*domainLifecycle.RemoteStatusResult, error)
 }
 
@@ -68,17 +68,17 @@ func (m *mockLifecycleService) CheckHealth(ctx context.Context, patentID string)
 }
 
 type mockLifecycleRepo struct {
-	savePaymentFn        func(ctx context.Context, p *domainLifecycle.PaymentRecord) (*domainLifecycle.PaymentRecord, error)
-	queryPaymentFn       func(ctx context.Context, q *domainLifecycle.PaymentQuery) ([]domainLifecycle.PaymentRecord, int64, error)
-	getByPatentIDFn      func(ctx context.Context, patentID string) (*domainLifecycle.LegalStatusEntity, error)
-	updateStatusFn       func(ctx context.Context, patentID string, status string, effectiveDate time.Time) error
-	saveSubscriptionFn   func(ctx context.Context, sub *domainLifecycle.SubscriptionEntity) error
-	deactivateSubFn      func(ctx context.Context, id string) error
-	getStatusHistoryFn   func(ctx context.Context, patentID string, pagination *importCommon.Pagination, from, to *time.Time) ([]*domainLifecycle.StatusHistoryEntity, error)
-	saveCustomEventFn    func(ctx context.Context, event *domainLifecycle.CustomEvent) error
-	getCustomEventsFn    func(ctx context.Context, patentIDs []string, start, end time.Time) ([]domainLifecycle.CustomEvent, error)
-	updateEventStatusFn  func(ctx context.Context, eventID string, status string) error
-	deleteEventFn        func(ctx context.Context, eventID string) error
+	savePaymentFn          func(ctx context.Context, p *domainLifecycle.PaymentRecord) (*domainLifecycle.PaymentRecord, error)
+	queryPaymentFn         func(ctx context.Context, q *domainLifecycle.PaymentQuery) ([]domainLifecycle.PaymentRecord, int64, error)
+	getByPatentIDFn        func(ctx context.Context, patentID string) (*domainLifecycle.LegalStatusEntity, error)
+	updateStatusFn         func(ctx context.Context, patentID string, status string, effectiveDate time.Time) error
+	saveSubscriptionFn     func(ctx context.Context, sub *domainLifecycle.SubscriptionEntity) error
+	deactivateSubFn        func(ctx context.Context, id string) error
+	getStatusHistoryFn     func(ctx context.Context, patentID string, pagination *importCommon.Pagination, from, to *time.Time) ([]*domainLifecycle.StatusHistoryEntity, error)
+	saveCustomEventFn      func(ctx context.Context, event *domainLifecycle.CustomEvent) error
+	getCustomEventsFn      func(ctx context.Context, patentIDs []string, start, end time.Time) ([]domainLifecycle.CustomEvent, error)
+	updateEventStatusFn    func(ctx context.Context, eventID string, status string) error
+	deleteEventFn          func(ctx context.Context, eventID string) error
 	getUpcomingAnnuitiesFn func(ctx context.Context, daysAhead int, limit, offset int) ([]*domainLifecycle.Annuity, int64, error)
 	updateAnnuityStatusFn  func(ctx context.Context, id string, status domainLifecycle.AnnuityStatus, paidAmount int64, paidDate *time.Time, paymentRef string) error
 	getActiveDeadlinesFn   func(ctx context.Context, userID *string, daysAhead int, limit, offset int) ([]*domainLifecycle.Deadline, int64, error)
@@ -103,51 +103,93 @@ func (m *mockLifecycleRepo) QueryPayments(ctx context.Context, q *domainLifecycl
 }
 
 // Implement other methods as needed, returning nil/empty by default or using fn hooks
-func (m *mockLifecycleRepo) CreateAnnuity(ctx context.Context, annuity *domainLifecycle.Annuity) error { return nil }
-func (m *mockLifecycleRepo) GetAnnuity(ctx context.Context, id string) (*domainLifecycle.Annuity, error) { return nil, nil }
-func (m *mockLifecycleRepo) GetAnnuitiesByPatent(ctx context.Context, patentID string) ([]*domainLifecycle.Annuity, error) { return nil, nil }
+func (m *mockLifecycleRepo) CreateAnnuity(ctx context.Context, annuity *domainLifecycle.Annuity) error {
+	return nil
+}
+func (m *mockLifecycleRepo) GetAnnuity(ctx context.Context, id string) (*domainLifecycle.Annuity, error) {
+	return nil, nil
+}
+func (m *mockLifecycleRepo) GetAnnuitiesByPatent(ctx context.Context, patentID string) ([]*domainLifecycle.Annuity, error) {
+	return nil, nil
+}
 func (m *mockLifecycleRepo) GetUpcomingAnnuities(ctx context.Context, daysAhead int, limit, offset int) ([]*domainLifecycle.Annuity, int64, error) {
 	if m.getUpcomingAnnuitiesFn != nil {
 		return m.getUpcomingAnnuitiesFn(ctx, daysAhead, limit, offset)
 	}
 	return nil, 0, nil
 }
-func (m *mockLifecycleRepo) GetOverdueAnnuities(ctx context.Context, limit, offset int) ([]*domainLifecycle.Annuity, int64, error) { return nil, 0, nil }
+func (m *mockLifecycleRepo) GetOverdueAnnuities(ctx context.Context, limit, offset int) ([]*domainLifecycle.Annuity, int64, error) {
+	return nil, 0, nil
+}
 func (m *mockLifecycleRepo) UpdateAnnuityStatus(ctx context.Context, id string, status domainLifecycle.AnnuityStatus, paidAmount int64, paidDate *time.Time, paymentRef string) error {
 	if m.updateAnnuityStatusFn != nil {
 		return m.updateAnnuityStatusFn(ctx, id, status, paidAmount, paidDate, paymentRef)
 	}
 	return nil
 }
-func (m *mockLifecycleRepo) BatchCreateAnnuities(ctx context.Context, annuities []*domainLifecycle.Annuity) error { return nil }
+func (m *mockLifecycleRepo) BatchCreateAnnuities(ctx context.Context, annuities []*domainLifecycle.Annuity) error {
+	return nil
+}
 func (m *mockLifecycleRepo) UpdateReminderSent(ctx context.Context, id string) error { return nil }
 
-func (m *mockLifecycleRepo) CreateDeadline(ctx context.Context, deadline *domainLifecycle.Deadline) error { return nil }
-func (m *mockLifecycleRepo) GetDeadline(ctx context.Context, id string) (*domainLifecycle.Deadline, error) { return nil, nil }
-func (m *mockLifecycleRepo) GetDeadlinesByPatent(ctx context.Context, patentID string, statusFilter []domainLifecycle.DeadlineStatus) ([]*domainLifecycle.Deadline, error) { return nil, nil }
+func (m *mockLifecycleRepo) CreateDeadline(ctx context.Context, deadline *domainLifecycle.Deadline) error {
+	return nil
+}
+func (m *mockLifecycleRepo) GetDeadline(ctx context.Context, id string) (*domainLifecycle.Deadline, error) {
+	return nil, nil
+}
+func (m *mockLifecycleRepo) GetDeadlinesByPatent(ctx context.Context, patentID string, statusFilter []domainLifecycle.DeadlineStatus) ([]*domainLifecycle.Deadline, error) {
+	return nil, nil
+}
 func (m *mockLifecycleRepo) GetActiveDeadlines(ctx context.Context, userID *string, daysAhead int, limit, offset int) ([]*domainLifecycle.Deadline, int64, error) {
 	if m.getActiveDeadlinesFn != nil {
 		return m.getActiveDeadlinesFn(ctx, userID, daysAhead, limit, offset)
 	}
 	return nil, 0, nil
 }
-func (m *mockLifecycleRepo) UpdateDeadlineStatus(ctx context.Context, id string, status domainLifecycle.DeadlineStatus, completedBy *string) error { return nil }
-func (m *mockLifecycleRepo) ExtendDeadline(ctx context.Context, id string, newDueDate time.Time, reason string) error { return nil }
-func (m *mockLifecycleRepo) GetCriticalDeadlines(ctx context.Context, limit int) ([]*domainLifecycle.Deadline, error) { return nil, nil }
+func (m *mockLifecycleRepo) UpdateDeadlineStatus(ctx context.Context, id string, status domainLifecycle.DeadlineStatus, completedBy *string) error {
+	return nil
+}
+func (m *mockLifecycleRepo) ExtendDeadline(ctx context.Context, id string, newDueDate time.Time, reason string) error {
+	return nil
+}
+func (m *mockLifecycleRepo) GetCriticalDeadlines(ctx context.Context, limit int) ([]*domainLifecycle.Deadline, error) {
+	return nil, nil
+}
 
-func (m *mockLifecycleRepo) CreateEvent(ctx context.Context, event *domainLifecycle.LifecycleEvent) error { return nil }
-func (m *mockLifecycleRepo) GetEventsByPatent(ctx context.Context, patentID string, eventTypes []domainLifecycle.EventType, limit, offset int) ([]*domainLifecycle.LifecycleEvent, int64, error) { return nil, 0, nil }
-func (m *mockLifecycleRepo) GetEventTimeline(ctx context.Context, patentID string) ([]*domainLifecycle.LifecycleEvent, error) { return nil, nil }
-func (m *mockLifecycleRepo) GetRecentEvents(ctx context.Context, orgID string, limit int) ([]*domainLifecycle.LifecycleEvent, error) { return nil, nil }
+func (m *mockLifecycleRepo) CreateEvent(ctx context.Context, event *domainLifecycle.LifecycleEvent) error {
+	return nil
+}
+func (m *mockLifecycleRepo) GetEventsByPatent(ctx context.Context, patentID string, eventTypes []domainLifecycle.EventType, limit, offset int) ([]*domainLifecycle.LifecycleEvent, int64, error) {
+	return nil, 0, nil
+}
+func (m *mockLifecycleRepo) GetEventTimeline(ctx context.Context, patentID string) ([]*domainLifecycle.LifecycleEvent, error) {
+	return nil, nil
+}
+func (m *mockLifecycleRepo) GetRecentEvents(ctx context.Context, orgID string, limit int) ([]*domainLifecycle.LifecycleEvent, error) {
+	return nil, nil
+}
 
-func (m *mockLifecycleRepo) CreateCostRecord(ctx context.Context, record *domainLifecycle.CostRecord) error { return nil }
-func (m *mockLifecycleRepo) GetCostsByPatent(ctx context.Context, patentID string) ([]*domainLifecycle.CostRecord, error) { return nil, nil }
-func (m *mockLifecycleRepo) GetCostSummary(ctx context.Context, patentID string) (*domainLifecycle.CostSummary, error) { return nil, nil }
-func (m *mockLifecycleRepo) GetPortfolioCostSummary(ctx context.Context, portfolioID string, startDate, endDate time.Time) (*domainLifecycle.PortfolioCostSummary, error) { return nil, nil }
+func (m *mockLifecycleRepo) CreateCostRecord(ctx context.Context, record *domainLifecycle.CostRecord) error {
+	return nil
+}
+func (m *mockLifecycleRepo) GetCostsByPatent(ctx context.Context, patentID string) ([]*domainLifecycle.CostRecord, error) {
+	return nil, nil
+}
+func (m *mockLifecycleRepo) GetCostSummary(ctx context.Context, patentID string) (*domainLifecycle.CostSummary, error) {
+	return nil, nil
+}
+func (m *mockLifecycleRepo) GetPortfolioCostSummary(ctx context.Context, portfolioID string, startDate, endDate time.Time) (*domainLifecycle.PortfolioCostSummary, error) {
+	return nil, nil
+}
 
-func (m *mockLifecycleRepo) GetLifecycleDashboard(ctx context.Context, orgID string) (*domainLifecycle.DashboardStats, error) { return nil, nil }
+func (m *mockLifecycleRepo) GetLifecycleDashboard(ctx context.Context, orgID string) (*domainLifecycle.DashboardStats, error) {
+	return nil, nil
+}
 
-func (m *mockLifecycleRepo) WithTx(ctx context.Context, fn func(domainLifecycle.LifecycleRepository) error) error { return fn(m) }
+func (m *mockLifecycleRepo) WithTx(ctx context.Context, fn func(domainLifecycle.LifecycleRepository) error) error {
+	return fn(m)
+}
 
 // LegalStatus specific methods
 func (m *mockLifecycleRepo) GetByPatentID(ctx context.Context, patentID string) (*domainLifecycle.LegalStatusEntity, error) {
@@ -155,9 +197,9 @@ func (m *mockLifecycleRepo) GetByPatentID(ctx context.Context, patentID string) 
 		return m.getByPatentIDFn(ctx, patentID)
 	}
 	return &domainLifecycle.LegalStatusEntity{
-		PatentID: patentID,
-		Jurisdiction: "CN",
-		Status: "GRANTED",
+		PatentID:      patentID,
+		Jurisdiction:  "CN",
+		Status:        "GRANTED",
 		EffectiveDate: time.Now().AddDate(-1, 0, 0),
 	}, nil
 }
@@ -229,7 +271,7 @@ type mockPatentInfo struct {
 
 type mockPatentRepo struct {
 	testutil.BasePatentRepoMock
-	patents map[string]*mockPatentInfo
+	patents           map[string]*mockPatentInfo
 	listByPortfolioFn func(ctx context.Context, portfolioID string) ([]*domainPatent.Patent, error)
 }
 
@@ -277,7 +319,9 @@ func (m *mockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string
 	return result, nil
 }
 
-func (m *mockPatentRepo) WithTx(ctx context.Context, fn func(domainPatent.PatentRepository) error) error { return fn(m) }
+func (m *mockPatentRepo) WithTx(ctx context.Context, fn func(domainPatent.PatentRepository) error) error {
+	return fn(m)
+}
 
 type mockExchangeRate struct {
 	rates map[string]float64
@@ -379,15 +423,31 @@ func (m *mockCache) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-type mockLogger struct{
+type mockLogger struct {
 	mu       sync.Mutex
 	messages []string
 }
 
-func (m *mockLogger) Info(msg string, _ ...interface{})  { m.mu.Lock(); defer m.mu.Unlock(); m.messages = append(m.messages, msg) }
-func (m *mockLogger) Warn(msg string, _ ...interface{})  { m.mu.Lock(); defer m.mu.Unlock(); m.messages = append(m.messages, msg) }
-func (m *mockLogger) Error(msg string, _ ...interface{}) { m.mu.Lock(); defer m.mu.Unlock(); m.messages = append(m.messages, msg) }
-func (m *mockLogger) Debug(msg string, _ ...interface{}) { m.mu.Lock(); defer m.mu.Unlock(); m.messages = append(m.messages, msg) }
+func (m *mockLogger) Info(msg string, _ ...interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.messages = append(m.messages, msg)
+}
+func (m *mockLogger) Warn(msg string, _ ...interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.messages = append(m.messages, msg)
+}
+func (m *mockLogger) Error(msg string, _ ...interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.messages = append(m.messages, msg)
+}
+func (m *mockLogger) Debug(msg string, _ ...interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.messages = append(m.messages, msg)
+}
 
 type mockValueProvider struct {
 	scores map[string]float64

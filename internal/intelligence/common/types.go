@@ -13,7 +13,7 @@ import (
 type InputFormat int
 
 const (
-	FormatJSON     InputFormat = iota
+	FormatJSON InputFormat = iota
 	FormatProtobuf
 	FormatNumpy
 	FormatText

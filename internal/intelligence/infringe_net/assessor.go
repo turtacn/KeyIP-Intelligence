@@ -104,11 +104,11 @@ const (
 
 // AssessmentOptions holds configurable parameters for an assessment run.
 type AssessmentOptions struct {
-	EnableEquivalents    bool
-	EnableEstoppelCheck  bool
-	ConfidenceThreshold  float64
-	MaxConcurrency       int
-	Timeout              time.Duration
+	EnableEquivalents   bool
+	EnableEstoppelCheck bool
+	ConfidenceThreshold float64
+	MaxConcurrency      int
+	Timeout             time.Duration
 }
 
 // DefaultAssessmentOptions returns production defaults.
@@ -177,9 +177,9 @@ func applyOptions(opts []AssessmentOption) *AssessmentOptions {
 
 // AssessmentRequest is the input for a single infringement assessment.
 type AssessmentRequest struct {
-	RequestID string          `json:"request_id,omitempty"`
-	Molecule  *MoleculeInput  `json:"molecule"`
-	Claims    []*ClaimInput   `json:"claims"`
+	RequestID string             `json:"request_id,omitempty"`
+	Molecule  *MoleculeInput     `json:"molecule"`
+	Claims    []*ClaimInput      `json:"claims"`
 	Options   []AssessmentOption `json:"-"`
 }
 
@@ -197,11 +197,11 @@ type ClaimMatchResult struct {
 
 // LiteralAnalysisResult is the sub-result from literal infringement analysis.
 type LiteralAnalysisResult struct {
-	Score           float64            `json:"score"`
-	ElementScores   map[string]float64 `json:"element_scores,omitempty"`
-	AllElementsMet  bool               `json:"all_elements_met"`
-	Confidence      float64            `json:"confidence"`
-	ModelVersion    string             `json:"model_version,omitempty"`
+	Score          float64            `json:"score"`
+	ElementScores  map[string]float64 `json:"element_scores,omitempty"`
+	AllElementsMet bool               `json:"all_elements_met"`
+	Confidence     float64            `json:"confidence"`
+	ModelVersion   string             `json:"model_version,omitempty"`
 }
 
 // EquivalentsAnalysisResult is the sub-result from doctrine-of-equivalents.
@@ -216,48 +216,48 @@ type EquivalentsAnalysisResult struct {
 
 // EstoppelCheckResult is the sub-result from prosecution-history estoppel.
 type EstoppelCheckResult struct {
-	HasEstoppel     bool               `json:"has_estoppel"`
-	PenaltyScore    float64            `json:"penalty_score"`
-	Amendments      []string           `json:"amendments,omitempty"`
-	Confidence      float64            `json:"confidence"`
-	Skipped         bool               `json:"skipped,omitempty"`
-	SkipReason      string             `json:"skip_reason,omitempty"`
+	HasEstoppel  bool     `json:"has_estoppel"`
+	PenaltyScore float64  `json:"penalty_score"`
+	Amendments   []string `json:"amendments,omitempty"`
+	Confidence   float64  `json:"confidence"`
+	Skipped      bool     `json:"skipped,omitempty"`
+	SkipReason   string   `json:"skip_reason,omitempty"`
 }
 
 // AssessmentResult is the comprehensive output of a single assessment.
 type AssessmentResult struct {
-	RequestID          string                     `json:"request_id"`
-	OverallRiskLevel   RiskLevel                  `json:"overall_risk_level"`
-	OverallScore       float64                    `json:"overall_score"`
-	LiteralAnalysis    *LiteralAnalysisResult     `json:"literal_analysis"`
+	RequestID           string                     `json:"request_id"`
+	OverallRiskLevel    RiskLevel                  `json:"overall_risk_level"`
+	OverallScore        float64                    `json:"overall_score"`
+	LiteralAnalysis     *LiteralAnalysisResult     `json:"literal_analysis"`
 	EquivalentsAnalysis *EquivalentsAnalysisResult `json:"equivalents_analysis"`
-	EstoppelCheck      *EstoppelCheckResult        `json:"estoppel_check"`
-	MatchedClaims      []*ClaimMatchResult         `json:"matched_claims"`
-	Confidence         float64                    `json:"confidence"`
-	Degraded           bool                       `json:"degraded"`
-	DegradedReason     string                     `json:"degraded_reason,omitempty"`
-	ProcessingTimeMs   int64                      `json:"processing_time_ms"`
-	ModelVersions      map[string]string          `json:"model_versions"`
-	Error              string                     `json:"error,omitempty"`
+	EstoppelCheck       *EstoppelCheckResult       `json:"estoppel_check"`
+	MatchedClaims       []*ClaimMatchResult        `json:"matched_claims"`
+	Confidence          float64                    `json:"confidence"`
+	Degraded            bool                       `json:"degraded"`
+	DegradedReason      string                     `json:"degraded_reason,omitempty"`
+	ProcessingTimeMs    int64                      `json:"processing_time_ms"`
+	ModelVersions       map[string]string          `json:"model_versions"`
+	Error               string                     `json:"error,omitempty"`
 }
 
 // PortfolioAssessmentResult aggregates results across a patent portfolio.
 type PortfolioAssessmentResult struct {
-	Molecule            *MoleculeInput             `json:"molecule"`
-	PortfolioID         string                     `json:"portfolio_id"`
-	TotalPatentsScanned int                        `json:"total_patents_scanned"`
-	RiskDistribution    map[RiskLevel]int          `json:"risk_distribution"`
-	TopRisks            []*AssessmentResult         `json:"top_risks"`
-	ScanDurationMs      int64                      `json:"scan_duration_ms"`
+	Molecule            *MoleculeInput      `json:"molecule"`
+	PortfolioID         string              `json:"portfolio_id"`
+	TotalPatentsScanned int                 `json:"total_patents_scanned"`
+	RiskDistribution    map[RiskLevel]int   `json:"risk_distribution"`
+	TopRisks            []*AssessmentResult `json:"top_risks"`
+	ScanDurationMs      int64               `json:"scan_duration_ms"`
 }
 
 // AssessmentExplanation provides human-readable interpretation.
 type AssessmentExplanation struct {
-	ResultID                string   `json:"result_id"`
-	NaturalLanguageSummary  string   `json:"natural_language_summary"`
+	ResultID                  string                 `json:"result_id"`
+	NaturalLanguageSummary    string                 `json:"natural_language_summary"`
 	ElementByElementBreakdown []ElementBreakdownItem `json:"element_by_element_breakdown"`
-	KeyFactors              []string `json:"key_factors"`
-	SuggestedActions        []string `json:"suggested_actions"`
+	KeyFactors                []string               `json:"key_factors"`
+	SuggestedActions          []string               `json:"suggested_actions"`
 }
 
 // ElementBreakdownItem is one row in the element-by-element comparison.
@@ -310,15 +310,15 @@ type InfringementAssessor interface {
 // ---------------------------------------------------------------------------
 
 type infringementAssessor struct {
-	model          InfringeModel
-	equivalents    EquivalentsAnalyzer
-	mapper         ClaimElementMapper
-	portfolio      PortfolioLoader
-	explStore      ExplanationStore
-	explGenerator  ExplanationGenerator
-	metrics        common.IntelligenceMetrics
-	logger         common.Logger
-	defaultOpts    *AssessmentOptions
+	model         InfringeModel
+	equivalents   EquivalentsAnalyzer
+	mapper        ClaimElementMapper
+	portfolio     PortfolioLoader
+	explStore     ExplanationStore
+	explGenerator ExplanationGenerator
+	metrics       common.IntelligenceMetrics
+	logger        common.Logger
+	defaultOpts   *AssessmentOptions
 }
 
 // NewInfringementAssessor constructs the assessor with all required dependencies.
@@ -809,7 +809,7 @@ func (a *infringementAssessor) buildClaimMatches(
 		if estoppel != nil && estoppel.HasEstoppel {
 			estPenalty = estoppel.PenaltyScore
 		}
-		combined := clamp01(weightLiteral*litScore + weightEquivalents*eqScore -	weightEstoppel*estPenalty)
+		combined := clamp01(weightLiteral*litScore + weightEquivalents*eqScore - weightEstoppel*estPenalty)
 
 		matched := []string{}
 		missed := []string{}
@@ -863,8 +863,8 @@ func convertClaimsToFeatures(m []*MappedClaim) []*ClaimElementFeature {
 	for _, mc := range m {
 		for _, e := range mc.Elements {
 			out = append(out, &ClaimElementFeature{
-				ElementID:     e.ElementID,
-				SMARTSPattern: e.StructuralConstraint,
+				ElementID:        e.ElementID,
+				SMARTSPattern:    e.StructuralConstraint,
 				RequiredPresence: true,
 			})
 		}
@@ -893,10 +893,8 @@ func groupClaimsByPatent(claims []*ClaimInput) map[string][]*ClaimInput {
 	return m
 }
 
-
 func roundTo4(v float64) float64 {
 	return math.Round(v*10000) / 10000
 }
 
 //Personal.AI order the ending
-

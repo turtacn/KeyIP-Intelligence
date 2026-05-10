@@ -86,13 +86,13 @@ const (
 
 // ShareRequest is the input DTO for creating a share.
 type ShareRequest struct {
-	WorkspaceID   string          `json:"workspace_id"`
-	Permission    SharePermission `json:"permission"`
-	Duration      ShareDuration   `json:"duration"`
-	CustomExpiry  *time.Time      `json:"custom_expiry,omitempty"`
-	CreatedBy     string          `json:"created_by"`
-	Description   string          `json:"description,omitempty"`
-	MaxAccessCount int            `json:"max_access_count,omitempty"`
+	WorkspaceID    string          `json:"workspace_id"`
+	Permission     SharePermission `json:"permission"`
+	Duration       ShareDuration   `json:"duration"`
+	CustomExpiry   *time.Time      `json:"custom_expiry,omitempty"`
+	CreatedBy      string          `json:"created_by"`
+	Description    string          `json:"description,omitempty"`
+	MaxAccessCount int             `json:"max_access_count,omitempty"`
 }
 
 // Validate checks the share request for correctness.
@@ -127,12 +127,12 @@ func (r *ShareRequest) Validate() error {
 
 // ShareResponse is the output DTO after creating a share.
 type ShareResponse struct {
-	ShareID   string          `json:"share_id"`
-	Token     string          `json:"token"`
-	Link      string          `json:"link"`
-	ExpiresAt *time.Time      `json:"expires_at,omitempty"`
+	ShareID    string          `json:"share_id"`
+	Token      string          `json:"token"`
+	Link       string          `json:"link"`
+	ExpiresAt  *time.Time      `json:"expires_at,omitempty"`
 	Permission SharePermission `json:"permission"`
-	CreatedAt time.Time       `json:"created_at"`
+	CreatedAt  time.Time       `json:"created_at"`
 }
 
 // ShareInfo contains validated share metadata returned by token validation.
@@ -165,7 +165,7 @@ type ShareRecord struct {
 type ListSharesOption func(*listSharesConfig)
 
 type listSharesConfig struct {
-	Pagination  commontypes.Pagination
+	Pagination     commontypes.Pagination
 	IncludeRevoked bool
 }
 

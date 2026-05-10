@@ -13,6 +13,7 @@
 //   - TestFormatTable_BasicTable / EmptyHeaders / UnevenRows / WideColumns
 //   - TestInitConfig_ExplicitPath / DefaultSearch / FallbackDefaults
 //   - TestPadRight_Exact / Shorter / Longer
+//
 // * Mock 依赖：无
 // * 断言验证：命令属性、Flag 默认值、输出内容、错误类型、表格格式
 // * 强制约束：文件最后一行必须为 `//Personal.AI order the ending`
@@ -184,8 +185,8 @@ type testTableData struct {
 	rows    [][]string
 }
 
-func (d *testTableData) TableHeaders() []string  { return d.headers }
-func (d *testTableData) TableRows() [][]string    { return d.rows }
+func (d *testTableData) TableHeaders() []string { return d.headers }
+func (d *testTableData) TableRows() [][]string  { return d.rows }
 
 type testStringer struct{ val string }
 

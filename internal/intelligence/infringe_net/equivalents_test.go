@@ -287,8 +287,8 @@ func TestAnalyzeElement_BelowBoundary(t *testing.T) {
 
 	// Just below each threshold.
 	tests := []struct {
-		name string
-		f, w, r float64
+		name     string
+		f, w, r  float64
 		failStep string
 	}{
 		{"function_below", 0.699, 0.80, 0.80, "function"},
@@ -1048,4 +1048,3 @@ func (l *mockEquivalentsLogger) Info(msg string, keysAndValues ...interface{})  
 func (l *mockEquivalentsLogger) Warn(msg string, keysAndValues ...interface{})  {}
 func (l *mockEquivalentsLogger) Error(msg string, keysAndValues ...interface{}) {}
 func (l *mockEquivalentsLogger) Debug(msg string, keysAndValues ...interface{}) {}
-

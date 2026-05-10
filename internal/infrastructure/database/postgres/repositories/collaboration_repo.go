@@ -22,10 +22,10 @@ import (
 // WorkspaceMember represents a single member entry stored inside the JSONB
 // "members" column of the workspaces table.
 type WorkspaceMember struct {
-	UserID   string    `json:"user_id"`
-	Role     string    `json:"role"` // owner | admin | editor | viewer
-	JoinedAt time.Time `json:"joined_at"`
-	InvitedBy string   `json:"invited_by,omitempty"`
+	UserID    string    `json:"user_id"`
+	Role      string    `json:"role"` // owner | admin | editor | viewer
+	JoinedAt  time.Time `json:"joined_at"`
+	InvitedBy string    `json:"invited_by,omitempty"`
 }
 
 // SharedResource represents a resource shared within a workspace, stored

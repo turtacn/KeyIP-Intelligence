@@ -4,49 +4,49 @@
 //
 // 实现要求:
 //
-// * **功能定位**：封装 net/http.Server 的创建、启动、优雅关闭全生命周期，
-//   作为 KeyIP-Intelligence API 服务的 HTTP 入口点
-// * **核心实现**：
-//   * 定义 `ServerConfig` 结构体：
-//     - Host string（监听地址，默认 "0.0.0.0"）
-//     - Port int（监听端口，默认 8080）
-//     - ReadTimeout time.Duration（读超时，默认 30s）
-//     - WriteTimeout time.Duration（写超时，默认 60s）
-//     - IdleTimeout time.Duration（空闲超时，默认 120s）
-//     - ReadHeaderTimeout time.Duration（读 Header 超时，默认 10s）
-//     - MaxHeaderBytes int（最大 Header 字节数，默认 1MB）
-//     - ShutdownTimeout time.Duration（优雅关闭超时，默认 30s）
-//     - TLSCertFile string（TLS 证书路径，可选）
-//     - TLSKeyFile string（TLS 密钥路径，可选）
-//   * 定义 `Server` 结构体：
-//     - httpServer *http.Server
-//     - config ServerConfig
-//     - handler http.Handler
-//     - logger logging.Logger
-//     - started atomic.Bool
-//   * 定义 `NewServer(cfg ServerConfig, handler http.Handler, logger logging.Logger) *Server`：
-//     - 应用默认值填充
-//     - 构建 net/http.Server 实例
-//   * 定义 `(s *Server) Start(ctx context.Context) error`：
-//     - 启动 HTTP/HTTPS 监听
-//     - 在 goroutine 中运行 ListenAndServe / ListenAndServeTLS
-//     - 监听 ctx.Done() 触发优雅关闭
-//     - 返回启动错误（非 ErrServerClosed）
-//   * 定义 `(s *Server) Shutdown(ctx context.Context) error`：
-//     - 调用 httpServer.Shutdown 优雅关闭
-//     - 等待所有活跃连接处理完毕或超时
-//   * 定义 `(s *Server) Addr() string`：返回实际监听地址
-//   * 定义 `(s *Server) IsRunning() bool`：返回服务器运行状态
-// * **业务逻辑**：
+//   - **功能定位**：封装 net/http.Server 的创建、启动、优雅关闭全生命周期，
+//     作为 KeyIP-Intelligence API 服务的 HTTP 入口点
+//   - **核心实现**：
+//   - 定义 `ServerConfig` 结构体：
+//   - Host string（监听地址，默认 "0.0.0.0"）
+//   - Port int（监听端口，默认 8080）
+//   - ReadTimeout time.Duration（读超时，默认 30s）
+//   - WriteTimeout time.Duration（写超时，默认 60s）
+//   - IdleTimeout time.Duration（空闲超时，默认 120s）
+//   - ReadHeaderTimeout time.Duration（读 Header 超时，默认 10s）
+//   - MaxHeaderBytes int（最大 Header 字节数，默认 1MB）
+//   - ShutdownTimeout time.Duration（优雅关闭超时，默认 30s）
+//   - TLSCertFile string（TLS 证书路径，可选）
+//   - TLSKeyFile string（TLS 密钥路径，可选）
+//   - 定义 `Server` 结构体：
+//   - httpServer *http.Server
+//   - config ServerConfig
+//   - handler http.Handler
+//   - logger logging.Logger
+//   - started atomic.Bool
+//   - 定义 `NewServer(cfg ServerConfig, handler http.Handler, logger logging.Logger) *Server`：
+//   - 应用默认值填充
+//   - 构建 net/http.Server 实例
+//   - 定义 `(s *Server) Start(ctx context.Context) error`：
+//   - 启动 HTTP/HTTPS 监听
+//   - 在 goroutine 中运行 ListenAndServe / ListenAndServeTLS
+//   - 监听 ctx.Done() 触发优雅关闭
+//   - 返回启动错误（非 ErrServerClosed）
+//   - 定义 `(s *Server) Shutdown(ctx context.Context) error`：
+//   - 调用 httpServer.Shutdown 优雅关闭
+//   - 等待所有活跃连接处理完毕或超时
+//   - 定义 `(s *Server) Addr() string`：返回实际监听地址
+//   - 定义 `(s *Server) IsRunning() bool`：返回服务器运行状态
+//   - **业务逻辑**：
 //   - 支持 HTTP 和 HTTPS 双模式，通过 TLS 配置自动切换
 //   - 优雅关闭时先停止接受新连接，等待活跃请求完成
 //   - 超时后强制关闭剩余连接
 //   - 启动时记录监听地址和协议到日志
-// * **依赖关系**：
-//   * 依赖：net/http、crypto/tls、internal/infrastructure/monitoring/logging/logger.go
-//   * 被依赖：cmd/apiserver/main.go
-// * **测试要求**：启动/关闭生命周期、TLS 模式切换、超时配置、并发安全
-// * **强制约束**：文件最后一行必须为 `//Personal.AI order the ending`
+//   - **依赖关系**：
+//   - 依赖：net/http、crypto/tls、internal/infrastructure/monitoring/logging/logger.go
+//   - 被依赖：cmd/apiserver/main.go
+//   - **测试要求**：启动/关闭生命周期、TLS 模式切换、超时配置、并发安全
+//   - **强制约束**：文件最后一行必须为 `//Personal.AI order the ending`
 //
 // ---
 package http

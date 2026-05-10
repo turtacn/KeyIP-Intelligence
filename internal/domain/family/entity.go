@@ -5,21 +5,21 @@ import (
 )
 
 type FamilyMember struct {
-	PatentID     string    `json:"patent_id"`
-	PatentNumber string    `json:"patent_number"`
-	Jurisdiction string    `json:"jurisdiction"`
+	PatentID     string     `json:"patent_id"`
+	PatentNumber string     `json:"patent_number"`
+	Jurisdiction string     `json:"jurisdiction"`
 	FilingDate   *time.Time `json:"filing_date,omitempty"`
-	Role         string    `json:"role"`
-	AddedAt      time.Time `json:"added_at"`
+	Role         string     `json:"role"`
+	AddedAt      time.Time  `json:"added_at"`
 }
 
 type FamilyAggregate struct {
-	FamilyID   string          `json:"family_id"`
-	FamilyType string          `json:"family_type"`
-	Members    []FamilyMember  `json:"members"`
-	Metadata   map[string]any  `json:"metadata,omitempty"`
-	CreatedAt  time.Time       `json:"created_at"`
-	UpdatedAt  time.Time       `json:"updated_at"`
+	FamilyID   string         `json:"family_id"`
+	FamilyType string         `json:"family_type"`
+	Members    []FamilyMember `json:"members"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
 }
 
 type FamilyMemberInput struct {
@@ -35,12 +35,12 @@ type PriorityLink struct {
 }
 
 type FamilyStats struct {
-	TotalMembers            int64            `json:"total_members"`
-	Jurisdictions           []string         `json:"jurisdictions"`
-	JurisdictionCounts      map[string]int64 `json:"jurisdiction_counts"`
-	EarliestFiling          *time.Time       `json:"earliest_filing,omitempty"`
-	LatestExpiry            *time.Time       `json:"latest_expiry,omitempty"`
-	StatusDistribution      map[string]int64 `json:"status_distribution"`
+	TotalMembers       int64            `json:"total_members"`
+	Jurisdictions      []string         `json:"jurisdictions"`
+	JurisdictionCounts map[string]int64 `json:"jurisdiction_counts"`
+	EarliestFiling     *time.Time       `json:"earliest_filing,omitempty"`
+	LatestExpiry       *time.Time       `json:"latest_expiry,omitempty"`
+	StatusDistribution map[string]int64 `json:"status_distribution"`
 }
 
 type RelatedFamily struct {

@@ -1,7 +1,7 @@
 /*
  * metrics.go 实现了 IntelligenceMetrics 接口的三种变体（Prometheus、Noop、InMemory）以及基于排序切片+线性插值的 latencyHistogram，所有 Prometheus 指标遵循 patentcraft_intelligence_ 前缀命名规范，bucket 配置覆盖 1ms–5000ms 区间。
  * metrics_test.go 覆盖了全部要求的测试用例，包括 Prometheus 注册/重复注册、各 Record 方法的标签验证、Noop 零值安全、InMemory 查询回溯、百分位数精度（P50/P95/P99）、并发读写安全性以及参数结构体完整性校验。
-*/
+ */
 
 package common
 
@@ -84,29 +84,29 @@ type InferenceMetricParams struct {
 
 // BatchMetricParams carries the data for a batch processing event.
 type BatchMetricParams struct {
-	BatchName        string  `json:"batch_name"`
-	TotalItems       int     `json:"total_items"`
-	SuccessItems     int     `json:"success_items"`
-	FailedItems      int     `json:"failed_items"`
-	TimeoutItems     int     `json:"timeout_items"`
-	CancelledItems   int     `json:"cancelled_items"`
-	TotalDurationMs  float64 `json:"total_duration_ms"`
+	BatchName         string  `json:"batch_name"`
+	TotalItems        int     `json:"total_items"`
+	SuccessItems      int     `json:"success_items"`
+	FailedItems       int     `json:"failed_items"`
+	TimeoutItems      int     `json:"timeout_items"`
+	CancelledItems    int     `json:"cancelled_items"`
+	TotalDurationMs   float64 `json:"total_duration_ms"`
 	AvgItemDurationMs float64 `json:"avg_item_duration_ms"`
-	MaxConcurrency   int     `json:"max_concurrency"`
+	MaxConcurrency    int     `json:"max_concurrency"`
 }
 
 // IntelligenceStats is a point-in-time snapshot of intelligence-layer metrics.
 type IntelligenceStats struct {
-	TotalInferences        int64              `json:"total_inferences"`
-	SuccessfulInferences   int64              `json:"successful_inferences"`
-	FailedInferences       int64              `json:"failed_inferences"`
-	AvgInferenceLatencyMs  float64            `json:"avg_inference_latency_ms"`
-	P50LatencyMs           float64            `json:"p50_latency_ms"`
-	P95LatencyMs           float64            `json:"p95_latency_ms"`
-	P99LatencyMs           float64            `json:"p99_latency_ms"`
-	CacheHitRate           float64            `json:"cache_hit_rate"`
-	ActiveModels           []string           `json:"active_models"`
-	CircuitBreakerStates   map[string]string  `json:"circuit_breaker_states"`
+	TotalInferences       int64             `json:"total_inferences"`
+	SuccessfulInferences  int64             `json:"successful_inferences"`
+	FailedInferences      int64             `json:"failed_inferences"`
+	AvgInferenceLatencyMs float64           `json:"avg_inference_latency_ms"`
+	P50LatencyMs          float64           `json:"p50_latency_ms"`
+	P95LatencyMs          float64           `json:"p95_latency_ms"`
+	P99LatencyMs          float64           `json:"p99_latency_ms"`
+	CacheHitRate          float64           `json:"cache_hit_rate"`
+	ActiveModels          []string          `json:"active_models"`
+	CircuitBreakerStates  map[string]string `json:"circuit_breaker_states"`
 }
 
 // ---------------------------------------------------------------------------
@@ -118,15 +118,15 @@ const metricsPrefix = "patentcraft_intelligence_"
 var defaultLatencyBuckets = []float64{1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000}
 
 type prometheusIntelligenceMetrics struct {
-	inferenceLatency       *prometheus.HistogramVec
-	inferenceTotal         *prometheus.CounterVec
+	inferenceLatency        *prometheus.HistogramVec
+	inferenceTotal          *prometheus.CounterVec
 	batchProcessingDuration *prometheus.HistogramVec
-	batchItemsTotal        *prometheus.CounterVec
-	cacheAccessTotal       *prometheus.CounterVec
-	circuitBreakerState    *prometheus.GaugeVec
-	riskAssessmentTotal    *prometheus.CounterVec
-	riskAssessmentDuration *prometheus.HistogramVec
-	modelLoadDuration      *prometheus.HistogramVec
+	batchItemsTotal         *prometheus.CounterVec
+	cacheAccessTotal        *prometheus.CounterVec
+	circuitBreakerState     *prometheus.GaugeVec
+	riskAssessmentTotal     *prometheus.CounterVec
+	riskAssessmentDuration  *prometheus.HistogramVec
+	modelLoadDuration       *prometheus.HistogramVec
 
 	// in-memory tracking for GetCurrentStats / GetInferenceLatencyHistogram
 	latencyHist *latencyHistogram
@@ -336,12 +336,13 @@ func NewNoopIntelligenceMetrics() *noopIntelligenceMetrics {
 	return &noopIntelligenceMetrics{}
 }
 
-func (n *noopIntelligenceMetrics) RecordInference(context.Context, *InferenceMetricParams)        {}
-func (n *noopIntelligenceMetrics) RecordBatchProcessing(context.Context, *BatchMetricParams)       {}
-func (n *noopIntelligenceMetrics) RecordCacheAccess(context.Context, bool, string)                 {}
-func (n *noopIntelligenceMetrics) RecordCircuitBreakerStateChange(context.Context, string, string, string) {}
-func (n *noopIntelligenceMetrics) RecordRiskAssessment(context.Context, string, float64)           {}
-func (n *noopIntelligenceMetrics) RecordModelLoad(context.Context, string, string, float64, bool)  {}
+func (n *noopIntelligenceMetrics) RecordInference(context.Context, *InferenceMetricParams)   {}
+func (n *noopIntelligenceMetrics) RecordBatchProcessing(context.Context, *BatchMetricParams) {}
+func (n *noopIntelligenceMetrics) RecordCacheAccess(context.Context, bool, string)           {}
+func (n *noopIntelligenceMetrics) RecordCircuitBreakerStateChange(context.Context, string, string, string) {
+}
+func (n *noopIntelligenceMetrics) RecordRiskAssessment(context.Context, string, float64)          {}
+func (n *noopIntelligenceMetrics) RecordModelLoad(context.Context, string, string, float64, bool) {}
 
 func (n *noopIntelligenceMetrics) GetInferenceLatencyHistogram() LatencyHistogram {
 	return newLatencyHistogram()
@@ -674,4 +675,3 @@ var (
 	_ IntelligenceMetrics = (*inMemoryIntelligenceMetrics)(nil)
 	_ LatencyHistogram    = (*latencyHistogram)(nil)
 )
-

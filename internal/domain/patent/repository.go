@@ -12,33 +12,33 @@ import (
 
 // PatentSearchCriteria encapsulates filters for querying patents.
 type PatentSearchCriteria struct {
-	Query             string         `json:"query"` // Full text query
-	PatentNumbers     []string       `json:"patent_numbers"`
-	TitleKeywords     []string       `json:"title_keywords"`
-	AbstractKeywords  []string       `json:"abstract_keywords"`
-	FullTextKeywords  []string       `json:"full_text_keywords"`
-	Offices           []PatentOffice `json:"offices"`
-	Status            []PatentStatus `json:"status"` // Corrected field name
-	Jurisdictions     []string       `json:"jurisdictions"` // Added
-	IPCCodes          []string       `json:"ipc_codes"`
-	ApplicantNames    []string       `json:"applicant_names"`
-	InventorNames     []string       `json:"inventor_names"`
-	MoleculeIDs       []string       `json:"molecule_ids"`
-	FamilyID          string         `json:"family_id"`
-	FilingDateStart   *time.Time     `json:"filing_date_start"` // Corrected field name
-	FilingDateEnd     *time.Time     `json:"filing_date_end"`   // Corrected field name
-	GrantDateFrom     *time.Time     `json:"grant_date_from"`
-	GrantDateTo       *time.Time     `json:"grant_date_to"`
-	ExpiryDateFrom    *time.Time     `json:"expiry_date_from"`
-	ExpiryDateTo      *time.Time     `json:"expiry_date_to"`
-	HasMarkushStructure *bool        `json:"has_markush_structure"`
-	MinClaimCount     *int           `json:"min_claim_count"`
-	MaxClaimCount     *int           `json:"max_claim_count"`
-	Language          string         `json:"language"`
-	SortBy            string         `json:"sort_by"`    // "filing_date", "grant_date", "relevance"
-	SortOrder         string         `json:"sort_order"` // "asc", "desc"
-	Offset            int            `json:"offset"`
-	Limit             int            `json:"limit"`
+	Query               string         `json:"query"` // Full text query
+	PatentNumbers       []string       `json:"patent_numbers"`
+	TitleKeywords       []string       `json:"title_keywords"`
+	AbstractKeywords    []string       `json:"abstract_keywords"`
+	FullTextKeywords    []string       `json:"full_text_keywords"`
+	Offices             []PatentOffice `json:"offices"`
+	Status              []PatentStatus `json:"status"`        // Corrected field name
+	Jurisdictions       []string       `json:"jurisdictions"` // Added
+	IPCCodes            []string       `json:"ipc_codes"`
+	ApplicantNames      []string       `json:"applicant_names"`
+	InventorNames       []string       `json:"inventor_names"`
+	MoleculeIDs         []string       `json:"molecule_ids"`
+	FamilyID            string         `json:"family_id"`
+	FilingDateStart     *time.Time     `json:"filing_date_start"` // Corrected field name
+	FilingDateEnd       *time.Time     `json:"filing_date_end"`   // Corrected field name
+	GrantDateFrom       *time.Time     `json:"grant_date_from"`
+	GrantDateTo         *time.Time     `json:"grant_date_to"`
+	ExpiryDateFrom      *time.Time     `json:"expiry_date_from"`
+	ExpiryDateTo        *time.Time     `json:"expiry_date_to"`
+	HasMarkushStructure *bool          `json:"has_markush_structure"`
+	MinClaimCount       *int           `json:"min_claim_count"`
+	MaxClaimCount       *int           `json:"max_claim_count"`
+	Language            string         `json:"language"`
+	SortBy              string         `json:"sort_by"`    // "filing_date", "grant_date", "relevance"
+	SortOrder           string         `json:"sort_order"` // "asc", "desc"
+	Offset              int            `json:"offset"`
+	Limit               int            `json:"limit"`
 }
 
 func (c PatentSearchCriteria) Validate() error {

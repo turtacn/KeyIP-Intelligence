@@ -25,11 +25,11 @@ import (
 // stubLogger implements logging.Logger for testing.
 type stubLogger struct{}
 
-func (s *stubLogger) Debug(msg string, fields ...logging.Field) {}
-func (s *stubLogger) Info(msg string, fields ...logging.Field)  {}
-func (s *stubLogger) Warn(msg string, fields ...logging.Field)  {}
-func (s *stubLogger) Error(msg string, fields ...logging.Field) {}
-func (s *stubLogger) Fatal(msg string, fields ...logging.Field) {}
+func (s *stubLogger) Debug(msg string, fields ...logging.Field)      {}
+func (s *stubLogger) Info(msg string, fields ...logging.Field)       {}
+func (s *stubLogger) Warn(msg string, fields ...logging.Field)       {}
+func (s *stubLogger) Error(msg string, fields ...logging.Field)      {}
+func (s *stubLogger) Fatal(msg string, fields ...logging.Field)      {}
 func (s *stubLogger) With(fields ...logging.Field) logging.Logger    { return s }
 func (s *stubLogger) WithContext(ctx context.Context) logging.Logger { return s }
 func (s *stubLogger) WithError(err error) logging.Logger             { return s }
@@ -40,7 +40,7 @@ type stubHealthChecker struct {
 	name string
 }
 
-func (s *stubHealthChecker) Name() string { return s.name }
+func (s *stubHealthChecker) Name() string                    { return s.name }
 func (s *stubHealthChecker) Check(ctx context.Context) error { return nil }
 
 // newMinimalHealthHandler creates a HealthHandler with stub dependencies.
@@ -139,7 +139,7 @@ func TestNewRouter_ConditionalMiddleware_Logic(t *testing.T) {
 	}
 
 	conditional := conditionalMiddleware("/api/", testMw)
-	
+
 	// Case 1: Match
 	handler := conditional(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	req := httptest.NewRequest("GET", "/api/v1/resource", nil)

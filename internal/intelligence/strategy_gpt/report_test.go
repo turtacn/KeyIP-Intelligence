@@ -116,12 +116,11 @@ func (m *mockPromptMgr) BuildPrompt(ctx context.Context, task AnalysisTask, para
 }
 
 // Satisfy other interface methods with no-ops or stubs
-func (m *mockPromptMgr) GetSystemPrompt(task AnalysisTask) (string, error) { return "", nil }
+func (m *mockPromptMgr) GetSystemPrompt(task AnalysisTask) (string, error)            { return "", nil }
 func (m *mockPromptMgr) RenderTemplate(name string, data interface{}) (string, error) { return "", nil }
-func (m *mockPromptMgr) RegisterTemplate(name string, tmpl string) error { return nil }
-func (m *mockPromptMgr) ListTemplates() []TemplateInfo { return nil }
-func (m *mockPromptMgr) EstimateTokenCount(text string) int { return len(text) / 4 }
-
+func (m *mockPromptMgr) RegisterTemplate(name string, tmpl string) error              { return nil }
+func (m *mockPromptMgr) ListTemplates() []TemplateInfo                                { return nil }
+func (m *mockPromptMgr) EstimateTokenCount(text string) int                           { return len(text) / 4 }
 
 type mockRAG struct {
 	retrieveFn func(ctx context.Context, query *RAGQuery) (*RAGResult, error)
@@ -143,12 +142,15 @@ func (m *mockRAG) RetrieveAndRerank(ctx context.Context, query *RAGQuery) (*RAGR
 }
 
 // Satisfy other interface methods
-func (m *mockRAG) Retrieve(ctx context.Context, query *RAGQuery) (*RAGResult, error) { return m.RetrieveAndRerank(ctx, query) }
-func (m *mockRAG) BuildContext(ctx context.Context, result *RAGResult, budget int) (string, error) { return "", nil }
+func (m *mockRAG) Retrieve(ctx context.Context, query *RAGQuery) (*RAGResult, error) {
+	return m.RetrieveAndRerank(ctx, query)
+}
+func (m *mockRAG) BuildContext(ctx context.Context, result *RAGResult, budget int) (string, error) {
+	return "", nil
+}
 func (m *mockRAG) IndexDocument(ctx context.Context, doc *Document) error { return nil }
 func (m *mockRAG) IndexBatch(ctx context.Context, docs []*Document) error { return nil }
 func (m *mockRAG) DeleteDocument(ctx context.Context, docID string) error { return nil }
-
 
 // ---------------------------------------------------------------------------
 // Helpers

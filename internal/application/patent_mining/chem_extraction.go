@@ -45,11 +45,11 @@ func ValidDocumentFormats() map[DocumentFormat]struct{} {
 type EntityType string
 
 const (
-	EntityTypeSMILES    EntityType = "smiles"
-	EntityTypeInChI     EntityType = "inchi"
-	EntityTypeChemName  EntityType = "chemical_name"
-	EntityTypeCAS       EntityType = "cas_number"
-	EntityTypeFormula   EntityType = "molecular_formula"
+	EntityTypeSMILES   EntityType = "smiles"
+	EntityTypeInChI    EntityType = "inchi"
+	EntityTypeChemName EntityType = "chemical_name"
+	EntityTypeCAS      EntityType = "cas_number"
+	EntityTypeFormula  EntityType = "molecular_formula"
 )
 
 // ReviewStatus indicates whether an extracted entity requires human review.
@@ -65,11 +65,11 @@ const (
 type JobStatus string
 
 const (
-	JobStatusPending    JobStatus = "pending"
-	JobStatusRunning    JobStatus = "running"
-	JobStatusCompleted  JobStatus = "completed"
-	JobStatusFailed     JobStatus = "failed"
-	JobStatusCancelled  JobStatus = "cancelled"
+	JobStatusPending   JobStatus = "pending"
+	JobStatusRunning   JobStatus = "running"
+	JobStatusCompleted JobStatus = "completed"
+	JobStatusFailed    JobStatus = "failed"
+	JobStatusCancelled JobStatus = "cancelled"
 )
 
 // ---------------------------------------------------------------------------
@@ -128,16 +128,16 @@ type ExtractionResult struct {
 
 // ExtractionJob tracks the state of an asynchronous batch extraction.
 type ExtractionJob struct {
-	JobID           string             `json:"job_id"`
-	Status          JobStatus          `json:"status"`
-	TotalDocuments  int                `json:"total_documents"`
-	ProcessedCount  int                `json:"processed_count"`
-	FailedCount     int                `json:"failed_count"`
-	Results         []ExtractionResult `json:"results,omitempty"`
-	ErrorMessage    string             `json:"error_message,omitempty"`
-	CreatedAt       time.Time          `json:"created_at"`
-	UpdatedAt       time.Time          `json:"updated_at"`
-	CompletedAt     *time.Time         `json:"completed_at,omitempty"`
+	JobID          string             `json:"job_id"`
+	Status         JobStatus          `json:"status"`
+	TotalDocuments int                `json:"total_documents"`
+	ProcessedCount int                `json:"processed_count"`
+	FailedCount    int                `json:"failed_count"`
+	Results        []ExtractionResult `json:"results,omitempty"`
+	ErrorMessage   string             `json:"error_message,omitempty"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	CompletedAt    *time.Time         `json:"completed_at,omitempty"`
 }
 
 // ListExtractionOpts provides pagination and filtering for extraction history queries.
@@ -184,14 +184,14 @@ type ChemExtractionService interface {
 
 // chemExtractionServiceImpl orchestrates chemical extraction across intelligence and domain layers.
 type chemExtractionServiceImpl struct {
-	extractor   chemextractor.ChemicalExtractor
-	molService  molecule.Service
-	molRepo     molecule.Repository
-	patentRepo  patent.Repository
-	storage     storageminio.ObjectRepository
-	logger      logging.Logger
-	jobs        map[string]*ExtractionJob
-	jobsMu      sync.RWMutex
+	extractor  chemextractor.ChemicalExtractor
+	molService molecule.Service
+	molRepo    molecule.Repository
+	patentRepo patent.Repository
+	storage    storageminio.ObjectRepository
+	logger     logging.Logger
+	jobs       map[string]*ExtractionJob
+	jobsMu     sync.RWMutex
 }
 
 // NewChemExtractionService constructs a ChemExtractionService with all required dependencies.
@@ -309,8 +309,8 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 
 	// 3. Process each raw entity: standardize, validate, deduplicate, persist.
 	result := &ExtractionResult{
-		RequestID:  string(commontypes.NewID()),
-		DocumentID: req.DocumentID,
+		RequestID:   string(commontypes.NewID()),
+		DocumentID:  req.DocumentID,
 		ExtractedAt: time.Now(),
 	}
 
@@ -377,8 +377,8 @@ func (s *chemExtractionServiceImpl) ExtractFromDocument(ctx context.Context, req
 			// Persist new molecule via domain service.
 			mol, createErr := s.molService.CreateFromSMILES(ctx, resolved.SMILES, map[string]string{
 				"source_document": req.DocumentID,
-				"source_page":    fmt.Sprintf("%d", 1),
-				"extraction_id":  result.RequestID,
+				"source_page":     fmt.Sprintf("%d", 1),
+				"extraction_id":   result.RequestID,
 			})
 			if createErr != nil {
 				s.logger.Error("failed to persist molecule",

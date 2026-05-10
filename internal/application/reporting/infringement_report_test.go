@@ -33,6 +33,7 @@ type infMockInfringementAssessor struct {
 	assessFunc func(ctx context.Context, smiles string, claimData interface{}, depth string) (interface{}, error)
 	callCount  int
 }
+
 func (m *infMockInfringementAssessor) Assess(ctx context.Context, smiles string, claimData interface{}, depth string) (interface{}, error) {
 	m.callCount++
 	if m.assessFunc != nil {
@@ -45,6 +46,7 @@ type infMockEquivalentsAnalyzer struct {
 	analyzeFunc func(ctx context.Context, claimData interface{}, targetSmiles string) (float64, []claimElementMapping, error)
 	callCount   int
 }
+
 func (m *infMockEquivalentsAnalyzer) Analyze(ctx context.Context, claimData interface{}, targetSmiles string) (float64, []claimElementMapping, error) {
 	m.callCount++
 	if m.analyzeFunc != nil {
@@ -57,6 +59,7 @@ func (m *infMockEquivalentsAnalyzer) Analyze(ctx context.Context, claimData inte
 type infMockClaimParser struct {
 	parseFunc func(ctx context.Context, patentID string) (interface{}, error)
 }
+
 func (m *infMockClaimParser) Parse(ctx context.Context, patentID string) (interface{}, error) {
 	if m.parseFunc != nil {
 		return m.parseFunc(ctx, patentID)
@@ -67,6 +70,7 @@ func (m *infMockClaimParser) Parse(ctx context.Context, patentID string) (interf
 type infMockMoleculeService struct {
 	validateFunc func(ctx context.Context, format, value string) (string, string, error)
 }
+
 func (m *infMockMoleculeService) ValidateAndNormalize(ctx context.Context, format, value string) (string, string, error) {
 	if m.validateFunc != nil {
 		return m.validateFunc(ctx, format, value)
@@ -78,6 +82,7 @@ func (m *infMockMoleculeService) ValidateAndNormalize(ctx context.Context, forma
 type infMockPatentRepo struct {
 	getDetailsFunc func(ctx context.Context, patentIDs []string) (interface{}, error)
 }
+
 func (m *infMockPatentRepo) GetDetails(ctx context.Context, patentIDs []string) (interface{}, error) {
 	if m.getDetailsFunc != nil {
 		return m.getDetailsFunc(ctx, patentIDs)
@@ -89,6 +94,7 @@ type infMockChemExtractor struct {
 	extractFunc func(ctx context.Context, text string) ([]string, error)
 	callCount   int
 }
+
 func (m *infMockChemExtractor) ExtractMolecules(ctx context.Context, text string) ([]string, error) {
 	m.callCount++
 	if m.extractFunc != nil {
@@ -100,6 +106,7 @@ func (m *infMockChemExtractor) ExtractMolecules(ctx context.Context, text string
 type infMockTemplateEngine struct {
 	renderFunc func(ctx context.Context, templateName string, data interface{}, format ReportFormat) ([]byte, error)
 }
+
 func (m *infMockTemplateEngine) Render(ctx context.Context, req *RenderRequest) (*RenderResult, error) {
 	if m.renderFunc != nil {
 		content, err := m.renderFunc(ctx, req.TemplateID, req.Data, req.OutputFormat)
@@ -139,6 +146,7 @@ type infMockStorageRepo struct {
 	saveFunc      func(ctx context.Context, key string, data []byte, contentType string) error
 	getStreamFunc func(ctx context.Context, key string) (io.ReadCloser, error)
 }
+
 func (m *infMockStorageRepo) Save(ctx context.Context, key string, data []byte, contentType string) error {
 	if m.saveFunc != nil {
 		return m.saveFunc(ctx, key, data, contentType)
@@ -160,25 +168,36 @@ type infMockMetadataRepo struct {
 	listFunc         func(ctx context.Context, filter *InfringementReportFilter, page *common.Pagination) ([]InfringementReportSummary, int64, error)
 	deleteFunc       func(ctx context.Context, reportID string) error
 }
+
 func (m *infMockMetadataRepo) Create(ctx context.Context, summary *InfringementReportSummary) error {
-	if m.createFunc != nil { return m.createFunc(ctx, summary) }
+	if m.createFunc != nil {
+		return m.createFunc(ctx, summary)
+	}
 	return nil
 }
 func (m *infMockMetadataRepo) UpdateStatus(ctx context.Context, reportID string, status ReportStatus, summary *InfringementReportSummary) error {
-	if m.updateStatusFunc != nil { return m.updateStatusFunc(ctx, reportID, status, summary) }
+	if m.updateStatusFunc != nil {
+		return m.updateStatusFunc(ctx, reportID, status, summary)
+	}
 	return nil
 }
 func (m *infMockMetadataRepo) Get(ctx context.Context, reportID string) (*InfringementReportSummary, error) {
-	if m.getFunc != nil { return m.getFunc(ctx, reportID) }
+	if m.getFunc != nil {
+		return m.getFunc(ctx, reportID)
+	}
 	now := time.Now()
 	return &InfringementReportSummary{ReportID: reportID, Status: StatusCompleted, CreatedAt: now}, nil
 }
 func (m *infMockMetadataRepo) List(ctx context.Context, filter *InfringementReportFilter, page *common.Pagination) ([]InfringementReportSummary, int64, error) {
-	if m.listFunc != nil { return m.listFunc(ctx, filter, page) }
+	if m.listFunc != nil {
+		return m.listFunc(ctx, filter, page)
+	}
 	return []InfringementReportSummary{{ReportID: "report-1", Status: StatusCompleted}}, 1, nil
 }
 func (m *infMockMetadataRepo) Delete(ctx context.Context, reportID string) error {
-	if m.deleteFunc != nil { return m.deleteFunc(ctx, reportID) }
+	if m.deleteFunc != nil {
+		return m.deleteFunc(ctx, reportID)
+	}
 	return nil
 }
 
@@ -186,6 +205,7 @@ type infMockCache struct {
 	data map[string]interface{}
 	mu   sync.RWMutex
 }
+
 func newInfMockCache() *infMockCache { return &infMockCache{data: make(map[string]interface{})} }
 func (m *infMockCache) Get(ctx context.Context, key string, dest interface{}) error {
 	m.mu.RLock()
@@ -212,14 +232,21 @@ type infMockLogger struct {
 	errs  []string
 	mu    sync.Mutex
 }
+
 func (l *infMockLogger) Info(ctx context.Context, msg string, keysAndValues ...interface{}) {
-	l.mu.Lock(); defer l.mu.Unlock(); l.infos = append(l.infos, msg)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.infos = append(l.infos, msg)
 }
 func (l *infMockLogger) Error(ctx context.Context, msg string, keysAndValues ...interface{}) {
-	l.mu.Lock(); defer l.mu.Unlock(); l.errs = append(l.errs, msg)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.errs = append(l.errs, msg)
 }
 func (l *infMockLogger) Warn(ctx context.Context, msg string, keysAndValues ...interface{}) {
-	l.mu.Lock(); defer l.mu.Unlock(); l.warns = append(l.warns, msg)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.warns = append(l.warns, msg)
 }
 func (l *infMockLogger) Debug(ctx context.Context, msg string, keysAndValues ...interface{}) {}
 
@@ -228,14 +255,19 @@ type infMockMetrics struct {
 	histos map[string][]float64
 	mu     sync.Mutex
 }
+
 func newInfMockMetrics() *infMockMetrics {
 	return &infMockMetrics{counts: make(map[string]int), histos: make(map[string][]float64)}
 }
 func (m *infMockMetrics) IncCounter(name string, labels map[string]string) {
-	m.mu.Lock(); defer m.mu.Unlock(); m.counts[name]++
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.counts[name]++
 }
 func (m *infMockMetrics) ObserveHistogram(name string, value float64, labels map[string]string) {
-	m.mu.Lock(); defer m.mu.Unlock(); m.histos[name] = append(m.histos[name], value)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.histos[name] = append(m.histos[name], value)
 }
 
 // ============================================================================
@@ -294,9 +326,11 @@ func validInfringementRequest() *InfringementReportRequest {
 	}
 }
 
-func sampleOwnedPatent() interface{} { return map[string]interface{}{"title": "Mock Patent"} }
+func sampleOwnedPatent() interface{}   { return map[string]interface{}{"title": "Mock Patent"} }
 func sampleClaimElements() interface{} { return []string{"Element A", "Element B"} }
-func sampleLiteralAssessment(prob float64) interface{} { return map[string]interface{}{"probability": prob} }
+func sampleLiteralAssessment(prob float64) interface{} {
+	return map[string]interface{}{"probability": prob}
+}
 func sampleEquivalentsAssessment() (float64, []claimElementMapping) {
 	mappings := []claimElementMapping{
 		{ElementNumber: 1, ClaimElement: "A", TargetFeature: "A'", MatchType: "Equivalent", ConfidenceScore: 0.9},
@@ -306,8 +340,12 @@ func sampleEquivalentsAssessment() (float64, []claimElementMapping) {
 
 func assertErrCode(t *testing.T, err error, code errors.ErrorCode) {
 	t.Helper()
-	if err == nil { t.Fatalf("Expected error code %s, got nil", code) }
-	if !errors.IsCode(err, code) { t.Errorf("Expected error code %s, got %v", code, err) }
+	if err == nil {
+		t.Fatalf("Expected error code %s, got nil", code)
+	}
+	if !errors.IsCode(err, code) {
+		t.Errorf("Expected error code %s, got %v", code, err)
+	}
 }
 
 // ============================================================================
@@ -322,13 +360,23 @@ func TestInfringementReportService_Generate_LiteralMode_Success(t *testing.T) {
 
 	resp, err := svc.Generate(context.Background(), req)
 
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
-	if resp.Status != StatusCompleted { t.Errorf("Expected StatusCompleted") }
-	if resp.ReportID == "" { t.Errorf("Expected ReportID") }
-	if m.equiv.callCount > 0 { t.Errorf("EquivalentsAnalyzer should not be called in ModeLiteral") }
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if resp.Status != StatusCompleted {
+		t.Errorf("Expected StatusCompleted")
+	}
+	if resp.ReportID == "" {
+		t.Errorf("Expected ReportID")
+	}
+	if m.equiv.callCount > 0 {
+		t.Errorf("EquivalentsAnalyzer should not be called in ModeLiteral")
+	}
 
 	// 2 patents * 3 molecules = 6 assessments
-	if m.assessor.callCount != 6 { t.Errorf("Expected 6 literal assessments, got %d", m.assessor.callCount) }
+	if m.assessor.callCount != 6 {
+		t.Errorf("Expected 6 literal assessments, got %d", m.assessor.callCount)
+	}
 }
 
 func TestInfringementReportService_Generate_EquivalentsMode_Success(t *testing.T) {
@@ -337,13 +385,21 @@ func TestInfringementReportService_Generate_EquivalentsMode_Success(t *testing.T
 	req := validInfringementRequest()
 	req.AnalysisMode = ModeEquivalents
 
-	// 
+	//
 	resp, err := svc.Generate(context.Background(), req)
 
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
-	if resp.Status != StatusCompleted { t.Errorf("Expected StatusCompleted") }
-	if m.equiv.callCount != 6 { t.Errorf("Expected 6 equivalent analyses, got %d", m.equiv.callCount) }
-	if m.assessor.callCount != 6 { t.Errorf("Expected 6 literal assessments") }
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if resp.Status != StatusCompleted {
+		t.Errorf("Expected StatusCompleted")
+	}
+	if m.equiv.callCount != 6 {
+		t.Errorf("Expected 6 equivalent analyses, got %d", m.equiv.callCount)
+	}
+	if m.assessor.callCount != 6 {
+		t.Errorf("Expected 6 literal assessments")
+	}
 }
 
 func TestInfringementReportService_Generate_ComprehensiveMode_Success(t *testing.T) {
@@ -354,9 +410,15 @@ func TestInfringementReportService_Generate_ComprehensiveMode_Success(t *testing
 	req.IncludeProsecutionHistory = true
 
 	resp, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
-	if resp.Status != StatusCompleted { t.Errorf("Expected StatusCompleted") }
-	if m.equiv.callCount == 0 { t.Errorf("Equiv should be called in Comprehensive") }
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if resp.Status != StatusCompleted {
+		t.Errorf("Expected StatusCompleted")
+	}
+	if m.equiv.callCount == 0 {
+		t.Errorf("Equiv should be called in Comprehensive")
+	}
 
 	// In the mock implementation, we simulate prosecution history by `len(smiles)%2 != 0`.
 	// C1=CC=CC=C1 length is 11 (odd) -> banned
@@ -373,7 +435,9 @@ func TestInfringementReportService_Generate_AutoUpgradeMode(t *testing.T) {
 	req.IncludeEquivalents = true
 
 	_, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	// Should be upgraded to ModeEquivalents
 	if m.equiv.callCount == 0 {
@@ -384,9 +448,13 @@ func TestInfringementReportService_Generate_AutoUpgradeMode(t *testing.T) {
 	defer m.logger.mu.Unlock()
 	hasUpgradeLog := false
 	for _, l := range m.logger.infos {
-		if strings.Contains(l, "Auto-upgrading") { hasUpgradeLog = true }
+		if strings.Contains(l, "Auto-upgrading") {
+			hasUpgradeLog = true
+		}
 	}
-	if !hasUpgradeLog { t.Errorf("Expected auto-upgrade log") }
+	if !hasUpgradeLog {
+		t.Errorf("Expected auto-upgrade log")
+	}
 }
 
 func TestInfringementReportService_Generate_EmptyOwnedPatents(t *testing.T) {
@@ -423,9 +491,15 @@ func TestInfringementReportService_Generate_SuspectedPatentsWithExtraction(t *te
 	}
 
 	_, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
-	if m.chemExt.callCount == 0 { t.Errorf("ChemExtractor should be called") }
-	if m.assessor.callCount == 0 { t.Errorf("Extracted molecules should be assessed") }
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if m.chemExt.callCount == 0 {
+		t.Errorf("ChemExtractor should be called")
+	}
+	if m.assessor.callCount == 0 {
+		t.Errorf("Extracted molecules should be assessed")
+	}
 }
 
 func TestInfringementReportService_Generate_MixedTargets_Dedup(t *testing.T) {
@@ -445,7 +519,9 @@ func TestInfringementReportService_Generate_MixedTargets_Dedup(t *testing.T) {
 	}
 
 	_, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	// 2 owned patents * 1 unique molecule = 2 assessments
 	if m.assessor.callCount != 2 {
@@ -465,8 +541,12 @@ func TestInfringementReportService_Generate_OwnedPatentNotFound(t *testing.T) {
 	}
 
 	resp, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Expected partial success, got error: %v", err) }
-	if resp.Status != StatusCompleted { t.Errorf("Expected StatusCompleted") }
+	if err != nil {
+		t.Fatalf("Expected partial success, got error: %v", err)
+	}
+	if resp.Status != StatusCompleted {
+		t.Errorf("Expected StatusCompleted")
+	}
 
 	// Only 1 patent succeeds * 3 molecules = 3 assessments
 	if m.assessor.callCount != 3 {
@@ -498,8 +578,12 @@ func TestInfringementReportService_Generate_ClaimParserError(t *testing.T) {
 	}
 
 	_, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Expected partial success") }
-	if m.assessor.callCount != 3 { t.Errorf("Expected 3 assessments") }
+	if err != nil {
+		t.Fatalf("Expected partial success")
+	}
+	if m.assessor.callCount != 3 {
+		t.Errorf("Expected 3 assessments")
+	}
 }
 
 func TestInfringementReportService_Generate_AssessorError(t *testing.T) {
@@ -512,8 +596,12 @@ func TestInfringementReportService_Generate_AssessorError(t *testing.T) {
 
 	// Implementation skips failing assessment. Doesn't completely abort the report but logs warning
 	resp, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Expected partial success handling") }
-	if resp.Status != StatusCompleted { t.Errorf("Expected StatusCompleted") }
+	if err != nil {
+		t.Fatalf("Expected partial success handling")
+	}
+	if resp.Status != StatusCompleted {
+		t.Errorf("Expected StatusCompleted")
+	}
 }
 
 func TestInfringementReportService_Generate_EquivalentsAnalyzerError(t *testing.T) {
@@ -526,8 +614,12 @@ func TestInfringementReportService_Generate_EquivalentsAnalyzerError(t *testing.
 
 	// Should still complete with literal results
 	resp, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Expected partial success handling") }
-	if resp.Status != StatusCompleted { t.Errorf("Expected StatusCompleted") }
+	if err != nil {
+		t.Fatalf("Expected partial success handling")
+	}
+	if resp.Status != StatusCompleted {
+		t.Errorf("Expected StatusCompleted")
+	}
 }
 
 func TestInfringementReportService_Generate_ChemExtractorError(t *testing.T) {
@@ -546,10 +638,16 @@ func TestInfringementReportService_Generate_ChemExtractorError(t *testing.T) {
 	}
 
 	resp, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Expected partial success handling, got error: %v", err) }
-	if resp.Status != StatusCompleted { t.Errorf("Expected StatusCompleted, got %s", resp.Status) }
+	if err != nil {
+		t.Fatalf("Expected partial success handling, got error: %v", err)
+	}
+	if resp.Status != StatusCompleted {
+		t.Errorf("Expected StatusCompleted, got %s", resp.Status)
+	}
 	// Assessor should run for MOL-P2 (1 owned patent * 1 valid extracted molecule)
-	if m.assessor.callCount != 1 { t.Errorf("Expected 1 assessment, got %d", m.assessor.callCount) }
+	if m.assessor.callCount != 1 {
+		t.Errorf("Expected 1 assessment, got %d", m.assessor.callCount)
+	}
 }
 
 func TestInfringementReportService_Generate_ClaimChart(t *testing.T) {
@@ -572,8 +670,12 @@ func TestInfringementReportService_Generate_ClaimChart(t *testing.T) {
 	}
 
 	_, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Unexpected error") }
-	if !dataPassedToTemplate { t.Errorf("Expected claim charts to be included in report data") }
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
+	if !dataPassedToTemplate {
+		t.Errorf("Expected claim charts to be included in report data")
+	}
 }
 
 func TestInfringementReportService_Generate_RiskLevelCalculation(t *testing.T) {
@@ -613,7 +715,9 @@ func TestInfringementReportService_Generate_RiskLevelCalculation(t *testing.T) {
 		}
 
 		_, err := svc.Generate(context.Background(), req)
-		if err != nil { t.Fatalf("Unexpected error: %v", err) }
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
 		if finalRisk != tc.expected {
 			t.Errorf("For probability %f, expected risk %s, got %s", tc.litProb, tc.expected, finalRisk)
 		}
@@ -632,10 +736,14 @@ func TestInfringementReportService_Generate_AsyncPath(t *testing.T) {
 	}
 	req.SuspectedMolecules = mols
 
-	// 
+	//
 	resp, err := svc.Generate(context.Background(), req)
-	if err != nil { t.Fatalf("Unexpected error") }
-	if resp.Status != StatusQueued { t.Errorf("Expected StatusQueued") }
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
+	if resp.Status != StatusQueued {
+		t.Errorf("Expected StatusQueued")
+	}
 }
 
 func TestInfringementReportService_Generate_TemplateRenderError(t *testing.T) {
@@ -647,7 +755,9 @@ func TestInfringementReportService_Generate_TemplateRenderError(t *testing.T) {
 	}
 
 	_, err := svc.Generate(context.Background(), req)
-	if err == nil { t.Fatalf("Expected error from template rendering") }
+	if err == nil {
+		t.Fatalf("Expected error from template rendering")
+	}
 }
 
 func TestInfringementReportService_Generate_StorageError(t *testing.T) {
@@ -659,7 +769,9 @@ func TestInfringementReportService_Generate_StorageError(t *testing.T) {
 	}
 
 	_, err := svc.Generate(context.Background(), req)
-	if err == nil { t.Fatalf("Expected error from storage save") }
+	if err == nil {
+		t.Fatalf("Expected error from storage save")
+	}
 }
 
 func TestInfringementReportService_Generate_MetricsRecorded(t *testing.T) {
@@ -690,8 +802,12 @@ func TestInfringementReportService_GetStatus_CacheHit(t *testing.T) {
 	}
 
 	info, err := svc.GetStatus(context.Background(), "R1")
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
-	if info.ProgressPct != 50 { t.Errorf("Expected 50%% progress from cache") }
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if info.ProgressPct != 50 {
+		t.Errorf("Expected 50%% progress from cache")
+	}
 }
 
 func TestInfringementReportService_GetStatus_CacheMiss(t *testing.T) {
@@ -703,8 +819,12 @@ func TestInfringementReportService_GetStatus_CacheMiss(t *testing.T) {
 	}
 
 	info, err := svc.GetStatus(context.Background(), "R2")
-	if err != nil { t.Fatalf("Unexpected error") }
-	if info.Status != StatusCompleted { t.Errorf("Expected StatusCompleted") }
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
+	if info.Status != StatusCompleted {
+		t.Errorf("Expected StatusCompleted")
+	}
 }
 
 func TestInfringementReportService_GetStatus_NotFound(t *testing.T) {
@@ -721,8 +841,12 @@ func TestInfringementReportService_GetReport_Success(t *testing.T) {
 	t.Parallel()
 	svc, _ := newTestInfringementService()
 	stream, err := svc.GetReport(context.Background(), "R1", FormatPDF)
-	if err != nil { t.Fatalf("Unexpected error") }
-	if stream == nil { t.Fatalf("Expected stream") }
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
+	if stream == nil {
+		t.Fatalf("Expected stream")
+	}
 }
 
 func TestInfringementReportService_GetReport_NotCompleted(t *testing.T) {
@@ -739,8 +863,12 @@ func TestInfringementReportService_ListReports_Success(t *testing.T) {
 	t.Parallel()
 	svc, _ := newTestInfringementService()
 	res, err := svc.ListReports(context.Background(), nil, &common.Pagination{Page: 1, PageSize: 10})
-	if err != nil { t.Fatalf("Unexpected error") }
-	if res.Pagination.Total != 1 { t.Errorf("Expected 1 result") }
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
+	if res.Pagination.Total != 1 {
+		t.Errorf("Expected 1 result")
+	}
 }
 
 func TestInfringementReportService_ListReports_FilterByOwnedPatent(t *testing.T) {
@@ -762,14 +890,18 @@ func TestInfringementReportService_ListReports_EmptyResult(t *testing.T) {
 		return []InfringementReportSummary{}, 0, nil
 	}
 	res, _ := svc.ListReports(context.Background(), nil, nil)
-	if res.Pagination.Total != 0 { t.Errorf("Expected total 0") }
+	if res.Pagination.Total != 0 {
+		t.Errorf("Expected total 0")
+	}
 }
 
 func TestInfringementReportService_DeleteReport_Success(t *testing.T) {
 	t.Parallel()
 	svc, _ := newTestInfringementService()
 	err := svc.DeleteReport(context.Background(), "R1")
-	if err != nil { t.Fatalf("Unexpected error") }
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
 }
 
 func TestInfringementReportService_DeleteReport_NotFound(t *testing.T) {

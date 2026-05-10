@@ -7,11 +7,11 @@ import (
 )
 
 type PatentNode struct {
-	ID           uuid.UUID `json:"id"`
-	PatentNumber string    `json:"patent_number"`
-	Jurisdiction string    `json:"jurisdiction"`
+	ID           uuid.UUID  `json:"id"`
+	PatentNumber string     `json:"patent_number"`
+	Jurisdiction string     `json:"jurisdiction"`
 	FilingDate   *time.Time `json:"filing_date,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 type PatentNodeData struct {

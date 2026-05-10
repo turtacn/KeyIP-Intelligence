@@ -3,7 +3,6 @@ package claim_bert
 import (
 	"bufio"
 	"fmt"
-	"math"
 	"os"
 	"regexp"
 	"strings"
@@ -71,18 +70,18 @@ const (
 // WordPieceTokenizer implements Tokenizer using the WordPiece algorithm with
 // chemical-patent-domain extensions.
 type WordPieceTokenizer struct {
-	vocab              map[string]int
-	inverseVocab       map[int]string
-	maxSequenceLength  int
-	unknownToken       string
-	clsToken           string
-	sepToken           string
-	padToken           string
-	maskToken          string
-	doLowerCase        bool
-	stripAccents       bool
-	chemicalPatterns   []*regexp.Regexp
-	maxWordLen         int
+	vocab             map[string]int
+	inverseVocab      map[int]string
+	maxSequenceLength int
+	unknownToken      string
+	clsToken          string
+	sepToken          string
+	padToken          string
+	maskToken         string
+	doLowerCase       bool
+	stripAccents      bool
+	chemicalPatterns  []*regexp.Regexp
+	maxWordLen        int
 }
 
 // TokenizerOption is a functional option for WordPieceTokenizer construction.
@@ -816,6 +815,3 @@ func appendN(s []int, val, n int) []int {
 
 // Ensure interface compliance at compile time.
 var _ Tokenizer = (*WordPieceTokenizer)(nil)
-
-// Suppress unused import for math in edge cases.
-var _ = math.MaxInt

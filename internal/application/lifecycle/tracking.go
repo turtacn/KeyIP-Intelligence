@@ -21,11 +21,11 @@ type TrackingService interface {
 
 // Lifecycle represents a patent lifecycle.
 type Lifecycle struct {
-	PatentID    string    `json:"patent_id"`
-	Phase       string    `json:"phase"`
-	Status      string    `json:"status"`
-	StartDate   time.Time `json:"start_date"`
-	CurrentDate time.Time `json:"current_date"`
+	PatentID     string     `json:"patent_id"`
+	Phase        string     `json:"phase"`
+	Status       string     `json:"status"`
+	StartDate    time.Time  `json:"start_date"`
+	CurrentDate  time.Time  `json:"current_date"`
 	NextDeadline *time.Time `json:"next_deadline,omitempty"`
 }
 
@@ -65,14 +65,14 @@ type MilestoneList struct {
 
 // Fee represents a lifecycle fee.
 type Fee struct {
-	ID        string    `json:"id"`
-	PatentID  string    `json:"patent_id"`
-	Type      string    `json:"type"`
-	Amount    float64   `json:"amount"`
-	Currency  string    `json:"currency"`
-	DueDate   time.Time `json:"due_date"`
-	PaidDate  *time.Time `json:"paid_date,omitempty"`
-	Status    string    `json:"status"`
+	ID       string     `json:"id"`
+	PatentID string     `json:"patent_id"`
+	Type     string     `json:"type"`
+	Amount   float64    `json:"amount"`
+	Currency string     `json:"currency"`
+	DueDate  time.Time  `json:"due_date"`
+	PaidDate *time.Time `json:"paid_date,omitempty"`
+	Status   string     `json:"status"`
 }
 
 // RecordFeeInput contains input for recording a fee.

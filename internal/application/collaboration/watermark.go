@@ -55,17 +55,17 @@ const (
 
 // WatermarkRecord is the persistent representation of a watermark.
 type WatermarkRecord struct {
-	ID           string          `json:"id"`
-	DocumentID   string          `json:"document_id"`
-	Type         WatermarkType   `json:"type"`
-	Status       WatermarkStatus `json:"status"`
-	Fingerprint  string          `json:"fingerprint"`
-	CreatedBy    string          `json:"created_by"`
-	Metadata     map[string]string `json:"metadata,omitempty"`
-	EmbeddedAt   *time.Time      `json:"embedded_at,omitempty"`
-	VerifiedAt   *time.Time      `json:"verified_at,omitempty"`
-	CreatedAt    time.Time       `json:"created_at"`
-	UpdatedAt    time.Time       `json:"updated_at"`
+	ID          string            `json:"id"`
+	DocumentID  string            `json:"document_id"`
+	Type        WatermarkType     `json:"type"`
+	Status      WatermarkStatus   `json:"status"`
+	Fingerprint string            `json:"fingerprint"`
+	CreatedBy   string            `json:"created_by"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	EmbeddedAt  *time.Time        `json:"embedded_at,omitempty"`
+	VerifiedAt  *time.Time        `json:"verified_at,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 // GenerateWatermarkRequest is the input for watermark generation.
@@ -123,10 +123,10 @@ func (r *EmbedWatermarkRequest) Validate() error {
 
 // EmbedWatermarkResponse is the output after embedding.
 type EmbedWatermarkResponse struct {
-	WatermarkID    string `json:"watermark_id"`
-	DocumentID     string `json:"document_id"`
-	ContentHash    string `json:"content_hash"`
-	EmbeddedAt     time.Time `json:"embedded_at"`
+	WatermarkID string    `json:"watermark_id"`
+	DocumentID  string    `json:"document_id"`
+	ContentHash string    `json:"content_hash"`
+	EmbeddedAt  time.Time `json:"embedded_at"`
 }
 
 // VerifyWatermarkRequest is the input for watermark verification.
@@ -148,11 +148,11 @@ func (r *VerifyWatermarkRequest) Validate() error {
 
 // VerifyWatermarkResponse is the output of verification.
 type VerifyWatermarkResponse struct {
-	DocumentID  string `json:"document_id"`
-	IsValid     bool   `json:"is_valid"`
-	WatermarkID string `json:"watermark_id,omitempty"`
-	Fingerprint string `json:"fingerprint,omitempty"`
-	Message     string `json:"message"`
+	DocumentID  string    `json:"document_id"`
+	IsValid     bool      `json:"is_valid"`
+	WatermarkID string    `json:"watermark_id,omitempty"`
+	Fingerprint string    `json:"fingerprint,omitempty"`
+	Message     string    `json:"message"`
 	VerifiedAt  time.Time `json:"verified_at"`
 }
 

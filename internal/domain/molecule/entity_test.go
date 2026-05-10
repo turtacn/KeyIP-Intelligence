@@ -525,19 +525,31 @@ func TestMolecule_GettersIsolation(t *testing.T) {
 func TestMolecule_ConvenienceMethods(t *testing.T) {
 	t.Parallel()
 	m := newTestMolecule(t)
-	if !m.IsPending() { t.Error("IsPending returned false") }
-	if m.IsActive() { t.Error("IsActive returned true") }
+	if !m.IsPending() {
+		t.Error("IsPending returned false")
+	}
+	if m.IsActive() {
+		t.Error("IsActive returned true")
+	}
 
 	m.InChIKey = "UHOVQNZJYSORNB-UHFFFAOYSA-N"
 	m.Activate()
-	if !m.IsActive() { t.Error("IsActive returned false") }
-	if m.IsPending() { t.Error("IsPending returned true") }
+	if !m.IsActive() {
+		t.Error("IsActive returned false")
+	}
+	if m.IsPending() {
+		t.Error("IsPending returned true")
+	}
 
 	m.Archive()
-	if !m.IsArchived() { t.Error("IsArchived returned false") }
+	if !m.IsArchived() {
+		t.Error("IsArchived returned false")
+	}
 
 	m.MarkDeleted()
-	if !m.IsDeleted() { t.Error("IsDeleted returned false") }
+	if !m.IsDeleted() {
+		t.Error("IsDeleted returned false")
+	}
 
 	str := m.String()
 	if !strings.Contains(str, "Molecule{") || !strings.Contains(str, "deleted") {

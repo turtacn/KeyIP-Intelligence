@@ -17,23 +17,23 @@ import (
 
 // GNNModelConfig holds all configuration for the MolPatent-GNN model.
 type GNNModelConfig struct {
-	ModelID          string            `json:"model_id" yaml:"model_id"`
-	ModelVersion     string            `json:"model_version" yaml:"model_version"`
-	EmbeddingDim     int               `json:"embedding_dim" yaml:"embedding_dim"`
-	NumLayers        int               `json:"num_layers" yaml:"num_layers"`
-	HiddenDim        int               `json:"hidden_dim" yaml:"hidden_dim"`
-	NumHeads         int               `json:"num_heads" yaml:"num_heads"`
-	DropoutRate      float64           `json:"dropout_rate" yaml:"dropout_rate"`
-	Aggregation      AggregationType   `json:"aggregation" yaml:"aggregation"`
-	Readout          ReadoutType       `json:"readout" yaml:"readout"`
-	MaxAtoms         int               `json:"max_atoms" yaml:"max_atoms"`
-	NodeFeatureDim   int               `json:"node_feature_dim" yaml:"node_feature_dim"`
-	EdgeFeatureDim   int               `json:"edge_feature_dim" yaml:"edge_feature_dim"`
-	ServingEndpoint  string            `json:"serving_endpoint" yaml:"serving_endpoint"`
-	TimeoutMs        int64             `json:"timeout_ms" yaml:"timeout_ms"`
-	BatchSize        int               `json:"batch_size" yaml:"batch_size"`
-	WarmupOnLoad     bool              `json:"warmup_on_load" yaml:"warmup_on_load"`
-	Labels           map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	ModelID         string            `json:"model_id" yaml:"model_id"`
+	ModelVersion    string            `json:"model_version" yaml:"model_version"`
+	EmbeddingDim    int               `json:"embedding_dim" yaml:"embedding_dim"`
+	NumLayers       int               `json:"num_layers" yaml:"num_layers"`
+	HiddenDim       int               `json:"hidden_dim" yaml:"hidden_dim"`
+	NumHeads        int               `json:"num_heads" yaml:"num_heads"`
+	DropoutRate     float64           `json:"dropout_rate" yaml:"dropout_rate"`
+	Aggregation     AggregationType   `json:"aggregation" yaml:"aggregation"`
+	Readout         ReadoutType       `json:"readout" yaml:"readout"`
+	MaxAtoms        int               `json:"max_atoms" yaml:"max_atoms"`
+	NodeFeatureDim  int               `json:"node_feature_dim" yaml:"node_feature_dim"`
+	EdgeFeatureDim  int               `json:"edge_feature_dim" yaml:"edge_feature_dim"`
+	ServingEndpoint string            `json:"serving_endpoint" yaml:"serving_endpoint"`
+	TimeoutMs       int64             `json:"timeout_ms" yaml:"timeout_ms"`
+	BatchSize       int               `json:"batch_size" yaml:"batch_size"`
+	WarmupOnLoad    bool              `json:"warmup_on_load" yaml:"warmup_on_load"`
+	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 // AggregationType enumerates GNN message-passing aggregation strategies.
@@ -49,10 +49,10 @@ const (
 type ReadoutType string
 
 const (
-	ReadoutMeanPool    ReadoutType = "mean_pool"
-	ReadoutSumPool     ReadoutType = "sum_pool"
-	ReadoutAttention   ReadoutType = "attention"
-	ReadoutSet2Set     ReadoutType = "set2set"
+	ReadoutMeanPool  ReadoutType = "mean_pool"
+	ReadoutSumPool   ReadoutType = "sum_pool"
+	ReadoutAttention ReadoutType = "attention"
+	ReadoutSet2Set   ReadoutType = "set2set"
 )
 
 // DefaultGNNModelConfig returns a sensible default configuration.
@@ -307,11 +307,10 @@ func (m *GNNModelManager) LastError() error {
 func (m *GNNModelManager) warmup(ctx context.Context) error {
 	warmupSMILES := "C"
 	dummyReq := &common.PredictRequest{
-		ModelName:  m.config.ModelID,
-		InputData:  []byte(fmt.Sprintf(`{"smiles":"%s"}`, warmupSMILES)),
+		ModelName:   m.config.ModelID,
+		InputData:   []byte(fmt.Sprintf(`{"smiles":"%s"}`, warmupSMILES)),
 		InputFormat: common.FormatJSON,
 	}
 	_, err := m.backend.Predict(ctx, dummyReq)
 	return err
 }
-

@@ -54,40 +54,40 @@ import (
 
 // CalculateAnnuityRequest holds parameters for a single-patent annuity calculation.
 type CalculateAnnuityRequest struct {
-	PatentID       string                  `json:"patent_id" validate:"required"`
+	PatentID       string                       `json:"patent_id" validate:"required"`
 	Jurisdiction   domainLifecycle.Jurisdiction `json:"jurisdiction" validate:"required"`
-	TargetCurrency Currency                `json:"target_currency,omitempty"`
-	AsOfDate       time.Time               `json:"as_of_date,omitempty"`
+	TargetCurrency Currency                     `json:"target_currency,omitempty"`
+	AsOfDate       time.Time                    `json:"as_of_date,omitempty"`
 }
 
 // AnnuityResult represents the computed annuity for one patent in one jurisdiction.
 type AnnuityResult struct {
-	PatentID       string                      `json:"patent_id"`
-	PatentNumber   string                      `json:"patent_number"`
-	Title          string                      `json:"title"`
+	PatentID       string                       `json:"patent_id"`
+	PatentNumber   string                       `json:"patent_number"`
+	Title          string                       `json:"title"`
 	Jurisdiction   domainLifecycle.Jurisdiction `json:"jurisdiction"`
-	YearNumber     int                         `json:"year_number"`
-	BaseFee        MoneyAmount                 `json:"base_fee"`
-	ConvertedFee   MoneyAmount                 `json:"converted_fee,omitempty"`
-	DueDate        time.Time                   `json:"due_date"`
-	GracePeriodEnd time.Time                   `json:"grace_period_end"`
-	Status         AnnuityPaymentStatus        `json:"status"`
+	YearNumber     int                          `json:"year_number"`
+	BaseFee        MoneyAmount                  `json:"base_fee"`
+	ConvertedFee   MoneyAmount                  `json:"converted_fee,omitempty"`
+	DueDate        time.Time                    `json:"due_date"`
+	GracePeriodEnd time.Time                    `json:"grace_period_end"`
+	Status         AnnuityPaymentStatus         `json:"status"`
 }
 
 // BatchCalculateRequest holds parameters for multi-patent annuity calculation.
 type BatchCalculateRequest struct {
-	PatentIDs      []string                    `json:"patent_ids" validate:"required,min=1"`
+	PatentIDs      []string                     `json:"patent_ids" validate:"required,min=1"`
 	Jurisdiction   domainLifecycle.Jurisdiction `json:"jurisdiction,omitempty"`
-	TargetCurrency Currency                    `json:"target_currency,omitempty"`
-	AsOfDate       time.Time                   `json:"as_of_date,omitempty"`
+	TargetCurrency Currency                     `json:"target_currency,omitempty"`
+	AsOfDate       time.Time                    `json:"as_of_date,omitempty"`
 }
 
 // BatchCalculateResponse aggregates results and per-patent errors.
 type BatchCalculateResponse struct {
-	Results    []AnnuityResult       `json:"results"`
-	Errors     []BatchItemError      `json:"errors,omitempty"`
-	TotalFee   MoneyAmount           `json:"total_fee"`
-	CalculatedAt time.Time           `json:"calculated_at"`
+	Results      []AnnuityResult  `json:"results"`
+	Errors       []BatchItemError `json:"errors,omitempty"`
+	TotalFee     MoneyAmount      `json:"total_fee"`
+	CalculatedAt time.Time        `json:"calculated_at"`
 }
 
 // BatchItemError captures a per-item failure inside a batch operation.
@@ -99,13 +99,13 @@ type BatchItemError struct {
 
 // GenerateBudgetRequest defines the scope of a budget report.
 type GenerateBudgetRequest struct {
-	PortfolioID    string                      `json:"portfolio_id,omitempty"`
-	PatentIDs      []string                    `json:"patent_ids,omitempty"`
+	PortfolioID    string                         `json:"portfolio_id,omitempty"`
+	PatentIDs      []string                       `json:"patent_ids,omitempty"`
 	Jurisdictions  []domainLifecycle.Jurisdiction `json:"jurisdictions,omitempty"`
-	StartDate      time.Time                   `json:"start_date" validate:"required"`
-	EndDate        time.Time                   `json:"end_date" validate:"required"`
-	GroupBy        BudgetGroupBy               `json:"group_by,omitempty"`
-	TargetCurrency Currency                    `json:"target_currency,omitempty"`
+	StartDate      time.Time                      `json:"start_date" validate:"required"`
+	EndDate        time.Time                      `json:"end_date" validate:"required"`
+	GroupBy        BudgetGroupBy                  `json:"group_by,omitempty"`
+	TargetCurrency Currency                       `json:"target_currency,omitempty"`
 }
 
 // BudgetGroupBy enumerates grouping dimensions for budget reports.
@@ -120,32 +120,32 @@ const (
 
 // BudgetReport is the output of GenerateBudget.
 type BudgetReport struct {
-	ID             string            `json:"id"`
-	GeneratedAt    time.Time         `json:"generated_at"`
-	Period         DateRange         `json:"period"`
-	TargetCurrency Currency          `json:"target_currency"`
-	TotalFee       MoneyAmount       `json:"total_fee"`
-	Items          []BudgetLineItem  `json:"items"`
-	Summary        BudgetSummary     `json:"summary"`
+	ID             string           `json:"id"`
+	GeneratedAt    time.Time        `json:"generated_at"`
+	Period         DateRange        `json:"period"`
+	TargetCurrency Currency         `json:"target_currency"`
+	TotalFee       MoneyAmount      `json:"total_fee"`
+	Items          []BudgetLineItem `json:"items"`
+	Summary        BudgetSummary    `json:"summary"`
 }
 
 // BudgetLineItem is one row in the budget report.
 type BudgetLineItem struct {
-	GroupKey     string      `json:"group_key"`
-	PatentID     string      `json:"patent_id,omitempty"`
-	PatentNumber string      `json:"patent_number,omitempty"`
+	GroupKey     string                       `json:"group_key"`
+	PatentID     string                       `json:"patent_id,omitempty"`
+	PatentNumber string                       `json:"patent_number,omitempty"`
 	Jurisdiction domainLifecycle.Jurisdiction `json:"jurisdiction"`
-	YearNumber   int         `json:"year_number"`
-	DueDate      time.Time   `json:"due_date"`
-	Fee          MoneyAmount `json:"fee"`
+	YearNumber   int                          `json:"year_number"`
+	DueDate      time.Time                    `json:"due_date"`
+	Fee          MoneyAmount                  `json:"fee"`
 }
 
 // BudgetSummary provides aggregated statistics.
 type BudgetSummary struct {
-	TotalPatents       int                        `json:"total_patents"`
-	TotalPayments      int                        `json:"total_payments"`
-	ByJurisdiction     map[string]MoneyAmount      `json:"by_jurisdiction"`
-	ByYear             map[int]MoneyAmount         `json:"by_year"`
+	TotalPatents   int                    `json:"total_patents"`
+	TotalPayments  int                    `json:"total_payments"`
+	ByJurisdiction map[string]MoneyAmount `json:"by_jurisdiction"`
+	ByYear         map[int]MoneyAmount    `json:"by_year"`
 }
 
 // DateRange is a simple start/end pair.
@@ -156,93 +156,93 @@ type DateRange struct {
 
 // PaymentScheduleRequest defines the query for upcoming payments.
 type PaymentScheduleRequest struct {
-	PatentID     string    `json:"patent_id,omitempty"`
-	PortfolioID  string    `json:"portfolio_id,omitempty"`
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	TargetCurrency Currency `json:"target_currency,omitempty"`
+	PatentID       string    `json:"patent_id,omitempty"`
+	PortfolioID    string    `json:"portfolio_id,omitempty"`
+	StartDate      time.Time `json:"start_date"`
+	EndDate        time.Time `json:"end_date"`
+	TargetCurrency Currency  `json:"target_currency,omitempty"`
 }
 
 // PaymentScheduleEntry is one upcoming payment.
 type PaymentScheduleEntry struct {
-	PatentID     string                      `json:"patent_id"`
-	PatentNumber string                      `json:"patent_number"`
+	PatentID     string                       `json:"patent_id"`
+	PatentNumber string                       `json:"patent_number"`
 	Jurisdiction domainLifecycle.Jurisdiction `json:"jurisdiction"`
-	YearNumber   int                         `json:"year_number"`
-	DueDate      time.Time                   `json:"due_date"`
-	Fee          MoneyAmount                 `json:"fee"`
-	Status       AnnuityPaymentStatus        `json:"status"`
-	DaysUntilDue int                         `json:"days_until_due"`
+	YearNumber   int                          `json:"year_number"`
+	DueDate      time.Time                    `json:"due_date"`
+	Fee          MoneyAmount                  `json:"fee"`
+	Status       AnnuityPaymentStatus         `json:"status"`
+	DaysUntilDue int                          `json:"days_until_due"`
 }
 
 // OptimizeCostsRequest defines parameters for cost-optimization analysis.
 type OptimizeCostsRequest struct {
-	PortfolioID        string  `json:"portfolio_id" validate:"required"`
-	ValueScoreThreshold float64 `json:"value_score_threshold,omitempty"`
-	ForecastYears      int     `json:"forecast_years,omitempty"`
-	TargetCurrency     Currency `json:"target_currency,omitempty"`
+	PortfolioID         string   `json:"portfolio_id" validate:"required"`
+	ValueScoreThreshold float64  `json:"value_score_threshold,omitempty"`
+	ForecastYears       int      `json:"forecast_years,omitempty"`
+	TargetCurrency      Currency `json:"target_currency,omitempty"`
 }
 
 // CostOptimizationReport is the output of OptimizeCosts.
 type CostOptimizationReport struct {
-	PortfolioID          string                    `json:"portfolio_id"`
-	GeneratedAt          time.Time                 `json:"generated_at"`
-	CurrentAnnualCost    MoneyAmount               `json:"current_annual_cost"`
-	OptimizedAnnualCost  MoneyAmount               `json:"optimized_annual_cost"`
-	PotentialSavings     MoneyAmount               `json:"potential_savings"`
-	Recommendations      []AbandonmentRecommendation `json:"recommendations"`
-	ForecastYears        int                       `json:"forecast_years"`
-	CumulativeSavings    MoneyAmount               `json:"cumulative_savings"`
+	PortfolioID         string                      `json:"portfolio_id"`
+	GeneratedAt         time.Time                   `json:"generated_at"`
+	CurrentAnnualCost   MoneyAmount                 `json:"current_annual_cost"`
+	OptimizedAnnualCost MoneyAmount                 `json:"optimized_annual_cost"`
+	PotentialSavings    MoneyAmount                 `json:"potential_savings"`
+	Recommendations     []AbandonmentRecommendation `json:"recommendations"`
+	ForecastYears       int                         `json:"forecast_years"`
+	CumulativeSavings   MoneyAmount                 `json:"cumulative_savings"`
 }
 
 // AbandonmentRecommendation suggests dropping a low-value patent.
 type AbandonmentRecommendation struct {
-	PatentID       string      `json:"patent_id"`
-	PatentNumber   string      `json:"patent_number"`
-	Title          string      `json:"title"`
-	ValueScore     float64     `json:"value_score"`
-	AnnualCost     MoneyAmount `json:"annual_cost"`
-	RemainingLife  int         `json:"remaining_life_years"`
-	TotalSavings   MoneyAmount `json:"total_savings"`
-	RiskLevel      string      `json:"risk_level"`
-	Rationale      string      `json:"rationale"`
+	PatentID      string      `json:"patent_id"`
+	PatentNumber  string      `json:"patent_number"`
+	Title         string      `json:"title"`
+	ValueScore    float64     `json:"value_score"`
+	AnnualCost    MoneyAmount `json:"annual_cost"`
+	RemainingLife int         `json:"remaining_life_years"`
+	TotalSavings  MoneyAmount `json:"total_savings"`
+	RiskLevel     string      `json:"risk_level"`
+	Rationale     string      `json:"rationale"`
 }
 
 // RecordPaymentRequest captures a completed payment.
 type RecordPaymentRequest struct {
-	PatentID      string                      `json:"patent_id" validate:"required"`
-	Jurisdiction  domainLifecycle.Jurisdiction `json:"jurisdiction" validate:"required"`
-	YearNumber    int                         `json:"year_number" validate:"required,min=1"`
-	Amount        MoneyAmount                 `json:"amount" validate:"required"`
-	PaidDate      time.Time                   `json:"paid_date" validate:"required"`
-	PaymentRef    string                      `json:"payment_ref,omitempty"`
-	PaidBy        string                      `json:"paid_by,omitempty"`
-	Notes         string                      `json:"notes,omitempty"`
+	PatentID     string                       `json:"patent_id" validate:"required"`
+	Jurisdiction domainLifecycle.Jurisdiction `json:"jurisdiction" validate:"required"`
+	YearNumber   int                          `json:"year_number" validate:"required,min=1"`
+	Amount       MoneyAmount                  `json:"amount" validate:"required"`
+	PaidDate     time.Time                    `json:"paid_date" validate:"required"`
+	PaymentRef   string                       `json:"payment_ref,omitempty"`
+	PaidBy       string                       `json:"paid_by,omitempty"`
+	Notes        string                       `json:"notes,omitempty"`
 }
 
 // PaymentRecord is a persisted payment entry.
 type PaymentRecord struct {
-	ID            string                      `json:"id"`
-	PatentID      string                      `json:"patent_id"`
-	Jurisdiction  domainLifecycle.Jurisdiction `json:"jurisdiction"`
-	YearNumber    int                         `json:"year_number"`
-	Amount        MoneyAmount                 `json:"amount"`
-	PaidDate      time.Time                   `json:"paid_date"`
-	PaymentRef    string                      `json:"payment_ref"`
-	PaidBy        string                      `json:"paid_by"`
-	Notes         string                      `json:"notes"`
-	RecordedAt    time.Time                   `json:"recorded_at"`
+	ID           string                       `json:"id"`
+	PatentID     string                       `json:"patent_id"`
+	Jurisdiction domainLifecycle.Jurisdiction `json:"jurisdiction"`
+	YearNumber   int                          `json:"year_number"`
+	Amount       MoneyAmount                  `json:"amount"`
+	PaidDate     time.Time                    `json:"paid_date"`
+	PaymentRef   string                       `json:"payment_ref"`
+	PaidBy       string                       `json:"paid_by"`
+	Notes        string                       `json:"notes"`
+	RecordedAt   time.Time                    `json:"recorded_at"`
 }
 
 // PaymentHistoryRequest queries past payments.
 type PaymentHistoryRequest struct {
-	PatentID     string                      `json:"patent_id,omitempty"`
-	PortfolioID  string                      `json:"portfolio_id,omitempty"`
+	PatentID     string                       `json:"patent_id,omitempty"`
+	PortfolioID  string                       `json:"portfolio_id,omitempty"`
 	Jurisdiction domainLifecycle.Jurisdiction `json:"jurisdiction,omitempty"`
-	StartDate    time.Time                   `json:"start_date,omitempty"`
-	EndDate      time.Time                   `json:"end_date,omitempty"`
-	Page         int                         `json:"page,omitempty"`
-	PageSize     int                         `json:"page_size,omitempty"`
+	StartDate    time.Time                    `json:"start_date,omitempty"`
+	EndDate      time.Time                    `json:"end_date,omitempty"`
+	Page         int                          `json:"page,omitempty"`
+	PageSize     int                          `json:"page_size,omitempty"`
 }
 
 // Currency represents an ISO-4217 currency code.
@@ -266,12 +266,12 @@ type MoneyAmount struct {
 type AnnuityPaymentStatus string
 
 const (
-	AnnuityStatusPending  AnnuityPaymentStatus = "pending"
-	AnnuityStatusPaid     AnnuityPaymentStatus = "paid"
-	AnnuityStatusOverdue  AnnuityPaymentStatus = "overdue"
-	AnnuityStatusGrace    AnnuityPaymentStatus = "grace_period"
-	AnnuityStatusWaived   AnnuityPaymentStatus = "waived"
-	AnnuityStatusExpired  AnnuityPaymentStatus = "expired"
+	AnnuityStatusPending AnnuityPaymentStatus = "pending"
+	AnnuityStatusPaid    AnnuityPaymentStatus = "paid"
+	AnnuityStatusOverdue AnnuityPaymentStatus = "overdue"
+	AnnuityStatusGrace   AnnuityPaymentStatus = "grace_period"
+	AnnuityStatusWaived  AnnuityPaymentStatus = "waived"
+	AnnuityStatusExpired AnnuityPaymentStatus = "expired"
 )
 
 // ---------------------------------------------------------------------------
@@ -341,19 +341,19 @@ type PatentValueProvider interface {
 
 // annuityServiceImpl is the concrete implementation of AnnuityService.
 type annuityServiceImpl struct {
-	lifecycleSvc   domainLifecycle.Service
-	lifecycleRepo  domainLifecycle.LifecycleRepository
-	patentRepo     domainPatent.PatentRepository
-	exchangeRate   ExchangeRateProvider
-	valueProvider  PatentValueProvider
-	cache          common.CachePort
-	logger         common.Logger
+	lifecycleSvc  domainLifecycle.Service
+	lifecycleRepo domainLifecycle.LifecycleRepository
+	patentRepo    domainPatent.PatentRepository
+	exchangeRate  ExchangeRateProvider
+	valueProvider PatentValueProvider
+	cache         common.CachePort
+	logger        common.Logger
 
 	// Configuration
-	defaultCurrency        Currency
-	valueScoreThreshold    float64
-	defaultForecastYears   int
-	batchConcurrencyLimit  int
+	defaultCurrency       Currency
+	valueScoreThreshold   float64
+	defaultForecastYears  int
+	batchConcurrencyLimit int
 }
 
 // AnnuityServiceConfig holds tunables for the annuity service.
@@ -531,8 +531,8 @@ func (s *annuityServiceImpl) BatchCalculate(ctx context.Context, req *BatchCalcu
 			jurisdiction := req.Jurisdiction
 			if jurisdiction == "" {
 				// Resolve primary jurisdiction from patent record
-			uid, _ := uuid.Parse(patentID)
-			pat, fetchErr := s.patentRepo.GetByID(ctx, uid)
+				uid, _ := uuid.Parse(patentID)
+				pat, fetchErr := s.patentRepo.GetByID(ctx, uid)
 				if fetchErr != nil {
 					results[idx] = itemResult{err: &BatchItemError{
 						PatentID: patentID,

@@ -11,24 +11,24 @@ import (
 // --- Mocks ---
 
 type mockMoleculeRepository struct {
-	SaveFunc               func(ctx context.Context, m *Molecule) error
-	UpdateFunc             func(ctx context.Context, m *Molecule) error
-	DeleteFunc             func(ctx context.Context, id string) error
-	BatchSaveFunc          func(ctx context.Context, molecules []*Molecule) (int, error)
-	FindByIDFunc           func(ctx context.Context, id string) (*Molecule, error)
-	FindByInChIKeyFunc     func(ctx context.Context, inchiKey string) (*Molecule, error)
-	ExistsByInChIKeyFunc   func(ctx context.Context, inchiKey string) (bool, error)
-	SearchFunc             func(ctx context.Context, query *MoleculeQuery) (*MoleculeSearchResult, error)
+	SaveFunc             func(ctx context.Context, m *Molecule) error
+	UpdateFunc           func(ctx context.Context, m *Molecule) error
+	DeleteFunc           func(ctx context.Context, id string) error
+	BatchSaveFunc        func(ctx context.Context, molecules []*Molecule) (int, error)
+	FindByIDFunc         func(ctx context.Context, id string) (*Molecule, error)
+	FindByInChIKeyFunc   func(ctx context.Context, inchiKey string) (*Molecule, error)
+	ExistsByInChIKeyFunc func(ctx context.Context, inchiKey string) (bool, error)
+	SearchFunc           func(ctx context.Context, query *MoleculeQuery) (*MoleculeSearchResult, error)
 
 	// Track calls
-	SaveCalls              int
-	UpdateCalls            int
-	DeleteCalls            int
-	BatchSaveCalls         int
-	FindByIDCalls          int
-	FindByInChIKeyCalls    int
-	ExistsByInChIKeyCalls  int
-	SearchCalls            int
+	SaveCalls             int
+	UpdateCalls           int
+	DeleteCalls           int
+	BatchSaveCalls        int
+	FindByIDCalls         int
+	FindByInChIKeyCalls   int
+	ExistsByInChIKeyCalls int
+	SearchCalls           int
 }
 
 func (m *mockMoleculeRepository) Save(ctx context.Context, molecule *Molecule) error {
@@ -96,17 +96,36 @@ func (m *mockMoleculeRepository) Search(ctx context.Context, query *MoleculeQuer
 }
 
 // Implement other interface methods with panic or no-op if not used in service logic
-func (m *mockMoleculeRepository) FindBySMILES(ctx context.Context, smiles string) ([]*Molecule, error) { return nil, nil }
-func (m *mockMoleculeRepository) FindByIDs(ctx context.Context, ids []string) ([]*Molecule, error) { return nil, nil }
-func (m *mockMoleculeRepository) Exists(ctx context.Context, id string) (bool, error) { return false, nil }
-func (m *mockMoleculeRepository) Count(ctx context.Context, query *MoleculeQuery) (int64, error) { return 0, nil }
-func (m *mockMoleculeRepository) FindBySource(ctx context.Context, source MoleculeSource, offset, limit int) ([]*Molecule, error) { return nil, nil }
-func (m *mockMoleculeRepository) FindByStatus(ctx context.Context, status MoleculeStatus, offset, limit int) ([]*Molecule, error) { return nil, nil }
-func (m *mockMoleculeRepository) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*Molecule, error) { return nil, nil }
-func (m *mockMoleculeRepository) FindByMolecularWeightRange(ctx context.Context, minWeight, maxWeight float64, offset, limit int) ([]*Molecule, error) { return nil, nil }
-func (m *mockMoleculeRepository) FindWithFingerprint(ctx context.Context, fpType FingerprintType, offset, limit int) ([]*Molecule, error) { return nil, nil }
-func (m *mockMoleculeRepository) FindWithoutFingerprint(ctx context.Context, fpType FingerprintType, offset, limit int) ([]*Molecule, error) { return nil, nil }
-
+func (m *mockMoleculeRepository) FindBySMILES(ctx context.Context, smiles string) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindByIDs(ctx context.Context, ids []string) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) Exists(ctx context.Context, id string) (bool, error) {
+	return false, nil
+}
+func (m *mockMoleculeRepository) Count(ctx context.Context, query *MoleculeQuery) (int64, error) {
+	return 0, nil
+}
+func (m *mockMoleculeRepository) FindBySource(ctx context.Context, source MoleculeSource, offset, limit int) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindByStatus(ctx context.Context, status MoleculeStatus, offset, limit int) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindByMolecularWeightRange(ctx context.Context, minWeight, maxWeight float64, offset, limit int) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindWithFingerprint(ctx context.Context, fpType FingerprintType, offset, limit int) ([]*Molecule, error) {
+	return nil, nil
+}
+func (m *mockMoleculeRepository) FindWithoutFingerprint(ctx context.Context, fpType FingerprintType, offset, limit int) ([]*Molecule, error) {
+	return nil, nil
+}
 
 type mockFingerprintCalculator struct {
 	CalculateFunc      func(ctx context.Context, smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) (*Fingerprint, error)
@@ -150,10 +169,10 @@ func (m *mockFingerprintCalculator) Standardize(ctx context.Context, smiles stri
 func (m *mockFingerprintCalculator) SupportedTypes() []FingerprintType { return nil }
 
 type mockSimilarityEngine struct {
-	SearchSimilarFunc func(ctx context.Context, target *Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error)
+	SearchSimilarFunc     func(ctx context.Context, target *Fingerprint, metric SimilarityMetric, threshold float64, limit int) ([]*SimilarityResult, error)
 	ComputeSimilarityFunc func(fp1, fp2 *Fingerprint, metric SimilarityMetric) (float64, error)
 
-	SearchSimilarCalls int
+	SearchSimilarCalls     int
 	ComputeSimilarityCalls int
 }
 
@@ -173,22 +192,26 @@ func (m *mockSimilarityEngine) ComputeSimilarity(fp1, fp2 *Fingerprint, metric S
 	return 0.0, nil
 }
 
-func (m *mockSimilarityEngine) BatchComputeSimilarity(target *Fingerprint, candidates []*Fingerprint, metric SimilarityMetric) ([]float64, error) { return nil, nil }
-func (m *mockSimilarityEngine) RankBySimilarity(ctx context.Context, target *Fingerprint, candidateIDs []string, metric SimilarityMetric) ([]*SimilarityResult, error) { return nil, nil }
+func (m *mockSimilarityEngine) BatchComputeSimilarity(target *Fingerprint, candidates []*Fingerprint, metric SimilarityMetric) ([]float64, error) {
+	return nil, nil
+}
+func (m *mockSimilarityEngine) RankBySimilarity(ctx context.Context, target *Fingerprint, candidateIDs []string, metric SimilarityMetric) ([]*SimilarityResult, error) {
+	return nil, nil
+}
 
 type mockLogger struct {
 	// Simple no-op logger or capture logs
 }
 
-func (l *mockLogger) Debug(msg string, fields ...logging.Field) {}
-func (l *mockLogger) Info(msg string, fields ...logging.Field) {}
-func (l *mockLogger) Warn(msg string, fields ...logging.Field) {}
-func (l *mockLogger) Error(msg string, fields ...logging.Field) {}
-func (l *mockLogger) Fatal(msg string, fields ...logging.Field) {}
-func (l *mockLogger) With(fields ...logging.Field) logging.Logger { return l }
-func (l *mockLogger) Sync() error { return nil }
+func (l *mockLogger) Debug(msg string, fields ...logging.Field)      {}
+func (l *mockLogger) Info(msg string, fields ...logging.Field)       {}
+func (l *mockLogger) Warn(msg string, fields ...logging.Field)       {}
+func (l *mockLogger) Error(msg string, fields ...logging.Field)      {}
+func (l *mockLogger) Fatal(msg string, fields ...logging.Field)      {}
+func (l *mockLogger) With(fields ...logging.Field) logging.Logger    { return l }
+func (l *mockLogger) Sync() error                                    { return nil }
 func (l *mockLogger) WithContext(ctx context.Context) logging.Logger { return l }
-func (l *mockLogger) WithError(err error) logging.Logger { return l }
+func (l *mockLogger) WithError(err error) logging.Logger             { return l }
 
 // --- Tests ---
 
@@ -330,7 +353,7 @@ func TestMoleculeService_CompareMolecules(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		fpCalc.StandardizeFunc = func(ctx context.Context, s string) (string, string, string, string, float64, error) {
-			return s, "InChI="+s, "KEY-"+s, "C", 10.0, nil
+			return s, "InChI=" + s, "KEY-" + s, "C", 10.0, nil
 		}
 		simEngine.ComputeSimilarityFunc = func(fp1, fp2 *Fingerprint, m SimilarityMetric) (float64, error) {
 			return 0.5, nil

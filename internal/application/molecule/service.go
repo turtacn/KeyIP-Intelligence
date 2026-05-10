@@ -127,6 +127,9 @@ func NewService(repo domainMol.MoleculeRepository, logger logging.Logger) Servic
 }
 
 func (s *serviceImpl) Create(ctx context.Context, input *CreateInput) (*Molecule, error) {
+	if input == nil {
+		return nil, errors.NewValidationError("input", "input is required")
+	}
 	if input.SMILES == "" {
 		return nil, errors.NewValidationError("smiles", "smiles is required")
 	}
@@ -252,13 +255,13 @@ func domainToDTO(mol *domainMol.Molecule) *Molecule {
 	if mol == nil {
 		return nil
 	}
-	
+
 	// Convert properties to map
 	propsMap := make(map[string]interface{})
 	for _, prop := range mol.Properties {
 		propsMap[prop.Name] = prop.Value
 	}
-	
+
 	return &Molecule{
 		ID:         mol.ID.String(),
 		Name:       mol.Name,

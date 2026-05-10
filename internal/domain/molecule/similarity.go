@@ -98,7 +98,9 @@ func (c *TanimotoCalculator) Calculate(fp1, fp2 *Fingerprint) (float64, error) {
 
 		// Calculate intersection (A AND B)
 		andBits, err := BitAnd(fp1.Bits, fp2.Bits)
-		if err != nil { return 0, err }
+		if err != nil {
+			return 0, err
+		}
 
 		intersection := PopCount(andBits)
 
@@ -144,12 +146,18 @@ func (c *DiceCalculator) SupportsEncoding(encoding FingerprintEncoding) bool {
 }
 
 func (c *DiceCalculator) Calculate(fp1, fp2 *Fingerprint) (float64, error) {
-	if fp1 == nil || fp2 == nil { return 0, errors.New(errors.ErrCodeInvalidInput, "fingerprints cannot be nil") }
+	if fp1 == nil || fp2 == nil {
+		return 0, errors.New(errors.ErrCodeInvalidInput, "fingerprints cannot be nil")
+	}
 	if !fp1.IsBitVector() || !fp2.IsBitVector() {
 		return 0, errors.New(errors.ErrCodeInvalidInput, "Dice requires bit vectors")
 	}
-	if fp1.Type != fp2.Type { return 0, errors.New(errors.ErrCodeInvalidInput, "type mismatch") }
-	if fp1.NumBits != fp2.NumBits { return 0, errors.New(errors.ErrCodeInvalidInput, "length mismatch") }
+	if fp1.Type != fp2.Type {
+		return 0, errors.New(errors.ErrCodeInvalidInput, "type mismatch")
+	}
+	if fp1.NumBits != fp2.NumBits {
+		return 0, errors.New(errors.ErrCodeInvalidInput, "length mismatch")
+	}
 
 	andBits, _ := BitAnd(fp1.Bits, fp2.Bits)
 	intersection := PopCount(andBits)
@@ -172,7 +180,9 @@ func (c *CosineCalculator) SupportsEncoding(encoding FingerprintEncoding) bool {
 }
 
 func (c *CosineCalculator) Calculate(fp1, fp2 *Fingerprint) (float64, error) {
-	if fp1 == nil || fp2 == nil { return 0, errors.New(errors.ErrCodeInvalidInput, "fingerprints cannot be nil") }
+	if fp1 == nil || fp2 == nil {
+		return 0, errors.New(errors.ErrCodeInvalidInput, "fingerprints cannot be nil")
+	}
 
 	// Convert to dense vectors
 	v1 := fp1.ToFloat32Slice()
@@ -210,8 +220,12 @@ func (c *CosineCalculator) Calculate(fp1, fp2 *Fingerprint) (float64, error) {
 	normalized := (cosine + 1.0) / 2.0
 
 	// Clamp just in case of float errors
-	if normalized > 1.0 { normalized = 1.0 }
-	if normalized < 0.0 { normalized = 0.0 }
+	if normalized > 1.0 {
+		normalized = 1.0
+	}
+	if normalized < 0.0 {
+		normalized = 0.0
+	}
 
 	return normalized, nil
 }
@@ -225,7 +239,9 @@ func (c *EuclideanCalculator) SupportsEncoding(encoding FingerprintEncoding) boo
 }
 
 func (c *EuclideanCalculator) Calculate(fp1, fp2 *Fingerprint) (float64, error) {
-	if fp1 == nil || fp2 == nil { return 0, errors.New(errors.ErrCodeInvalidInput, "fingerprints cannot be nil") }
+	if fp1 == nil || fp2 == nil {
+		return 0, errors.New(errors.ErrCodeInvalidInput, "fingerprints cannot be nil")
+	}
 	if !fp1.IsDenseVector() || !fp2.IsDenseVector() {
 		return 0, errors.New(errors.ErrCodeInvalidInput, "Euclidean requires dense vectors")
 	}
@@ -263,12 +279,12 @@ func NewSimilarityCalculator(metric SimilarityMetric) (SimilarityCalculator, err
 
 // SimilarityResult
 type SimilarityResult struct {
-	MoleculeID      string          `json:"molecule_id"`
-	SMILES          string          `json:"smiles"`
-	Score           float64         `json:"score"`
+	MoleculeID      string           `json:"molecule_id"`
+	SMILES          string           `json:"smiles"`
+	Score           float64          `json:"score"`
 	Metric          SimilarityMetric `json:"metric"`
-	FingerprintType FingerprintType `json:"fingerprint_type"`
-	Rank            int             `json:"rank"`
+	FingerprintType FingerprintType  `json:"fingerprint_type"`
+	Rank            int              `json:"rank"`
 }
 
 func (r *SimilarityResult) String() string {

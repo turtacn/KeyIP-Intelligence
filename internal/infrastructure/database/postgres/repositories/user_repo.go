@@ -169,7 +169,9 @@ func (r *postgresUserRepo) UpdateMFA(ctx context.Context, id uuid.UUID, enabled 
 	// Prompt says mfa_secret VARCHAR(256), nullable.
 	// If secret is empty, pass nil?
 	var sec interface{} = secret
-	if !enabled { sec = nil }
+	if !enabled {
+		sec = nil
+	}
 
 	_, err := r.executor().ExecContext(ctx, query, enabled, sec, id)
 	return err
@@ -198,10 +200,16 @@ func (r *postgresUserRepo) List(ctx context.Context, filter user.ListFilter) ([]
 	}
 
 	limit := filter.Limit
-	if limit <= 0 { limit = 20 }
-	if limit > 100 { limit = 100 }
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
 	offset := filter.Offset
-	if offset < 0 { offset = 0 }
+	if offset < 0 {
+		offset = 0
+	}
 
 	var total int64
 	err := r.executor().QueryRowContext(ctx, "SELECT COUNT(*) "+baseQuery, args...).Scan(&total)
@@ -226,7 +234,9 @@ func (r *postgresUserRepo) List(ctx context.Context, filter user.ListFilter) ([]
 	var users []*user.User
 	for rows.Next() {
 		u, err := scanUser(rows)
-		if err != nil { return nil, 0, err }
+		if err != nil {
+			return nil, 0, err
+		}
 		users = append(users, u)
 	}
 	return users, total, nil
@@ -248,7 +258,9 @@ func scanOrganization(row scanner) (*user.Organization, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan organization")
 	}
-	if len(settings) > 0 { _ = json.Unmarshal(settings, &o.Settings) }
+	if len(settings) > 0 {
+		_ = json.Unmarshal(settings, &o.Settings)
+	}
 	return o, nil
 }
 
@@ -374,7 +386,9 @@ func (r *postgresUserRepo) GetUserOrganizations(ctx context.Context, userID uuid
 	var orgs []*user.Organization
 	for rows.Next() {
 		o, err := scanOrganization(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		orgs = append(orgs, o)
 	}
 	return orgs, nil
@@ -414,7 +428,9 @@ func scanRole(row scanner) (*user.Role, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan role")
 	}
-	if len(permissions) > 0 { _ = json.Unmarshal(permissions, &r.Permissions) }
+	if len(permissions) > 0 {
+		_ = json.Unmarshal(permissions, &r.Permissions)
+	}
 	return r, nil
 }
 
@@ -472,7 +488,9 @@ func (r *postgresUserRepo) GetUserRoles(ctx context.Context, userID uuid.UUID, o
 	var roles []*user.Role
 	for rows.Next() {
 		role, err := scanRole(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		roles = append(roles, role)
 	}
 	return roles, nil
@@ -545,8 +563,12 @@ func scanAPIKey(row scanner) (*user.APIKey, error) {
 	if orgID.Valid {
 		k.OrganizationID = &orgID.UUID
 	}
-	if expiresAt.Valid { k.ExpiresAt = &expiresAt.Time }
-	if lastUsedAt.Valid { k.LastUsedAt = &lastUsedAt.Time }
+	if expiresAt.Valid {
+		k.ExpiresAt = &expiresAt.Time
+	}
+	if lastUsedAt.Valid {
+		k.LastUsedAt = &lastUsedAt.Time
+	}
 	return k, nil
 }
 
@@ -584,7 +606,9 @@ func (r *postgresUserRepo) GetAPIKeysByUser(ctx context.Context, userID uuid.UUI
 	var keys []*user.APIKey
 	for rows.Next() {
 		k, err := scanAPIKey(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		keys = append(keys, k)
 	}
 	return keys, nil
@@ -638,11 +662,21 @@ func scanAuditLog(row scanner) (*user.AuditLog, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan audit log")
 	}
-	if userID.Valid { l.UserID = &userID.UUID }
-	if orgID.Valid { l.OrganizationID = &orgID.UUID }
-	if len(beforeState) > 0 { _ = json.Unmarshal(beforeState, &l.BeforeState) }
-	if len(afterState) > 0 { _ = json.Unmarshal(afterState, &l.AfterState) }
-	if len(metadata) > 0 { _ = json.Unmarshal(metadata, &l.Metadata) }
+	if userID.Valid {
+		l.UserID = &userID.UUID
+	}
+	if orgID.Valid {
+		l.OrganizationID = &orgID.UUID
+	}
+	if len(beforeState) > 0 {
+		_ = json.Unmarshal(beforeState, &l.BeforeState)
+	}
+	if len(afterState) > 0 {
+		_ = json.Unmarshal(afterState, &l.AfterState)
+	}
+	if len(metadata) > 0 {
+		_ = json.Unmarshal(metadata, &l.Metadata)
+	}
 	return l, nil
 }
 
@@ -717,9 +751,13 @@ func (r *postgresUserRepo) GetAuditLogs(ctx context.Context, filter user.AuditLo
 	}
 
 	limit := filter.Limit
-	if limit <= 0 { limit = 50 }
+	if limit <= 0 {
+		limit = 50
+	}
 	offset := filter.Offset
-	if offset < 0 { offset = 0 }
+	if offset < 0 {
+		offset = 0
+	}
 
 	query := fmt.Sprintf("SELECT * %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d", baseQuery, argIdx, argIdx+1)
 	args = append(args, limit, offset)
@@ -733,14 +771,18 @@ func (r *postgresUserRepo) GetAuditLogs(ctx context.Context, filter user.AuditLo
 	var logs []*user.AuditLog
 	for rows.Next() {
 		l, err := scanAuditLog(rows)
-		if err != nil { return nil, 0, err }
+		if err != nil {
+			return nil, 0, err
+		}
 		logs = append(logs, l)
 	}
 	return logs, total, nil
 }
 
 func (r *postgresUserRepo) GetAuditLogsByResource(ctx context.Context, resourceType string, resourceID string, limit int) ([]*user.AuditLog, error) {
-	if limit <= 0 { limit = 50 }
+	if limit <= 0 {
+		limit = 50
+	}
 
 	query := `SELECT * FROM audit_logs WHERE resource_type = $1 AND resource_id = $2 ORDER BY created_at DESC LIMIT $3`
 	rows, err := r.executor().QueryContext(ctx, query, resourceType, resourceID, limit)
@@ -752,7 +794,9 @@ func (r *postgresUserRepo) GetAuditLogsByResource(ctx context.Context, resourceT
 	var logs []*user.AuditLog
 	for rows.Next() {
 		l, err := scanAuditLog(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		logs = append(logs, l)
 	}
 	return logs, nil
@@ -800,7 +844,9 @@ func (r *postgresUserRepo) PurgeAuditLogs(ctx context.Context, olderThan time.Ti
 // Transaction
 func (r *postgresUserRepo) WithTx(ctx context.Context, fn func(user.UserRepository) error) error {
 	tx, err := r.conn.DB().BeginTx(ctx, nil)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	txRepo := &postgresUserRepo{conn: r.conn, tx: tx, log: r.log}
 	if err := fn(txRepo); err != nil {
 		tx.Rollback()
@@ -824,8 +870,12 @@ func scanUser(row scanner) (*user.User, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan user")
 	}
-	if len(pref) > 0 { _ = json.Unmarshal(pref, &u.Preferences) }
-	if len(meta) > 0 { _ = json.Unmarshal(meta, &u.Metadata) }
+	if len(pref) > 0 {
+		_ = json.Unmarshal(pref, &u.Preferences)
+	}
+	if len(meta) > 0 {
+		_ = json.Unmarshal(meta, &u.Metadata)
+	}
 	return u, nil
 }
 
@@ -849,10 +899,18 @@ func scanUserForAuth(row scanner) (*user.User, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan user")
 	}
-	if pwd.Valid { u.PasswordHash = pwd.String }
-	if mfaSecret.Valid { u.MFASecret = mfaSecret.String }
-	if len(pref) > 0 { _ = json.Unmarshal(pref, &u.Preferences) }
-	if len(meta) > 0 { _ = json.Unmarshal(meta, &u.Metadata) }
+	if pwd.Valid {
+		u.PasswordHash = pwd.String
+	}
+	if mfaSecret.Valid {
+		u.MFASecret = mfaSecret.String
+	}
+	if len(pref) > 0 {
+		_ = json.Unmarshal(pref, &u.Preferences)
+	}
+	if len(meta) > 0 {
+		_ = json.Unmarshal(meta, &u.Metadata)
+	}
 	return u, nil
 }
 

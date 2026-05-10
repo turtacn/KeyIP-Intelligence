@@ -364,7 +364,9 @@ func (m *Molecule) GetFingerprint(fpType FingerprintType) (*Fingerprint, bool) {
 	for _, fp := range m.Fingerprints {
 		if fp.Type == fpType {
 			// Populate map cache
-			if m.FingerprintsMap == nil { m.FingerprintsMap = make(map[FingerprintType]*Fingerprint) }
+			if m.FingerprintsMap == nil {
+				m.FingerprintsMap = make(map[FingerprintType]*Fingerprint)
+			}
 			m.FingerprintsMap[fpType] = fp
 			return fp, true
 		}
@@ -458,15 +460,15 @@ func (m *Molecule) SetMetadata(key, value string) {
 
 // Getters
 
-func (m *Molecule) GetID() string { return m.ID.String() }
-func (m *Molecule) GetSMILES() string { return m.SMILES }
-func (m *Molecule) GetCanonicalSMILES() string { return m.CanonicalSMILES }
-func (m *Molecule) GetInChI() string { return m.InChI }
-func (m *Molecule) GetInChIKey() string { return m.InChIKey }
+func (m *Molecule) GetID() string               { return m.ID.String() }
+func (m *Molecule) GetSMILES() string           { return m.SMILES }
+func (m *Molecule) GetCanonicalSMILES() string  { return m.CanonicalSMILES }
+func (m *Molecule) GetInChI() string            { return m.InChI }
+func (m *Molecule) GetInChIKey() string         { return m.InChIKey }
 func (m *Molecule) GetMolecularFormula() string { return m.MolecularFormula }
 func (m *Molecule) GetMolecularWeight() float64 { return m.MolecularWeight }
-func (m *Molecule) GetSource() MoleculeSource { return m.Source }
-func (m *Molecule) GetSourceRef() string { return m.SourceReference }
+func (m *Molecule) GetSource() MoleculeSource   { return m.Source }
+func (m *Molecule) GetSourceRef() string        { return m.SourceReference }
 func (m *Molecule) GetTags() []string {
 	result := make([]string, len(m.Tags))
 	copy(result, m.Tags)
@@ -482,7 +484,7 @@ func (m *Molecule) GetMetadata() map[string]any {
 }
 func (m *Molecule) GetCreatedAt() time.Time { return m.CreatedAt }
 func (m *Molecule) GetUpdatedAt() time.Time { return m.UpdatedAt }
-func (m *Molecule) GetVersion() int64 { return m.Version }
+func (m *Molecule) GetVersion() int64       { return m.Version }
 
 // IsActive checks if the molecule is active.
 func (m *Molecule) IsActive() bool {

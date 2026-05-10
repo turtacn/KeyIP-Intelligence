@@ -130,7 +130,9 @@ func (r *postgresPortfolioRepo) List(ctx context.Context, ownerID string, opts .
 	var portfolios []*portfolio.Portfolio
 	for rows.Next() {
 		p, err := scanPortfolio(rows)
-		if err != nil { return nil, 0, err }
+		if err != nil {
+			return nil, 0, err
+		}
 		portfolios = append(portfolios, p)
 	}
 	return portfolios, total, nil
@@ -188,7 +190,9 @@ func (r *postgresPortfolioRepo) GetPatents(ctx context.Context, portfolioID stri
 	args = append(args, limit, offset)
 
 	rows, err := r.executor().QueryContext(ctx, dataQuery, args...)
-	if err != nil { return nil, 0, err }
+	if err != nil {
+		return nil, 0, err
+	}
 	defer rows.Close()
 
 	var patents []*patent.Patent
@@ -197,7 +201,9 @@ func (r *postgresPortfolioRepo) GetPatents(ctx context.Context, portfolioID stri
 		// scanPatent is not exported from patent_repo.go.
 		// I must reimplement it here or extract to a shared location.
 		// I'll reimplement simplified version for now.
-		if err != nil { return nil, 0, err }
+		if err != nil {
+			return nil, 0, err
+		}
 		patents = append(patents, p)
 	}
 	return patents, total, nil
@@ -282,13 +288,27 @@ func scanValuation(row scanner) (*portfolio.Valuation, error) {
 		s := evaluatedBy.UUID.String()
 		v.EvaluatedBy = &s
 	}
-	if monetaryLow.Valid { v.MonetaryValueLow = &monetaryLow.Int64 }
-	if monetaryMid.Valid { v.MonetaryValueMid = &monetaryMid.Int64 }
-	if monetaryHigh.Valid { v.MonetaryValueHigh = &monetaryHigh.Int64 }
-	if validUntil.Valid { v.ValidUntil = &validUntil.Time }
-	if len(scoringDetails) > 0 { _ = json.Unmarshal(scoringDetails, &v.ScoringDetails) }
-	if len(assumptions) > 0 { _ = json.Unmarshal(assumptions, &v.Assumptions) }
-	if len(comparablePatents) > 0 { _ = json.Unmarshal(comparablePatents, &v.ComparablePatents) }
+	if monetaryLow.Valid {
+		v.MonetaryValueLow = &monetaryLow.Int64
+	}
+	if monetaryMid.Valid {
+		v.MonetaryValueMid = &monetaryMid.Int64
+	}
+	if monetaryHigh.Valid {
+		v.MonetaryValueHigh = &monetaryHigh.Int64
+	}
+	if validUntil.Valid {
+		v.ValidUntil = &validUntil.Time
+	}
+	if len(scoringDetails) > 0 {
+		_ = json.Unmarshal(scoringDetails, &v.ScoringDetails)
+	}
+	if len(assumptions) > 0 {
+		_ = json.Unmarshal(assumptions, &v.Assumptions)
+	}
+	if len(comparablePatents) > 0 {
+		_ = json.Unmarshal(comparablePatents, &v.ComparablePatents)
+	}
 	return v, nil
 }
 
@@ -307,8 +327,12 @@ func (r *postgresPortfolioRepo) CreateValuation(ctx context.Context, v *portfoli
 	assumptions, _ := json.Marshal(v.Assumptions)
 
 	var portfolioID, evaluatedBy interface{}
-	if v.PortfolioID != nil { portfolioID = *v.PortfolioID }
-	if v.EvaluatedBy != nil { evaluatedBy = *v.EvaluatedBy }
+	if v.PortfolioID != nil {
+		portfolioID = *v.PortfolioID
+	}
+	if v.EvaluatedBy != nil {
+		evaluatedBy = *v.EvaluatedBy
+	}
 
 	err := r.executor().QueryRowContext(ctx, query,
 		v.PatentID, portfolioID,
@@ -350,7 +374,9 @@ func (r *postgresPortfolioRepo) GetValuationHistory(ctx context.Context, patentI
 	var valuations []*portfolio.Valuation
 	for rows.Next() {
 		v, err := scanValuation(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		valuations = append(valuations, v)
 	}
 	return valuations, nil
@@ -367,7 +393,9 @@ func (r *postgresPortfolioRepo) GetValuationsByPortfolio(ctx context.Context, po
 	var valuations []*portfolio.Valuation
 	for rows.Next() {
 		v, err := scanValuation(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		valuations = append(valuations, v)
 	}
 	return valuations, nil
@@ -410,7 +438,9 @@ func (r *postgresPortfolioRepo) BatchCreateValuations(ctx context.Context, valua
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
 		)
 	`
-	stmt, err := r.executor().(interface{ PrepareContext(context.Context, string) (*sql.Stmt, error) }).PrepareContext(ctx, query)
+	stmt, err := r.executor().(interface {
+		PrepareContext(context.Context, string) (*sql.Stmt, error)
+	}).PrepareContext(ctx, query)
 	if err != nil {
 		return errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to prepare batch valuation insert")
 	}
@@ -422,8 +452,12 @@ func (r *postgresPortfolioRepo) BatchCreateValuations(ctx context.Context, valua
 		assumptions, _ := json.Marshal(v.Assumptions)
 
 		var portfolioID, evaluatedBy interface{}
-		if v.PortfolioID != nil { portfolioID = *v.PortfolioID }
-		if v.EvaluatedBy != nil { evaluatedBy = *v.EvaluatedBy }
+		if v.PortfolioID != nil {
+			portfolioID = *v.PortfolioID
+		}
+		if v.EvaluatedBy != nil {
+			evaluatedBy = *v.EvaluatedBy
+		}
 
 		_, err := stmt.ExecContext(ctx,
 			v.PatentID, portfolioID,
@@ -459,10 +493,18 @@ func scanHealthScore(row scanner) (*portfolio.HealthScore, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan health score")
 	}
-	if len(jurisdictionDist) > 0 { _ = json.Unmarshal(jurisdictionDist, &h.JurisdictionDistribution) }
-	if len(techDomainDist) > 0 { _ = json.Unmarshal(techDomainDist, &h.TechDomainDistribution) }
-	if len(tierDist) > 0 { _ = json.Unmarshal(tierDist, &h.TierDistribution) }
-	if len(recommendations) > 0 { _ = json.Unmarshal(recommendations, &h.Recommendations) }
+	if len(jurisdictionDist) > 0 {
+		_ = json.Unmarshal(jurisdictionDist, &h.JurisdictionDistribution)
+	}
+	if len(techDomainDist) > 0 {
+		_ = json.Unmarshal(techDomainDist, &h.TechDomainDistribution)
+	}
+	if len(tierDist) > 0 {
+		_ = json.Unmarshal(tierDist, &h.TierDistribution)
+	}
+	if len(recommendations) > 0 {
+		_ = json.Unmarshal(recommendations, &h.Recommendations)
+	}
 	return h, nil
 }
 
@@ -513,7 +555,9 @@ func (r *postgresPortfolioRepo) GetHealthScoreHistory(ctx context.Context, portf
 	var scores []*portfolio.HealthScore
 	for rows.Next() {
 		s, err := scanHealthScore(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		scores = append(scores, s)
 	}
 	return scores, nil
@@ -534,7 +578,9 @@ func (r *postgresPortfolioRepo) GetHealthScoreTrend(ctx context.Context, portfol
 	var scores []*portfolio.HealthScore
 	for rows.Next() {
 		s, err := scanHealthScore(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		scores = append(scores, s)
 	}
 	return scores, nil
@@ -566,13 +612,30 @@ func scanOptimizationSuggestion(row scanner) (*portfolio.OptimizationSuggestion,
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan suggestion")
 	}
-	if healthScoreID.Valid { h := healthScoreID.UUID.String(); s.HealthScoreID = &h }
-	if targetPatentID.Valid { t := targetPatentID.UUID.String(); s.TargetPatentID = &t }
-	if resolvedBy.Valid { r := resolvedBy.UUID.String(); s.ResolvedBy = &r }
-	if resolvedAt.Valid { s.ResolvedAt = &resolvedAt.Time }
-	if estimatedImpact.Valid { s.EstimatedImpact = &estimatedImpact.Float64 }
-	if estimatedCost.Valid { s.EstimatedCost = &estimatedCost.Int64 }
-	if len(rationale) > 0 { _ = json.Unmarshal(rationale, &s.Rationale) }
+	if healthScoreID.Valid {
+		h := healthScoreID.UUID.String()
+		s.HealthScoreID = &h
+	}
+	if targetPatentID.Valid {
+		t := targetPatentID.UUID.String()
+		s.TargetPatentID = &t
+	}
+	if resolvedBy.Valid {
+		r := resolvedBy.UUID.String()
+		s.ResolvedBy = &r
+	}
+	if resolvedAt.Valid {
+		s.ResolvedAt = &resolvedAt.Time
+	}
+	if estimatedImpact.Valid {
+		s.EstimatedImpact = &estimatedImpact.Float64
+	}
+	if estimatedCost.Valid {
+		s.EstimatedCost = &estimatedCost.Int64
+	}
+	if len(rationale) > 0 {
+		_ = json.Unmarshal(rationale, &s.Rationale)
+	}
 	return s, nil
 }
 
@@ -589,8 +652,12 @@ func (r *postgresPortfolioRepo) CreateSuggestion(ctx context.Context, s *portfol
 	rationale, _ := json.Marshal(s.Rationale)
 
 	var healthScoreID, targetPatentID interface{}
-	if s.HealthScoreID != nil { healthScoreID = *s.HealthScoreID }
-	if s.TargetPatentID != nil { targetPatentID = *s.TargetPatentID }
+	if s.HealthScoreID != nil {
+		healthScoreID = *s.HealthScoreID
+	}
+	if s.TargetPatentID != nil {
+		targetPatentID = *s.TargetPatentID
+	}
 
 	err := r.executor().QueryRowContext(ctx, query,
 		s.PortfolioID, healthScoreID, s.SuggestionType, s.Priority, s.Title, s.Description,
@@ -633,7 +700,9 @@ func (r *postgresPortfolioRepo) GetSuggestions(ctx context.Context, portfolioID 
 	var suggestions []*portfolio.OptimizationSuggestion
 	for rows.Next() {
 		s, err := scanOptimizationSuggestion(rows)
-		if err != nil { return nil, 0, err }
+		if err != nil {
+			return nil, 0, err
+		}
 		suggestions = append(suggestions, s)
 	}
 	return suggestions, total, nil
@@ -860,7 +929,9 @@ func (r *postgresPortfolioRepo) ComparePortfolios(ctx context.Context, portfolio
 // Transaction
 func (r *postgresPortfolioRepo) WithTx(ctx context.Context, fn func(portfolio.PortfolioRepository) error) error {
 	tx, err := r.conn.DB().BeginTx(ctx, nil)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	txRepo := &postgresPortfolioRepo{conn: r.conn, tx: tx, log: r.log}
 	if err := fn(txRepo); err != nil {
 		tx.Rollback()
@@ -885,7 +956,9 @@ func scanPortfolio(row scanner) (*portfolio.Portfolio, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan portfolio")
 	}
-	if len(meta) > 0 { _ = json.Unmarshal(meta, &p.Metadata) }
+	if len(meta) > 0 {
+		_ = json.Unmarshal(meta, &p.Metadata)
+	}
 	return p, nil
 }
 
@@ -901,11 +974,17 @@ func scanPortfolioPatent(row scanner) (*patent.Patent, error) {
 		&p.FamilyID, &p.ApplicationNumber, &p.FullTextHash, &p.Source,
 		&raw, &meta, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 	)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 
 	p.Status = parsePatentStatus(statusStr)
-	if len(raw) > 0 { _ = json.Unmarshal(raw, &p.RawData) }
-	if len(meta) > 0 { _ = json.Unmarshal(meta, &p.Metadata) }
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &p.RawData)
+	}
+	if len(meta) > 0 {
+		_ = json.Unmarshal(meta, &p.Metadata)
+	}
 
 	return p, nil
 }

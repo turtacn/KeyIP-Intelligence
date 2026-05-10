@@ -1,7 +1,7 @@
 /*
  * model.go 实现了 InfringeModel 接口及其本地/远程双模式推理引擎，包含 LRU 缓存、指数退避重试、确定性嵌入、SMARTS 匹配与向量余弦相似度融合、QSPR 性能预测等核心能力。
  * model_test.go 覆盖了全部 50+ 测试用例，涵盖正常路径、边界条件、缓存命中/淘汰、重试退避验证、并发安全、枚举完整性及辅助函数正确性。
-*/
+ */
 package infringe_net
 
 import (
@@ -25,13 +25,13 @@ import (
 type PropertyType string
 
 const (
-	PropertyHOMO                PropertyType = "HOMO"
-	PropertyLUMO                PropertyType = "LUMO"
-	PropertyBandGap             PropertyType = "BandGap"
-	PropertyEmissionWavelength  PropertyType = "EmissionWavelength"
-	PropertyQuantumYield        PropertyType = "QuantumYield"
-	PropertyThermalStability    PropertyType = "ThermalStability"
-	PropertyGlassTransitionTemp PropertyType = "GlassTransitionTemp"
+	PropertyHOMO                  PropertyType = "HOMO"
+	PropertyLUMO                  PropertyType = "LUMO"
+	PropertyBandGap               PropertyType = "BandGap"
+	PropertyEmissionWavelength    PropertyType = "EmissionWavelength"
+	PropertyQuantumYield          PropertyType = "QuantumYield"
+	PropertyThermalStability      PropertyType = "ThermalStability"
+	PropertyGlassTransitionTemp   PropertyType = "GlassTransitionTemp"
 	PropertyChargeCarrierMobility PropertyType = "ChargeCarrierMobility"
 )
 
@@ -60,8 +60,8 @@ type ImpactLevel string
 const (
 	ImpactNegligible ImpactLevel = "Negligible" // < 1 %
 	ImpactMinor      ImpactLevel = "Minor"      // 1 – 5 %
-	ImpactModerate   ImpactLevel = "Moderate"    // 5 – 20 %
-	ImpactMajor      ImpactLevel = "Major"       // > 20 %
+	ImpactModerate   ImpactLevel = "Moderate"   // 5 – 20 %
+	ImpactMajor      ImpactLevel = "Major"      // > 20 %
 )
 
 // ClassifyImpact maps an absolute delta-percent to an ImpactLevel.
@@ -1036,9 +1036,9 @@ func stubPropertyPredictions(smiles string, props []PropertyType) map[PropertyTy
 	out := make(map[PropertyType]float64, len(props))
 
 	// Compute properties with physical correlations.
-	homoVal := makeProperty(-6.8, 2.0, -0.05, -0.5, -0.3)  // -6 to -9 eV, lower with conjugation
-	lumoVal := makeProperty(-1.2, 2.2, -0.03, -0.4, -0.5)  // -1 to -4 eV, lower with conjugation
-	bandGapVal := math.Abs(lumoVal - homoVal)                // physical: BandGap = |LUMO - HOMO|
+	homoVal := makeProperty(-6.8, 2.0, -0.05, -0.5, -0.3) // -6 to -9 eV, lower with conjugation
+	lumoVal := makeProperty(-1.2, 2.2, -0.03, -0.4, -0.5) // -1 to -4 eV, lower with conjugation
+	bandGapVal := math.Abs(lumoVal - homoVal)             // physical: BandGap = |LUMO - HOMO|
 
 	for _, p := range props {
 		switch p {
@@ -1144,4 +1144,3 @@ func marshalJSON(v interface{}) []byte {
 func unmarshalJSON(data []byte, v interface{}) error {
 	return json.Unmarshal(data, v)
 }
-

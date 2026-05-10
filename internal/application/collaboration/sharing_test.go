@@ -127,11 +127,11 @@ func (m *mockWorkspaceRepo) FindBySlug(ctx context.Context, slug string) (*colla
 func (m *mockWorkspaceRepo) Count(ctx context.Context, ownerID string) (int64, error) { return 0, nil }
 
 type mockShareRepo struct {
-	createFn              func(ctx context.Context, record *ShareRecord) error
-	getByIDFn             func(ctx context.Context, shareID string) (*ShareRecord, error)
-	getByTokenFn          func(ctx context.Context, token string) (*ShareRecord, error)
-	listByWorkspaceFn     func(ctx context.Context, workspaceID string, includeRevoked bool, p commontypes.Pagination) ([]*ShareRecord, int, error)
-	updateFn              func(ctx context.Context, record *ShareRecord) error
+	createFn               func(ctx context.Context, record *ShareRecord) error
+	getByIDFn              func(ctx context.Context, shareID string) (*ShareRecord, error)
+	getByTokenFn           func(ctx context.Context, token string) (*ShareRecord, error)
+	listByWorkspaceFn      func(ctx context.Context, workspaceID string, includeRevoked bool, p commontypes.Pagination) ([]*ShareRecord, int, error)
+	updateFn               func(ctx context.Context, record *ShareRecord) error
 	incrementAccessCountFn func(ctx context.Context, shareID string) error
 }
 
@@ -217,15 +217,15 @@ func (m *mockCache) Delete(ctx context.Context, key string) error {
 
 type mockSharingLogger struct{}
 
-func (m *mockSharingLogger) Debug(msg string, fields ...logging.Field) {}
-func (m *mockSharingLogger) Info(msg string, fields ...logging.Field)  {}
-func (m *mockSharingLogger) Warn(msg string, fields ...logging.Field)  {}
-func (m *mockSharingLogger) Error(msg string, fields ...logging.Field) {}
-func (m *mockSharingLogger) Fatal(msg string, fields ...logging.Field) {}
-func (m *mockSharingLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockSharingLogger) Debug(msg string, fields ...logging.Field)      {}
+func (m *mockSharingLogger) Info(msg string, fields ...logging.Field)       {}
+func (m *mockSharingLogger) Warn(msg string, fields ...logging.Field)       {}
+func (m *mockSharingLogger) Error(msg string, fields ...logging.Field)      {}
+func (m *mockSharingLogger) Fatal(msg string, fields ...logging.Field)      {}
+func (m *mockSharingLogger) With(fields ...logging.Field) logging.Logger    { return m }
 func (m *mockSharingLogger) WithContext(ctx context.Context) logging.Logger { return m }
-func (m *mockSharingLogger) WithError(err error) logging.Logger { return m }
-func (m *mockSharingLogger) Sync() error { return nil }
+func (m *mockSharingLogger) WithError(err error) logging.Logger             { return m }
+func (m *mockSharingLogger) Sync() error                                    { return nil }
 
 func newTestSharingService(
 	domainSvc *mockCollabDomainService,

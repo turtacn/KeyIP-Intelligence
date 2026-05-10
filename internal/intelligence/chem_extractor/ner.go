@@ -145,7 +145,7 @@ type nerModelImpl struct {
 	logger     common.Logger
 	metrics    common.IntelligenceMetrics
 	labelIndex map[string]int
-	indexLabel  map[int]string
+	indexLabel map[int]string
 	transition [][]float64 // CRF transition matrix [from][to]
 	mu         sync.RWMutex
 }
@@ -186,7 +186,7 @@ func NewNERModel(
 		logger:     logger,
 		metrics:    metrics,
 		labelIndex: labelIdx,
-		indexLabel:  idxLabel,
+		indexLabel: idxLabel,
 	}
 
 	if config.UseCRF {
@@ -820,14 +820,16 @@ func argmaxDecode(emission [][]float64, indexLabel map[int]string) []string {
 // BIO constraints. Legal transitions get probability 1.0, illegal ones get 0.0.
 //
 // Legal transitions:
-//   O  -> O, B-*           (O cannot go to I-*)
-//   B-X -> I-X, O, B-*     (B-X can continue with I-X or start new)
-//   I-X -> I-X, O, B-*     (I-X can continue or end)
+//
+//	O  -> O, B-*           (O cannot go to I-*)
+//	B-X -> I-X, O, B-*     (B-X can continue with I-X or start new)
+//	I-X -> I-X, O, B-*     (I-X can continue or end)
 //
 // Illegal:
-//   O  -> I-*
-//   B-X -> I-Y (where Y != X)
-//   I-X -> I-Y (where Y != X)
+//
+//	O  -> I-*
+//	B-X -> I-Y (where Y != X)
+//	I-X -> I-Y (where Y != X)
 func buildBIOTransitionMatrix(labelSet []string, labelIndex map[string]int) [][]float64 {
 	n := len(labelSet)
 	trans := make([][]float64, n)

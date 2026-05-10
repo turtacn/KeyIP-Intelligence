@@ -337,10 +337,10 @@ func (c *ClaimBERTConfig) Validate() error {
 
 // DefaultTaskHeads returns the four pre-defined task heads with sensible defaults.
 //
-//   ClaimClassification  – 5-class softmax  (Independent / Dependent / Method / Product / Use)
-//   FeatureExtraction    – 9-label BIO tagger (B/I for COMPOUND, CONDITION, PROPERTY, MARKUSH + O)
-//   ScopeAnalysis        – scalar regression [0,1]
-//   DependencyParsing    – pointer logits over up to 128 candidate claims
+//	ClaimClassification  – 5-class softmax  (Independent / Dependent / Method / Product / Use)
+//	FeatureExtraction    – 9-label BIO tagger (B/I for COMPOUND, CONDITION, PROPERTY, MARKUSH + O)
+//	ScopeAnalysis        – scalar regression [0,1]
+//	DependencyParsing    – pointer logits over up to 128 candidate claims
 func DefaultTaskHeads() []TaskHeadConfig {
 	return []TaskHeadConfig{
 		{
@@ -510,4 +510,3 @@ func isPowerOfTwo(n int) bool {
 	}
 	return bits.OnesCount(uint(n)) == 1
 }
-

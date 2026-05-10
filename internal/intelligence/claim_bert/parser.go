@@ -80,17 +80,17 @@ const (
 // ============================================================================
 
 const (
-	bioO              = 0
-	bioBStructural    = 1
-	bioIStructural    = 2
-	bioBFunctional    = 3
-	bioIFunctional    = 4
-	bioBProcess       = 5
-	bioIProcess       = 6
-	bioBComposition   = 7
-	bioIComposition   = 8
-	bioBParameter     = 9
-	bioIParameter     = 10
+	bioO            = 0
+	bioBStructural  = 1
+	bioIStructural  = 2
+	bioBFunctional  = 3
+	bioIFunctional  = 4
+	bioBProcess     = 5
+	bioIProcess     = 6
+	bioBComposition = 7
+	bioIComposition = 8
+	bioBParameter   = 9
+	bioIParameter   = 10
 )
 
 // bioTagName maps tag index to human-readable name.
@@ -221,22 +221,22 @@ type ParsedClaim struct {
 	ScopeScore         float64                `json:"scope_score"`
 	MarkushGroups      []*MarkushGroup        `json:"markush_groups,omitempty"`
 	Confidence         float64                `json:"confidence"`
-	Category           string                 `json:"category,omitempty"`       // Added for scope analysis
+	Category           string                 `json:"category,omitempty"`         // Added for scope analysis
 	NumericalRanges    []*NumericalRange      `json:"numerical_ranges,omitempty"` // Added for scope analysis
 }
 
 // ClaimClassification is the output of claim type classification.
 type ClaimClassification struct {
-	ClaimType     ClaimType              `json:"claim_type"`
-	Confidence    float64                `json:"confidence"`
-	Probabilities map[ClaimType]float64  `json:"probabilities"`
+	ClaimType     ClaimType             `json:"claim_type"`
+	Confidence    float64               `json:"confidence"`
+	Probabilities map[ClaimType]float64 `json:"probabilities"`
 }
 
 // DependencyTree represents the hierarchical dependency structure of a claim set.
 type DependencyTree struct {
-	Roots    []int          `json:"roots"`
-	Children map[int][]int  `json:"children"`
-	Depth    int            `json:"depth"`
+	Roots    []int         `json:"roots"`
+	Children map[int][]int `json:"children"`
+	Depth    int           `json:"depth"`
 }
 
 // ParsedClaimSet is the structured representation of an entire set of claims.
@@ -1704,4 +1704,3 @@ func CosineSimilarity(a, b []float32) (float64, error) {
 }
 
 //Personal.AI order the ending
-

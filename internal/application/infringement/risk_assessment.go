@@ -55,10 +55,8 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/claim_bert"
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/infringe_net"
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/molpatent_gnn"
-	commonTypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	moleculeTypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/molecule"
-	patentTypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/patent"
 	pkgErrors "github.com/turtacn/KeyIP-Intelligence/pkg/errors"
+	commonTypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // ---------------------------------------------------------------------------
@@ -347,10 +345,10 @@ type MoleculeRiskResponse struct {
 	OverallRiskScore float64   `json:"overall_risk_score"`
 
 	// Component scores contributing to the overall score.
-	LiteralInfringementScore    float64 `json:"literal_infringement_score"`
+	LiteralInfringementScore     float64 `json:"literal_infringement_score"`
 	EquivalentsInfringementScore float64 `json:"equivalents_infringement_score"`
-	ClaimBreadthScore           float64 `json:"claim_breadth_score"`
-	ProsecutionHistoryPenalty   float64 `json:"prosecution_history_penalty"`
+	ClaimBreadthScore            float64 `json:"claim_breadth_score"`
+	ProsecutionHistoryPenalty    float64 `json:"prosecution_history_penalty"`
 
 	// MatchedPatents lists the candidate patents that contributed to the
 	// risk score, ordered by descending risk.
@@ -369,12 +367,12 @@ type MoleculeRiskResponse struct {
 
 // PatentRiskDetail describes the risk contribution of a single patent.
 type PatentRiskDetail struct {
-	PatentNumber    string    `json:"patent_number"`
-	Title           string    `json:"title"`
-	Assignee        string    `json:"assignee"`
-	FilingDate      time.Time `json:"filing_date"`
-	LegalStatus     string    `json:"legal_status"`
-	IPCCodes        []string  `json:"ipc_codes,omitempty"`
+	PatentNumber string    `json:"patent_number"`
+	Title        string    `json:"title"`
+	Assignee     string    `json:"assignee"`
+	FilingDate   time.Time `json:"filing_date"`
+	LegalStatus  string    `json:"legal_status"`
+	IPCCodes     []string  `json:"ipc_codes,omitempty"`
 
 	// Similarity scores from the multi-fingerprint fusion.
 	SimilarityScores SimilarityScores `json:"similarity_scores"`
@@ -406,15 +404,15 @@ func (s *SimilarityScores) FusedScore() float64 {
 
 // ClaimRiskDetail describes the infringement analysis for a single claim.
 type ClaimRiskDetail struct {
-	ClaimNumber       int       `json:"claim_number"`
-	ClaimType         string    `json:"claim_type"` // independent / dependent
-	LiteralMatch      bool      `json:"literal_match"`
-	MarkushCovered    bool      `json:"markush_covered"`
-	EquivalentsMatch  bool      `json:"equivalents_match"`
-	EstoppelApplies   bool      `json:"estoppel_applies"`
-	ClaimRiskScore    float64   `json:"claim_risk_score"`
-	ClaimRiskLevel    RiskLevel `json:"claim_risk_level"`
-	Explanation       string    `json:"explanation"`
+	ClaimNumber      int       `json:"claim_number"`
+	ClaimType        string    `json:"claim_type"` // independent / dependent
+	LiteralMatch     bool      `json:"literal_match"`
+	MarkushCovered   bool      `json:"markush_covered"`
+	EquivalentsMatch bool      `json:"equivalents_match"`
+	EstoppelApplies  bool      `json:"estoppel_applies"`
+	ClaimRiskScore   float64   `json:"claim_risk_score"`
+	ClaimRiskLevel   RiskLevel `json:"claim_risk_level"`
+	Explanation      string    `json:"explanation"`
 }
 
 // BatchRiskRequest is the input for batch molecule risk assessment.
@@ -485,27 +483,28 @@ type BatchRiskResponse struct {
 	TotalProcessingTime time.Duration `json:"total_processing_time_ms"`
 	AssessedAt          time.Time     `json:"assessed_at"`
 }
+
 // BatchMoleculeResult holds the assessment outcome for one molecule in a batch.
 type BatchMoleculeResult struct {
-	Index      int                  `json:"index"`
-	ID         string               `json:"id,omitempty"`
-	Name       string               `json:"name,omitempty"`
-	Response   *MoleculeRiskResponse `json:"response,omitempty"`
-	Error      string               `json:"error,omitempty"`
-	Succeeded  bool                 `json:"succeeded"`
+	Index     int                   `json:"index"`
+	ID        string                `json:"id,omitempty"`
+	Name      string                `json:"name,omitempty"`
+	Response  *MoleculeRiskResponse `json:"response,omitempty"`
+	Error     string                `json:"error,omitempty"`
+	Succeeded bool                  `json:"succeeded"`
 }
 
 // BatchRiskStats aggregates statistics across all molecules in a batch.
 type BatchRiskStats struct {
-	Total          int            `json:"total"`
-	Succeeded      int            `json:"succeeded"`
-	Failed         int            `json:"failed"`
-	CacheHits      int            `json:"cache_hits"`
+	Total            int               `json:"total"`
+	Succeeded        int               `json:"succeeded"`
+	Failed           int               `json:"failed"`
+	CacheHits        int               `json:"cache_hits"`
 	RiskDistribution map[RiskLevel]int `json:"risk_distribution"`
-	HighRiskCount  int            `json:"high_risk_count"`
-	AverageScore   float64        `json:"average_score"`
-	MaxScore       float64        `json:"max_score"`
-	MinScore       float64        `json:"min_score"`
+	HighRiskCount    int               `json:"high_risk_count"`
+	AverageScore     float64           `json:"average_score"`
+	MaxScore         float64           `json:"max_score"`
+	MinScore         float64           `json:"min_score"`
 }
 
 // FTORequest is the input for freedom-to-operate analysis.
@@ -680,28 +679,28 @@ type RiskTrendPoint struct {
 
 // RiskRecord is an immutable audit record of a risk assessment.
 type RiskRecord struct {
-	RecordID     string      `json:"record_id"`
-	MoleculeID   string      `json:"molecule_id"`
-	SMILES       string      `json:"smiles"`
-	InChIKey     string      `json:"inchi_key,omitempty"`
-	Trigger      TriggerType `json:"trigger"`
-	RiskLevel    RiskLevel   `json:"risk_level"`
-	RiskScore    float64     `json:"risk_score"`
-	MatchCount   int         `json:"match_count"`
-	Depth        AnalysisDepth `json:"depth"`
-	InputHash    string      `json:"input_hash"`
-	ResultJSON   string      `json:"result_json,omitempty"`
-	CreatedAt    time.Time   `json:"created_at"`
+	RecordID   string        `json:"record_id"`
+	MoleculeID string        `json:"molecule_id"`
+	SMILES     string        `json:"smiles"`
+	InChIKey   string        `json:"inchi_key,omitempty"`
+	Trigger    TriggerType   `json:"trigger"`
+	RiskLevel  RiskLevel     `json:"risk_level"`
+	RiskScore  float64       `json:"risk_score"`
+	MatchCount int           `json:"match_count"`
+	Depth      AnalysisDepth `json:"depth"`
+	InputHash  string        `json:"input_hash"`
+	ResultJSON string        `json:"result_json,omitempty"`
+	CreatedAt  time.Time     `json:"created_at"`
 }
 
 // QueryOption configures optional parameters for risk history queries.
 type QueryOption func(*queryOptions)
 
 type queryOptions struct {
-	pageSize   int
-	pageToken  string
-	fromDate   *time.Time
-	toDate     *time.Time
+	pageSize      int
+	pageToken     string
+	fromDate      *time.Time
+	toDate        *time.Time
 	triggerFilter []TriggerType
 	levelFilter   []RiskLevel
 }
@@ -793,14 +792,14 @@ type FTOReportRepository interface {
 
 // RiskAssessmentEvent is published after each risk assessment completes.
 type RiskAssessmentEvent struct {
-	EventType    string    `json:"event_type"` // "risk.assessed"
-	AssessmentID string    `json:"assessment_id"`
-	MoleculeID   string    `json:"molecule_id,omitempty"`
-	SMILES       string    `json:"smiles"`
-	RiskLevel    RiskLevel `json:"risk_level"`
-	RiskScore    float64   `json:"risk_score"`
+	EventType    string      `json:"event_type"` // "risk.assessed"
+	AssessmentID string      `json:"assessment_id"`
+	MoleculeID   string      `json:"molecule_id,omitempty"`
+	SMILES       string      `json:"smiles"`
+	RiskLevel    RiskLevel   `json:"risk_level"`
+	RiskScore    float64     `json:"risk_score"`
 	Trigger      TriggerType `json:"trigger"`
-	Timestamp    time.Time `json:"timestamp"`
+	Timestamp    time.Time   `json:"timestamp"`
 }
 
 // EventPublisher publishes domain events.
@@ -1172,12 +1171,12 @@ func (s *riskAssessmentServiceImpl) AssessFTO(ctx context.Context, req *FTOReque
 						}
 					} else {
 						allBlockingPatents[key] = &BlockingPatentDetail{
-							PatentNumber:  mp.PatentNumber,
-							Title:         mp.Title,
-							Assignee:      mp.Assignee,
-							Jurisdictions: []string{jurisdiction},
-							RiskLevel:     mp.PatentRiskLevel,
-							RiskScore:     mp.PatentRiskScore,
+							PatentNumber:   mp.PatentNumber,
+							Title:          mp.Title,
+							Assignee:       mp.Assignee,
+							Jurisdictions:  []string{jurisdiction},
+							RiskLevel:      mp.PatentRiskLevel,
+							RiskScore:      mp.PatentRiskScore,
 							ExpirationDate: mp.FilingDate.AddDate(20, 0, 0),
 						}
 					}
@@ -1513,15 +1512,15 @@ func (s *riskAssessmentServiceImpl) searchCandidatePatents(
 		}()
 
 		results, err := s.patentSvc.SearchBySimilarity(ctx, &patent.SimilaritySearchRequest{
-			SMILES:          canonicalSMILES,
-			Threshold:       req.SimilarityThreshold,
-			MaxResults:      req.MaxCandidates,
-			PatentOffices:   req.PatentOffices,
-			Assignees:       req.CompetitorFilter,
-			TechDomains:     req.TechDomains,
-			DateFrom:        req.DateFrom,
-			DateTo:          req.DateTo,
-			ExcludePatents:  req.ExcludePatents,
+			SMILES:         canonicalSMILES,
+			Threshold:      req.SimilarityThreshold,
+			MaxResults:     req.MaxCandidates,
+			PatentOffices:  req.PatentOffices,
+			Assignees:      req.CompetitorFilter,
+			TechDomains:    req.TechDomains,
+			DateFrom:       req.DateFrom,
+			DateTo:         req.DateTo,
+			ExcludePatents: req.ExcludePatents,
 		})
 		if err != nil {
 			fpCh <- searchResult{err: fmt.Errorf("fingerprint similarity search failed: %w", err)}
@@ -1926,21 +1925,21 @@ func (s *riskAssessmentServiceImpl) aggregateRiskResponse(
 
 	return &MoleculeRiskResponse{
 		AssessmentID:                 assessmentID,
-		CanonicalSMILES:             canonicalSMILES,
-		InChIKey:                    inchiKey,
-		OverallRiskLevel:            RiskLevelFromScore(overallScore),
-		OverallRiskScore:            overallScore,
-		LiteralInfringementScore:    literalMax,
+		CanonicalSMILES:              canonicalSMILES,
+		InChIKey:                     inchiKey,
+		OverallRiskLevel:             RiskLevelFromScore(overallScore),
+		OverallRiskScore:             overallScore,
+		LiteralInfringementScore:     literalMax,
 		EquivalentsInfringementScore: equivalentsMax,
-		ClaimBreadthScore:           breadthMax,
-		ProsecutionHistoryPenalty:   penaltyMax,
-		MatchedPatents:              patentDetails,
-		Summary:                     summary,
-		CandidatesSearched:          len(patentDetails),
-		AnalysisDepth:               req.Depth,
-		ProcessingTime:              time.Since(startTime),
-		CacheHit:                    false,
-		AssessedAt:                  time.Now().UTC(),
+		ClaimBreadthScore:            breadthMax,
+		ProsecutionHistoryPenalty:    penaltyMax,
+		MatchedPatents:               patentDetails,
+		Summary:                      summary,
+		CandidatesSearched:           len(patentDetails),
+		AnalysisDepth:                req.Depth,
+		ProcessingTime:               time.Since(startTime),
+		CacheHit:                     false,
+		AssessedAt:                   time.Now().UTC(),
 	}
 }
 
@@ -1952,13 +1951,13 @@ func (s *riskAssessmentServiceImpl) buildNoneRiskResponse(
 	startTime time.Time,
 ) *MoleculeRiskResponse {
 	return &MoleculeRiskResponse{
-		AssessmentID:     commonTypes.GenerateID("ra"),
-		CanonicalSMILES:  canonicalSMILES,
-		InChIKey:         inchiKey,
-		OverallRiskLevel: RiskLevelNone,
-		OverallRiskScore: 0,
-		MatchedPatents:   []PatentRiskDetail{},
-		Summary:          "No candidate patents found matching the specified criteria. The molecule appears to have no infringement risk based on the current patent corpus.",
+		AssessmentID:       commonTypes.GenerateID("ra"),
+		CanonicalSMILES:    canonicalSMILES,
+		InChIKey:           inchiKey,
+		OverallRiskLevel:   RiskLevelNone,
+		OverallRiskScore:   0,
+		MatchedPatents:     []PatentRiskDetail{},
+		Summary:            "No candidate patents found matching the specified criteria. The molecule appears to have no infringement risk based on the current patent corpus.",
 		CandidatesSearched: 0,
 		AnalysisDepth:      req.Depth,
 		ProcessingTime:     time.Since(startTime),
@@ -2291,8 +2290,6 @@ var _ RiskAssessmentService = (*riskAssessmentServiceImpl)(nil)
 // Ensure unused imports are referenced (build guard for Go 1.22.1).
 var (
 	_ = commonTypes.GenerateID
-	_ = moleculeTypes.MoleculeID("")
-	_ = patentTypes.PatentID("")
 	_ = json.Marshal
 	_ = hex.EncodeToString
 	_ = sha256.New

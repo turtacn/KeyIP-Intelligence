@@ -17,9 +17,9 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockInfringeModel struct {
-	predictFn    func(ctx context.Context, req *LiteralPredictionRequest) (*LiteralPredictionResult, error)
-	version      string
-	callCount    atomic.Int32
+	predictFn func(ctx context.Context, req *LiteralPredictionRequest) (*LiteralPredictionResult, error)
+	version   string
+	callCount atomic.Int32
 }
 
 func (m *mockInfringeModel) PredictLiteralInfringement(ctx context.Context, req *LiteralPredictionRequest) (*LiteralPredictionResult, error) {
@@ -59,7 +59,6 @@ func (m *mockInfringeModel) Healthy(ctx context.Context) error {
 	return nil
 }
 
-
 type mockEquivalentsAnalyzer struct {
 	analyzeFn func(ctx context.Context, req *EquivalentsRequest) (*EquivalentsResult, error)
 	elementFn func(ctx context.Context, q, c *StructuralElement) (*ElementEquivalence, error)
@@ -94,14 +93,14 @@ func (m *mockEquivalentsAnalyzer) ModelVersion() string {
 }
 
 type mockClaimElementMapper struct {
-	mapFn              func(ctx context.Context, claims []*ClaimInput) ([]*MappedClaim, error)
-	mapMolFn           func(ctx context.Context, molecule *MoleculeInput) ([]*StructuralElement, error)
-	alignFn            func(ctx context.Context, moleculeElements []*StructuralElement, claimElements []*ClaimElement) (*ElementAlignment, error)
-	estoppelFn         func(ctx context.Context, alignment *ElementAlignment, history *ProsecutionHistory) (*EstoppelResult, error)
-	loadIndepFn        func(ctx context.Context, deps []*ClaimInput) ([]*ClaimInput, error)
-	parseHistFn        func(ctx context.Context, rawHistory []byte) (*ProsecutionHistory, error)
-	mapCallCount       atomic.Int32
-	estoppelCount      atomic.Int32
+	mapFn         func(ctx context.Context, claims []*ClaimInput) ([]*MappedClaim, error)
+	mapMolFn      func(ctx context.Context, molecule *MoleculeInput) ([]*StructuralElement, error)
+	alignFn       func(ctx context.Context, moleculeElements []*StructuralElement, claimElements []*ClaimElement) (*ElementAlignment, error)
+	estoppelFn    func(ctx context.Context, alignment *ElementAlignment, history *ProsecutionHistory) (*EstoppelResult, error)
+	loadIndepFn   func(ctx context.Context, deps []*ClaimInput) ([]*ClaimInput, error)
+	parseHistFn   func(ctx context.Context, rawHistory []byte) (*ProsecutionHistory, error)
+	mapCallCount  atomic.Int32
+	estoppelCount atomic.Int32
 }
 
 func (m *mockClaimElementMapper) MapElements(ctx context.Context, claims []*ClaimInput) ([]*MappedClaim, error) {
@@ -177,9 +176,9 @@ func (m *mockPortfolioLoader) LoadPortfolioClaims(ctx context.Context, portfolio
 }
 
 type mockExplanationStore struct {
-	mu        sync.RWMutex
-	data      map[string]*AssessmentResult
-	storeFn   func(ctx context.Context, result *AssessmentResult) error
+	mu         sync.RWMutex
+	data       map[string]*AssessmentResult
+	storeFn    func(ctx context.Context, result *AssessmentResult) error
 	storeCount atomic.Int32
 }
 
@@ -225,9 +224,9 @@ func (m *mockExplanationGenerator) Generate(ctx context.Context, result *Assessm
 }
 
 type mockAssessorMetrics struct {
-	inferenceCount    atomic.Int32
-	riskCount         atomic.Int32
-	lastRiskLevel     atomic.Value
+	inferenceCount atomic.Int32
+	riskCount      atomic.Int32
+	lastRiskLevel  atomic.Value
 }
 
 func (m *mockAssessorMetrics) RecordInference(ctx context.Context, p *common.InferenceMetricParams) {
@@ -237,12 +236,16 @@ func (m *mockAssessorMetrics) RecordRiskAssessment(ctx context.Context, riskLeve
 	m.riskCount.Add(1)
 	m.lastRiskLevel.Store(riskLevel)
 }
-func (m *mockAssessorMetrics) RecordBatchProcessing(ctx context.Context, p *common.BatchMetricParams)       {}
-func (m *mockAssessorMetrics) RecordCacheAccess(ctx context.Context, hit bool, modelName string)            {}
-func (m *mockAssessorMetrics) RecordCircuitBreakerStateChange(ctx context.Context, mn, from, to string)     {}
-func (m *mockAssessorMetrics) RecordModelLoad(ctx context.Context, mn, v string, d float64, s bool)         {}
-func (m *mockAssessorMetrics) GetInferenceLatencyHistogram() common.LatencyHistogram                        { return nil }
-func (m *mockAssessorMetrics) GetCurrentStats() *common.IntelligenceStats                                   { return &common.IntelligenceStats{} }
+func (m *mockAssessorMetrics) RecordBatchProcessing(ctx context.Context, p *common.BatchMetricParams) {
+}
+func (m *mockAssessorMetrics) RecordCacheAccess(ctx context.Context, hit bool, modelName string) {}
+func (m *mockAssessorMetrics) RecordCircuitBreakerStateChange(ctx context.Context, mn, from, to string) {
+}
+func (m *mockAssessorMetrics) RecordModelLoad(ctx context.Context, mn, v string, d float64, s bool) {}
+func (m *mockAssessorMetrics) GetInferenceLatencyHistogram() common.LatencyHistogram                { return nil }
+func (m *mockAssessorMetrics) GetCurrentStats() *common.IntelligenceStats {
+	return &common.IntelligenceStats{}
+}
 
 type mockAssessorLogger struct{}
 
@@ -1380,4 +1383,3 @@ func TestAssess_ScoringFormula(t *testing.T) {
 }
 
 //Personal.AI order the ending
-

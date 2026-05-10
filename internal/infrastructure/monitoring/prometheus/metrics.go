@@ -7,10 +7,10 @@ import (
 
 // GRPCMetrics holds gRPC-specific metrics for service/method/code dimensions.
 type GRPCMetrics struct {
-	collector            MetricsCollector
-	UnaryRequestsTotal   CounterVec
-	UnaryRequestDuration HistogramVec
-	StreamRequestsTotal  CounterVec
+	collector             MetricsCollector
+	UnaryRequestsTotal    CounterVec
+	UnaryRequestDuration  HistogramVec
+	StreamRequestsTotal   CounterVec
 	StreamRequestDuration HistogramVec
 }
 
@@ -42,24 +42,24 @@ func (m *GRPCMetrics) RecordStreamRequest(service, method, code string, duration
 // AppMetrics holds all application metrics.
 type AppMetrics struct {
 	// HTTP Layer
-	HTTPRequestsTotal     CounterVec
-	HTTPRequestDuration   HistogramVec
-	HTTPRequestSize       HistogramVec
-	HTTPResponseSize      HistogramVec
-	HTTPActiveRequests    GaugeVec
+	HTTPRequestsTotal   CounterVec
+	HTTPRequestDuration HistogramVec
+	HTTPRequestSize     HistogramVec
+	HTTPResponseSize    HistogramVec
+	HTTPActiveRequests  GaugeVec
 
 	// Auth Layer
-	AuthAttemptsTotal     CounterVec
+	AuthAttemptsTotal       CounterVec
 	AuthTokenVerifyDuration HistogramVec
-	AuthActiveTokens      GaugeVec
+	AuthActiveTokens        GaugeVec
 
 	// Patent Layer
-	PatentIngestTotal     CounterVec
-	PatentIngestDuration  HistogramVec
-	PatentStorageSize     GaugeVec
-	PatentSearchDuration  HistogramVec
+	PatentIngestTotal       CounterVec
+	PatentIngestDuration    HistogramVec
+	PatentStorageSize       GaugeVec
+	PatentSearchDuration    HistogramVec
 	PatentSearchResultCount HistogramVec
-	PatentTotalCount      GaugeVec
+	PatentTotalCount        GaugeVec
 
 	// Infringement/Risk Layer
 	RiskAssessmentRequestsTotal  CounterVec
@@ -68,38 +68,38 @@ type AppMetrics struct {
 	FTOAnalysisDuration          HistogramVec
 
 	// Analysis Layer
-	AnalysisTasksTotal    CounterVec
-	AnalysisTaskDuration  HistogramVec
+	AnalysisTasksTotal     CounterVec
+	AnalysisTaskDuration   HistogramVec
 	AnalysisTaskQueueDepth GaugeVec
-	AnalysisActiveWorkers GaugeVec
-	AnalysisTaskRetries   CounterVec
+	AnalysisActiveWorkers  GaugeVec
+	AnalysisTaskRetries    CounterVec
 
 	// Graph Layer
-	GraphNodesTotal       GaugeVec
-	GraphEdgesTotal       GaugeVec
-	GraphQueryDuration    HistogramVec
-	GraphBuildDuration    HistogramVec
+	GraphNodesTotal    GaugeVec
+	GraphEdgesTotal    GaugeVec
+	GraphQueryDuration HistogramVec
+	GraphBuildDuration HistogramVec
 
 	// AI/LLM Layer
-	LLMRequestsTotal      CounterVec
-	LLMRequestDuration    HistogramVec
-	LLMTokensUsed         CounterVec
-	LLMCostTotal          CounterVec
-	LLMCacheHitRate       GaugeVec
+	LLMRequestsTotal   CounterVec
+	LLMRequestDuration HistogramVec
+	LLMTokensUsed      CounterVec
+	LLMCostTotal       CounterVec
+	LLMCacheHitRate    GaugeVec
 
 	// Infrastructure Layer
-	DBConnectionPoolSize  GaugeVec
+	DBConnectionPoolSize   GaugeVec
 	DBConnectionPoolActive GaugeVec
-	DBQueryDuration       HistogramVec
-	CacheHitsTotal        CounterVec
-	CacheMissesTotal      CounterVec
-	MessageQueueDepth     GaugeVec
+	DBQueryDuration        HistogramVec
+	CacheHitsTotal         CounterVec
+	CacheMissesTotal       CounterVec
+	MessageQueueDepth      GaugeVec
 	MessageProcessDuration HistogramVec
 
 	// System Health
-	ServiceUptime         GaugeVec
-	HealthCheckStatus     GaugeVec
-	ErrorsTotal           CounterVec
+	ServiceUptime     GaugeVec
+	HealthCheckStatus GaugeVec
+	ErrorsTotal       CounterVec
 }
 
 // Default Buckets

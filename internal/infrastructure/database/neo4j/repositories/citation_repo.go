@@ -618,9 +618,9 @@ func (r *neo4jCitationRepo) GetCoCitationPatents(ctx context.Context, patentID u
 		LIMIT $limit
 	`
 	params := map[string]interface{}{
-		"id":         patentID.String(),
-		"minCommon":  minCommonCitations,
-		"limit":      limit,
+		"id":        patentID.String(),
+		"minCommon": minCommonCitations,
+		"limit":     limit,
 	}
 
 	res, err := r.driver.ExecuteRead(ctx, func(tx driver.Transaction) (interface{}, error) {

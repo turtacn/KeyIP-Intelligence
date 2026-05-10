@@ -210,15 +210,15 @@ func TestPrometheus_RecordBatchProcessing(t *testing.T) {
 	m, _ := NewPrometheusIntelligenceMetrics(reg)
 
 	m.RecordBatchProcessing(context.Background(), &BatchMetricParams{
-		BatchName:        "mol_embed_batch",
-		TotalItems:       100,
-		SuccessItems:     90,
-		FailedItems:      5,
-		TimeoutItems:     3,
-		CancelledItems:   2,
-		TotalDurationMs:  5000.0,
+		BatchName:         "mol_embed_batch",
+		TotalItems:        100,
+		SuccessItems:      90,
+		FailedItems:       5,
+		TimeoutItems:      3,
+		CancelledItems:    2,
+		TotalDurationMs:   5000.0,
 		AvgItemDurationMs: 50.0,
-		MaxConcurrency:   8,
+		MaxConcurrency:    8,
 	})
 
 	successCounter, _ := m.batchItemsTotal.GetMetricWithLabelValues("mol_embed_batch", "success")
@@ -1121,6 +1121,3 @@ var (
 	_ IntelligenceMetrics = (*inMemoryIntelligenceMetrics)(nil)
 	_ LatencyHistogram    = (*latencyHistogram)(nil)
 )
-
-
-

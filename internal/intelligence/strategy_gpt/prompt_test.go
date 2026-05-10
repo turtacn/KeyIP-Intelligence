@@ -538,6 +538,7 @@ func TestBuildPrompt_EmptyContext(t *testing.T) {
 		t.Error("should not have patent section when no patents provided")
 	}
 }
+
 // ---------------------------------------------------------------------------
 // Messages structure tests
 // ---------------------------------------------------------------------------
@@ -1261,4 +1262,3 @@ func TestIsCJK(t *testing.T) {
 		}
 	}
 }
-

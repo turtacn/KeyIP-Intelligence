@@ -18,15 +18,15 @@ type testLogger struct {
 	t *testing.T
 }
 
-func (l *testLogger) Debug(msg string, fields ...logging.Field) { l.t.Logf("DEBUG: %s", msg) }
-func (l *testLogger) Info(msg string, fields ...logging.Field)  { l.t.Logf("INFO: %s", msg) }
-func (l *testLogger) Warn(msg string, fields ...logging.Field)  { l.t.Logf("WARN: %s", msg) }
-func (l *testLogger) Error(msg string, fields ...logging.Field) { l.t.Logf("ERROR: %s", msg) }
-func (l *testLogger) Fatal(msg string, fields ...logging.Field) { l.t.Logf("FATAL: %s", msg) }
-func (l *testLogger) With(fields ...logging.Field) logging.Logger { return l }
+func (l *testLogger) Debug(msg string, fields ...logging.Field)      { l.t.Logf("DEBUG: %s", msg) }
+func (l *testLogger) Info(msg string, fields ...logging.Field)       { l.t.Logf("INFO: %s", msg) }
+func (l *testLogger) Warn(msg string, fields ...logging.Field)       { l.t.Logf("WARN: %s", msg) }
+func (l *testLogger) Error(msg string, fields ...logging.Field)      { l.t.Logf("ERROR: %s", msg) }
+func (l *testLogger) Fatal(msg string, fields ...logging.Field)      { l.t.Logf("FATAL: %s", msg) }
+func (l *testLogger) With(fields ...logging.Field) logging.Logger    { return l }
 func (l *testLogger) WithContext(ctx context.Context) logging.Logger { return l }
-func (l *testLogger) WithError(err error) logging.Logger { return l }
-func (l *testLogger) Sync() error { return nil }
+func (l *testLogger) WithError(err error) logging.Logger             { return l }
+func (l *testLogger) Sync() error                                    { return nil }
 
 func newTestAppMetrics(t *testing.T) (*AppMetrics, MetricsCollector) {
 	cfg := CollectorConfig{

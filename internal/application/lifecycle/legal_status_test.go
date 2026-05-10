@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	importUUID "github.com/google/uuid"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/lifecycle"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
-	importUUID "github.com/google/uuid"
 )
 
 // ===========================================================================
@@ -612,10 +612,10 @@ func TestDetectAnomalies_SyncFailure(t *testing.T) {
 	}
 	h.lifecycleRepo.getByPatentIDFn = func(_ context.Context, _ string) (*lifecycle.LegalStatusEntity, error) {
 		return &lifecycle.LegalStatusEntity{
-			PatentID:                  "00000000-0000-0000-0000-000000000001",
-			Jurisdiction:              "CN",
-			Status:                    "授权",
-			ConsecutiveSyncFailures:   5,
+			PatentID:                "00000000-0000-0000-0000-000000000001",
+			Jurisdiction:            "CN",
+			Status:                  "授权",
+			ConsecutiveSyncFailures: 5,
 		}, nil
 	}
 
@@ -1372,9 +1372,9 @@ func TestQueryOptions(t *testing.T) {
 		WithPagination(*pagination), // pass value as WithPagination expects value in legal_status.go implementation?
 	})
 
-    // Check implementation of WithPagination in legal_status.go
-    // func WithPagination(p commontypes.Pagination) QueryOption
-    // So passing value is correct.
+	// Check implementation of WithPagination in legal_status.go
+	// func WithPagination(p commontypes.Pagination) QueryOption
+	// So passing value is correct.
 
 	if opts.From == nil || !opts.From.Equal(from) {
 		t.Error("expected From to be set")

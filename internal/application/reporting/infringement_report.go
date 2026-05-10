@@ -239,7 +239,6 @@ func (s *infringementReportServiceImpl) validateRequest(req *InfringementReportR
 	return nil
 }
 
-// 
 func (s *infringementReportServiceImpl) Generate(ctx context.Context, req *InfringementReportRequest) (*InfringementReportResponse, error) {
 	startTime := time.Now()
 	if err := s.validateRequest(req); err != nil {
@@ -418,8 +417,10 @@ func (s *infringementReportServiceImpl) executeReportPipeline(ctx context.Contex
 
 				if req.AnalysisMode == ModeComprehensive && req.IncludeProsecutionHistory {
 					// Simulate prosecution history check (requires integration with patent registry file wrappers)
-					// isBanned = checkProsecutionHistory(...) 
-					if len(smiles)%2 != 0 { isBanned = true } // Mock logic
+					// isBanned = checkProsecutionHistory(...)
+					if len(smiles)%2 != 0 {
+						isBanned = true
+					} // Mock logic
 				}
 			}
 
@@ -441,8 +442,12 @@ func (s *infringementReportServiceImpl) executeReportPipeline(ctx context.Contex
 			}
 
 			// Update counts
-			if litProb > 0.75 { literalCount++ }
-			if equivProb > 0.75 && !isBanned { equivalentCount++ }
+			if litProb > 0.75 {
+				literalCount++
+			}
+			if equivProb > 0.75 && !isBanned {
+				equivalentCount++
+			}
 
 			// Update overall risk
 			if riskToInt(localRisk) > riskToInt(overallRisk) {
@@ -492,7 +497,9 @@ func (s *infringementReportServiceImpl) executeReportPipeline(ctx context.Contex
 	}
 
 	targetFormat := FormatPDF
-	if req.Language == LangEN { targetFormat = FormatDOCX } // Mock format decision
+	if req.Language == LangEN {
+		targetFormat = FormatDOCX
+	} // Mock format decision
 
 	renderResult, err := s.templater.Render(ctx, &RenderRequest{
 		TemplateID:   "infringement_template",
@@ -525,12 +532,18 @@ func (s *infringementReportServiceImpl) executeReportPipeline(ctx context.Contex
 
 func riskToInt(r InfringementRiskLevel) int {
 	switch r {
-	case RiskNegligible: return 1
-	case RiskLow: return 2
-	case RiskMedium: return 3
-	case RiskHigh: return 4
-	case RiskCritical: return 5
-	default: return 0
+	case RiskNegligible:
+		return 1
+	case RiskLow:
+		return 2
+	case RiskMedium:
+		return 3
+	case RiskHigh:
+		return 4
+	case RiskCritical:
+		return 5
+	default:
+		return 0
 	}
 }
 
@@ -555,8 +568,12 @@ func (s *infringementReportServiceImpl) GetStatus(ctx context.Context, reportID 
 	}
 
 	progress := 0
-	if meta.Status == StatusCompleted { progress = 100 }
-	if meta.Status == StatusFailed { progress = 0 }
+	if meta.Status == StatusCompleted {
+		progress = 100
+	}
+	if meta.Status == StatusFailed {
+		progress = 0
+	}
 
 	return &ReportStatusInfo{
 		ReportID:    meta.ReportID,

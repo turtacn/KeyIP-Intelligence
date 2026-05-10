@@ -133,13 +133,13 @@ type SearchResult struct {
 
 // Stats represents patent statistics.
 type Stats struct {
-	TotalPatents         int64            `json:"total_patents"`
-	ByJurisdiction       map[string]int64 `json:"by_jurisdiction"`
-	ByYear               map[string]int64 `json:"by_year"`
-	TopApplicants        []ApplicantStat  `json:"top_applicants"`
-	TopIPCCodes          []IPCStat        `json:"top_ipc_codes"`
-	AverageClaimsPerDoc  float64          `json:"average_claims_per_doc"`
-	ActivePatentPerc     float64          `json:"active_patent_perc"`
+	TotalPatents        int64            `json:"total_patents"`
+	ByJurisdiction      map[string]int64 `json:"by_jurisdiction"`
+	ByYear              map[string]int64 `json:"by_year"`
+	TopApplicants       []ApplicantStat  `json:"top_applicants"`
+	TopIPCCodes         []IPCStat        `json:"top_ipc_codes"`
+	AverageClaimsPerDoc float64          `json:"average_claims_per_doc"`
+	ActivePatentPerc    float64          `json:"active_patent_perc"`
 }
 
 // ApplicantStat represents applicant statistics.

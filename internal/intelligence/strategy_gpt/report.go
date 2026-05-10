@@ -199,10 +199,10 @@ type ReportMetadata struct {
 
 // ReportValidation holds quality-check results.
 type ReportValidation struct {
-	IsValid               bool                        `json:"is_valid"`
-	QualityScore          float64                     `json:"quality_score"`
-	Issues                []*ValidationIssue          `json:"issues"`
-	CitationVerification  *CitationVerificationResult `json:"citation_verification,omitempty"`
+	IsValid              bool                        `json:"is_valid"`
+	QualityScore         float64                     `json:"quality_score"`
+	Issues               []*ValidationIssue          `json:"issues"`
+	CitationVerification *CitationVerificationResult `json:"citation_verification,omitempty"`
 }
 
 // ValidationIssue is a single quality problem.
@@ -360,9 +360,9 @@ func (g *reportGeneratorImpl) GenerateReport(ctx context.Context, req *ReportReq
 
 	// 7. Assemble report
 	report := &Report{
-		ReportID:    reportID,
-		Task:        req.Task,
-		Content:     content,
+		ReportID: reportID,
+		Task:     req.Task,
+		Content:  content,
 		Metadata: &ReportMetadata{
 			ModelID:      g.config.ModelID,
 			ModelVersion: g.config.ModelID, // simplified
@@ -1464,9 +1464,9 @@ const (
 )
 
 type wDocument struct {
-	XMLName xml.Name  `xml:"w:document"`
-	W       string    `xml:"xmlns:w,attr"`
-	Body    wBody     `xml:"w:body"`
+	XMLName xml.Name `xml:"w:document"`
+	W       string   `xml:"xmlns:w,attr"`
+	Body    wBody    `xml:"w:body"`
 }
 
 type wBody struct {
@@ -1475,7 +1475,7 @@ type wBody struct {
 
 type wParagraph struct {
 	ParagraphProps *wParagraphProps `xml:"w:pPr,omitempty"`
-	Runs          []wRun           `xml:"w:r,omitempty"`
+	Runs           []wRun           `xml:"w:r,omitempty"`
 }
 
 type wParagraphProps struct {

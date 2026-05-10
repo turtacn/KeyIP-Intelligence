@@ -48,8 +48,8 @@ func ClassifyBreadth(score float64) ScopeBreadthLevel {
 type ScopeRelationship string
 
 const (
-	RelAContainsB ScopeRelationship = "A_CONTAINS_B"
-	RelBContainsA ScopeRelationship = "B_CONTAINS_A"
+	RelAContainsB  ScopeRelationship = "A_CONTAINS_B"
+	RelBContainsA  ScopeRelationship = "B_CONTAINS_A"
 	RelOverlapping ScopeRelationship = "OVERLAPPING"
 	RelDisjoint    ScopeRelationship = "DISJOINT"
 	RelEquivalent  ScopeRelationship = "EQUIVALENT"
@@ -84,29 +84,29 @@ type ScopeAnalysis struct {
 
 // ScopeComparison is the result of comparing two claims' scopes.
 type ScopeComparison struct {
-	ClaimA         int                `json:"claim_a"`
-	ClaimB         int                `json:"claim_b"`
-	Relationship   ScopeRelationship  `json:"relationship"`
-	OverlapScore   float64            `json:"overlap_score"`
+	ClaimA         int                 `json:"claim_a"`
+	ClaimB         int                 `json:"claim_b"`
+	Relationship   ScopeRelationship   `json:"relationship"`
+	OverlapScore   float64             `json:"overlap_score"`
 	SharedFeatures []*TechnicalFeature `json:"shared_features"`
 	UniqueToA      []*TechnicalFeature `json:"unique_to_a"`
 	UniqueToB      []*TechnicalFeature `json:"unique_to_b"`
-	Analysis       string             `json:"analysis"`
+	Analysis       string              `json:"analysis"`
 }
 
 // ClaimSetScopeAnalysis is the result of analyzing an entire claim set.
 type ClaimSetScopeAnalysis struct {
-	PatentID           string                   `json:"patent_id"`
-	TotalClaims        int                      `json:"total_claims"`
-	IndependentCount   int                      `json:"independent_count"`
-	DependentCount     int                      `json:"dependent_count"`
-	OverallCoverage    float64                  `json:"overall_coverage"`
-	ClaimAnalyses      []*ScopeAnalysis         `json:"claim_analyses"`
-	WidestClaim        *ScopeAnalysis           `json:"widest_claim"`
-	NarrowestClaim     *ScopeAnalysis           `json:"narrowest_claim"`
-	Gaps               []*ScopeGap              `json:"gaps"`
-	Visualization      *ScopeVisualizationData  `json:"visualization"`
-	CategoryCoverage   map[string]int           `json:"category_coverage"`
+	PatentID         string                  `json:"patent_id"`
+	TotalClaims      int                     `json:"total_claims"`
+	IndependentCount int                     `json:"independent_count"`
+	DependentCount   int                     `json:"dependent_count"`
+	OverallCoverage  float64                 `json:"overall_coverage"`
+	ClaimAnalyses    []*ScopeAnalysis        `json:"claim_analyses"`
+	WidestClaim      *ScopeAnalysis          `json:"widest_claim"`
+	NarrowestClaim   *ScopeAnalysis          `json:"narrowest_claim"`
+	Gaps             []*ScopeGap             `json:"gaps"`
+	Visualization    *ScopeVisualizationData `json:"visualization"`
+	CategoryCoverage map[string]int          `json:"category_coverage"`
 }
 
 // ScopeGap represents a gap in the protection scope of a claim set.
@@ -119,10 +119,10 @@ type ScopeGap struct {
 
 // ScopeVisualizationData provides data for rendering a claim scope graph.
 type ScopeVisualizationData struct {
-	Nodes       []ScopeNode     `json:"nodes"`
-	Edges       []ScopeEdge     `json:"edges"`
-	Layers      [][]int         `json:"layers"`
-	HeatmapData [][]float64     `json:"heatmap_data"`
+	Nodes       []ScopeNode `json:"nodes"`
+	Edges       []ScopeEdge `json:"edges"`
+	Layers      [][]int     `json:"layers"`
+	HeatmapData [][]float64 `json:"heatmap_data"`
 }
 
 // ScopeNode represents a single claim in the visualization graph.
@@ -208,10 +208,10 @@ var transitionalPhraseImpactDescriptions = map[TransitionalPhraseType]string{
 // ============================================================================
 
 const (
-	featureMatchThreshold     = 0.80 // cosine similarity threshold for feature matching
-	overlapEdgeThreshold      = 0.30 // minimum overlap score to draw an overlap edge
-	equivalenceThreshold      = 0.95 // overlap score above which claims are considered equivalent
-	containmentThreshold      = 0.90 // fraction of features matched to consider containment
+	featureMatchThreshold = 0.80 // cosine similarity threshold for feature matching
+	overlapEdgeThreshold  = 0.30 // minimum overlap score to draw an overlap edge
+	equivalenceThreshold  = 0.95 // overlap score above which claims are considered equivalent
+	containmentThreshold  = 0.90 // fraction of features matched to consider containment
 )
 
 // ============================================================================

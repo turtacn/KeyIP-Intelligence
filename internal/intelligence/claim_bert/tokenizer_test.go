@@ -1163,8 +1163,6 @@ func TestTokenize_PatentClaimText(t *testing.T) {
 	}
 }
 
-
-
 func TestTokenize_CaseSensitivity_Strict(t *testing.T) {
 	tok := setupTestTokenizer()
 

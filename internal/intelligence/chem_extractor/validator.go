@@ -16,12 +16,12 @@ import (
 
 // ValidationResult holds the outcome of validating a single entity.
 type ValidationResult struct {
-	Entity             *RawChemicalEntity    `json:"entity"`
-	IsValid            bool                  `json:"is_valid"`
-	AdjustedConfidence float64               `json:"adjusted_confidence"`
-	AdjustedType       ChemicalEntityType    `json:"adjusted_type"`
-	Issues             []string              `json:"issues,omitempty"`
-	Corrections        map[string]string     `json:"corrections,omitempty"`
+	Entity             *RawChemicalEntity `json:"entity"`
+	IsValid            bool               `json:"is_valid"`
+	AdjustedConfidence float64            `json:"adjusted_confidence"`
+	AdjustedType       ChemicalEntityType `json:"adjusted_type"`
+	Issues             []string           `json:"issues,omitempty"`
+	Corrections        map[string]string  `json:"corrections,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ var smilesValidAtoms = map[string]bool{
 	"B": true, "C": true, "N": true, "O": true, "P": true, "S": true,
 	"F": true, "Cl": true, "Br": true, "I": true,
 	"c": true, "n": true, "o": true, "s": true, "p": true,
-	"b": true,
+	"b":  true,
 	"Si": true, "Se": true, "Te": true, "As": true, "Ge": true,
 	"Na": true, "Mg": true, "Al": true, "Ca": true, "Fe": true,
 	"Cu": true, "Zn": true, "Ag": true, "Au": true, "Pt": true,
@@ -160,13 +160,13 @@ var genericStructureKeywords = []string{
 // ---------------------------------------------------------------------------
 
 var (
-	reCASFormat          = regexp.MustCompile(`^\d{2,7}-\d{2}-\d$`)
-	reMolecularFormula   = regexp.MustCompile(`^([A-Z][a-z]?\d*)+$`)
-	reFormulaElement     = regexp.MustCompile(`([A-Z][a-z]?)(\d*)`)
-	rePureDigits         = regexp.MustCompile(`^\d+$`)
-	reMarkushVar         = regexp.MustCompile(`^(?:R\d*|R'\d*|R''\d*|X|Y|Z|Ar|Het|Alk|Hal|Q|W|M|L)$`)
-	reInChIPrefix        = regexp.MustCompile(`^InChI=`)
-	reInChILayer         = regexp.MustCompile(`/[a-z]`)
+	reCASFormat        = regexp.MustCompile(`^\d{2,7}-\d{2}-\d$`)
+	reMolecularFormula = regexp.MustCompile(`^([A-Z][a-z]?\d*)+$`)
+	reFormulaElement   = regexp.MustCompile(`([A-Z][a-z]?)(\d*)`)
+	rePureDigits       = regexp.MustCompile(`^\d+$`)
+	reMarkushVar       = regexp.MustCompile(`^(?:R\d*|R'\d*|R''\d*|X|Y|Z|Ar|Het|Alk|Hal|Q|W|M|L)$`)
+	reInChIPrefix      = regexp.MustCompile(`^InChI=`)
+	reInChILayer       = regexp.MustCompile(`/[a-z]`)
 )
 
 // ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ func (v *entityValidatorImpl) Validate(ctx context.Context, entity *RawChemicalE
 		Corrections:        map[string]string{},
 	}
 
-		text := strings.TrimSpace(entity.Text)
+	text := strings.TrimSpace(entity.Text)
 	if text == "" {
 		result.IsValid = false
 		result.Issues = append(result.Issues, "empty text")
@@ -215,7 +215,7 @@ func (v *entityValidatorImpl) Validate(ctx context.Context, entity *RawChemicalE
 		return result, nil
 	}
 
-		// ---- Blacklist check ----
+	// ---- Blacklist check ----
 	if v.isBlacklisted(text) {
 		result.IsValid = false
 		result.Issues = append(result.Issues, "entity is blacklisted")
@@ -270,7 +270,7 @@ func (v *entityValidatorImpl) isBlacklisted(text string) bool {
 		return true
 	}
 	// Pure digits (not matching CAS format)
-    if rePureDigits != nil && rePureDigits.MatchString(text) {
+	if rePureDigits != nil && rePureDigits.MatchString(text) {
 		return true
 	}
 	return false
@@ -701,7 +701,7 @@ func (v *entityValidatorImpl) validateInChI(result *ValidationResult, text strin
 func (v *entityValidatorImpl) validateBrandName(result *ValidationResult, text string) {
 	// Must start with uppercase
 	if len(text) == 0 || !unicode.IsUpper(rune(text[0])) {
-		result.Issues = append(result.Issues,"brand name should start with uppercase letter")
+		result.Issues = append(result.Issues, "brand name should start with uppercase letter")
 	}
 
 	// Check blacklist for common proper nouns that are not brand names

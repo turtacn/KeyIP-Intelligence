@@ -46,6 +46,7 @@ func (m *MockMinIO) PresignedPutObject(ctx context.Context, bucketName, objectNa
 	args := m.Called(ctx, bucketName, objectName, expiry)
 	return args.Get(0).(*url.URL), args.Error(1)
 }
+
 // ... Implement other methods as needed or stub them
 func (m *MockMinIO) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, objectSize int64, opts minio.PutObjectOptions) (minio.UploadInfo, error) {
 	args := m.Called(ctx, bucketName, objectName, reader, objectSize, opts)
@@ -85,11 +86,11 @@ func TestEnsureBuckets_AllNew(t *testing.T) {
 		config: &MinIOConfig{
 			Region: "us-east-1",
 			Buckets: BucketConfig{
-				Documents: "docs",
-				Models:    "models",
-				Reports:   "reports",
-				Exports:   "exports",
-				Temp:      "temp",
+				Documents:   "docs",
+				Models:      "models",
+				Reports:     "reports",
+				Exports:     "exports",
+				Temp:        "temp",
 				Attachments: "attach",
 			},
 		},
@@ -159,12 +160,12 @@ func TestApplyDefaults(t *testing.T) {
 
 func TestApplyDefaults_PreservesValues(t *testing.T) {
 	cfg := &MinIOConfig{
-		Region:       "eu-west-1",
-		PartSize:     32 * 1024 * 1024,
-		MaxRetries:   5,
-		PresignExpiry: 2 * time.Hour,
+		Region:         "eu-west-1",
+		PartSize:       32 * 1024 * 1024,
+		MaxRetries:     5,
+		PresignExpiry:  2 * time.Hour,
 		TempFileExpiry: 14,
-		DefaultBucket: "custom-bucket",
+		DefaultBucket:  "custom-bucket",
 		Buckets: BucketConfig{
 			Documents:   "custom-docs",
 			Models:      "custom-models",

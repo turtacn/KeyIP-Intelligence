@@ -196,7 +196,9 @@ func (r *postgresMoleculeRepo) buildSearchQuery(query *molecule.MoleculeQuery, i
 
 	if len(query.Statuses) > 0 {
 		statusStrs := make([]string, len(query.Statuses))
-		for i, s := range query.Statuses { statusStrs[i] = string(s) }
+		for i, s := range query.Statuses {
+			statusStrs[i] = string(s)
+		}
 		sb.WriteString(fmt.Sprintf("AND m.status = ANY($%d) ", argIdx))
 		args = append(args, pq.Array(statusStrs))
 		argIdx++
@@ -204,7 +206,9 @@ func (r *postgresMoleculeRepo) buildSearchQuery(query *molecule.MoleculeQuery, i
 
 	if len(query.Sources) > 0 {
 		sourceStrs := make([]string, len(query.Sources))
-		for i, s := range query.Sources { sourceStrs[i] = string(s) }
+		for i, s := range query.Sources {
+			sourceStrs[i] = string(s)
+		}
 		sb.WriteString(fmt.Sprintf("AND m.source = ANY($%d) ", argIdx))
 		args = append(args, pq.Array(sourceStrs))
 		argIdx++
@@ -212,7 +216,9 @@ func (r *postgresMoleculeRepo) buildSearchQuery(query *molecule.MoleculeQuery, i
 
 	if len(query.HasFingerprintTypes) > 0 {
 		fpStrs := make([]string, len(query.HasFingerprintTypes))
-		for i, f := range query.HasFingerprintTypes { fpStrs[i] = string(f) }
+		for i, f := range query.HasFingerprintTypes {
+			fpStrs[i] = string(f)
+		}
 		sb.WriteString(fmt.Sprintf("AND mf.fingerprint_type = ANY($%d) ", argIdx))
 		args = append(args, pq.Array(fpStrs))
 		argIdx++
@@ -312,7 +318,9 @@ func (r *postgresMoleculeRepo) Search(ctx context.Context, query *molecule.Molec
 	}
 
 	limit := query.Limit
-	if limit <= 0 { limit = 20 }
+	if limit <= 0 {
+		limit = 20
+	}
 
 	return &molecule.MoleculeSearchResult{
 		Molecules: molecules,
@@ -347,7 +355,9 @@ func (r *postgresMoleculeRepo) FindBySource(ctx context.Context, source molecule
 	var mols []*molecule.Molecule
 	for rows.Next() {
 		m, err := scanMolecule(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		mols = append(mols, m)
 	}
 	return mols, nil
@@ -364,7 +374,9 @@ func (r *postgresMoleculeRepo) FindByStatus(ctx context.Context, status molecule
 	var mols []*molecule.Molecule
 	for rows.Next() {
 		m, err := scanMolecule(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		mols = append(mols, m)
 	}
 	return mols, nil
@@ -384,7 +396,9 @@ func (r *postgresMoleculeRepo) FindByTags(ctx context.Context, tags []string, of
 	var mols []*molecule.Molecule
 	for rows.Next() {
 		m, err := scanMolecule(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		mols = append(mols, m)
 	}
 	return mols, nil
@@ -401,7 +415,9 @@ func (r *postgresMoleculeRepo) FindByMolecularWeightRange(ctx context.Context, m
 	var mols []*molecule.Molecule
 	for rows.Next() {
 		m, err := scanMolecule(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		mols = append(mols, m)
 	}
 	return mols, nil
@@ -423,7 +439,9 @@ func (r *postgresMoleculeRepo) FindWithFingerprint(ctx context.Context, fpType m
 	var mols []*molecule.Molecule
 	for rows.Next() {
 		m, err := scanMolecule(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		mols = append(mols, m)
 	}
 	return mols, nil
@@ -445,7 +463,9 @@ func (r *postgresMoleculeRepo) FindWithoutFingerprint(ctx context.Context, fpTyp
 	var mols []*molecule.Molecule
 	for rows.Next() {
 		m, err := scanMolecule(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		mols = append(mols, m)
 	}
 	return mols, nil
@@ -484,8 +504,12 @@ func scanProperty(row scanner) (*molecule.Property, error) {
 	err := row.Scan(
 		&p.ID, &p.MoleculeID, &p.Type, &p.Value, &p.Unit, &conds, &p.DataSource, &p.Confidence, &p.SourceReference, &p.CreatedAt,
 	)
-	if err != nil { return nil, err }
-	if len(conds) > 0 { _ = json.Unmarshal(conds, &p.MeasurementConditions) }
+	if err != nil {
+		return nil, err
+	}
+	if len(conds) > 0 {
+		_ = json.Unmarshal(conds, &p.MeasurementConditions)
+	}
 	p.Name = p.Type // alias
 	return p, nil
 }
@@ -510,7 +534,9 @@ func (r *postgresMoleculeRepo) GetProperties(ctx context.Context, moleculeID uui
 	var props []*molecule.Property
 	for rows.Next() {
 		p, err := scanProperty(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		props = append(props, p)
 	}
 	return props, nil
@@ -540,7 +566,9 @@ func (r *postgresMoleculeRepo) GetPropertiesByType(ctx context.Context, property
 	var props []*molecule.Property
 	for rows.Next() {
 		p, err := scanProperty(rows)
-		if err != nil { return nil, 0, err }
+		if err != nil {
+			return nil, 0, err
+		}
 		props = append(props, p)
 	}
 	return props, count, nil
@@ -585,7 +613,9 @@ func scanPatentRelation(row scanner) (*molecule.PatentRelation, error) {
 	err := row.Scan(
 		&r.ID, &r.PatentID, &r.MoleculeID, &r.RelationType, &r.LocationInPatent, &r.PageReference, pq.Array(&claims), &r.ExtractionMethod, &r.Confidence, &r.CreatedAt,
 	)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	r.ClaimNumbers = claims
 	return r, nil
 }
@@ -606,7 +636,9 @@ func (r *postgresMoleculeRepo) GetPatentRelations(ctx context.Context, moleculeI
 	var rels []*molecule.PatentRelation
 	for rows.Next() {
 		rel, err := scanPatentRelation(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		rels = append(rels, rel)
 	}
 	return rels, nil
@@ -641,7 +673,9 @@ func (r *postgresMoleculeRepo) GetMoleculesByPatent(ctx context.Context, patentI
 	var mols []*molecule.Molecule
 	for rows.Next() {
 		m, err := scanMolecule(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		mols = append(mols, m)
 	}
 	return mols, nil
@@ -980,7 +1014,9 @@ func scanMoleculeWithScore(row scanner) (*molecule.MoleculeWithScore, error) {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan molecule with score")
 	}
 	m.Status = molecule.MoleculeStatus(statusStr)
-	if len(meta) > 0 { _ = json.Unmarshal(meta, &m.Metadata) }
+	if len(meta) > 0 {
+		_ = json.Unmarshal(meta, &m.Metadata)
+	}
 	return ms, nil
 }
 
@@ -1003,7 +1039,9 @@ func (r *postgresMoleculeRepo) SearchByVectorSimilarity(ctx context.Context, emb
 	var results []*molecule.MoleculeWithScore
 	for rows.Next() {
 		ms, err := scanMoleculeWithScore(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		results = append(results, ms)
 	}
 	return results, nil
@@ -1012,7 +1050,9 @@ func (r *postgresMoleculeRepo) SearchByVectorSimilarity(ctx context.Context, emb
 // Transaction
 func (r *postgresMoleculeRepo) WithTx(ctx context.Context, fn func(molecule.MoleculeRepository) error) error {
 	tx, err := r.conn.DB().BeginTx(ctx, nil)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	txRepo := &postgresMoleculeRepo{conn: r.conn, tx: tx, log: r.log}
 	if err := fn(txRepo); err != nil {
 		tx.Rollback()
@@ -1049,7 +1089,9 @@ func scanMolecule(row scanner) (*molecule.Molecule, error) {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan molecule")
 	}
 	m.Status = molecule.Status(statusStr)
-	if len(meta) > 0 { _ = json.Unmarshal(meta, &m.Metadata) }
+	if len(meta) > 0 {
+		_ = json.Unmarshal(meta, &m.Metadata)
+	}
 	return m, nil
 }
 
@@ -1067,7 +1109,9 @@ func scanFingerprint(row scanner) (*molecule.Fingerprint, error) {
 		return nil, err
 	}
 
-	if len(params) > 0 { _ = json.Unmarshal(params, &fp.Parameters) }
+	if len(params) > 0 {
+		_ = json.Unmarshal(params, &fp.Parameters)
+	}
 	if len(vec.Slice()) > 0 {
 		fp.Vector = vec.Slice()
 	}

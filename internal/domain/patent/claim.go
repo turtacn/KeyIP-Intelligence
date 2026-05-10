@@ -101,16 +101,16 @@ type ClaimElement struct {
 
 // Claim is a value object representing a single patent claim.
 type Claim struct {
-	Number               int            `json:"number"`
-	Text                 string         `json:"text"`
-	Type                 ClaimType      `json:"type"`
-	Category             ClaimCategory  `json:"category"`
-	DependsOn            []int          `json:"depends_on,omitempty"`
-	Preamble             string         `json:"preamble,omitempty"`
+	Number                int            `json:"number"`
+	Text                  string         `json:"text"`
+	Type                  ClaimType      `json:"type"`
+	Category              ClaimCategory  `json:"category"`
+	DependsOn             []int          `json:"depends_on,omitempty"`
+	Preamble              string         `json:"preamble,omitempty"`
 	CharacterizingPortion string         `json:"characterizing_portion,omitempty"`
-	Elements             []ClaimElement `json:"elements,omitempty"`
-	MarkushStructures    []string       `json:"markush_structures,omitempty"`
-	Language             string         `json:"language"`
+	Elements              []ClaimElement `json:"elements,omitempty"`
+	MarkushStructures     []string       `json:"markush_structures,omitempty"`
+	Language              string         `json:"language"`
 }
 
 // NewClaim constructs and validates a new Claim.

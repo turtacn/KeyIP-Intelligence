@@ -36,10 +36,10 @@ type patentRepoPort interface {
 
 // LifecycleOutput represents the output for lifecycle operations.
 type LifecycleOutput struct {
-	PatentID    string `json:"patent_id"`
-	Phase       string `json:"phase"`
-	Status      string `json:"status"`
-	UpdatedAt   string `json:"updated_at,omitempty"`
+	PatentID  string `json:"patent_id"`
+	Phase     string `json:"phase"`
+	Status    string `json:"status"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 }
 
 // MilestoneOutput represents the output for milestone operations.

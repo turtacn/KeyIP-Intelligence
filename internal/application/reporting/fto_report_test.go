@@ -271,11 +271,11 @@ func validFTORequest() *FTOReportRequest {
 			{Format: "smiles", Value: "C1=CC=CC=C1"},
 			{Format: "smiles", Value: "CC(=O)OC1=CC=CC=C1C(=O)O"},
 		},
-		TargetProduct:    "Test Product Alpha",
-		Jurisdictions:    []string{"CN", "US"},
-		AnalysisDepth:    DepthStandard,
-		RequestedBy:      "user-123",
-		Language:         LangZH,
+		TargetProduct: "Test Product Alpha",
+		Jurisdictions: []string{"CN", "US"},
+		AnalysisDepth: DepthStandard,
+		RequestedBy:   "user-123",
+		Language:      LangZH,
 	}
 }
 

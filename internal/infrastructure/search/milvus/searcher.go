@@ -435,7 +435,7 @@ func (s *Searcher) BatchSearch(ctx context.Context, requests []common.VectorSear
 			if err != nil {
 				s.logger.Warn("Batch search sub-request failed", logging.Error(err))
 				results[i] = nil // Partial failure allowed? Prompt says "Single request failure doesn't affect others"
-				return nil // Don't fail the group
+				return nil       // Don't fail the group
 			}
 			results[i] = res
 			return nil
@@ -542,7 +542,9 @@ func (s *Searcher) convertToColumns(ctx context.Context, collectionName string, 
 		name := field.Name
 		values, ok := fieldData[name]
 		if !ok {
-			if field.AutoID { continue } // Skip auto-id fields if missing
+			if field.AutoID {
+				continue
+			} // Skip auto-id fields if missing
 			return nil, fmt.Errorf("missing required field: %s", name)
 		}
 
@@ -552,9 +554,13 @@ func (s *Searcher) convertToColumns(ctx context.Context, collectionName string, 
 			intValues := make([]int64, len(values))
 			for i, v := range values {
 				// Type assertion/conversion
-				if f, ok := v.(float64); ok { intValues[i] = int64(f) } else
-				if n, ok := v.(int64); ok { intValues[i] = n } else
-				if n, ok := v.(int); ok { intValues[i] = int64(n) }
+				if f, ok := v.(float64); ok {
+					intValues[i] = int64(f)
+				} else if n, ok := v.(int64); ok {
+					intValues[i] = n
+				} else if n, ok := v.(int); ok {
+					intValues[i] = int64(n)
+				}
 			}
 			col = entity.NewColumnInt64(name, intValues)
 		case entity.FieldTypeVarChar:
@@ -566,8 +572,11 @@ func (s *Searcher) convertToColumns(ctx context.Context, collectionName string, 
 		case entity.FieldTypeFloat:
 			floatValues := make([]float32, len(values))
 			for i, v := range values {
-				if f, ok := v.(float64); ok { floatValues[i] = float32(f) } else
-				if f, ok := v.(float32); ok { floatValues[i] = f }
+				if f, ok := v.(float64); ok {
+					floatValues[i] = float32(f)
+				} else if f, ok := v.(float32); ok {
+					floatValues[i] = f
+				}
 			}
 			col = entity.NewColumnFloat(name, floatValues)
 		case entity.FieldTypeFloatVector:
@@ -576,15 +585,21 @@ func (s *Searcher) convertToColumns(ctx context.Context, collectionName string, 
 			for i, v := range values {
 				if vv, ok := v.([]float32); ok {
 					vecValues[i] = vv
-					if dim == 0 { dim = len(vv) }
+					if dim == 0 {
+						dim = len(vv)
+					}
 				} else if ifaceSlice, ok := v.([]interface{}); ok {
 					// Handle JSON numeric array
 					vec := make([]float32, len(ifaceSlice))
 					for j, item := range ifaceSlice {
-						if f, ok := item.(float64); ok { vec[j] = float32(f) }
+						if f, ok := item.(float64); ok {
+							vec[j] = float32(f)
+						}
 					}
 					vecValues[i] = vec
-					if dim == 0 { dim = len(vec) }
+					if dim == 0 {
+						dim = len(vec)
+					}
 				}
 			}
 			col = entity.NewColumnFloatVector(name, dim, vecValues)
@@ -640,7 +655,9 @@ func (s *Searcher) buildSearchParam(indexType entity.IndexType, params map[strin
 	nprobe := s.config.DefaultNProbe
 	if v, ok := params["nprobe"]; ok {
 		// parse v to int
-		if n, ok := v.(int); ok { nprobe = n }
+		if n, ok := v.(int); ok {
+			nprobe = n
+		}
 	}
 
 	return entity.NewIndexIvfFlatSearchParam(nprobe)

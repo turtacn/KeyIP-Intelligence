@@ -205,8 +205,12 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 
 		_ = mol.SetStructureIdentifiers(canonical, inchi, inchiKey, formula, weight)
 
-		for _, tag := range req.Tags { _ = mol.AddTag(tag) }
-		for _, prop := range req.Properties { _ = mol.AddProperty(prop) }
+		for _, tag := range req.Tags {
+			_ = mol.AddTag(tag)
+		}
+		for _, prop := range req.Properties {
+			_ = mol.AddProperty(prop)
+		}
 
 		toRegister = append(toRegister, pendingMol{mol, canonical, i})
 		canonicals = append(canonicals, canonical)
@@ -378,9 +382,13 @@ func (s *MoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2
 
 	for _, ft := range fpTypes {
 		fp1, err := s.fpCalculator.Calculate(ctx, smiles1, ft, opts)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		fp2, err := s.fpCalculator.Calculate(ctx, smiles2, ft, opts)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 
 		metric := MetricTanimoto
 		if ft == FingerprintGNN {
@@ -388,7 +396,9 @@ func (s *MoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2
 		}
 
 		score, err := s.similarityEngine.ComputeSimilarity(fp1, fp2, metric)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		scores[ft] = score
 	}
 
@@ -407,25 +417,35 @@ func (s *MoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2
 // ArchiveMolecule transitions a molecule to Archived status.
 func (s *MoleculeService) ArchiveMolecule(ctx context.Context, id string) error {
 	mol, err := s.repo.FindByID(ctx, id)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
-	if err := mol.Archive(); err != nil { return err }
+	if err := mol.Archive(); err != nil {
+		return err
+	}
 	return s.repo.Update(ctx, mol)
 }
 
 // DeleteMolecule transitions a molecule to Deleted status.
 func (s *MoleculeService) DeleteMolecule(ctx context.Context, id string) error {
 	mol, err := s.repo.FindByID(ctx, id)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
-	if err := mol.MarkDeleted(); err != nil { return err }
+	if err := mol.MarkDeleted(); err != nil {
+		return err
+	}
 	return s.repo.Update(ctx, mol)
 }
 
 // AddMoleculeProperties adds properties to a molecule.
 func (s *MoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID string, properties []*MolecularProperty) error {
 	mol, err := s.repo.FindByID(ctx, moleculeID)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	updated := false
 	for _, p := range properties {
@@ -444,7 +464,9 @@ func (s *MoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID 
 // TagMolecule adds tags to a molecule.
 func (s *MoleculeService) TagMolecule(ctx context.Context, moleculeID string, tags []string) error {
 	mol, err := s.repo.FindByID(ctx, moleculeID)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	updated := false
 	for _, t := range tags {

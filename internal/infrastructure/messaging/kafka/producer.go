@@ -24,23 +24,23 @@ var (
 
 // ProducerConfig holds configuration for the Producer.
 type ProducerConfig struct {
-	Brokers          []string
-	Acks             string
-	MaxRetries       int
-	RetryBackoff     time.Duration
-	BatchSize        int
-	BatchTimeout     time.Duration
-	MaxMessageBytes  int
-	CompressionCodec string
-	Idempotent       bool
-	WriteTimeout     time.Duration
-	ReadTimeout      time.Duration
-	SASLEnabled      bool
-	SASLMechanism    string
-	SASLUsername     string
-	SASLPassword     string
-	TLSEnabled       bool
-	TLSCertPath      string
+	Brokers           []string
+	Acks              string
+	MaxRetries        int
+	RetryBackoff      time.Duration
+	BatchSize         int
+	BatchTimeout      time.Duration
+	MaxMessageBytes   int
+	CompressionCodec  string
+	Idempotent        bool
+	WriteTimeout      time.Duration
+	ReadTimeout       time.Duration
+	SASLEnabled       bool
+	SASLMechanism     string
+	SASLUsername      string
+	SASLPassword      string
+	TLSEnabled        bool
+	TLSCertPath       string
 	AsyncErrorHandler func(err error, msg *common.ProducerMessage)
 }
 
@@ -62,10 +62,10 @@ type WriterInterface interface {
 
 // Producer manages message production.
 type Producer struct {
-	writer WriterInterface
-	config ProducerConfig
-	logger logging.Logger
-	closed atomic.Bool
+	writer  WriterInterface
+	config  ProducerConfig
+	logger  logging.Logger
+	closed  atomic.Bool
 	metrics *ProducerMetrics
 }
 
@@ -76,13 +76,27 @@ func NewProducer(cfg ProducerConfig, logger logging.Logger) (*Producer, error) {
 	}
 
 	// Defaults
-	if cfg.MaxRetries == 0 { cfg.MaxRetries = 3 }
-	if cfg.RetryBackoff == 0 { cfg.RetryBackoff = 100 * time.Millisecond }
-	if cfg.BatchSize == 0 { cfg.BatchSize = 100 }
-	if cfg.BatchTimeout == 0 { cfg.BatchTimeout = 1 * time.Second }
-	if cfg.MaxMessageBytes == 0 { cfg.MaxMessageBytes = 1024 * 1024 } // 1MB
-	if cfg.WriteTimeout == 0 { cfg.WriteTimeout = 10 * time.Second }
-	if cfg.ReadTimeout == 0 { cfg.ReadTimeout = 10 * time.Second }
+	if cfg.MaxRetries == 0 {
+		cfg.MaxRetries = 3
+	}
+	if cfg.RetryBackoff == 0 {
+		cfg.RetryBackoff = 100 * time.Millisecond
+	}
+	if cfg.BatchSize == 0 {
+		cfg.BatchSize = 100
+	}
+	if cfg.BatchTimeout == 0 {
+		cfg.BatchTimeout = 1 * time.Second
+	}
+	if cfg.MaxMessageBytes == 0 {
+		cfg.MaxMessageBytes = 1024 * 1024
+	} // 1MB
+	if cfg.WriteTimeout == 0 {
+		cfg.WriteTimeout = 10 * time.Second
+	}
+	if cfg.ReadTimeout == 0 {
+		cfg.ReadTimeout = 10 * time.Second
+	}
 
 	// Transport
 	transport := &kafka.Transport{
@@ -131,19 +145,27 @@ func NewProducer(cfg ProducerConfig, logger logging.Logger) (*Producer, error) {
 	// Acks
 	var requiredAcks kafka.RequiredAcks
 	switch cfg.Acks {
-	case "none": requiredAcks = kafka.RequireNone
-	case "all":  requiredAcks = kafka.RequireAll
-	default:     requiredAcks = kafka.RequireOne
+	case "none":
+		requiredAcks = kafka.RequireNone
+	case "all":
+		requiredAcks = kafka.RequireAll
+	default:
+		requiredAcks = kafka.RequireOne
 	}
 
 	// Compression
 	var compression kafka.Compression
 	switch cfg.CompressionCodec {
-	case "gzip":   compression = kafka.Gzip
-	case "snappy": compression = kafka.Snappy
-	case "lz4":    compression = kafka.Lz4
-	case "zstd":   compression = kafka.Zstd
-	default:       compression = kafka.Compression(0) // None
+	case "gzip":
+		compression = kafka.Gzip
+	case "snappy":
+		compression = kafka.Snappy
+	case "lz4":
+		compression = kafka.Lz4
+	case "zstd":
+		compression = kafka.Zstd
+	default:
+		compression = kafka.Compression(0) // None
 	}
 
 	writer := &kafka.Writer{
@@ -268,14 +290,14 @@ func (p *Producer) PublishAsync(ctx context.Context, msg *common.ProducerMessage
 }
 
 // GetMetrics returns metrics snapshot.
-func (p *Producer) GetMetrics() ProducerMetrics {
+func (p *Producer) GetMetrics() *ProducerMetrics {
 	m := ProducerMetrics{}
 	m.MessagesSent.Store(p.metrics.MessagesSent.Load())
 	m.MessagesFailed.Store(p.metrics.MessagesFailed.Load())
 	m.BytesSent.Store(p.metrics.BytesSent.Load())
 	m.AvgLatencyMs.Store(p.metrics.AvgLatencyMs.Load())
 	m.LastSentAt.Store(p.metrics.LastSentAt.Load())
-	return m
+	return &m
 }
 
 // Close closes the producer.

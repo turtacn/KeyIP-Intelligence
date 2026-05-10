@@ -54,18 +54,18 @@ const (
 
 // EmbedRequest is the input for a single-molecule embedding.
 type EmbedRequest struct {
-	SMILES              string          `json:"smiles"`
-	FingerprintPrefer   FingerprintType `json:"fingerprint_prefer,omitempty"`
-	Mode                InferenceMode   `json:"mode,omitempty"`
+	SMILES            string          `json:"smiles"`
+	FingerprintPrefer FingerprintType `json:"fingerprint_prefer,omitempty"`
+	Mode              InferenceMode   `json:"mode,omitempty"`
 }
 
 // EmbedResponse is the output of a single-molecule embedding.
 type EmbedResponse struct {
-	Embedding    []float32     `json:"embedding"`
-	SMILES       string        `json:"smiles"`
-	Confidence   float64       `json:"confidence"`
-	InferenceMs  int64         `json:"inference_ms"`
-	ModelVersion string        `json:"model_version"`
+	Embedding    []float32 `json:"embedding"`
+	SMILES       string    `json:"smiles"`
+	Confidence   float64   `json:"confidence"`
+	InferenceMs  int64     `json:"inference_ms"`
+	ModelVersion string    `json:"model_version"`
 }
 
 // BatchEmbedRequest wraps multiple embed requests.
@@ -93,11 +93,11 @@ type SimilarityRequest struct {
 
 // SimilarityResponse contains multi-fingerprint similarity scores.
 type SimilarityResponse struct {
-	FusedScore      float64                  `json:"fused_score"`
-	Scores          map[string]float64       `json:"scores"`
-	Level           molecule.SimilarityLevel `json:"level"`
-	InferenceMs     int64                    `json:"inference_ms"`
-	ModelVersion    string                   `json:"model_version"`
+	FusedScore   float64                  `json:"fused_score"`
+	Scores       map[string]float64       `json:"scores"`
+	Level        molecule.SimilarityLevel `json:"level"`
+	InferenceMs  int64                    `json:"inference_ms"`
+	ModelVersion string                   `json:"model_version"`
 }
 
 // SimilarSearchRequest asks for molecules similar to a query.
@@ -138,9 +138,9 @@ var defaultFusionWeights = map[string]float64{
 // ---------------------------------------------------------------------------
 
 const (
-	maxBatchSize    = 64
-	defaultRetries  = 2
-	retryBaseDelay  = 200 * time.Millisecond
+	maxBatchSize   = 64
+	defaultRetries = 2
+	retryBaseDelay = 200 * time.Millisecond
 )
 
 // GNNInferenceEngine implements GNNInferenceService.
@@ -217,10 +217,10 @@ func (e *GNNInferenceEngine) Embed(ctx context.Context, req *EmbedRequest) (*Emb
 
 	// 3. Build backend request
 	backendReq := &common.PredictRequest{
-		ModelName:  e.config.ModelID,
-		InputData:  common.EncodeMolecularGraph(graph.NodeFeatures, graph.EdgeIndex, graph.EdgeFeatures, graph.GlobalFeatures),
+		ModelName:   e.config.ModelID,
+		InputData:   common.EncodeMolecularGraph(graph.NodeFeatures, graph.EdgeIndex, graph.EdgeFeatures, graph.GlobalFeatures),
 		InputFormat: common.FormatJSON,
-		Metadata:   map[string]string{"smiles": req.SMILES},
+		Metadata:    map[string]string{"smiles": req.SMILES},
 	}
 
 	// 4. Invoke with retry

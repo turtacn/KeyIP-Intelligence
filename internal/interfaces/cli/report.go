@@ -18,14 +18,14 @@ import (
 )
 
 var (
-	reportType           string
-	reportTarget         string
-	reportFormat         string
-	reportOutputDir      string
-	reportTemplate       string
-	reportLanguage       string
+	reportType            string
+	reportTarget          string
+	reportFormat          string
+	reportOutputDir       string
+	reportTemplate        string
+	reportLanguage        string
 	reportIncludeAppendix bool
-	reportJobID          string
+	reportJobID           string
 )
 
 const (
@@ -178,7 +178,7 @@ func runReportGenerate(
 
 	case "portfolio":
 		req := &reporting.PortfolioReportRequest{
-			PortfolioID: reportTarget,
+			PortfolioID:  reportTarget,
 			OutputFormat: reporting.FormatPortfolioPDF,
 		}
 		result, genErr := portfolioReportService.GenerateFullReport(ctx, req)

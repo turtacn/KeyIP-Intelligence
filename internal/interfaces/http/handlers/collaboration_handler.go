@@ -68,11 +68,11 @@ type CreateWorkspaceRequest struct {
 
 // ShareDocumentRequest is the request body for sharing a document.
 type ShareDocumentRequest struct {
-	DocumentID     string `json:"document_id"`
-	WorkspaceID    string `json:"workspace_id"`
-	EnableWatermark bool  `json:"enable_watermark"`
-	MaxDownloads   int    `json:"max_downloads"`
-	ExpiresInHours int    `json:"expires_in_hours"`
+	DocumentID      string `json:"document_id"`
+	WorkspaceID     string `json:"workspace_id"`
+	EnableWatermark bool   `json:"enable_watermark"`
+	MaxDownloads    int    `json:"max_downloads"`
+	ExpiresInHours  int    `json:"expires_in_hours"`
 }
 
 // InviteMemberRequest is the request body for inviting a member.
@@ -436,9 +436,9 @@ func (h *CollaborationHandler) ListMembers(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"members": members,
-		"total":   total,
-		"page":    page,
+		"members":   members,
+		"total":     total,
+		"page":      page,
 		"page_size": pageSize,
 	})
 }

@@ -464,7 +464,7 @@ func TestSearchEntities_CacheMiss_ThenSet(t *testing.T) {
 	timeout := time.After(2 * time.Second)
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	var exists bool
 	var ttl time.Duration
 	for {
@@ -487,7 +487,7 @@ func TestSearchEntities_CacheMiss_ThenSet(t *testing.T) {
 			}
 		}
 	}
-	
+
 checkTTL:
 	if ttl != 5*time.Minute {
 		t.Errorf("Expected TTL 5m, got %v", ttl)
@@ -850,7 +850,7 @@ func TestAggregateByDimension_CacheMiss_ThenSet(t *testing.T) {
 	timeout := time.After(2 * time.Second)
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	var exists bool
 	var ttl time.Duration
 	for {
@@ -866,7 +866,7 @@ func TestAggregateByDimension_CacheMiss_ThenSet(t *testing.T) {
 			}
 		}
 	}
-	
+
 checkTTL:
 	if ttl != 15*time.Minute {
 		t.Errorf("Expected TTL 15m, got %v", ttl)
@@ -961,8 +961,12 @@ func TestHybridSearch_WeightSumInvalid(t *testing.T) {
 func TestHybridSearch_WeightSumFloatingPointTolerance(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestKGSearchService()
-	m.txt.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) { return nil, nil }
-	m.vec.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) { return nil, nil }
+	m.txt.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) {
+		return nil, nil
+	}
+	m.vec.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) {
+		return nil, nil
+	}
 	m.repo.queryNodesFunc = func(ctx context.Context, req *EntitySearchRequest) ([]GraphEntity, int64, map[string][]FacetBucket, error) {
 		return nil, 0, nil, nil
 	}
@@ -1023,8 +1027,12 @@ func TestHybridSearch_AllRoutesTimeout(t *testing.T) {
 	svc, m := newTestKGSearchService()
 
 	errMock := fmt.Errorf("timeout")
-	m.txt.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) { return nil, errMock }
-	m.vec.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) { return nil, errMock }
+	m.txt.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) {
+		return nil, errMock
+	}
+	m.vec.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) {
+		return nil, errMock
+	}
 	m.repo.queryNodesFunc = func(ctx context.Context, req *EntitySearchRequest) ([]GraphEntity, int64, map[string][]FacetBucket, error) {
 		return nil, 0, nil, errMock
 	}
@@ -1080,7 +1088,7 @@ func TestHybridSearch_EntityMissingOneScore(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// Vector branch succeeds but returns no score for doc1. 
+	// Vector branch succeeds but returns no score for doc1.
 	// Combined = 0.3*1.0(txt) + 0.3*0.0(vec) + 0.4*1.0(graph) = 0.7
 	if math.Abs(resp.Results[0].CombinedScore-0.7) > 0.001 {
 		t.Errorf("Expected score ~0.7, got %f", resp.Results[0].CombinedScore)
@@ -1098,7 +1106,9 @@ func TestHybridSearch_Pagination(t *testing.T) {
 		}
 		return res, nil
 	}
-	m.vec.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) { return nil, nil }
+	m.vec.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) {
+		return nil, nil
+	}
 	m.repo.queryNodesFunc = func(ctx context.Context, req *EntitySearchRequest) ([]GraphEntity, int64, map[string][]FacetBucket, error) {
 		return nil, 0, nil, nil
 	}
@@ -1141,14 +1151,18 @@ func TestHybridSearch_MetricsRecorded(t *testing.T) {
 	m.txt.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) {
 		return map[string]float64{"doc1": 1.0}, nil
 	}
-	m.vec.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) { return nil, nil }
-	m.repo.queryNodesFunc = func(ctx context.Context, req *EntitySearchRequest) ([]GraphEntity, int64, map[string][]FacetBucket, error) { return nil, 0, nil, nil }
+	m.vec.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) {
+		return nil, nil
+	}
+	m.repo.queryNodesFunc = func(ctx context.Context, req *EntitySearchRequest) ([]GraphEntity, int64, map[string][]FacetBucket, error) {
+		return nil, 0, nil, nil
+	}
 
 	req := &HybridSearchRequest{Query: "test", VectorWeight: 0.3, TextWeight: 0.3, GraphWeight: 0.4}
 	_, _ = svc.HybridSearch(context.Background(), req)
 
 	// Verify metrics or at least ensure no panics.
-	// Implementation might not have added explicit metric for HybridSearch latency in previous output, 
+	// Implementation might not have added explicit metric for HybridSearch latency in previous output,
 	// but testing that the mock is safe to call.
 	m.metrics.mu.Lock()
 	defer m.metrics.mu.Unlock()
@@ -1162,8 +1176,12 @@ func TestHybridSearch_LoggingOnError(t *testing.T) {
 	m.txt.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) {
 		return nil, fmt.Errorf("text engine down")
 	}
-	m.vec.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) { return nil, nil }
-	m.repo.queryNodesFunc = func(ctx context.Context, req *EntitySearchRequest) ([]GraphEntity, int64, map[string][]FacetBucket, error) { return nil, 0, nil, nil }
+	m.vec.searchFunc = func(ctx context.Context, q string, e []EntityType, l int) (map[string]float64, error) {
+		return nil, nil
+	}
+	m.repo.queryNodesFunc = func(ctx context.Context, req *EntitySearchRequest) ([]GraphEntity, int64, map[string][]FacetBucket, error) {
+		return nil, 0, nil, nil
+	}
 
 	req := &HybridSearchRequest{Query: "test", VectorWeight: 0.3, TextWeight: 0.3, GraphWeight: 0.4}
 	_, _ = svc.HybridSearch(context.Background(), req)

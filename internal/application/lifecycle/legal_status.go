@@ -28,13 +28,12 @@
 // ---
 package lifecycle
 
-
 import (
-	"sync/atomic"
 	"context"
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 
 	"time"
 

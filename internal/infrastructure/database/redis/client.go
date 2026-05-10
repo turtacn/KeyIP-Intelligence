@@ -15,29 +15,29 @@ import (
 
 // RedisConfig holds Redis connection configuration.
 type RedisConfig struct {
-	Mode                         string        `mapstructure:"mode"`
-	Addr                         string        `mapstructure:"addr"`
-	MasterName                   string        `mapstructure:"master_name"`
-	SentinelAddrs                []string      `mapstructure:"sentinel_addrs"`
-	ClusterAddrs                 []string      `mapstructure:"cluster_addrs"`
-	Password                     string        `mapstructure:"password"`
-	Username                     string        `mapstructure:"username"`
-	DB                           int           `mapstructure:"db"`
-	PoolSize                     int           `mapstructure:"pool_size"`
-	MinIdleConns                 int           `mapstructure:"min_idle_conns"`
-	MaxIdleTime                  time.Duration `mapstructure:"max_idle_time"`
-	PoolTimeout                  time.Duration `mapstructure:"pool_timeout"`
-	DialTimeout                  time.Duration `mapstructure:"dial_timeout"`
-	ReadTimeout                  time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout                 time.Duration `mapstructure:"write_timeout"`
-	TLSEnabled                   bool          `mapstructure:"tls_enabled"`
-	TLSCertFile                  string        `mapstructure:"tls_cert_file"`
-	TLSKeyFile                   string        `mapstructure:"tls_key_file"`
-	TLSCAFile                    string        `mapstructure:"tls_ca_file"`
-	TLSInsecure                  bool          `mapstructure:"tls_insecure"`
-	MaxRetries                   int           `mapstructure:"max_retries"`
-	MinRetryBackoff              time.Duration `mapstructure:"min_retry_backoff"`
-	MaxRetryBackoff              time.Duration `mapstructure:"max_retry_backoff"`
+	Mode            string        `mapstructure:"mode"`
+	Addr            string        `mapstructure:"addr"`
+	MasterName      string        `mapstructure:"master_name"`
+	SentinelAddrs   []string      `mapstructure:"sentinel_addrs"`
+	ClusterAddrs    []string      `mapstructure:"cluster_addrs"`
+	Password        string        `mapstructure:"password"`
+	Username        string        `mapstructure:"username"`
+	DB              int           `mapstructure:"db"`
+	PoolSize        int           `mapstructure:"pool_size"`
+	MinIdleConns    int           `mapstructure:"min_idle_conns"`
+	MaxIdleTime     time.Duration `mapstructure:"max_idle_time"`
+	PoolTimeout     time.Duration `mapstructure:"pool_timeout"`
+	DialTimeout     time.Duration `mapstructure:"dial_timeout"`
+	ReadTimeout     time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout    time.Duration `mapstructure:"write_timeout"`
+	TLSEnabled      bool          `mapstructure:"tls_enabled"`
+	TLSCertFile     string        `mapstructure:"tls_cert_file"`
+	TLSKeyFile      string        `mapstructure:"tls_key_file"`
+	TLSCAFile       string        `mapstructure:"tls_ca_file"`
+	TLSInsecure     bool          `mapstructure:"tls_insecure"`
+	MaxRetries      int           `mapstructure:"max_retries"`
+	MinRetryBackoff time.Duration `mapstructure:"min_retry_backoff"`
+	MaxRetryBackoff time.Duration `mapstructure:"max_retry_backoff"`
 }
 
 type Client struct {

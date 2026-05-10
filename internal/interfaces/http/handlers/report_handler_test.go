@@ -22,10 +22,10 @@ import (
 
 // mockFTOReportService implements reporting.FTOReportService for testing.
 type mockFTOReportService struct {
-	generateFn    func(context.Context, *reporting.FTOReportRequest) (*reporting.FTOReportResponse, error)
-	getStatusFn   func(context.Context, string) (*reporting.ReportStatusInfo, error)
-	getReportFn   func(context.Context, string, reporting.ReportFormat) (io.ReadCloser, error)
-	listReportsFn func(context.Context, *reporting.FTOReportFilter, *commontypes.Pagination) (*commontypes.PaginatedResult[reporting.FTOReportSummary], error)
+	generateFn     func(context.Context, *reporting.FTOReportRequest) (*reporting.FTOReportResponse, error)
+	getStatusFn    func(context.Context, string) (*reporting.ReportStatusInfo, error)
+	getReportFn    func(context.Context, string, reporting.ReportFormat) (io.ReadCloser, error)
+	listReportsFn  func(context.Context, *reporting.FTOReportFilter, *commontypes.Pagination) (*commontypes.PaginatedResult[reporting.FTOReportSummary], error)
 	deleteReportFn func(context.Context, string) error
 }
 
@@ -47,10 +47,10 @@ func (m *mockFTOReportService) DeleteReport(ctx context.Context, reportID string
 
 // mockInfringementReportService implements reporting.InfringementReportService for testing.
 type mockInfringementReportService struct {
-	generateFn    func(context.Context, *reporting.InfringementReportRequest) (*reporting.InfringementReportResponse, error)
-	getStatusFn   func(context.Context, string) (*reporting.ReportStatusInfo, error)
-	getReportFn   func(context.Context, string, reporting.ReportFormat) (io.ReadCloser, error)
-	listReportsFn func(context.Context, *reporting.InfringementReportFilter, *commontypes.Pagination) (*commontypes.PaginatedResult[reporting.InfringementReportSummary], error)
+	generateFn     func(context.Context, *reporting.InfringementReportRequest) (*reporting.InfringementReportResponse, error)
+	getStatusFn    func(context.Context, string) (*reporting.ReportStatusInfo, error)
+	getReportFn    func(context.Context, string, reporting.ReportFormat) (io.ReadCloser, error)
+	listReportsFn  func(context.Context, *reporting.InfringementReportFilter, *commontypes.Pagination) (*commontypes.PaginatedResult[reporting.InfringementReportSummary], error)
 	deleteReportFn func(context.Context, string) error
 }
 
@@ -72,13 +72,13 @@ func (m *mockInfringementReportService) DeleteReport(ctx context.Context, report
 
 // mockPortfolioReportService implements reporting.PortfolioReportService for testing.
 type mockPortfolioReportService struct {
-	generateFullReportFn       func(context.Context, *reporting.PortfolioReportRequest) (*reporting.PortfolioReportResult, error)
-	generateSummaryReportFn    func(context.Context, *reporting.PortfolioSummaryRequest) (*reporting.PortfolioReportResult, error)
-	generateGapReportFn        func(context.Context, *reporting.GapReportRequest) (*reporting.PortfolioReportResult, error)
+	generateFullReportFn        func(context.Context, *reporting.PortfolioReportRequest) (*reporting.PortfolioReportResult, error)
+	generateSummaryReportFn     func(context.Context, *reporting.PortfolioSummaryRequest) (*reporting.PortfolioReportResult, error)
+	generateGapReportFn         func(context.Context, *reporting.GapReportRequest) (*reporting.PortfolioReportResult, error)
 	generateCompetitiveReportFn func(context.Context, *reporting.CompetitiveReportRequest) (*reporting.PortfolioReportResult, error)
-	getReportStatusFn          func(context.Context, string) (*reporting.ReportStatusInfo, error)
-	listReportsFn              func(context.Context, string, *reporting.ListReportOptions) (*commontypes.PaginatedResult[reporting.ReportMeta], error)
-	exportReportFn             func(context.Context, string, reporting.ExportFormat) ([]byte, error)
+	getReportStatusFn           func(context.Context, string) (*reporting.ReportStatusInfo, error)
+	listReportsFn               func(context.Context, string, *reporting.ListReportOptions) (*commontypes.PaginatedResult[reporting.ReportMeta], error)
+	exportReportFn              func(context.Context, string, reporting.ExportFormat) ([]byte, error)
 }
 
 func (m *mockPortfolioReportService) GenerateFullReport(ctx context.Context, req *reporting.PortfolioReportRequest) (*reporting.PortfolioReportResult, error) {
@@ -105,15 +105,15 @@ func (m *mockPortfolioReportService) ExportReport(ctx context.Context, reportID 
 
 // mockTemplateEngine implements reporting.TemplateEngine for testing.
 type mockTemplateEngine struct {
-	renderFn          func(context.Context, *reporting.RenderRequest) (*reporting.RenderResult, error)
-	renderToBytesFn   func(context.Context, *reporting.RenderRequest) ([]byte, error)
-	listTemplatesFn   func(context.Context, *reporting.ListTemplateOptions) (*commontypes.PaginatedResult[reporting.TemplateMeta], error)
-	getTemplateFn     func(context.Context, string) (*reporting.Template, error)
+	renderFn           func(context.Context, *reporting.RenderRequest) (*reporting.RenderResult, error)
+	renderToBytesFn    func(context.Context, *reporting.RenderRequest) ([]byte, error)
+	listTemplatesFn    func(context.Context, *reporting.ListTemplateOptions) (*commontypes.PaginatedResult[reporting.TemplateMeta], error)
+	getTemplateFn      func(context.Context, string) (*reporting.Template, error)
 	registerTemplateFn func(context.Context, *reporting.Template) error
-	updateTemplateFn  func(context.Context, *reporting.Template) error
-	deleteTemplateFn  func(context.Context, string) error
+	updateTemplateFn   func(context.Context, *reporting.Template) error
+	deleteTemplateFn   func(context.Context, string) error
 	validateTemplateFn func(context.Context, *reporting.Template) (*reporting.ValidationResult, error)
-	previewTemplateFn func(context.Context, string, map[string]interface{}) (*reporting.RenderResult, error)
+	previewTemplateFn  func(context.Context, string, map[string]interface{}) (*reporting.RenderResult, error)
 }
 
 func (m *mockTemplateEngine) Render(ctx context.Context, req *reporting.RenderRequest) (*reporting.RenderResult, error) {

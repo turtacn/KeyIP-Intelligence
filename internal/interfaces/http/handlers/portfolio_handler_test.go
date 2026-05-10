@@ -176,9 +176,9 @@ func TestPortfolioHandler_ListPortfolios(t *testing.T) {
 				assert.Equal(t, 20, in.PageSize)
 				return &portfolio.ListResult{
 					Portfolios: []*portfolio.Portfolio{{ID: "pf-1", Name: "test"}},
-					Total:     1,
-					Page:      1,
-					PageSize:  20,
+					Total:      1,
+					Page:       1,
+					PageSize:   20,
 				}, nil
 			},
 		}

@@ -242,28 +242,28 @@ func (l *tmplMockLogger) Debug(ctx context.Context, msg string, keysAndValues ..
 // ============================================================================
 
 type tmplTestMocks struct {
-	repo      *mockTemplateRepository
-	htmlRen   *mockHTMLRenderer
-	docxRen   *mockDOCXRenderer
-	pptxRen   *mockPPTXRenderer
-	chartRen  *mockChartRenderer
-	mdProc    *mockMarkdownProcessor
-	storage   *tmplMockObjectStorage
-	cache     *tmplMockCache
-	logger    *tmplMockLogger
+	repo     *mockTemplateRepository
+	htmlRen  *mockHTMLRenderer
+	docxRen  *mockDOCXRenderer
+	pptxRen  *mockPPTXRenderer
+	chartRen *mockChartRenderer
+	mdProc   *mockMarkdownProcessor
+	storage  *tmplMockObjectStorage
+	cache    *tmplMockCache
+	logger   *tmplMockLogger
 }
 
 func newTestTemplateEngine(t *testing.T) (TemplateEngine, *tmplTestMocks) {
 	m := &tmplTestMocks{
-		repo:      newMockTemplateRepository(),
-		htmlRen:   &mockHTMLRenderer{},
-		docxRen:   &mockDOCXRenderer{},
-		pptxRen:   &mockPPTXRenderer{},
-		chartRen:  &mockChartRenderer{},
-		mdProc:    &mockMarkdownProcessor{},
-		storage:   &tmplMockObjectStorage{},
-		cache:     newTmplMockCache(),
-		logger:    &tmplMockLogger{},
+		repo:     newMockTemplateRepository(),
+		htmlRen:  &mockHTMLRenderer{},
+		docxRen:  &mockDOCXRenderer{},
+		pptxRen:  &mockPPTXRenderer{},
+		chartRen: &mockChartRenderer{},
+		mdProc:   &mockMarkdownProcessor{},
+		storage:  &tmplMockObjectStorage{},
+		cache:    newTmplMockCache(),
+		logger:   &tmplMockLogger{},
 	}
 	engine := NewTemplateEngine(
 		m.repo, m.htmlRen, m.docxRen, m.pptxRen,
@@ -649,7 +649,9 @@ func TestRender_ChartParallelRendering(t *testing.T) {
 	_, err := engine.Render(context.Background(), req)
 	duration := time.Since(start)
 
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	// 5 charts * 100ms = 500ms sequentially. If parallel, should be ~100ms.
 	if duration >= 400*time.Millisecond {
@@ -752,8 +754,12 @@ func TestRenderToBytes_Success(t *testing.T) {
 
 	req := &RenderRequest{TemplateID: tmpl.ID, Data: &ReportData{}, OutputFormat: "HTML"}
 	bytes, err := engine.RenderToBytes(context.Background(), req)
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
-	if len(bytes) == 0 { t.Errorf("Expected bytes") }
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if len(bytes) == 0 {
+		t.Errorf("Expected bytes")
+	}
 }
 
 // ============================================================================
@@ -772,17 +778,23 @@ func TestListTemplates_FiltersAndPagination(t *testing.T) {
 
 	// No filters
 	res, _ := engine.ListTemplates(context.Background(), nil)
-	if res.Pagination.Total != 5 { t.Errorf("Expected 5 templates, got %d", res.Pagination.Total) }
+	if res.Pagination.Total != 5 {
+		t.Errorf("Expected 5 templates, got %d", res.Pagination.Total)
+	}
 
 	// Filter by Type
 	ftoType := string(FTOReport)
 	resFto, _ := engine.ListTemplates(context.Background(), &ListTemplateOptions{Type: &ftoType})
-	if resFto.Pagination.Total != 3 { t.Errorf("Expected 3 FTO templates, got %d", resFto.Pagination.Total) }
+	if resFto.Pagination.Total != 3 {
+		t.Errorf("Expected 3 FTO templates, got %d", resFto.Pagination.Total)
+	}
 
 	// Filter by Format
 	htmlFmt := HTMLTemplate
 	resHtml, _ := engine.ListTemplates(context.Background(), &ListTemplateOptions{Format: &htmlFmt})
-	if resHtml.Pagination.Total != 3 { t.Errorf("Expected 3 HTML templates, got %d", resHtml.Pagination.Total) }
+	if resHtml.Pagination.Total != 3 {
+		t.Errorf("Expected 3 HTML templates, got %d", resHtml.Pagination.Total)
+	}
 }
 
 func TestGetTemplate_Success_NotFound(t *testing.T) {
@@ -791,7 +803,9 @@ func TestGetTemplate_Success_NotFound(t *testing.T) {
 	_ = m.repo.Create(context.Background(), &Template{ID: "t1", Content: "c1"})
 
 	tmpl, err := engine.GetTemplate(context.Background(), "t1")
-	if err != nil || tmpl.Content != "c1" { t.Errorf("Failed to get template") }
+	if err != nil || tmpl.Content != "c1" {
+		t.Errorf("Failed to get template")
+	}
 
 	_, err = engine.GetTemplate(context.Background(), "t2")
 	assertErrCodeTmpl(t, err, errors.ErrCodeNotFound)
@@ -804,7 +818,9 @@ func TestRegisterTemplate_Success_Duplicate_Invalid(t *testing.T) {
 	// Valid
 	tmpl := &Template{ID: "new-1", Format: HTMLTemplate, Content: "<div>{{.Title}}</div>"}
 	err := engine.RegisterTemplate(context.Background(), tmpl)
-	if err != nil { t.Errorf("Valid register failed: %v", err) }
+	if err != nil {
+		t.Errorf("Valid register failed: %v", err)
+	}
 	if len(tmpl.Placeholders) != 1 || tmpl.Placeholders[0].Key != "Title" {
 		t.Errorf("Placeholder not extracted automatically")
 	}
@@ -827,10 +843,14 @@ func TestUpdateTemplate_Success_NotFound(t *testing.T) {
 
 	tmplUp := &Template{ID: "up-1", Format: HTMLTemplate, Content: "new"}
 	err := engine.UpdateTemplate(context.Background(), tmplUp)
-	if err != nil { t.Fatalf("Update failed: %v", err) }
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
 
 	// Version should be bumped
-	if tmplUp.Version != "1.0.1" { t.Errorf("Expected version 1.0.1, got %s", tmplUp.Version) }
+	if tmplUp.Version != "1.0.1" {
+		t.Errorf("Expected version 1.0.1, got %s", tmplUp.Version)
+	}
 
 	tmplMissing := &Template{ID: "miss", Format: HTMLTemplate, Content: "new"}
 	err = engine.UpdateTemplate(context.Background(), tmplMissing)
@@ -844,7 +864,9 @@ func TestDeleteTemplate_Success(t *testing.T) {
 	_ = m.repo.Create(context.Background(), tmpl)
 
 	err := engine.DeleteTemplate(context.Background(), "del-1")
-	if err != nil { t.Fatalf("Delete failed: %v", err) }
+	if err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
 
 	_, err = m.repo.Get(context.Background(), "del-1")
 	assertErrCodeTmpl(t, err, errors.ErrCodeNotFound)
@@ -865,11 +887,15 @@ func TestValidateTemplate_Scenarios(t *testing.T) {
 
 	// Valid HTML
 	res, _ := engine.ValidateTemplate(context.Background(), &Template{Format: HTMLTemplate, Content: `<b>{{.Title}}</b>`})
-	if !res.Valid || len(res.Errors) > 0 { t.Errorf("Expected valid HTML") }
+	if !res.Valid || len(res.Errors) > 0 {
+		t.Errorf("Expected valid HTML")
+	}
 
 	// Invalid Unclosed Placeholder
 	res, _ = engine.ValidateTemplate(context.Background(), &Template{Format: HTMLTemplate, Content: `<b>{{.Title}</b>`})
-	if res.Valid { t.Errorf("Expected invalid template due to unclosed placeholder") }
+	if res.Valid {
+		t.Errorf("Expected invalid template due to unclosed placeholder")
+	}
 
 	// Extractor warning checks are normally done statically or at extraction phase
 }
@@ -881,7 +907,9 @@ func TestPreviewTemplate_Success(t *testing.T) {
 	_ = m.repo.Create(context.Background(), tmpl)
 
 	res, err := engine.PreviewTemplate(context.Background(), "prev-1", map[string]interface{}{"Title": "Preview"})
-	if err != nil { t.Fatalf("Preview failed: %v", err) }
+	if err != nil {
+		t.Fatalf("Preview failed: %v", err)
+	}
 
 	// Result is HTML
 	assertHTMLContains(t, res.Content, "<b>Preview</b>")
@@ -898,21 +926,31 @@ func TestTemplateFuncs(t *testing.T) {
 
 	// FormatNumber
 	fnFormatNumber := funcs["formatNumber"].(func(interface{}, int) string)
-	if fnFormatNumber(1234.567, 2) != "1234.57" { t.Errorf("formatNumber failed") }
+	if fnFormatNumber(1234.567, 2) != "1234.57" {
+		t.Errorf("formatNumber failed")
+	}
 
 	// FormatDate
 	fnFormatDate := funcs["formatDate"].(func(time.Time, string) string)
 	date := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
-	if fnFormatDate(date, "2006-01-02") != "2024-01-15" { t.Errorf("formatDate failed") }
+	if fnFormatDate(date, "2006-01-02") != "2024-01-15" {
+		t.Errorf("formatDate failed")
+	}
 
 	// SafeHTML
 	fnSafeHTML := funcs["safeHTML"].(func(string) template.HTML)
-	if fnSafeHTML("<b>a</b>") != "<b>a</b>" { t.Errorf("safeHTML failed") }
+	if fnSafeHTML("<b>a</b>") != "<b>a</b>" {
+		t.Errorf("safeHTML failed")
+	}
 
 	// Truncate
 	fnTruncate := funcs["truncate"].(func(string, int) string)
-	if fnTruncate("Hello World", 5) != "Hello..." { t.Errorf("truncate failed") }
-	if fnTruncate("Hi", 10) != "Hi" { t.Errorf("truncate short string failed") }
+	if fnTruncate("Hello World", 5) != "Hello..." {
+		t.Errorf("truncate failed")
+	}
+	if fnTruncate("Hi", 10) != "Hi" {
+		t.Errorf("truncate short string failed")
+	}
 }
 
 // ============================================================================
@@ -926,8 +964,8 @@ func TestSecurity_XSSPrevention(t *testing.T) {
 	_ = m.repo.Create(context.Background(), tmpl)
 
 	req := &RenderRequest{
-		TemplateID: "xss-1",
-		Data:       &ReportData{Title: "<script>alert('xss')</script>"},
+		TemplateID:   "xss-1",
+		Data:         &ReportData{Title: "<script>alert('xss')</script>"},
 		OutputFormat: "HTML",
 	}
 

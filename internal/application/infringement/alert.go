@@ -202,10 +202,10 @@ func (r *DismissAlertRequest) Validate() error {
 
 // AlertConfigRequest carries the parameters for updating alert configuration.
 type AlertConfigRequest struct {
-	WatchlistID    string                    `json:"watchlist_id" validate:"required"`
+	WatchlistID    string                         `json:"watchlist_id" validate:"required"`
 	ChannelMapping map[AlertLevel]DispatchChannel `json:"channel_mapping"`
-	QuietHours     *QuietHoursConfig         `json:"quiet_hours,omitempty"`
-	DedupWindowMin int                       `json:"dedup_window_min"`
+	QuietHours     *QuietHoursConfig              `json:"quiet_hours,omitempty"`
+	DedupWindowMin int                            `json:"dedup_window_min"`
 }
 
 // QuietHoursConfig defines the time window during which non-critical alerts are suppressed.
@@ -218,15 +218,15 @@ type QuietHoursConfig struct {
 
 // AlertListOptions carries filtering and pagination parameters for listing alerts.
 type AlertListOptions struct {
-	WatchlistID string       `json:"watchlist_id,omitempty"`
-	Level       *AlertLevel  `json:"level,omitempty"`
-	Status      *AlertStatus `json:"status,omitempty"`
-	PatentNumber string      `json:"patent_number,omitempty"`
-	MoleculeID  string       `json:"molecule_id,omitempty"`
-	Since       *time.Time   `json:"since,omitempty"`
-	Until       *time.Time   `json:"until,omitempty"`
-	Page        int          `json:"page"`
-	PageSize    int          `json:"page_size"`
+	WatchlistID  string       `json:"watchlist_id,omitempty"`
+	Level        *AlertLevel  `json:"level,omitempty"`
+	Status       *AlertStatus `json:"status,omitempty"`
+	PatentNumber string       `json:"patent_number,omitempty"`
+	MoleculeID   string       `json:"molecule_id,omitempty"`
+	Since        *time.Time   `json:"since,omitempty"`
+	Until        *time.Time   `json:"until,omitempty"`
+	Page         int          `json:"page"`
+	PageSize     int          `json:"page_size"`
 }
 
 // AlertStats holds aggregated alert statistics.

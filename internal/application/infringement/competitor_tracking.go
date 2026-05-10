@@ -41,18 +41,18 @@ func (s CompetitorStatus) String() string {
 
 // TrackedCompetitor represents a competitor entity being monitored.
 type TrackedCompetitor struct {
-	ID               string           `json:"id"`
-	Name             string           `json:"name"`
-	Aliases          []string         `json:"aliases,omitempty"`
-	Status           CompetitorStatus `json:"status"`
-	WatchlistID      string           `json:"watchlist_id"`
-	TechnologyAreas  []string         `json:"technology_areas,omitempty"`
-	PatentCount      int              `json:"patent_count"`
-	RecentFilings    int              `json:"recent_filings"`
-	LastScanAt       *time.Time       `json:"last_scan_at,omitempty"`
-	CreatedAt        time.Time        `json:"created_at"`
-	UpdatedAt        time.Time        `json:"updated_at"`
-	Metadata         map[string]any   `json:"metadata,omitempty"`
+	ID              string           `json:"id"`
+	Name            string           `json:"name"`
+	Aliases         []string         `json:"aliases,omitempty"`
+	Status          CompetitorStatus `json:"status"`
+	WatchlistID     string           `json:"watchlist_id"`
+	TechnologyAreas []string         `json:"technology_areas,omitempty"`
+	PatentCount     int              `json:"patent_count"`
+	RecentFilings   int              `json:"recent_filings"`
+	LastScanAt      *time.Time       `json:"last_scan_at,omitempty"`
+	CreatedAt       time.Time        `json:"created_at"`
+	UpdatedAt       time.Time        `json:"updated_at"`
+	Metadata        map[string]any   `json:"metadata,omitempty"`
 }
 
 // TrackCompetitorRequest carries the parameters for adding a new competitor to track.
@@ -89,7 +89,7 @@ type CompetitorPortfolioAnalysis struct {
 	TechnologyBreakdown map[string]int       `json:"technology_breakdown"`
 	TopIPCClasses       []IPCClassCount      `json:"top_ipc_classes"`
 	FilingTrend         []MonthlyFilingCount `json:"filing_trend"`
-	AnalyzedAt          time.Time                `json:"analyzed_at"`
+	AnalyzedAt          time.Time            `json:"analyzed_at"`
 }
 
 // IPCClassCount pairs an IPC classification code with its occurrence count.
@@ -117,12 +117,12 @@ type NewFilingDetection struct {
 
 // CompetitiveLandscape represents the competitive intelligence overview for a technology area.
 type CompetitiveLandscape struct {
-	TechnologyArea   string                   `json:"technology_area"`
-	TotalCompetitors int                      `json:"total_competitors"`
-	TotalPatents     int                      `json:"total_patents"`
+	TechnologyArea   string                    `json:"technology_area"`
+	TotalCompetitors int                       `json:"total_competitors"`
+	TotalPatents     int                       `json:"total_patents"`
 	TopFilers        []CompetitorFilingSummary `json:"top_filers"`
-	TrendDirection   string                   `json:"trend_direction"`
-	AnalyzedAt       time.Time                `json:"analyzed_at"`
+	TrendDirection   string                    `json:"trend_direction"`
+	AnalyzedAt       time.Time                 `json:"analyzed_at"`
 }
 
 // CompetitorFilingSummary provides a brief filing summary for a competitor.
@@ -135,15 +135,15 @@ type CompetitorFilingSummary struct {
 
 // PortfolioComparison holds the result of comparing two competitor portfolios.
 type PortfolioComparison struct {
-	CompetitorA      string   `json:"competitor_a"`
-	CompetitorB      string   `json:"competitor_b"`
-	OverlappingAreas []string `json:"overlapping_areas"`
-	UniqueToA        []string `json:"unique_to_a"`
-	UniqueToB        []string `json:"unique_to_b"`
-	PatentCountA     int      `json:"patent_count_a"`
-	PatentCountB     int      `json:"patent_count_b"`
-	FilingVelocityA  float64  `json:"filing_velocity_a"`
-	FilingVelocityB  float64  `json:"filing_velocity_b"`
+	CompetitorA      string    `json:"competitor_a"`
+	CompetitorB      string    `json:"competitor_b"`
+	OverlappingAreas []string  `json:"overlapping_areas"`
+	UniqueToA        []string  `json:"unique_to_a"`
+	UniqueToB        []string  `json:"unique_to_b"`
+	PatentCountA     int       `json:"patent_count_a"`
+	PatentCountB     int       `json:"patent_count_b"`
+	FilingVelocityA  float64   `json:"filing_velocity_a"`
+	FilingVelocityB  float64   `json:"filing_velocity_b"`
 	ComparedAt       time.Time `json:"compared_at"`
 }
 

@@ -41,13 +41,13 @@ const (
 type IntentType string
 
 const (
-	IntentEntitySearch   IntentType = "EntitySearch"
-	IntentRelationQuery  IntentType = "RelationQuery"
-	IntentAggregation    IntentType = "Aggregation"
-	IntentComparison     IntentType = "Comparison"
-	IntentTrendAnalysis  IntentType = "TrendAnalysis"
-	IntentSimilarity     IntentType = "SimilaritySearch"
-	IntentPathFinding    IntentType = "PathFinding"
+	IntentEntitySearch  IntentType = "EntitySearch"
+	IntentRelationQuery IntentType = "RelationQuery"
+	IntentAggregation   IntentType = "Aggregation"
+	IntentComparison    IntentType = "Comparison"
+	IntentTrendAnalysis IntentType = "TrendAnalysis"
+	IntentSimilarity    IntentType = "SimilaritySearch"
+	IntentPathFinding   IntentType = "PathFinding"
 )
 
 type ResponseDataType string
@@ -69,11 +69,11 @@ const (
 )
 
 const (
-	MaxConversationTurns = 5
-	ConversationTTL      = 30 * time.Minute
-	EntityCacheTTL       = 1 * time.Hour
-	QueryExecutionTimeout= 30 * time.Second
-	MaxResultsForLLM     = 20
+	MaxConversationTurns  = 5
+	ConversationTTL       = 30 * time.Minute
+	EntityCacheTTL        = 1 * time.Hour
+	QueryExecutionTimeout = 30 * time.Second
+	MaxResultsForLLM      = 20
 )
 
 // ============================================================================
@@ -223,14 +223,14 @@ type NLQueryService interface {
 }
 
 type nlQueryServiceImpl struct {
-	llm             StrategyGPTModel
-	kgSearch        KGSearchService
-	simSearch       SimilaritySearchService
-	patentRepo      PatentRepository
-	moleculeRepo    MoleculeRepository
-	cache           Cache
-	logger          Logger
-	metrics         MetricsCollector
+	llm          StrategyGPTModel
+	kgSearch     KGSearchService
+	simSearch    SimilaritySearchService
+	patentRepo   PatentRepository
+	moleculeRepo MoleculeRepository
+	cache        Cache
+	logger       Logger
+	metrics      MetricsCollector
 }
 
 func NewNLQueryService(
@@ -379,7 +379,8 @@ func (s *nlQueryServiceImpl) SuggestQuestions(ctx context.Context, req *SuggestR
 		roleMatch := false
 		for _, r := range t.TargetRoles {
 			if r == req.UserContext.Role {
-				roleMatch = true; break
+				roleMatch = true
+				break
 			}
 		}
 		if roleMatch {
@@ -524,7 +525,7 @@ func (s *nlQueryServiceImpl) normalizeEntities(ctx context.Context, entities []R
 			resolved = append(resolved, e)
 			continue
 		}
-		
+
 		cacheKey := fmt.Sprintf("entity_dict:%s:%s", e.Type, e.Text)
 		var normValue string
 
@@ -558,8 +559,8 @@ func (s *nlQueryServiceImpl) normalizeEntities(ctx context.Context, entities []R
 
 		// Unresolved
 		unresolved = append(unresolved, UnresolvedEntity{
-			Text: e.Text,
-			Type: e.Type,
+			Text:        e.Text,
+			Type:        e.Type,
 			Suggestions: []string{}, // Could populate via another LLM call or Elastic fuzzy suggest
 		})
 	}
@@ -641,7 +642,7 @@ func (s *nlQueryServiceImpl) executeQuery(ctx context.Context, query interface{}
 }
 
 func (s *nlQueryServiceImpl) truncateResults(results interface{}, maxItems int) interface{} {
-	// Abstract simplification for truncation. 
+	// Abstract simplification for truncation.
 	// In reality, uses reflection or type assertions to slice arrays.
 	switch r := results.(type) {
 	case *EntitySearchResponse:

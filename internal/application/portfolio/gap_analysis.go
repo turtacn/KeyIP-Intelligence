@@ -31,26 +31,26 @@ type GapAnalysisRequest struct {
 
 // GapAnalysisResponse contains the full gap analysis result.
 type GapAnalysisResponse struct {
-	PortfolioID      string              `json:"portfolio_id"`
-	TechGaps         []TechnologyGap     `json:"technology_gaps"`
-	ExpirationRisks  []ExpirationRisk    `json:"expiration_risks"`
-	GeographicGaps   []GeographicGap     `json:"geographic_gaps"`
-	Opportunities    []FilingOpportunity `json:"filing_opportunities"`
-	OverallScore     float64             `json:"overall_health_score"`
-	Summary          GapSummary          `json:"summary"`
-	GeneratedAt      time.Time           `json:"generated_at"`
+	PortfolioID     string              `json:"portfolio_id"`
+	TechGaps        []TechnologyGap     `json:"technology_gaps"`
+	ExpirationRisks []ExpirationRisk    `json:"expiration_risks"`
+	GeographicGaps  []GeographicGap     `json:"geographic_gaps"`
+	Opportunities   []FilingOpportunity `json:"filing_opportunities"`
+	OverallScore    float64             `json:"overall_health_score"`
+	Summary         GapSummary          `json:"summary"`
+	GeneratedAt     time.Time           `json:"generated_at"`
 }
 
 // TechnologyGap represents a gap in technology domain coverage.
 type TechnologyGap struct {
-	GapID            string   `json:"gap_id"`
-	TechDomain       string   `json:"tech_domain"`
-	DomainName       string   `json:"domain_name"`
-	CompetitorCount  int      `json:"competitor_patent_count"`
-	OwnCount         int      `json:"own_patent_count"`
-	GapSeverity      float64  `json:"gap_severity"`
-	CompetitorNames  []string `json:"competitors_present"`
-	Recommendation   string   `json:"recommendation"`
+	GapID           string   `json:"gap_id"`
+	TechDomain      string   `json:"tech_domain"`
+	DomainName      string   `json:"domain_name"`
+	CompetitorCount int      `json:"competitor_patent_count"`
+	OwnCount        int      `json:"own_patent_count"`
+	GapSeverity     float64  `json:"gap_severity"`
+	CompetitorNames []string `json:"competitors_present"`
+	Recommendation  string   `json:"recommendation"`
 }
 
 // ExpirationRisk represents a patent nearing expiration that may create a coverage hole.
@@ -77,38 +77,38 @@ const (
 
 // GeographicGap represents a jurisdiction where patent protection is missing.
 type GeographicGap struct {
-	GapID          string  `json:"gap_id"`
-	Jurisdiction   string  `json:"jurisdiction"`
-	JurisdName     string  `json:"jurisdiction_name"`
-	TechDomain     string  `json:"tech_domain,omitempty"`
-	MarketSize     float64 `json:"market_size_score"`
-	CompPresence   int     `json:"competitor_presence_count"`
-	Priority       float64 `json:"priority_score"`
+	GapID        string  `json:"gap_id"`
+	Jurisdiction string  `json:"jurisdiction"`
+	JurisdName   string  `json:"jurisdiction_name"`
+	TechDomain   string  `json:"tech_domain,omitempty"`
+	MarketSize   float64 `json:"market_size_score"`
+	CompPresence int     `json:"competitor_presence_count"`
+	Priority     float64 `json:"priority_score"`
 }
 
 // FilingOpportunity represents a recommended patent filing action.
 type FilingOpportunity struct {
-	OpportunityID   string  `json:"opportunity_id"`
-	Type            string  `json:"type"`
-	TechDomain      string  `json:"tech_domain"`
-	Jurisdiction    string  `json:"jurisdiction,omitempty"`
-	Description     string  `json:"description"`
-	StrategicValue  float64 `json:"strategic_value"`
-	CompPressure    float64 `json:"competitive_pressure"`
-	Feasibility     float64 `json:"feasibility"`
-	OverallScore    float64 `json:"overall_score"`
-	Urgency         string  `json:"urgency"`
+	OpportunityID  string  `json:"opportunity_id"`
+	Type           string  `json:"type"`
+	TechDomain     string  `json:"tech_domain"`
+	Jurisdiction   string  `json:"jurisdiction,omitempty"`
+	Description    string  `json:"description"`
+	StrategicValue float64 `json:"strategic_value"`
+	CompPressure   float64 `json:"competitive_pressure"`
+	Feasibility    float64 `json:"feasibility"`
+	OverallScore   float64 `json:"overall_score"`
+	Urgency        string  `json:"urgency"`
 }
 
 // GapSummary provides aggregate statistics about the gap analysis.
 type GapSummary struct {
-	TotalTechGaps       int     `json:"total_tech_gaps"`
-	CriticalGaps        int     `json:"critical_gaps"`
-	ExpiringPatents     int     `json:"expiring_patents"`
-	GeographicGapCount  int     `json:"geographic_gap_count"`
-	OpportunityCount    int     `json:"opportunity_count"`
-	HealthScore         float64 `json:"health_score"`
-	TopRecommendation   string  `json:"top_recommendation"`
+	TotalTechGaps      int     `json:"total_tech_gaps"`
+	CriticalGaps       int     `json:"critical_gaps"`
+	ExpiringPatents    int     `json:"expiring_patents"`
+	GeographicGapCount int     `json:"geographic_gap_count"`
+	OpportunityCount   int     `json:"opportunity_count"`
+	HealthScore        float64 `json:"health_score"`
+	TopRecommendation  string  `json:"top_recommendation"`
 }
 
 // -----------------------------------------------------------------------
@@ -135,12 +135,12 @@ type GapAnalysisService interface {
 // -----------------------------------------------------------------------
 
 type gapAnalysisServiceImpl struct {
-	portfolioSvc    domainportfolio.Service
-	portfolioRepo   domainportfolio.PortfolioRepository
-	patentRepo      domainpatent.Repository
-	logger          logging.Logger
-	cache           ConstellationCache
-	cacheTTL        time.Duration
+	portfolioSvc  domainportfolio.Service
+	portfolioRepo domainportfolio.PortfolioRepository
+	patentRepo    domainpatent.Repository
+	logger        logging.Logger
+	cache         ConstellationCache
+	cacheTTL      time.Duration
 }
 
 // GapAnalysisServiceConfig holds configuration for constructing the gap analysis service.
@@ -212,7 +212,7 @@ func (s *gapAnalysisServiceImpl) AnalyzeGaps(ctx context.Context, req *GapAnalys
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to load portfolio patents")
 	}
-	
+
 	// Convert to value types
 	ownPatents := make([]domainpatent.Patent, len(ownPatentPtrs))
 	for i, p := range ownPatentPtrs {
@@ -903,4 +903,3 @@ func jurisdictionName(juris string) string {
 }
 
 //Personal.AI order the ending
-

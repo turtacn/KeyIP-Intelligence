@@ -86,21 +86,21 @@ func (f ScanFrequency) Duration() time.Duration {
 
 // Watchlist represents a monitoring watchlist containing patents and molecules to monitor.
 type Watchlist struct {
-	ID                string          `json:"id"`
-	Name              string          `json:"name"`
-	Description       string          `json:"description,omitempty"`
-	OwnerID           string          `json:"owner_id"`
-	Status            WatchlistStatus `json:"status"`
-	ScanFrequency     ScanFrequency   `json:"scan_frequency"`
-	SimilarityThreshold float64       `json:"similarity_threshold"`
-	PatentNumbers     []string        `json:"patent_numbers"`
-	MoleculeIDs       []string        `json:"molecule_ids"`
-	LastScanAt        *time.Time      `json:"last_scan_at,omitempty"`
-	NextScanAt        *time.Time      `json:"next_scan_at,omitempty"`
-	TotalScans        int            `json:"total_scans"`
-	TotalAlerts       int            `json:"total_alerts"`
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         time.Time      `json:"updated_at"`
+	ID                  string          `json:"id"`
+	Name                string          `json:"name"`
+	Description         string          `json:"description,omitempty"`
+	OwnerID             string          `json:"owner_id"`
+	Status              WatchlistStatus `json:"status"`
+	ScanFrequency       ScanFrequency   `json:"scan_frequency"`
+	SimilarityThreshold float64         `json:"similarity_threshold"`
+	PatentNumbers       []string        `json:"patent_numbers"`
+	MoleculeIDs         []string        `json:"molecule_ids"`
+	LastScanAt          *time.Time      `json:"last_scan_at,omitempty"`
+	NextScanAt          *time.Time      `json:"next_scan_at,omitempty"`
+	TotalScans          int             `json:"total_scans"`
+	TotalAlerts         int             `json:"total_alerts"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
 }
 
 // CreateWatchlistRequest carries the parameters for creating a new watchlist.
@@ -139,11 +139,11 @@ func (r *CreateWatchlistRequest) Validate() error {
 
 // UpdateWatchlistRequest carries the parameters for updating a watchlist.
 type UpdateWatchlistRequest struct {
-	WatchlistID         string         `json:"watchlist_id" validate:"required"`
-	Name                *string        `json:"name,omitempty"`
-	Description         *string        `json:"description,omitempty"`
-	ScanFrequency       *ScanFrequency `json:"scan_frequency,omitempty"`
-	SimilarityThreshold *float64       `json:"similarity_threshold,omitempty"`
+	WatchlistID         string           `json:"watchlist_id" validate:"required"`
+	Name                *string          `json:"name,omitempty"`
+	Description         *string          `json:"description,omitempty"`
+	ScanFrequency       *ScanFrequency   `json:"scan_frequency,omitempty"`
+	SimilarityThreshold *float64         `json:"similarity_threshold,omitempty"`
 	Status              *WatchlistStatus `json:"status,omitempty"`
 }
 
@@ -163,17 +163,17 @@ func (r *UpdateWatchlistRequest) Validate() error {
 
 // ScanResult represents the outcome of a single monitoring scan.
 type ScanResult struct {
-	ScanID        string          `json:"scan_id"`
-	WatchlistID   string          `json:"watchlist_id"`
-	StartedAt     time.Time       `json:"started_at"`
-	CompletedAt   time.Time       `json:"completed_at"`
-	Duration      time.Duration   `json:"duration"`
-	PatentsScanned int            `json:"patents_scanned"`
-	MoleculesScanned int          `json:"molecules_scanned"`
-	MatchesFound  int             `json:"matches_found"`
-	AlertsCreated int             `json:"alerts_created"`
-	Matches       []ScanMatch     `json:"matches,omitempty"`
-	Error         string          `json:"error,omitempty"`
+	ScanID           string        `json:"scan_id"`
+	WatchlistID      string        `json:"watchlist_id"`
+	StartedAt        time.Time     `json:"started_at"`
+	CompletedAt      time.Time     `json:"completed_at"`
+	Duration         time.Duration `json:"duration"`
+	PatentsScanned   int           `json:"patents_scanned"`
+	MoleculesScanned int           `json:"molecules_scanned"`
+	MatchesFound     int           `json:"matches_found"`
+	AlertsCreated    int           `json:"alerts_created"`
+	Matches          []ScanMatch   `json:"matches,omitempty"`
+	Error            string        `json:"error,omitempty"`
 }
 
 // ScanMatch represents a single match found during a scan.

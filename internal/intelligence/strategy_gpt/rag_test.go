@@ -3,8 +3,8 @@ package strategy_gpt
 import (
 	"context"
 	"fmt"
-	"sync"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -1092,9 +1092,9 @@ func TestDocumentChunker_NilDocument(t *testing.T) {
 
 func TestEstimateTokens(t *testing.T) {
 	tests := []struct {
-		text    string
-		minTok  int
-		maxTok  int
+		text   string
+		minTok int
+		maxTok int
 	}{
 		{"", 0, 0},
 		{"hello", 1, 3},
@@ -1708,6 +1708,3 @@ func BenchmarkBuildContext(b *testing.B) {
 		_, _ = eng.BuildContext(ctx, result, 2048)
 	}
 }
-
-
-

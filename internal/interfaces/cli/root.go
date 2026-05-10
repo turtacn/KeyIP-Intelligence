@@ -13,6 +13,7 @@
 //   - GetCLIContext 从 cobra.Command.Context 提取上下文
 //   - Execute() 入口函数
 //   - PrintResult/PrintError/PrintSuccess/FormatTable 输出辅助
+//
 // * 业务逻辑：配置搜索顺序、默认值、版本注入、输出格式化
 // * 依赖：cobra、internal/config、logging、pkg/client
 // * 被依赖：cmd/keyip/main.go、所有 CLI 子命令

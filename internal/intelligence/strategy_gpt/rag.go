@@ -21,15 +21,15 @@ import (
 type DocumentSourceType string
 
 const (
-	SourcePatent                DocumentSourceType = "Patent"
-	SourceCaseLaw               DocumentSourceType = "CaseLaw"
-	SourceExaminationGuideline  DocumentSourceType = "ExaminationGuideline"
-	SourceScientificPaper       DocumentSourceType = "ScientificPaper"
-	SourceRegulatory            DocumentSourceType = "Regulatory"
-	SourceStatute               DocumentSourceType = "Statute"
-	SourceMPEP                  DocumentSourceType = "MPEP"       // Alias for ExaminationGuideline? Or distinct.
-	SourceLiterature            DocumentSourceType = "Literature" // Alias for ScientificPaper? Or distinct.
-	SourceOther                 DocumentSourceType = "Other"
+	SourcePatent               DocumentSourceType = "Patent"
+	SourceCaseLaw              DocumentSourceType = "CaseLaw"
+	SourceExaminationGuideline DocumentSourceType = "ExaminationGuideline"
+	SourceScientificPaper      DocumentSourceType = "ScientificPaper"
+	SourceRegulatory           DocumentSourceType = "Regulatory"
+	SourceStatute              DocumentSourceType = "Statute"
+	SourceMPEP                 DocumentSourceType = "MPEP"       // Alias for ExaminationGuideline? Or distinct.
+	SourceLiterature           DocumentSourceType = "Literature" // Alias for ScientificPaper? Or distinct.
+	SourceOther                DocumentSourceType = "Other"
 )
 
 // ---------------------------------------------------------------------------
@@ -44,21 +44,21 @@ type DateRange struct {
 
 // RAGFilters constrains which documents are eligible for retrieval.
 type RAGFilters struct {
-	DateRange              *DateRange `json:"date_range,omitempty"`
-	Jurisdictions          []string   `json:"jurisdictions,omitempty"`
-	PatentClassifications  []string   `json:"patent_classifications,omitempty"`
-	DocumentTypes          []string   `json:"document_types,omitempty"`
-	Assignees              []string   `json:"assignees,omitempty"`
-	ExcludeDocIDs          []string   `json:"exclude_doc_ids,omitempty"`
+	DateRange             *DateRange `json:"date_range,omitempty"`
+	Jurisdictions         []string   `json:"jurisdictions,omitempty"`
+	PatentClassifications []string   `json:"patent_classifications,omitempty"`
+	DocumentTypes         []string   `json:"document_types,omitempty"`
+	Assignees             []string   `json:"assignees,omitempty"`
+	ExcludeDocIDs         []string   `json:"exclude_doc_ids,omitempty"`
 }
 
 // RAGQuery is the input to a retrieval call.
 type RAGQuery struct {
-	QueryText           string             `json:"query_text"`
-	QueryEmbedding      []float32          `json:"query_embedding,omitempty"`
-	Filters             *RAGFilters        `json:"filters,omitempty"`
-	TopK                int                `json:"top_k"`
-	SimilarityThreshold float64            `json:"similarity_threshold"`
+	QueryText           string               `json:"query_text"`
+	QueryEmbedding      []float32            `json:"query_embedding,omitempty"`
+	Filters             *RAGFilters          `json:"filters,omitempty"`
+	TopK                int                  `json:"top_k"`
+	SimilarityThreshold float64              `json:"similarity_threshold"`
 	SourceTypes         []DocumentSourceType `json:"source_types,omitempty"`
 }
 
@@ -516,10 +516,10 @@ func (r *ragEngineImpl) IndexBatch(ctx context.Context, docs []*Document) error 
 	}
 
 	var (
-		mu     sync.Mutex
-		errs   []error
-		wg     sync.WaitGroup
-		sem    = make(chan struct{}, r.config.IndexBatchSize)
+		mu   sync.Mutex
+		errs []error
+		wg   sync.WaitGroup
+		sem  = make(chan struct{}, r.config.IndexBatchSize)
 	)
 	if r.config.IndexBatchSize <= 0 {
 		sem = make(chan struct{}, 8)
@@ -1080,9 +1080,8 @@ func (n *noopRAGLogger) Error(msg string, keysAndValues ...interface{}) {}
 
 type noopRAGMetrics struct{}
 
-func (n *noopRAGMetrics) RecordRetrievalLatency(ctx context.Context, durationMs float64, source string) {}
-func (n *noopRAGMetrics) RecordRerankLatency(ctx context.Context, durationMs float64)                   {}
-func (n *noopRAGMetrics) RecordIndexLatency(ctx context.Context, durationMs float64)                    {}
-func (n *noopRAGMetrics) RecordChunkCount(ctx context.Context, count int)                               {}
-
-
+func (n *noopRAGMetrics) RecordRetrievalLatency(ctx context.Context, durationMs float64, source string) {
+}
+func (n *noopRAGMetrics) RecordRerankLatency(ctx context.Context, durationMs float64) {}
+func (n *noopRAGMetrics) RecordIndexLatency(ctx context.Context, durationMs float64)  {}
+func (n *noopRAGMetrics) RecordChunkCount(ctx context.Context, count int)             {}

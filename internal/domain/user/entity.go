@@ -8,28 +8,28 @@ import (
 
 // User represents a system user.
 type User struct {
-	ID               uuid.UUID         `json:"id"`
-	Email            string            `json:"email"`
-	Username         string            `json:"username"`
-	DisplayName      string            `json:"display_name"`
-	PasswordHash     string            `json:"-"`
-	Status           string            `json:"status"`
-	AvatarURL        string            `json:"avatar_url,omitempty"`
-	Locale           string            `json:"locale"`
-	Timezone         string            `json:"timezone"`
-	LastLoginAt      *time.Time        `json:"last_login_at,omitempty"`
-	LastLoginIP      string            `json:"last_login_ip,omitempty"`
-	LoginCount       int               `json:"login_count"`
-	FailedLoginCount int               `json:"failed_login_count"`
-	LockedUntil      *time.Time        `json:"locked_until,omitempty"`
-	EmailVerifiedAt  *time.Time        `json:"email_verified_at,omitempty"`
-	MFAEnabled       bool              `json:"mfa_enabled"`
-	MFASecret        string            `json:"-"`
-	Preferences      map[string]any    `json:"preferences,omitempty"`
-	Metadata         map[string]any    `json:"metadata,omitempty"`
-	CreatedAt        time.Time         `json:"created_at"`
-	UpdatedAt        time.Time         `json:"updated_at"`
-	DeletedAt        *time.Time        `json:"deleted_at,omitempty"`
+	ID               uuid.UUID      `json:"id"`
+	Email            string         `json:"email"`
+	Username         string         `json:"username"`
+	DisplayName      string         `json:"display_name"`
+	PasswordHash     string         `json:"-"`
+	Status           string         `json:"status"`
+	AvatarURL        string         `json:"avatar_url,omitempty"`
+	Locale           string         `json:"locale"`
+	Timezone         string         `json:"timezone"`
+	LastLoginAt      *time.Time     `json:"last_login_at,omitempty"`
+	LastLoginIP      string         `json:"last_login_ip,omitempty"`
+	LoginCount       int            `json:"login_count"`
+	FailedLoginCount int            `json:"failed_login_count"`
+	LockedUntil      *time.Time     `json:"locked_until,omitempty"`
+	EmailVerifiedAt  *time.Time     `json:"email_verified_at,omitempty"`
+	MFAEnabled       bool           `json:"mfa_enabled"`
+	MFASecret        string         `json:"-"`
+	Preferences      map[string]any `json:"preferences,omitempty"`
+	Metadata         map[string]any `json:"metadata,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+	DeletedAt        *time.Time     `json:"deleted_at,omitempty"`
 }
 
 // Organization represents a tenant or team.
@@ -50,10 +50,10 @@ type Organization struct {
 
 // OrganizationMember represents a user's membership in an organization.
 type OrganizationMember struct {
-	OrganizationID uuid.UUID `json:"organization_id"`
-	UserID         uuid.UUID `json:"user_id"`
-	Role           string    `json:"role"`
-	JoinedAt       time.Time `json:"joined_at"`
+	OrganizationID uuid.UUID  `json:"organization_id"`
+	UserID         uuid.UUID  `json:"user_id"`
+	Role           string     `json:"role"`
+	JoinedAt       time.Time  `json:"joined_at"`
 	InvitedBy      *uuid.UUID `json:"invited_by,omitempty"`
 }
 
@@ -71,20 +71,20 @@ type Role struct {
 
 // APIKey represents an API access key.
 type APIKey struct {
-	ID             uuid.UUID `json:"id"`
-	UserID         uuid.UUID `json:"user_id"`
+	ID             uuid.UUID  `json:"id"`
+	UserID         uuid.UUID  `json:"user_id"`
 	OrganizationID *uuid.UUID `json:"organization_id,omitempty"`
-	Name           string    `json:"name"`
-	KeyHash        string    `json:"-"`
-	KeyPrefix      string    `json:"key_prefix"`
-	Scopes         []string  `json:"scopes"`
-	RateLimit      int       `json:"rate_limit"`
+	Name           string     `json:"name"`
+	KeyHash        string     `json:"-"`
+	KeyPrefix      string     `json:"key_prefix"`
+	Scopes         []string   `json:"scopes"`
+	RateLimit      int        `json:"rate_limit"`
 	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
 	LastUsedAt     *time.Time `json:"last_used_at,omitempty"`
-	LastUsedIP     string    `json:"last_used_ip,omitempty"`
-	IsActive       bool      `json:"is_active"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	LastUsedIP     string     `json:"last_used_ip,omitempty"`
+	IsActive       bool       `json:"is_active"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 // AuditLog represents a system audit record.
@@ -127,7 +127,7 @@ type AuditLogFilter struct {
 
 // ActivitySummary aggregates user activity.
 type ActivitySummary struct {
-	UserID     uuid.UUID      `json:"user_id"`
+	UserID       uuid.UUID        `json:"user_id"`
 	ActionCounts map[string]int64 `json:"action_counts"`
 }
 

@@ -53,12 +53,12 @@ func (m *mockPubChemClient) GetCompound(ctx context.Context, cid int) (*PubChemC
 // ---- mockRDKitService ---------------------------------------------------
 
 type mockRDKitService struct {
-	validateFn    func(string) (bool, error)
+	validateFn     func(string) (bool, error)
 	canonicalizeFn func(string) (string, error)
-	toInChIFn     func(string) (string, error)
-	toFormulaFn   func(string) (string, error)
-	toMWFn        func(string) (float64, error)
-	toInChIKeyFn  func(string) (string, error)
+	toInChIFn      func(string) (string, error)
+	toFormulaFn    func(string) (string, error)
+	toMWFn         func(string) (float64, error)
+	toInChIKeyFn   func(string) (string, error)
 }
 
 func newDefaultMockRDKit() *mockRDKitService {
@@ -320,7 +320,7 @@ func TestResolve_CASNumber_PubChemFallback(t *testing.T) {
 	/* if res.PubChemCID != 2244 {
 		t.Errorf("expected CID 2244, got %d", res.PubChemCID)
 	}
- */
+	*/
 	if res.ResolutionMethod != "pubchem_cas" {
 		t.Errorf("expected resolution_path=pubchem_cas, got %s", res.ResolutionMethod)
 	}
@@ -505,7 +505,7 @@ func TestResolve_IUPACName_PubChemFallback(t *testing.T) {
 	/* if res.PubChemCID != 3672 {
 		t.Errorf("expected CID 3672, got %d", res.PubChemCID)
 	}
- */
+	*/
 	if res.ResolutionMethod != "pubchem_name" {
 		t.Errorf("expected resolution_path=pubchem_name, got %s", res.ResolutionMethod)
 	}
@@ -596,15 +596,15 @@ func TestResolve_MolecularFormula_Ambiguous(t *testing.T) {
 	/* if !res.IsAmbiguous {
 		t.Fatal("expected IsAmbiguous=true for molecular formula")
 	}
- */
+	*/
 	/* if res.AmbiguityNote == "" {
 		t.Error("expected non-empty AmbiguityNote")
 	}
- */
+	*/
 	/* if res.PubChemCID != 5793 {
 		t.Errorf("expected CID 5793, got %d", res.PubChemCID)
 	}
- */
+	*/
 }
 
 func TestResolve_MolecularFormula_InvalidFormat(t *testing.T) {
@@ -653,7 +653,7 @@ func TestResolve_InChI_Valid(t *testing.T) {
 	/* if res.PubChemCID != 702 {
 		t.Errorf("expected CID 702, got %d", res.PubChemCID)
 	}
- */
+	*/
 }
 
 func TestResolve_InChI_Invalid(t *testing.T) {
@@ -1105,7 +1105,6 @@ func TestResolveByType_Override(t *testing.T) {
 // Tests — Edge cases
 // =========================================================================
 
-
 func TestResolve_EmptyText(t *testing.T) {
 	resolver := buildResolver(nil, nil, nil, nil, nil, nil)
 	_, err := resolver.Resolve(context.Background(), &RawChemicalEntity{
@@ -1331,11 +1330,11 @@ func TestChemicalDictionary_CaseInsensitive(t *testing.T) {
 	tests := []string{"aspirin", "ASPIRIN", "Aspirin", "  aspirin  "}
 	for _, input := range tests {
 		entry, ok := dict.Lookup(input)
-	if !ok {
-		t.Errorf("Lookup(%q) should find ...", input)
-		continue
-	}
-	if entry.SMILES != "CC(=O)OC1=CC=CC=C1C(=O)O" {
+		if !ok {
+			t.Errorf("Lookup(%q) should find ...", input)
+			continue
+		}
+		if entry.SMILES != "CC(=O)OC1=CC=CC=C1C(=O)O" {
 			t.Errorf("LookupName(%q) = %q, want aspirin SMILES", input, entry.SMILES)
 		}
 	}
@@ -1348,11 +1347,11 @@ func TestChemicalDictionary_BrandCaseInsensitive(t *testing.T) {
 	tests := []string{"advil", "ADVIL", "Advil", " advil "}
 	for _, input := range tests {
 		entry, ok := dict.LookupBrand(input)
-	if !ok {
-		t.Errorf("LookupBrand(%q) should find ibuprofen", input)
-		continue
-	}
-	if entry.CanonicalName != "ibuprofen" {
+		if !ok {
+			t.Errorf("LookupBrand(%q) should find ibuprofen", input)
+			continue
+		}
+		if entry.CanonicalName != "ibuprofen" {
 			t.Errorf("LookupBrand(%q) = %q, want ibuprofen", input, entry.CanonicalName)
 		}
 	}
@@ -1390,8 +1389,8 @@ func TestMockResolverCache(t *testing.T) {
 
 	entity := &ResolvedChemicalEntity{
 
-		SMILES: "CCO",
-		IsResolved:      true,
+		SMILES:     "CCO",
+		IsResolved: true,
 	}
 
 	// Miss
@@ -1544,8 +1543,6 @@ func TestResolveBatch_MixedTypes(t *testing.T) {
 	}
 }
 
-
-
 func TestResolve_ConfidencePreserved(t *testing.T) {
 	dict := NewInMemoryDictionary()
 	dict.AddName("water", "O")
@@ -1618,4 +1615,3 @@ func TestDefaultResolverConfig(t *testing.T) {
 		t.Errorf("expected BatchConcurrency=10, got %d", cfg.BatchConcurrency)
 	}
 }
-

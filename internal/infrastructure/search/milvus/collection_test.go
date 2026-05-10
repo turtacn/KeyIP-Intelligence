@@ -14,16 +14,16 @@ import (
 type mockCollectionClient struct {
 	client.Client // Embed interface
 
-	createCollectionFunc func(ctx context.Context, schema *entity.Schema, shardsNum int32) error
-	dropCollectionFunc   func(ctx context.Context, name string) error
-	hasCollectionFunc    func(ctx context.Context, name string) (bool, error)
-	describeCollectionFunc func(ctx context.Context, name string) (*entity.Collection, error)
+	createCollectionFunc        func(ctx context.Context, schema *entity.Schema, shardsNum int32) error
+	dropCollectionFunc          func(ctx context.Context, name string) error
+	hasCollectionFunc           func(ctx context.Context, name string) (bool, error)
+	describeCollectionFunc      func(ctx context.Context, name string) (*entity.Collection, error)
 	getCollectionStatisticsFunc func(ctx context.Context, name string) (map[string]string, error)
-	createIndexFunc      func(ctx context.Context, collName, fieldName string, idx entity.Index, async bool) error
-	dropIndexFunc        func(ctx context.Context, collName, fieldName string) error
-	loadCollectionFunc   func(ctx context.Context, name string, async bool) error
-	releaseCollectionFunc func(ctx context.Context, name string) error
-	getLoadingProgressFunc func(ctx context.Context, name string, partitions []string) (int64, error)
+	createIndexFunc             func(ctx context.Context, collName, fieldName string, idx entity.Index, async bool) error
+	dropIndexFunc               func(ctx context.Context, collName, fieldName string) error
+	loadCollectionFunc          func(ctx context.Context, name string, async bool) error
+	releaseCollectionFunc       func(ctx context.Context, name string) error
+	getLoadingProgressFunc      func(ctx context.Context, name string, partitions []string) (int64, error)
 }
 
 func (m *mockCollectionClient) CreateCollection(ctx context.Context, schema *entity.Schema, shardsNum int32, opts ...client.CreateCollectionOption) error {

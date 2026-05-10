@@ -1,7 +1,7 @@
 /*
  * mapper.go 实现了完整的权利要求要素映射器，包括 NLP 文本分解、分子结构映射、匈牙利算法最优对齐和禁反言检测；
  * mapper_test.go 覆盖了所有要 求的测试用例，包含 mock 依赖、边界值验证和算法最优性断言。
-*/
+ */
 package infringe_net
 
 import (
@@ -128,7 +128,7 @@ func (m *mockMapperInfringeModel) PredictPropertyImpact(ctx context.Context, req
 func (m *mockMapperInfringeModel) EmbedStructure(ctx context.Context, smiles string) ([]float64, error) {
 	return nil, nil
 }
-func (m *mockMapperInfringeModel) ModelInfo() *ModelMetadata { return nil }
+func (m *mockMapperInfringeModel) ModelInfo() *ModelMetadata         { return nil }
 func (m *mockMapperInfringeModel) Healthy(ctx context.Context) error { return nil }
 func (m *mockMapperInfringeModel) Close() error                      { return nil }
 
@@ -588,7 +588,7 @@ func TestAlignElements_ExtraMoleculeElements(t *testing.T) {
 	}
 
 	// All claim elements should still be covered.
-	assertInDelta(t, 1.0, alignment.CoverageRatio,0.001, "CoverageRatio with extra molecule elements")
+	assertInDelta(t, 1.0, alignment.CoverageRatio, 0.001, "CoverageRatio with extra molecule elements")
 	if len(alignment.UnmatchedMoleculeElements) == 0 {
 		t.Error("expected at least 1 unmatched molecule element (the extra linker)")
 	}

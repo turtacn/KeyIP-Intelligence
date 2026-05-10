@@ -9,20 +9,20 @@ import (
 
 // EventType constants
 const (
-	EventPatentCreated          common.EventType = "patent.created"
-	EventPatentPublished        common.EventType = "patent.published"
+	EventPatentCreated            common.EventType = "patent.created"
+	EventPatentPublished          common.EventType = "patent.published"
 	EventPatentExaminationStarted common.EventType = "patent.examination_started"
-	EventPatentGranted          common.EventType = "patent.granted"
-	EventPatentRejected         common.EventType = "patent.rejected"
-	EventPatentWithdrawn        common.EventType = "patent.withdrawn"
-	EventPatentExpired          common.EventType = "patent.expired"
-	EventPatentInvalidated      common.EventType = "patent.invalidated"
-	EventPatentLapsed           common.EventType = "patent.lapsed"
-	EventPatentClaimsUpdated    common.EventType = "patent.claims_updated"
-	EventPatentMoleculeLinked   common.EventType = "patent.molecule_linked"
-	EventPatentMoleculeUnlinked common.EventType = "patent.molecule_unlinked"
-	EventPatentCitationAdded    common.EventType = "patent.citation_added"
-	EventPatentAnalysisCompleted common.EventType = "patent.analysis_completed"
+	EventPatentGranted            common.EventType = "patent.granted"
+	EventPatentRejected           common.EventType = "patent.rejected"
+	EventPatentWithdrawn          common.EventType = "patent.withdrawn"
+	EventPatentExpired            common.EventType = "patent.expired"
+	EventPatentInvalidated        common.EventType = "patent.invalidated"
+	EventPatentLapsed             common.EventType = "patent.lapsed"
+	EventPatentClaimsUpdated      common.EventType = "patent.claims_updated"
+	EventPatentMoleculeLinked     common.EventType = "patent.molecule_linked"
+	EventPatentMoleculeUnlinked   common.EventType = "patent.molecule_unlinked"
+	EventPatentCitationAdded      common.EventType = "patent.citation_added"
+	EventPatentAnalysisCompleted  common.EventType = "patent.analysis_completed"
 )
 
 // EventHandler interface for handling domain events.

@@ -56,11 +56,11 @@ const (
 type CompetitiveDimension string
 
 const (
-	DimPatentCount     CompetitiveDimension = "PatentCount"
-	DimTechBreadth     CompetitiveDimension = "TechBreadth"
-	DimCitationImpact  CompetitiveDimension = "CitationImpact"
-	DimFilingTrend     CompetitiveDimension = "FilingTrend"
-	DimGeoCoverage     CompetitiveDimension = "GeoCoverage"
+	DimPatentCount    CompetitiveDimension = "PatentCount"
+	DimTechBreadth    CompetitiveDimension = "TechBreadth"
+	DimCitationImpact CompetitiveDimension = "CitationImpact"
+	DimFilingTrend    CompetitiveDimension = "FilingTrend"
+	DimGeoCoverage    CompetitiveDimension = "GeoCoverage"
 )
 
 type ReportType string
@@ -137,10 +137,10 @@ type ReportMeta struct {
 }
 
 type ListReportOptions struct {
-	Type        *ReportType
-	DateFrom    *time.Time
-	DateTo      *time.Time
-	Pagination  common.Pagination
+	Type       *ReportType
+	DateFrom   *time.Time
+	DateTo     *time.Time
+	Pagination common.Pagination
 }
 
 // ============================================================================
@@ -280,7 +280,8 @@ func (s *portfolioReportServiceImpl) GenerateFullReport(ctx context.Context, req
 	hasOverview := false
 	for _, sec := range req.IncludeSections {
 		if sec == SectionOverview {
-			hasOverview = true; break
+			hasOverview = true
+			break
 		}
 	}
 	if !hasOverview {
@@ -369,7 +370,7 @@ func (s *portfolioReportServiceImpl) initiateReportTask(ctx context.Context, por
 	lockKey := fmt.Sprintf("lock:portfolio_report:%s", portfolioID)
 	acquired, err := s.lock.Acquire(ctx, lockKey, 10*time.Minute)
 	if err != nil || !acquired {
-		return "", errors.InvalidState( "another report generation task is currently running for this portfolio")
+		return "", errors.InvalidState("another report generation task is currently running for this portfolio")
 	}
 
 	reportID := uuid.New().String()
@@ -492,7 +493,9 @@ func (s *portfolioReportServiceImpl) processFullReport(ctx context.Context, repo
 
 	// 4. Render & Storage
 	format := req.OutputFormat
-	if format == "" { format = FormatPortfolioPDF }
+	if format == "" {
+		format = FormatPortfolioPDF
+	}
 
 	renderResult, err := s.templater.Render(ctx, &RenderRequest{
 		TemplateID:   "portfolio_full",
@@ -570,14 +573,18 @@ func (s *portfolioReportServiceImpl) calculateHealthScores(patents []interface{}
 }
 
 func (s *portfolioReportServiceImpl) calculateGiniCoefficient(values []float64) float64 {
-	if len(values) == 0 { return 0.0 }
+	if len(values) == 0 {
+		return 0.0
+	}
 	sort.Float64s(values)
 	var sum, area float64
 	for i, v := range values {
 		sum += v
 		area += (float64(i) + 1.0) * v
 	}
-	if sum == 0 { return 0.0 }
+	if sum == 0 {
+		return 0.0
+	}
 	n := float64(len(values))
 	return (2.0*area)/(n*sum) - (n+1.0)/n
 }
@@ -618,7 +625,9 @@ func (s *portfolioReportServiceImpl) GetReportStatus(ctx context.Context, report
 	}
 
 	progress := 0
-	if meta.Status == StatusCompleted { progress = 100 }
+	if meta.Status == StatusCompleted {
+		progress = 100
+	}
 
 	return &ReportStatusInfo{
 		ReportID:    meta.ReportID,
@@ -658,7 +667,7 @@ func (s *portfolioReportServiceImpl) ExportReport(ctx context.Context, reportID 
 		return nil, errors.Wrap(err, errors.ErrCodeNotFound, "report metadata not found")
 	}
 	if meta.Status != StatusCompleted {
-		return nil, errors.InvalidState( "report is not completed")
+		return nil, errors.InvalidState("report is not completed")
 	}
 
 	// Assuming the file is saved as reportID.Format
@@ -667,7 +676,7 @@ func (s *portfolioReportServiceImpl) ExportReport(ctx context.Context, reportID 
 	if err != nil {
 		// Mock logic: If format doesn't exist, we might trigger a synchronous conversion here.
 		// For MVP, return error indicating format unavailable.
-		return nil, errors.NotFound( "requested format not available")
+		return nil, errors.NotFound("requested format not available")
 	}
 	defer stream.Close()
 

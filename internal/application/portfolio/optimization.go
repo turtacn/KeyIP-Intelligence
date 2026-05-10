@@ -21,87 +21,87 @@ import (
 
 // OptimizationRequest defines parameters for portfolio optimization.
 type OptimizationRequest struct {
-	PortfolioID    string              `json:"portfolio_id" validate:"required"`
-	Objective      OptimizationGoal    `json:"objective"`
-	Budget         float64             `json:"budget,omitempty"`
-	Constraints    OptConstraints      `json:"constraints,omitempty"`
-	Preferences    OptPreferences      `json:"preferences,omitempty"`
+	PortfolioID string           `json:"portfolio_id" validate:"required"`
+	Objective   OptimizationGoal `json:"objective"`
+	Budget      float64          `json:"budget,omitempty"`
+	Constraints OptConstraints   `json:"constraints,omitempty"`
+	Preferences OptPreferences   `json:"preferences,omitempty"`
 }
 
 // OptimizationGoal enumerates optimization objectives.
 type OptimizationGoal string
 
 const (
-	GoalMaxCoverage    OptimizationGoal = "maximize_coverage"
-	GoalMinCost        OptimizationGoal = "minimize_cost"
-	GoalMaxROI         OptimizationGoal = "maximize_roi"
-	GoalBalanced       OptimizationGoal = "balanced"
+	GoalMaxCoverage OptimizationGoal = "maximize_coverage"
+	GoalMinCost     OptimizationGoal = "minimize_cost"
+	GoalMaxROI      OptimizationGoal = "maximize_roi"
+	GoalBalanced    OptimizationGoal = "balanced"
 )
 
 // OptConstraints defines constraints for the optimization.
 type OptConstraints struct {
-	MinPatentCount    int      `json:"min_patent_count,omitempty"`
-	MaxPatentCount    int      `json:"max_patent_count,omitempty"`
-	RequiredDomains   []string `json:"required_domains,omitempty"`
-	RequiredJurisd    []string `json:"required_jurisdictions,omitempty"`
-	MaxAnnualCost     float64  `json:"max_annual_cost,omitempty"`
+	MinPatentCount  int      `json:"min_patent_count,omitempty"`
+	MaxPatentCount  int      `json:"max_patent_count,omitempty"`
+	RequiredDomains []string `json:"required_domains,omitempty"`
+	RequiredJurisd  []string `json:"required_jurisdictions,omitempty"`
+	MaxAnnualCost   float64  `json:"max_annual_cost,omitempty"`
 }
 
 // OptPreferences defines soft preferences for the optimization.
 type OptPreferences struct {
-	PreferRecent       bool    `json:"prefer_recent"`
-	PreferHighValue    bool    `json:"prefer_high_value"`
-	DiversityWeight    float64 `json:"diversity_weight,omitempty"`
-	CostSensitivity    float64 `json:"cost_sensitivity,omitempty"`
+	PreferRecent    bool    `json:"prefer_recent"`
+	PreferHighValue bool    `json:"prefer_high_value"`
+	DiversityWeight float64 `json:"diversity_weight,omitempty"`
+	CostSensitivity float64 `json:"cost_sensitivity,omitempty"`
 }
 
 // OptimizationResponse contains the optimization result.
 type OptimizationResponse struct {
-	PortfolioID       string                `json:"portfolio_id"`
-	Objective         OptimizationGoal      `json:"objective"`
+	PortfolioID       string                 `json:"portfolio_id"`
+	Objective         OptimizationGoal       `json:"objective"`
 	Recommendations   []PatentRecommendation `json:"recommendations"`
-	RetainList        []string              `json:"retain_list"`
-	PruneList         []PruneCandidate      `json:"prune_list"`
-	ProjectedSavings  float64               `json:"projected_savings"`
-	ProjectedCoverage float64               `json:"projected_coverage"`
-	HealthDelta       float64               `json:"health_delta"`
-	Summary           OptSummary            `json:"summary"`
-	GeneratedAt       time.Time             `json:"generated_at"`
+	RetainList        []string               `json:"retain_list"`
+	PruneList         []PruneCandidate       `json:"prune_list"`
+	ProjectedSavings  float64                `json:"projected_savings"`
+	ProjectedCoverage float64                `json:"projected_coverage"`
+	HealthDelta       float64                `json:"health_delta"`
+	Summary           OptSummary             `json:"summary"`
+	GeneratedAt       time.Time              `json:"generated_at"`
 }
 
 // PatentRecommendation represents a recommendation for a specific patent.
 type PatentRecommendation struct {
-	PatentID      string  `json:"patent_id"`
-	PatentNumber  string  `json:"patent_number"`
-	TechDomain    string  `json:"tech_domain"`
-	Action        string  `json:"action"`
-	Reason        string  `json:"reason"`
-	ValueScore    float64 `json:"value_score"`
-	CostEstimate  float64 `json:"cost_estimate"`
-	Priority      int     `json:"priority"`
+	PatentID     string  `json:"patent_id"`
+	PatentNumber string  `json:"patent_number"`
+	TechDomain   string  `json:"tech_domain"`
+	Action       string  `json:"action"`
+	Reason       string  `json:"reason"`
+	ValueScore   float64 `json:"value_score"`
+	CostEstimate float64 `json:"cost_estimate"`
+	Priority     int     `json:"priority"`
 }
 
 // PruneCandidate represents a patent recommended for pruning (abandonment).
 type PruneCandidate struct {
-	PatentID       string  `json:"patent_id"`
-	PatentNumber   string  `json:"patent_number"`
-	TechDomain     string  `json:"tech_domain"`
-	AnnualCost     float64 `json:"annual_cost"`
-	ValueScore     float64 `json:"value_score"`
-	Redundancy     float64 `json:"redundancy_score"`
-	PruneScore     float64 `json:"prune_score"`
-	Reason         string  `json:"reason"`
+	PatentID     string  `json:"patent_id"`
+	PatentNumber string  `json:"patent_number"`
+	TechDomain   string  `json:"tech_domain"`
+	AnnualCost   float64 `json:"annual_cost"`
+	ValueScore   float64 `json:"value_score"`
+	Redundancy   float64 `json:"redundancy_score"`
+	PruneScore   float64 `json:"prune_score"`
+	Reason       string  `json:"reason"`
 }
 
 // OptSummary provides aggregate statistics about the optimization.
 type OptSummary struct {
-	TotalPatents       int     `json:"total_patents"`
-	RetainCount        int     `json:"retain_count"`
-	PruneCount         int     `json:"prune_count"`
-	NewFilingCount     int     `json:"new_filing_count"`
-	EstimatedSavings   float64 `json:"estimated_savings"`
-	CoverageChange     float64 `json:"coverage_change_pct"`
-	ROIImprovement     float64 `json:"roi_improvement_pct"`
+	TotalPatents     int     `json:"total_patents"`
+	RetainCount      int     `json:"retain_count"`
+	PruneCount       int     `json:"prune_count"`
+	NewFilingCount   int     `json:"new_filing_count"`
+	EstimatedSavings float64 `json:"estimated_savings"`
+	CoverageChange   float64 `json:"coverage_change_pct"`
+	ROIImprovement   float64 `json:"roi_improvement_pct"`
 }
 
 // -----------------------------------------------------------------------

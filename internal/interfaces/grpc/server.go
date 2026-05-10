@@ -27,8 +27,10 @@
 //   - Reflection 仅在 config.Debug=true 时注册
 //
 // 依赖：internal/config, internal/infrastructure/monitoring/logging,
-//       internal/infrastructure/monitoring/prometheus, pkg/errors,
-//       google.golang.org/grpc, grpc/health, grpc/reflection
+//
+//	internal/infrastructure/monitoring/prometheus, pkg/errors,
+//	google.golang.org/grpc, grpc/health, grpc/reflection
+//
 // 被依赖：cmd/apiserver/main.go, grpc/services/*
 // ---
 package grpc
@@ -58,8 +60,8 @@ import (
 )
 
 const (
-	defaultMaxRecvMsgSize = 16 * 1024 * 1024 // 16MB
-	defaultMaxSendMsgSize = 16 * 1024 * 1024 // 16MB
+	defaultMaxRecvMsgSize  = 16 * 1024 * 1024 // 16MB
+	defaultMaxSendMsgSize  = 16 * 1024 * 1024 // 16MB
 	defaultGracefulTimeout = 10 * time.Second
 )
 

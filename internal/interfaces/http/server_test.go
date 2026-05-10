@@ -6,20 +6,21 @@
 //
 // * **功能定位**：验证 Server 的创建、启动、优雅关闭、TLS 模式、超时配置、并发安全
 // * **测试用例**：
-//   * `TestNewServer_DefaultConfig`：零值配置应用默认值
-//   * `TestNewServer_CustomConfig`：自定义配置正确传递
-//   * `TestServer_StartAndShutdown`：正常启动和优雅关闭
-//   * `TestServer_StartWithEphemeralPort`：端口 0 分配临时端口
-//   * `TestServer_DoubleStart_Error`：重复启动返回错误
-//   * `TestServer_ShutdownBeforeStart`：未启动时关闭不报错
-//   * `TestServer_IsRunning`：运行状态正确反映
-//   * `TestServer_Addr_AfterStart`：启动后返回实际地址
-//   * `TestServer_TLSEnabled`：TLS 配置检测
-//   * `TestServer_GracefulShutdown_WaitsForActiveRequests`：优雅关闭等待活跃请求
-//   * `TestServer_ShutdownTimeout_ForcesClose`：超时后强制关闭
-//   * `TestServerConfig_ApplyDefaults`：默认值填充逻辑
-//   * `TestServerConfig_IsTLSEnabled`：TLS 启用判断
-//   * `TestServerConfig_ListenAddr`：地址格式化
+//   - `TestNewServer_DefaultConfig`：零值配置应用默认值
+//   - `TestNewServer_CustomConfig`：自定义配置正确传递
+//   - `TestServer_StartAndShutdown`：正常启动和优雅关闭
+//   - `TestServer_StartWithEphemeralPort`：端口 0 分配临时端口
+//   - `TestServer_DoubleStart_Error`：重复启动返回错误
+//   - `TestServer_ShutdownBeforeStart`：未启动时关闭不报错
+//   - `TestServer_IsRunning`：运行状态正确反映
+//   - `TestServer_Addr_AfterStart`：启动后返回实际地址
+//   - `TestServer_TLSEnabled`：TLS 配置检测
+//   - `TestServer_GracefulShutdown_WaitsForActiveRequests`：优雅关闭等待活跃请求
+//   - `TestServer_ShutdownTimeout_ForcesClose`：超时后强制关闭
+//   - `TestServerConfig_ApplyDefaults`：默认值填充逻辑
+//   - `TestServerConfig_IsTLSEnabled`：TLS 启用判断
+//   - `TestServerConfig_ListenAddr`：地址格式化
+//
 // * **Mock 依赖**：stubLogger、slowHandler（模拟慢请求）
 // * **断言验证**：状态码、地址格式、超时行为、并发安全
 // * **强制约束**：文件最后一行必须为 `//Personal.AI order the ending`
@@ -644,4 +645,3 @@ serverRunning:
 }
 
 //Personal.AI order the ending
-

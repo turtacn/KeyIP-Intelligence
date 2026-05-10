@@ -12,11 +12,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/reporting"
 	"github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
 )
 
 const (
@@ -29,9 +29,9 @@ const (
 // PatentServiceServer implements the gRPC PatentService
 type PatentServiceServer struct {
 	pb.UnimplementedPatentServiceServer
-	patentRepo  patent.PatentRepository
-	ftoService  reporting.FTOReportService
-	logger      logging.Logger
+	patentRepo patent.PatentRepository
+	ftoService reporting.FTOReportService
+	logger     logging.Logger
 }
 
 // NewPatentServiceServer creates a new PatentServiceServer instance
@@ -432,12 +432,12 @@ func int32SliceFromIntSlice(ints []int) []int32 {
 func isValidPatentNumber(patentNumber string) bool {
 	// Support common patent office prefixes: CN, US, EP, JP, KR, WO
 	validFormats := []string{
-		`^CN\d{9}[A-Z]?$`,                    // CN123456789A
-		`^US\d{7,8}[A-Z]\d?$`,                // US1234567B2
-		`^EP\d{7}[A-Z]\d?$`,                  // EP1234567A1
-		`^JP\d{7,10}[A-Z]?$`,                 // JP2021123456A
-		`^KR\d{10}[A-Z]\d?$`,                 // KR1020210001234B1
-		`^WO\d{4}/\d{6}[A-Z]\d?$`,            // WO2021/123456A1
+		`^CN\d{9}[A-Z]?$`,         // CN123456789A
+		`^US\d{7,8}[A-Z]\d?$`,     // US1234567B2
+		`^EP\d{7}[A-Z]\d?$`,       // EP1234567A1
+		`^JP\d{7,10}[A-Z]?$`,      // JP2021123456A
+		`^KR\d{10}[A-Z]\d?$`,      // KR1020210001234B1
+		`^WO\d{4}/\d{6}[A-Z]\d?$`, // WO2021/123456A1
 	}
 
 	for _, pattern := range validFormats {

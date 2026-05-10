@@ -93,9 +93,9 @@ type mockRegistryMetrics struct {
 	modelLoadCount atomic.Int32
 }
 
-func (m *mockRegistryMetrics) RecordInference(ctx context.Context, p *InferenceMetricParams)         {}
-func (m *mockRegistryMetrics) RecordBatchProcessing(ctx context.Context, p *BatchMetricParams)       {}
-func (m *mockRegistryMetrics) RecordCacheAccess(ctx context.Context, hit bool, modelName string)     {}
+func (m *mockRegistryMetrics) RecordInference(ctx context.Context, p *InferenceMetricParams)     {}
+func (m *mockRegistryMetrics) RecordBatchProcessing(ctx context.Context, p *BatchMetricParams)   {}
+func (m *mockRegistryMetrics) RecordCacheAccess(ctx context.Context, hit bool, modelName string) {}
 func (m *mockRegistryMetrics) RecordCircuitBreakerStateChange(ctx context.Context, modelName, from, to string) {
 }
 func (m *mockRegistryMetrics) RecordRiskAssessment(ctx context.Context, riskLevel string, durationMs float64) {
@@ -128,7 +128,7 @@ func newRegistryTestHelper(t *testing.T) (ModelRegistry, *mockModelLoader, *mock
 	metrics := &mockRegistryMetrics{}
 	reg, err := NewModelRegistry(loader, metrics, NewNoopLogger(),
 		WithRegistryHealthCheckInterval(1*time.Hour), // disable periodic checks in tests
-		WithUnloadDelay(0),                           // immediate unload for test speed
+		WithUnloadDelay(0), // immediate unload for test speed
 		WithMaxLoadedVersions(3),
 	)
 	if err != nil {
@@ -1155,5 +1155,3 @@ func TestVersionStatus_String(t *testing.T) {
 		}
 	}
 }
-
-

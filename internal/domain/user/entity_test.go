@@ -11,12 +11,12 @@ func TestUserStruct(t *testing.T) {
 	id := uuid.New()
 	now := time.Now().UTC()
 	u := &User{
-		ID:          id,
-		Email:       "test@example.com",
-		Username:    "testuser",
-		CreatedAt:   now,
-		Status:      "active",
-		MFAEnabled:  false,
+		ID:         id,
+		Email:      "test@example.com",
+		Username:   "testuser",
+		CreatedAt:  now,
+		Status:     "active",
+		MFAEnabled: false,
 	}
 
 	if u.ID != id {

@@ -11,12 +11,12 @@ import (
 
 func makeRawEntity(text string, entityType ChemicalEntityType, confidence float64, ctxText string) *RawChemicalEntity {
 	return &RawChemicalEntity{
-		Text:       text,
-		EntityType: entityType,
-		Confidence: confidence,
-		Context:    ctxText,
-		StartOffset:   0,
-		EndOffset:     len(text),
+		Text:        text,
+		EntityType:  entityType,
+		Confidence:  confidence,
+		Context:     ctxText,
+		StartOffset: 0,
+		EndOffset:   len(text),
 	}
 }
 

@@ -18,16 +18,17 @@ import (
 type MockLogger struct {
 	logging.Logger
 }
-func (m *MockLogger) Debug(msg string, fields ...logging.Field) {}
-func (m *MockLogger) Info(msg string, fields ...logging.Field)  {}
-func (m *MockLogger) Warn(msg string, fields ...logging.Field)  {}
-func (m *MockLogger) Error(msg string, fields ...logging.Field) {}
-func (m *MockLogger) Fatal(msg string, fields ...logging.Field) {}
-func (m *MockLogger) With(fields ...logging.Field) logging.Logger { return m }
+
+func (m *MockLogger) Debug(msg string, fields ...logging.Field)      {}
+func (m *MockLogger) Info(msg string, fields ...logging.Field)       {}
+func (m *MockLogger) Warn(msg string, fields ...logging.Field)       {}
+func (m *MockLogger) Error(msg string, fields ...logging.Field)      {}
+func (m *MockLogger) Fatal(msg string, fields ...logging.Field)      {}
+func (m *MockLogger) With(fields ...logging.Field) logging.Logger    { return m }
 func (m *MockLogger) WithContext(ctx context.Context) logging.Logger { return m }
-func (m *MockLogger) WithError(err error) logging.Logger { return m }
-func (m *MockLogger) Sync() error { return nil }
-func newMockLogger() logging.Logger { return &MockLogger{} }
+func (m *MockLogger) WithError(err error) logging.Logger             { return m }
+func (m *MockLogger) Sync() error                                    { return nil }
+func newMockLogger() logging.Logger                                  { return &MockLogger{} }
 
 // Mock Milvus Client
 type mockMilvusClient struct {
@@ -157,7 +158,7 @@ func TestClient_Close_Idempotent(t *testing.T) {
 	c := &Client{milvusClient: mock, logger: newMockLogger(), cancel: cancel}
 
 	c.Close()
-	c.Close() // Should not panic
+	c.Close()                  // Should not panic
 	assert.Error(t, ctx.Err()) // context canceled
 }
 

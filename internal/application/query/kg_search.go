@@ -361,7 +361,6 @@ func (s *kgSearchServiceImpl) SearchEntities(ctx context.Context, req *EntitySea
 // ----------------------------------------------------------------------------
 // 2. TraverseRelations
 // ----------------------------------------------------------------------------
-//
 func (s *kgSearchServiceImpl) TraverseRelations(ctx context.Context, req *RelationTraverseRequest) (*RelationTraverseResponse, error) {
 	if req.MaxDepth <= 0 || req.MaxDepth > MaxGraphSearchDepth {
 		return nil, errors.NewValidation(fmt.Sprintf("MaxDepth must be between 1 and %d", MaxGraphSearchDepth))
@@ -496,7 +495,6 @@ func (s *kgSearchServiceImpl) AggregateByDimension(ctx context.Context, req *Agg
 // ----------------------------------------------------------------------------
 // 5. HybridSearch
 // ----------------------------------------------------------------------------
-//
 func (s *kgSearchServiceImpl) HybridSearch(ctx context.Context, req *HybridSearchRequest) (*HybridSearchResponse, error) {
 	// 默认权重处理
 	if req.VectorWeight == 0 && req.TextWeight == 0 && req.GraphWeight == 0 {
@@ -524,13 +522,13 @@ func (s *kgSearchServiceImpl) HybridSearch(ctx context.Context, req *HybridSearc
 	g, gCtx := errgroup.WithContext(ctxTotal)
 
 	var (
-		textScores   map[string]float64
-		vecScores    map[string]float64
-		graphNodes   []GraphEntity
-		textErr      error
-		vecErr       error
-		graphErr     error
-		mu           sync.Mutex
+		textScores map[string]float64
+		vecScores  map[string]float64
+		graphNodes []GraphEntity
+		textErr    error
+		vecErr     error
+		graphErr   error
+		mu         sync.Mutex
 	)
 
 	searchLimit := req.Offset + req.Limit*2 // 多取一些数据用于融合后排序截取
@@ -629,7 +627,7 @@ func (s *kgSearchServiceImpl) HybridSearch(ctx context.Context, req *HybridSearc
 	if graphErr == nil {
 		globalGraphWeight = req.GraphWeight
 	}
-	
+
 	// 检查是否需要归一化（有任何路失败）
 	needNormalization := (textErr != nil) || (vecErr != nil) || (graphErr != nil)
 	if needNormalization {
@@ -640,7 +638,7 @@ func (s *kgSearchServiceImpl) HybridSearch(ctx context.Context, req *HybridSearc
 			globalGraphWeight /= totalActiveWeight
 		}
 	}
-	
+
 	var results []HybridSearchResult
 
 	for id, entity := range entitySet {
@@ -734,13 +732,13 @@ func (s *kgSearchServiceImpl) validateEntitySearchRequest(req *EntitySearchReque
 
 	// Defense against NoSQL/Cypher injection: enforce filter whitelist
 	whitelist := map[string]bool{
-		"assignee":          true,
-		"publication_date":  true,
-		"molecular_weight":  true,
-		"smiles":            true,
-		"tech_domain_id":    true,
-		"legal_status":      true,
-		"country":           true,
+		"assignee":         true,
+		"publication_date": true,
+		"molecular_weight": true,
+		"smiles":           true,
+		"tech_domain_id":   true,
+		"legal_status":     true,
+		"country":          true,
 	}
 	for k := range req.Filters {
 		if !whitelist[k] {

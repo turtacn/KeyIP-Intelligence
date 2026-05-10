@@ -20,14 +20,14 @@ import (
 
 // mockPatentService implements patent.Service for testing.
 type mockPatentService struct {
-	createFn        func(context.Context, *patent.CreateInput) (*patent.Patent, error)
-	getByIDFn       func(context.Context, string) (*patent.Patent, error)
-	listFn          func(context.Context, *patent.ListInput) (*patent.ListResult, error)
-	updateFn        func(context.Context, *patent.UpdateInput) (*patent.Patent, error)
-	deleteFn        func(context.Context, string, string) error
-	searchFn        func(context.Context, *patent.SearchInput) (*patent.SearchResult, error)
+	createFn         func(context.Context, *patent.CreateInput) (*patent.Patent, error)
+	getByIDFn        func(context.Context, string) (*patent.Patent, error)
+	listFn           func(context.Context, *patent.ListInput) (*patent.ListResult, error)
+	updateFn         func(context.Context, *patent.UpdateInput) (*patent.Patent, error)
+	deleteFn         func(context.Context, string, string) error
+	searchFn         func(context.Context, *patent.SearchInput) (*patent.SearchResult, error)
 	advancedSearchFn func(context.Context, *patent.AdvancedSearchInput) (*patent.SearchResult, error)
-	getStatsFn      func(context.Context, *patent.StatsInput) (*patent.Stats, error)
+	getStatsFn       func(context.Context, *patent.StatsInput) (*patent.Stats, error)
 }
 
 func (m *mockPatentService) Create(ctx context.Context, in *patent.CreateInput) (*patent.Patent, error) {

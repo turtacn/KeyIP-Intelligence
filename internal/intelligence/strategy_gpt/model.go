@@ -78,18 +78,18 @@ func (r *RetryConfig) Validate() error {
 
 // RAGConfig controls Retrieval-Augmented Generation behaviour.
 type RAGConfig struct {
-	Enabled              bool    `json:"enabled" yaml:"enabled"`
-	VectorStoreEndpoint  string  `json:"vector_store_endpoint" yaml:"vector_store_endpoint"`
-	TopK                 int     `json:"top_k" yaml:"top_k"`
-	DefaultTopK          int     `json:"default_top_k" yaml:"default_top_k"`
-	SimilarityThreshold  float64 `json:"similarity_threshold" yaml:"similarity_threshold"`
-	ChunkSize            int     `json:"chunk_size" yaml:"chunk_size"`
-	ChunkOverlap         int     `json:"chunk_overlap" yaml:"chunk_overlap"`
-	MaxContextTokens     int     `json:"max_context_tokens" yaml:"max_context_tokens"`
-	IndexBatchSize       int     `json:"index_batch_size" yaml:"index_batch_size"`
-	RerankerEnabled      bool    `json:"reranker_enabled" yaml:"reranker_enabled"`
-	RerankerTopK         int     `json:"reranker_top_k" yaml:"reranker_top_k"`
-	RerankerMultiplier   int     `json:"reranker_multiplier" yaml:"reranker_multiplier"`
+	Enabled             bool    `json:"enabled" yaml:"enabled"`
+	VectorStoreEndpoint string  `json:"vector_store_endpoint" yaml:"vector_store_endpoint"`
+	TopK                int     `json:"top_k" yaml:"top_k"`
+	DefaultTopK         int     `json:"default_top_k" yaml:"default_top_k"`
+	SimilarityThreshold float64 `json:"similarity_threshold" yaml:"similarity_threshold"`
+	ChunkSize           int     `json:"chunk_size" yaml:"chunk_size"`
+	ChunkOverlap        int     `json:"chunk_overlap" yaml:"chunk_overlap"`
+	MaxContextTokens    int     `json:"max_context_tokens" yaml:"max_context_tokens"`
+	IndexBatchSize      int     `json:"index_batch_size" yaml:"index_batch_size"`
+	RerankerEnabled     bool    `json:"reranker_enabled" yaml:"reranker_enabled"`
+	RerankerTopK        int     `json:"reranker_top_k" yaml:"reranker_top_k"`
+	RerankerMultiplier  int     `json:"reranker_multiplier" yaml:"reranker_multiplier"`
 }
 
 // DefaultRAGConfig returns sensible RAG defaults for patent domain retrieval.
@@ -321,4 +321,3 @@ func (c *StrategyGPTConfig) RegisterToRegistry(registry common.ModelRegistry) er
 
 	return registry.Register(context.Background(), meta)
 }
-

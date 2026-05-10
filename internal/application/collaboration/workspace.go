@@ -71,10 +71,10 @@ func (r *UpdateWorkspaceRequest) Validate() error {
 
 // AddMemberRequest is the input DTO for adding a member.
 type AddMemberRequest struct {
-	WorkspaceID string             `json:"workspace_id"`
-	UserID      string             `json:"user_id"`
-	Role        collabdomain.Role  `json:"role"`
-	AddedBy     string             `json:"added_by"`
+	WorkspaceID string            `json:"workspace_id"`
+	UserID      string            `json:"user_id"`
+	Role        collabdomain.Role `json:"role"`
+	AddedBy     string            `json:"added_by"`
 }
 
 func (r *AddMemberRequest) Validate() error {
@@ -125,9 +125,9 @@ type WorkspaceResponse struct {
 
 // MemberResponse is the output DTO for member queries.
 type MemberResponse struct {
-	UserID    string            `json:"user_id"`
-	Role      collabdomain.Role `json:"role"`
-	JoinedAt  time.Time         `json:"joined_at"`
+	UserID   string            `json:"user_id"`
+	Role     collabdomain.Role `json:"role"`
+	JoinedAt time.Time         `json:"joined_at"`
 }
 
 // WorkspaceAppService defines the application-level workspace operations.
@@ -463,9 +463,9 @@ func (s *workspaceAppServiceImpl) ListMembers(ctx context.Context, workspaceID s
 	results := make([]*MemberResponse, 0, len(pagedMembers))
 	for _, m := range pagedMembers {
 		results = append(results, &MemberResponse{
-			UserID:    m.UserID,
-			Role:      m.Role,
-			JoinedAt:  m.CreatedAt,
+			UserID:   m.UserID,
+			Role:     m.Role,
+			JoinedAt: m.CreatedAt,
 		})
 	}
 

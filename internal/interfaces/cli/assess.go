@@ -18,11 +18,11 @@ import (
 )
 
 var (
-	assessPatentNumber          string
-	assessDimensions            string
-	assessOutput                string
-	assessFile                  string
-	assessPortfolioID           string
+	assessPatentNumber           string
+	assessDimensions             string
+	assessOutput                 string
+	assessFile                   string
+	assessPortfolioID            string
 	assessIncludeRecommendations bool
 )
 
@@ -147,9 +147,9 @@ func runAssessPortfolio(ctx context.Context, valuationService portfolio.Valuatio
 
 	// Build assessment request
 	req := &portfolio.CLIPortfolioAssessRequest{
-		PortfolioID:           assessPortfolioID,
+		PortfolioID:            assessPortfolioID,
 		IncludeRecommendations: assessIncludeRecommendations,
-		Context:               ctx,
+		Context:                ctx,
 	}
 
 	// Call valuation service
@@ -207,10 +207,10 @@ func isValidPatentNumber(pn string) bool {
 
 func parseDimensions(input string) ([]string, error) {
 	validDimensions := map[string]bool{
-		"technical":   true,
-		"legal":       true,
-		"commercial":  true,
-		"strategic":   true,
+		"technical":  true,
+		"legal":      true,
+		"commercial": true,
+		"strategic":  true,
 	}
 
 	parts := strings.Split(input, ",")

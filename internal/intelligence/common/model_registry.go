@@ -122,26 +122,26 @@ type ModelMetadata struct {
 
 // RegisteredModel is the external view of a model in the registry.
 type RegisteredModel struct {
-	ModelID         string        `json:"model_id"`
-	Name            string        `json:"name"`
-	Description     string        `json:"description,omitempty"`
-	ActiveVersion   string        `json:"active_version"`
-	PreviousVersion string        `json:"previous_version,omitempty"`
+	ModelID         string         `json:"model_id"`
+	Name            string         `json:"name"`
+	Description     string         `json:"description,omitempty"`
+	ActiveVersion   string         `json:"active_version"`
+	PreviousVersion string         `json:"previous_version,omitempty"`
 	Metadata        *ModelMetadata `json:"metadata,omitempty"`
-	Status          ModelStatus   `json:"status"`
-	LoadedAt        time.Time     `json:"loaded_at,omitempty"`
-	LastUsedAt      time.Time     `json:"last_used_at,omitempty"`
+	Status          ModelStatus    `json:"status"`
+	LoadedAt        time.Time      `json:"loaded_at,omitempty"`
+	LastUsedAt      time.Time      `json:"last_used_at,omitempty"`
 }
 
 // ModelVersion describes a single version of a model.
 type ModelVersion struct {
-	Version      string        `json:"version"`
-	CreatedAt    time.Time     `json:"created_at"`
-	Status       VersionStatus `json:"status"`
+	Version      string         `json:"version"`
+	CreatedAt    time.Time      `json:"created_at"`
+	Status       VersionStatus  `json:"status"`
 	Metadata     *ModelMetadata `json:"metadata,omitempty"`
-	ArtifactPath string        `json:"artifact_path"`
-	Checksum     string        `json:"checksum,omitempty"`
-	SizeBytes    int64         `json:"size_bytes,omitempty"`
+	ArtifactPath string         `json:"artifact_path"`
+	Checksum     string         `json:"checksum,omitempty"`
+	SizeBytes    int64          `json:"size_bytes,omitempty"`
 }
 
 // ABTestConfig describes an A/B test across model versions.
@@ -1173,4 +1173,3 @@ func (l *noopModelLoader) Validate(ctx context.Context, artifactPath string, che
 }
 
 //Personal.AI order the ending
-

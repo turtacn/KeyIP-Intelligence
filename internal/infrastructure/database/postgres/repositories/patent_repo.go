@@ -1038,7 +1038,9 @@ func (r *postgresPatentRepo) GetIPCDistribution(ctx context.Context, level int) 
 // Transaction
 func (r *postgresPatentRepo) WithTx(ctx context.Context, fn func(patent.PatentRepository) error) error {
 	tx, err := r.conn.DB().BeginTx(ctx, nil)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	txRepo := &postgresPatentRepo{conn: r.conn, tx: tx, log: r.log}
 	if err := fn(txRepo); err != nil {
 		tx.Rollback()
@@ -1069,25 +1071,40 @@ func scanPatent(row scanner) (*patent.Patent, error) {
 	}
 
 	p.Status = parsePatentStatus(statusStr)
-	if len(raw) > 0 { _ = json.Unmarshal(raw, &p.RawData) }
-	if len(meta) > 0 { _ = json.Unmarshal(meta, &p.Metadata) }
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &p.RawData)
+	}
+	if len(meta) > 0 {
+		_ = json.Unmarshal(meta, &p.Metadata)
+	}
 
 	return p, nil
 }
 
 func parsePatentStatus(s string) patent.PatentStatus {
 	switch s {
-	case "draft": return patent.PatentStatusDraft
-	case "filed": return patent.PatentStatusFiled
-	case "published": return patent.PatentStatusPublished
-	case "under_examination": return patent.PatentStatusUnderExamination
-	case "granted": return patent.PatentStatusGranted
-	case "rejected": return patent.PatentStatusRejected
-	case "withdrawn": return patent.PatentStatusWithdrawn
-	case "expired": return patent.PatentStatusExpired
-	case "invalidated": return patent.PatentStatusInvalidated
-	case "lapsed": return patent.PatentStatusLapsed
-	default: return patent.PatentStatusUnknown
+	case "draft":
+		return patent.PatentStatusDraft
+	case "filed":
+		return patent.PatentStatusFiled
+	case "published":
+		return patent.PatentStatusPublished
+	case "under_examination":
+		return patent.PatentStatusUnderExamination
+	case "granted":
+		return patent.PatentStatusGranted
+	case "rejected":
+		return patent.PatentStatusRejected
+	case "withdrawn":
+		return patent.PatentStatusWithdrawn
+	case "expired":
+		return patent.PatentStatusExpired
+	case "invalidated":
+		return patent.PatentStatusInvalidated
+	case "lapsed":
+		return patent.PatentStatusLapsed
+	default:
+		return patent.PatentStatusUnknown
 	}
 }
 
@@ -1095,9 +1112,10 @@ func scanPatents(rows *sql.Rows) ([]*patent.Patent, error) {
 	var list []*patent.Patent
 	for rows.Next() {
 		p, err := scanPatent(rows)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		list = append(list, p)
 	}
 	return list, nil
 }
-

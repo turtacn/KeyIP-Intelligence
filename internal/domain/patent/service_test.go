@@ -291,7 +291,7 @@ func TestPatentService_UpdatePatentStatus_Publish_Success(t *testing.T) {
 
 	ctx := context.Background()
 	p, _ := NewPatent("CN123", "Title", OfficeCNIPA, time.Now())
-	p.ID.String() // ensure ID generated
+	_ = p.ID.String() // ensure ID generated
 
 	repo.On("FindByID", ctx, p.ID.String()).Return(p, nil)
 	repo.On("Save", ctx, p).Return(nil)

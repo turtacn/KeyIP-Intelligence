@@ -64,7 +64,7 @@ func (m *mockRuleEngine) EvaluateUtility(ctx context.Context, subject string, cl
 }
 
 type mockMolRepoForPatentability struct {
-	getByIDFn    func(ctx context.Context, id string) (*MoleculeRef, error)
+	getByIDFn     func(ctx context.Context, id string) (*MoleculeRef, error)
 	getBySMILESFn func(ctx context.Context, smiles string) (*MoleculeRef, error)
 }
 
@@ -645,4 +645,3 @@ func TestMin(t *testing.T) {
 }
 
 //Personal.AI order the ending
-

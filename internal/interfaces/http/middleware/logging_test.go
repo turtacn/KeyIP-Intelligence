@@ -15,6 +15,7 @@
 //   - TestWrappedResponseWriter_WriteHeader: 状态码捕获
 //   - TestWrappedResponseWriter_DoubleWriteHeader: 只记录第一次
 //   - TestDefaultLoggingConfig: 默认配置值
+//
 // 强制约束: 文件最后一行必须为 //Personal.AI order the ending
 package middleware
 
@@ -33,8 +34,8 @@ import (
 // captureLogger captures log calls for assertion.
 type captureLogger struct {
 	mock.Mock
-	lastLevel string
-	lastMsg   string
+	lastLevel  string
+	lastMsg    string
 	lastFields []logging.Field
 }
 
@@ -58,10 +59,14 @@ func (l *captureLogger) Error(msg string, fields ...logging.Field) {
 	l.lastMsg = msg
 	l.lastFields = fields
 }
-func (l *captureLogger) With(fields ...logging.Field) logging.Logger { return l }
+func (l *captureLogger) With(fields ...logging.Field) logging.Logger    { return l }
 func (l *captureLogger) WithContext(ctx context.Context) logging.Logger { return l }
-func (l *captureLogger) WithError(err error) logging.Logger { return l }
-func (l *captureLogger) Fatal(msg string, fields ...logging.Field) { l.lastLevel = "fatal"; l.lastMsg = msg; l.lastFields = fields }
+func (l *captureLogger) WithError(err error) logging.Logger             { return l }
+func (l *captureLogger) Fatal(msg string, fields ...logging.Field) {
+	l.lastLevel = "fatal"
+	l.lastMsg = msg
+	l.lastFields = fields
+}
 func (l *captureLogger) Sync() error { return nil }
 
 func TestRequestLogging_BasicRequest(t *testing.T) {

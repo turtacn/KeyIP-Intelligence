@@ -96,31 +96,31 @@ var electronegativityMap = map[int]float32{
 
 // vdwRadiusMap maps atomic number to Van der Waals radius in Angstroms (normalised by 3.0).
 var vdwRadiusMap = map[int]float32{
-	1:  1.20 / 3.0,  // H
-	3:  1.82 / 3.0,  // Li
-	4:  1.53 / 3.0,  // Be
-	5:  1.92 / 3.0,  // B
-	6:  1.70 / 3.0,  // C
-	7:  1.55 / 3.0,  // N
-	8:  1.52 / 3.0,  // O
-	9:  1.47 / 3.0,  // F
-	11: 2.27 / 3.0,  // Na
-	12: 1.73 / 3.0,  // Mg
-	13: 1.84 / 3.0,  // Al
-	14: 2.10 / 3.0,  // Si
-	15: 1.80 / 3.0,  // P
-	16: 1.80 / 3.0,  // S
-	17: 1.75 / 3.0,  // Cl
-	19: 2.75 / 3.0,  // K
-	20: 2.31 / 3.0,  // Ca
-	26: 2.04 / 3.0,  // Fe
-	29: 1.40 / 3.0,  // Cu
-	30: 1.39 / 3.0,  // Zn
-	34: 1.90 / 3.0,  // Se
-	35: 1.85 / 3.0,  // Br
-	50: 2.17 / 3.0,  // Sn
-	53: 1.98 / 3.0,  // I
-	78: 1.75 / 3.0,  // Pt
+	1:  1.20 / 3.0, // H
+	3:  1.82 / 3.0, // Li
+	4:  1.53 / 3.0, // Be
+	5:  1.92 / 3.0, // B
+	6:  1.70 / 3.0, // C
+	7:  1.55 / 3.0, // N
+	8:  1.52 / 3.0, // O
+	9:  1.47 / 3.0, // F
+	11: 2.27 / 3.0, // Na
+	12: 1.73 / 3.0, // Mg
+	13: 1.84 / 3.0, // Al
+	14: 2.10 / 3.0, // Si
+	15: 1.80 / 3.0, // P
+	16: 1.80 / 3.0, // S
+	17: 1.75 / 3.0, // Cl
+	19: 2.75 / 3.0, // K
+	20: 2.31 / 3.0, // Ca
+	26: 2.04 / 3.0, // Fe
+	29: 1.40 / 3.0, // Cu
+	30: 1.39 / 3.0, // Zn
+	34: 1.90 / 3.0, // Se
+	35: 1.85 / 3.0, // Br
+	50: 2.17 / 3.0, // Sn
+	53: 1.98 / 3.0, // I
+	78: 1.75 / 3.0, // Pt
 }
 
 // countRadicalElectrons returns the number of unpaired electrons for an atom.
@@ -238,12 +238,12 @@ func (p *gnnPreprocessorImpl) Canonicalize(smiles string) (string, error) {
 // PreprocessSMILES converts a SMILES string into a MolecularGraph.
 //
 // Pipeline:
-//   1. Validate SMILES
-//   2. Parse atoms and bonds from the SMILES string
-//   3. Encode atom features → NodeFeatures
-//   4. Encode bond features → EdgeFeatures + EdgeIndex
-//   5. Compute global features (molecular weight, atom count, etc.)
-//   6. Validate against MaxAtoms
+//  1. Validate SMILES
+//  2. Parse atoms and bonds from the SMILES string
+//  3. Encode atom features → NodeFeatures
+//  4. Encode bond features → EdgeFeatures + EdgeIndex
+//  5. Compute global features (molecular weight, atom count, etc.)
+//  6. Validate against MaxAtoms
 func (p *gnnPreprocessorImpl) PreprocessSMILES(ctx context.Context, smiles string) (*MolecularGraph, error) {
 	if err := p.ValidateSMILES(smiles); err != nil {
 		return nil, err
@@ -387,10 +387,10 @@ type parsedAtom struct {
 
 // parsedBond represents a parsed bond from SMILES.
 type parsedBond struct {
-	Src       int
-	Dst       int
-	BondType  int // 1=single, 2=double, 3=triple, 4=aromatic
-	InRing    bool
+	Src        int
+	Dst        int
+	BondType   int // 1=single, 2=double, 3=triple, 4=aromatic
+	InRing     bool
 	Conjugated bool
 }
 
@@ -484,10 +484,10 @@ func parseSMILES(smiles string) ([]parsedAtom, []parsedBond, error) {
 			symbol, aromatic, advance := parseOrganicAtom(runes, i)
 			atomicNum := lookupAtomicNumber(symbol)
 			atom := parsedAtom{
-				Symbol:    symbol,
-				AtomicNum: atomicNum,
+				Symbol:     symbol,
+				AtomicNum:  atomicNum,
 				IsAromatic: aromatic,
-				NumH:      estimateImplicitH(atomicNum, 0),
+				NumH:       estimateImplicitH(atomicNum, 0),
 			}
 			atomIdx := len(atoms)
 			atoms = append(atoms, atom)
@@ -718,7 +718,7 @@ func parseMOLBlock(molBlock string) ([]parsedAtom, []parsedBond, error) {
 					charge = -2
 				case 6:
 					charge = -3
-				// 7 = doublet radical — charge 0 with radical electron
+					// 7 = doublet radical — charge 0 with radical electron
 				}
 			}
 		}
@@ -1063,13 +1063,11 @@ func computeGlobalFeatures(atoms []parsedAtom, bonds []parsedBond) []float32 {
 	logAtoms := float32(math.Log1p(float64(numAtoms))) / 6.0
 
 	return []float32{
-		numAtoms / 200.0,  // normalised atom count
-		numBonds / 200.0,  // normalised bond count
-		mw / 1000.0,       // normalised molecular weight
-		aromaticFrac,      // aromatic fraction
-		bondDensity,       // bond density
-		logAtoms,          // log atom count
+		numAtoms / 200.0, // normalised atom count
+		numBonds / 200.0, // normalised bond count
+		mw / 1000.0,      // normalised molecular weight
+		aromaticFrac,     // aromatic fraction
+		bondDensity,      // bond density
+		logAtoms,         // log atom count
 	}
 }
-
-

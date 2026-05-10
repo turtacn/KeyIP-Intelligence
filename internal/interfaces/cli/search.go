@@ -17,20 +17,20 @@ import (
 )
 
 var (
-	searchSMILES        string
-	searchInChI         string
-	searchThreshold     float64
-	searchFingerprints  string
-	searchMaxResults    int
-	searchOffices       string
-	searchIncludeRisk   bool
-	searchOutput        string
-	searchQuery         string
-	searchIPC           string
-	searchCPC           string
-	searchDateFrom      string
-	searchDateTo        string
-	searchSort          string
+	searchSMILES       string
+	searchInChI        string
+	searchThreshold    float64
+	searchFingerprints string
+	searchMaxResults   int
+	searchOffices      string
+	searchIncludeRisk  bool
+	searchOutput       string
+	searchQuery        string
+	searchIPC          string
+	searchCPC          string
+	searchDateFrom     string
+	searchDateTo       string
+	searchSort         string
 )
 
 // NewSearchCmd creates the search command

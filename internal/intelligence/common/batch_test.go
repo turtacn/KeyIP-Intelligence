@@ -111,17 +111,17 @@ type testBatchMetrics struct {
 	lastParams atomic.Pointer[BatchMetricParams]
 }
 
-func (m *testBatchMetrics) RecordInference(_ context.Context, _ *InferenceMetricParams)                {}
+func (m *testBatchMetrics) RecordInference(_ context.Context, _ *InferenceMetricParams) {}
 func (m *testBatchMetrics) RecordBatchProcessing(_ context.Context, p *BatchMetricParams) {
 	m.batchCalls.Add(1)
 	m.lastParams.Store(p)
 }
-func (m *testBatchMetrics) RecordCacheAccess(_ context.Context, _ bool, _ string)                      {}
-func (m *testBatchMetrics) RecordCircuitBreakerStateChange(_ context.Context, _, _, _ string)           {}
-func (m *testBatchMetrics) RecordRiskAssessment(_ context.Context, _ string, _ float64)                 {}
-func (m *testBatchMetrics) RecordModelLoad(_ context.Context, _, _ string, _ float64, _ bool)           {}
-func (m *testBatchMetrics) GetInferenceLatencyHistogram() LatencyHistogram                              { return nil }
-func (m *testBatchMetrics) GetCurrentStats() *IntelligenceStats                                         { return &IntelligenceStats{} }
+func (m *testBatchMetrics) RecordCacheAccess(_ context.Context, _ bool, _ string)             {}
+func (m *testBatchMetrics) RecordCircuitBreakerStateChange(_ context.Context, _, _, _ string) {}
+func (m *testBatchMetrics) RecordRiskAssessment(_ context.Context, _ string, _ float64)       {}
+func (m *testBatchMetrics) RecordModelLoad(_ context.Context, _, _ string, _ float64, _ bool) {}
+func (m *testBatchMetrics) GetInferenceLatencyHistogram() LatencyHistogram                    { return nil }
+func (m *testBatchMetrics) GetCurrentStats() *IntelligenceStats                               { return &IntelligenceStats{} }
 
 // =========================================================================
 // Tests — NewBatchProcessor
@@ -1318,4 +1318,3 @@ func TestPriorityQueue_Ordering(t *testing.T) {
 		t.Errorf("expected 'low' third, got %q", third.value)
 	}
 }
-

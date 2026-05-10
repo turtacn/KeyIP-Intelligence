@@ -13,14 +13,17 @@
 //   - 实现 ListReports: GET /api/v1/reports，支持按类型/日期/状态过滤 + 分页
 //   - 实现 DeleteReport: DELETE /api/v1/reports/:report_id，软删除报告
 //   - 实现 RegisterRoutes(router)，注册所有报告相关路由
+//
 // 业务逻辑:
 //   - 报告生成为异步操作，POST 返回 202 Accepted + 报告 ID
 //   - 下载时检查报告状态，未完成返回 409 Conflict
 //   - 支持 format 查询参数选择导出格式（pdf/docx/xlsx）
 //   - 报告保留策略: 默认 90 天自动清理
+//
 // 依赖关系:
 //   - 依赖: internal/application/reporting/fto_report.go, infringement_report.go, portfolio_report.go, template.go
 //   - 被依赖: internal/interfaces/http/router.go
+//
 // 测试要求: 全部端点正常/异常路径、异步状态查询、文件下载 Content-Type、权限校验
 // 强制约束: 文件最后一行必须为 //Personal.AI order the ending
 package handlers
@@ -88,10 +91,10 @@ type GenerateInfringementReportRequest struct {
 
 // GeneratePortfolioReportRequest represents the request body for portfolio report generation.
 type GeneratePortfolioReportRequest struct {
-	PortfolioID string `json:"portfolio_id"`
-	ReportType  string `json:"report_type"`
-	Format      string `json:"format"`
-	IncludeCharts bool `json:"include_charts"`
+	PortfolioID   string `json:"portfolio_id"`
+	ReportType    string `json:"report_type"`
+	Format        string `json:"format"`
+	IncludeCharts bool   `json:"include_charts"`
 }
 
 // ReportStatusResponse represents the status of a report generation task.

@@ -81,10 +81,10 @@ func newTestWorkspace(suffix string) *repositories.Workspace {
 				Permissions:  "read",
 			},
 		},
-		Status:   "active",
-		Tags:     []string{"pharma", "collab"},
-		Settings: map[string]interface{}{"notifications": true},
-		Metadata: map[string]interface{}{"region": "US"},
+		Status:    "active",
+		Tags:      []string{"pharma", "collab"},
+		Settings:  map[string]interface{}{"notifications": true},
+		Metadata:  map[string]interface{}{"region": "US"},
 		CreatedAt: now,
 		UpdatedAt: now,
 		CreatedBy: common.UserID("test-user"),
@@ -581,4 +581,3 @@ func TestCollaborationRepository_MemberOperationsEdgeCases(t *testing.T) {
 }
 
 //Personal.AI order the ending
-

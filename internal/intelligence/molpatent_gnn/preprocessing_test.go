@@ -49,10 +49,10 @@ func TestValidateSMILES_TooLong(t *testing.T) {
 func TestValidateSMILES_InvalidChars(t *testing.T) {
 	pp, _ := NewGNNPreprocessor(DefaultGNNModelConfig())
 	invalid := []string{
-		"CC O",   // space
-		"CC\tO",  // tab
-		"CC{O}",  // curly braces
-		"CC<O>",  // angle brackets
+		"CC O",  // space
+		"CC\tO", // tab
+		"CC{O}", // curly braces
+		"CC<O>", // angle brackets
 	}
 	for _, s := range invalid {
 		if err := pp.ValidateSMILES(s); err == nil {
@@ -437,10 +437,10 @@ func TestAtomicNumToBin(t *testing.T) {
 		atomicNum int
 		wantBin   int
 	}{
-		{1, 0},   // H
-		{6, 1},   // C
-		{7, 2},   // N
-		{8, 3},   // O
+		{1, 0},                      // H
+		{6, 1},                      // C
+		{7, 2},                      // N
+		{8, 3},                      // O
 		{999, atomicNumberBins - 1}, // unknown → other
 	}
 	for _, tt := range tests {
@@ -702,5 +702,3 @@ func TestLookupAtomicNumber_Unknown(t *testing.T) {
 		t.Error("expected unknown → 0")
 	}
 }
-
-

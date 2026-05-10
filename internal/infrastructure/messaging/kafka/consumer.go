@@ -33,26 +33,26 @@ type RetryConfig struct {
 
 // ConsumerConfig holds configuration for the Consumer.
 type ConsumerConfig struct {
-	Brokers           []string
-	GroupID           string
-	Topics            []string
-	AutoOffsetReset   string
-	EnableAutoCommit  bool
+	Brokers            []string
+	GroupID            string
+	Topics             []string
+	AutoOffsetReset    string
+	EnableAutoCommit   bool
 	AutoCommitInterval time.Duration
-	SessionTimeout    time.Duration
-	HeartbeatInterval time.Duration
-	MaxPollInterval   time.Duration
-	FetchMinBytes     int
-	FetchMaxBytes     int
-	MaxPollRecords    int
-	IsolationLevel    string
-	SASLEnabled       bool
-	SASLMechanism     string
-	SASLUsername      string
-	SASLPassword      string
-	TLSEnabled        bool
-	TLSCertPath       string
-	RetryConfig       RetryConfig
+	SessionTimeout     time.Duration
+	HeartbeatInterval  time.Duration
+	MaxPollInterval    time.Duration
+	FetchMinBytes      int
+	FetchMaxBytes      int
+	MaxPollRecords     int
+	IsolationLevel     string
+	SASLEnabled        bool
+	SASLMechanism      string
+	SASLUsername       string
+	SASLPassword       string
+	TLSEnabled         bool
+	TLSCertPath        string
+	RetryConfig        RetryConfig
 }
 
 // ConsumerMetrics holds consumer metrics.
@@ -98,13 +98,27 @@ func NewConsumer(cfg ConsumerConfig, logger logging.Logger) (*Consumer, error) {
 	}
 
 	// Defaults
-	if cfg.AutoOffsetReset == "" { cfg.AutoOffsetReset = "earliest" }
-	if cfg.AutoCommitInterval == 0 { cfg.AutoCommitInterval = 5 * time.Second }
-	if cfg.SessionTimeout == 0 { cfg.SessionTimeout = 30 * time.Second }
-	if cfg.HeartbeatInterval == 0 { cfg.HeartbeatInterval = 3 * time.Second }
-	if cfg.MaxPollInterval == 0 { cfg.MaxPollInterval = 300 * time.Second }
-	if cfg.FetchMinBytes == 0 { cfg.FetchMinBytes = 1 }
-	if cfg.FetchMaxBytes == 0 { cfg.FetchMaxBytes = 50 * 1024 * 1024 } // 50MB
+	if cfg.AutoOffsetReset == "" {
+		cfg.AutoOffsetReset = "earliest"
+	}
+	if cfg.AutoCommitInterval == 0 {
+		cfg.AutoCommitInterval = 5 * time.Second
+	}
+	if cfg.SessionTimeout == 0 {
+		cfg.SessionTimeout = 30 * time.Second
+	}
+	if cfg.HeartbeatInterval == 0 {
+		cfg.HeartbeatInterval = 3 * time.Second
+	}
+	if cfg.MaxPollInterval == 0 {
+		cfg.MaxPollInterval = 300 * time.Second
+	}
+	if cfg.FetchMinBytes == 0 {
+		cfg.FetchMinBytes = 1
+	}
+	if cfg.FetchMaxBytes == 0 {
+		cfg.FetchMaxBytes = 50 * 1024 * 1024
+	} // 50MB
 
 	// Create Reader Config
 	commitInterval := cfg.AutoCommitInterval
@@ -364,9 +378,9 @@ func (c *Consumer) processMessage(ctx context.Context, msg *common.Message, hand
 	if c.deadLetterProducer != nil && c.config.RetryConfig.DeadLetterTopic != "" {
 		// Send to DLQ
 		dlMsg := &common.ProducerMessage{
-			Topic: c.config.RetryConfig.DeadLetterTopic,
-			Key:   msg.Key,
-			Value: msg.Value,
+			Topic:   c.config.RetryConfig.DeadLetterTopic,
+			Key:     msg.Key,
+			Value:   msg.Value,
 			Headers: msg.Headers,
 			// Add error info to headers?
 		}
@@ -384,7 +398,7 @@ func (c *Consumer) processMessage(ctx context.Context, msg *common.Message, hand
 }
 
 // GetMetrics returns a snapshot of metrics.
-func (c *Consumer) GetMetrics() ConsumerMetrics {
+func (c *Consumer) GetMetrics() *ConsumerMetrics {
 	m := ConsumerMetrics{
 		MessagesConsumed:     atomic.Int64{},
 		MessagesProcessed:    atomic.Int64{},
@@ -400,7 +414,7 @@ func (c *Consumer) GetMetrics() ConsumerMetrics {
 	m.MessagesDeadLettered.Store(c.metrics.MessagesDeadLettered.Load())
 	m.Lag.Store(c.metrics.Lag.Load())
 	m.LastConsumedAt.Store(c.metrics.LastConsumedAt.Load())
-	return m
+	return &m
 }
 
 // Close closes the consumer.

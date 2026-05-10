@@ -373,10 +373,10 @@ func (r *postgresLifecycleRepo) ExtendDeadline(ctx context.Context, id string, n
 	}
 
 	historyEntry := map[string]interface{}{
-		"from": d.DueDate,
-		"to": newDueDate,
+		"from":   d.DueDate,
+		"to":     newDueDate,
 		"reason": reason,
-		"at": time.Now(),
+		"at":     time.Now(),
 	}
 
 	// Append using jsonb_set or || operator in Postgres, but simple approach is to read, modify, write or use complex SQL.
@@ -840,6 +840,7 @@ func (r *postgresLifecycleRepo) WithTx(ctx context.Context, fn func(lifecycle.Li
 	}
 	return nil
 }
+
 // Implement all methods for txLifecycleRepo by delegating or copy-paste?
 // Copy-paste or code reuse is needed.
 // To avoid duplication, I should have a `baseRepo` that takes `queryExecutor`.
@@ -849,7 +850,7 @@ type baseLifecycleRepo struct {
 	exec queryExecutor
 	log  logging.Logger
 	// conn is needed for WithTx only on the main repo, or access DB for BatchCreate
-	db   *sql.DB // optional, for BatchCreate using CopyIn which requires *sql.Tx or *sql.DB
+	db *sql.DB // optional, for BatchCreate using CopyIn which requires *sql.Tx or *sql.DB
 }
 
 // Re-implementing methods on baseLifecycleRepo...
@@ -943,9 +944,15 @@ func scanDeadline(row scanner) (*lifecycle.Deadline, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan deadline")
 	}
-	if len(remJSON) > 0 { _ = json.Unmarshal(remJSON, &d.ReminderConfig) }
-	if len(metaJSON) > 0 { _ = json.Unmarshal(metaJSON, &d.Metadata) }
-	if len(extHistoryJSON) > 0 { _ = json.Unmarshal(extHistoryJSON, &d.ExtensionHistory) }
+	if len(remJSON) > 0 {
+		_ = json.Unmarshal(remJSON, &d.ReminderConfig)
+	}
+	if len(metaJSON) > 0 {
+		_ = json.Unmarshal(metaJSON, &d.Metadata)
+	}
+	if len(extHistoryJSON) > 0 {
+		_ = json.Unmarshal(extHistoryJSON, &d.ExtensionHistory)
+	}
 	return d, nil
 }
 
@@ -963,10 +970,18 @@ func scanEvent(row scanner) (*lifecycle.LifecycleEvent, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan event")
 	}
-	if len(before) > 0 { _ = json.Unmarshal(before, &e.BeforeState) }
-	if len(after) > 0 { _ = json.Unmarshal(after, &e.AfterState) }
-	if len(attach) > 0 { _ = json.Unmarshal(attach, &e.Attachments) }
-	if len(meta) > 0 { _ = json.Unmarshal(meta, &e.Metadata) }
+	if len(before) > 0 {
+		_ = json.Unmarshal(before, &e.BeforeState)
+	}
+	if len(after) > 0 {
+		_ = json.Unmarshal(after, &e.AfterState)
+	}
+	if len(attach) > 0 {
+		_ = json.Unmarshal(attach, &e.Attachments)
+	}
+	if len(meta) > 0 {
+		_ = json.Unmarshal(meta, &e.Metadata)
+	}
 	return e, nil
 }
 
@@ -984,7 +999,9 @@ func scanCostRecord(row scanner) (*lifecycle.CostRecord, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan cost record")
 	}
-	if len(meta) > 0 { _ = json.Unmarshal(meta, &c.Metadata) }
+	if len(meta) > 0 {
+		_ = json.Unmarshal(meta, &c.Metadata)
+	}
 	return c, nil
 }
 

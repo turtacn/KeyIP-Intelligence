@@ -49,18 +49,26 @@ func TestTanimotoCalculator(t *testing.T) {
 	fp1, _ := NewBitFingerprint(FingerprintMorgan, []byte{0x0F}, 8, 2)
 	fp2, _ := NewBitFingerprint(FingerprintMorgan, []byte{0x0F}, 8, 2)
 	score, err := calc.Calculate(fp1, fp2)
-	if err != nil { t.Fatalf("Calculate failed: %v", err) }
-	if math.Abs(score-1.0) > testEpsilon { t.Errorf("Identical score = %f, want 1.0", score) }
+	if err != nil {
+		t.Fatalf("Calculate failed: %v", err)
+	}
+	if math.Abs(score-1.0) > testEpsilon {
+		t.Errorf("Identical score = %f, want 1.0", score)
+	}
 
 	// 1111 (0x0F) vs 0000 (0x00) -> 0.0
 	fp3, _ := NewBitFingerprint(FingerprintMorgan, []byte{0x00}, 8, 2)
 	score, _ = calc.Calculate(fp1, fp3)
-	if math.Abs(score-0.0) > testEpsilon { t.Errorf("Disjoint score = %f, want 0.0", score) }
+	if math.Abs(score-0.0) > testEpsilon {
+		t.Errorf("Disjoint score = %f, want 0.0", score)
+	}
 
 	// 1111 (0x0F) vs 0011 (0x03) -> 0.5 (Intersection 2, Union 4)
 	fp4, _ := NewBitFingerprint(FingerprintMorgan, []byte{0x03}, 8, 2)
 	score, _ = calc.Calculate(fp1, fp4)
-	if math.Abs(score-0.5) > testEpsilon { t.Errorf("Overlap score = %f, want 0.5", score) }
+	if math.Abs(score-0.5) > testEpsilon {
+		t.Errorf("Overlap score = %f, want 0.5", score)
+	}
 
 	// Dense vectors (Generalized Tanimoto)
 	// [1.0, 0.5] vs [0.5, 1.0] (padded with zeros)
@@ -71,8 +79,12 @@ func TestTanimotoCalculator(t *testing.T) {
 	dfp2 := makeDenseFP(t, []float32{0.5, 1.0})
 
 	score, err = calc.Calculate(dfp1, dfp2)
-	if err != nil { t.Fatalf("Calculate dense failed: %v", err) }
-	if math.Abs(score-0.5) > testEpsilon { t.Errorf("Dense score = %f, want 0.5", score) }
+	if err != nil {
+		t.Fatalf("Calculate dense failed: %v", err)
+	}
+	if math.Abs(score-0.5) > testEpsilon {
+		t.Errorf("Dense score = %f, want 0.5", score)
+	}
 }
 
 func TestDiceCalculator(t *testing.T) {
@@ -87,14 +99,20 @@ func TestDiceCalculator(t *testing.T) {
 	fp2, _ := NewBitFingerprint(FingerprintMorgan, []byte{0x03}, 8, 2)
 
 	score, err := calc.Calculate(fp1, fp2)
-	if err != nil { t.Fatalf("Calculate failed: %v", err) }
-	if math.Abs(score-0.6666666667) > testEpsilon { t.Errorf("Dice score = %f, want ~0.667", score) }
+	if err != nil {
+		t.Fatalf("Calculate failed: %v", err)
+	}
+	if math.Abs(score-0.6666666667) > testEpsilon {
+		t.Errorf("Dice score = %f, want ~0.667", score)
+	}
 
 	// Dense not supported
 	// use makeDenseFP to get a valid dense FP to test rejection
 	denseFP := makeDenseFP(t, []float32{1.0})
 	_, err = calc.Calculate(denseFP, denseFP)
-	if err == nil { t.Error("Dice calculated on dense vector unexpectedly") }
+	if err == nil {
+		t.Error("Dice calculated on dense vector unexpectedly")
+	}
 }
 
 func TestCosineCalculator(t *testing.T) {
@@ -107,19 +125,27 @@ func TestCosineCalculator(t *testing.T) {
 	dfpB := makeDenseFP(t, []float32{0.0, 1.0})
 
 	score, err := calc.Calculate(dfpA, dfpB)
-	if err != nil { t.Fatalf("Calculate failed: %v", err) }
-	if math.Abs(score-0.5) > testEpsilon { t.Errorf("Orthogonal score = %f, want 0.5", score) }
+	if err != nil {
+		t.Fatalf("Calculate failed: %v", err)
+	}
+	if math.Abs(score-0.5) > testEpsilon {
+		t.Errorf("Orthogonal score = %f, want 0.5", score)
+	}
 
 	// Identical -> 1.0 -> Normalized 1.0
 	score, _ = calc.Calculate(dfpA, dfpA)
-	if math.Abs(score-1.0) > testEpsilon { t.Errorf("Identical score = %f, want 1.0", score) }
+	if math.Abs(score-1.0) > testEpsilon {
+		t.Errorf("Identical score = %f, want 1.0", score)
+	}
 
 	// Anti-parallel -> -1.0 -> Normalized 0.0
 	// Need negative value.
 	dfpC := makeDenseFP(t, []float32{-1.0, 0.0})
 
 	score, _ = calc.Calculate(dfpA, dfpC)
-	if math.Abs(score-0.0) > testEpsilon { t.Errorf("Anti-parallel score = %f, want 0.0", score) }
+	if math.Abs(score-0.0) > testEpsilon {
+		t.Errorf("Anti-parallel score = %f, want 0.0", score)
+	}
 }
 
 func TestEuclideanCalculator(t *testing.T) {
@@ -129,8 +155,12 @@ func TestEuclideanCalculator(t *testing.T) {
 	// Identical -> dist 0 -> score 1.0
 	dfpA := makeDenseFP(t, []float32{0.0})
 	score, err := calc.Calculate(dfpA, dfpA)
-	if err != nil { t.Fatalf("Calculate failed: %v", err) }
-	if math.Abs(score-1.0) > testEpsilon { t.Errorf("Identical score = %f, want 1.0", score) }
+	if err != nil {
+		t.Fatalf("Calculate failed: %v", err)
+	}
+	if math.Abs(score-1.0) > testEpsilon {
+		t.Errorf("Identical score = %f, want 1.0", score)
+	}
 
 	// Dist 1.0 -> score 0.5
 	// [0,0...] vs [1,0...]
@@ -139,7 +169,9 @@ func TestEuclideanCalculator(t *testing.T) {
 	score, _ = calc.Calculate(dfpA, dfpB)
 	// dist = sqrt((0-1)^2) = 1.0
 	// score = 1/(1+1) = 0.5
-	if math.Abs(score-0.5) > testEpsilon { t.Errorf("Dist 1 score = %f, want 0.5", score) }
+	if math.Abs(score-0.5) > testEpsilon {
+		t.Errorf("Dist 1 score = %f, want 0.5", score)
+	}
 }
 
 func TestDefaultSimilarityEngine(t *testing.T) {
@@ -150,17 +182,27 @@ func TestDefaultSimilarityEngine(t *testing.T) {
 	fp2, _ := NewBitFingerprint(FingerprintMorgan, []byte{0x0F}, 8, 2)
 
 	score, err := engine.ComputeSimilarity(fp1, fp2, MetricTanimoto)
-	if err != nil { t.Fatalf("ComputeSimilarity failed: %v", err) }
-	if math.Abs(score-1.0) > testEpsilon { t.Errorf("Score = %f, want 1.0", score) }
+	if err != nil {
+		t.Fatalf("ComputeSimilarity failed: %v", err)
+	}
+	if math.Abs(score-1.0) > testEpsilon {
+		t.Errorf("Score = %f, want 1.0", score)
+	}
 
 	// Unsupported metric (if removed from map or added new enum but not init)
 	_, err = engine.ComputeSimilarity(fp1, fp2, MetricManhattan)
-	if err == nil { t.Error("ComputeSimilarity allowed unsupported metric") }
+	if err == nil {
+		t.Error("ComputeSimilarity allowed unsupported metric")
+	}
 
 	// Batch
 	scores, err := engine.BatchComputeSimilarity(fp1, []*Fingerprint{fp2, fp2}, MetricTanimoto)
-	if err != nil { t.Fatalf("BatchComputeSimilarity failed: %v", err) }
-	if len(scores) != 2 || scores[0] != 1.0 { t.Error("BatchComputeSimilarity results incorrect") }
+	if err != nil {
+		t.Fatalf("BatchComputeSimilarity failed: %v", err)
+	}
+	if len(scores) != 2 || scores[0] != 1.0 {
+		t.Error("BatchComputeSimilarity results incorrect")
+	}
 }
 
 func TestClassifySimilarity(t *testing.T) {
@@ -202,8 +244,8 @@ func FuzzTanimotoSymmetry(f *testing.F) {
 
 		// Create fingerprints
 		// Use dummy type and bit length
-		fp1 := &Fingerprint{Type: FingerprintMorgan, Encoding: EncodingBitVector, Bits: b1, NumBits: len(b1)*8}
-		fp2 := &Fingerprint{Type: FingerprintMorgan, Encoding: EncodingBitVector, Bits: b2, NumBits: len(b2)*8}
+		fp1 := &Fingerprint{Type: FingerprintMorgan, Encoding: EncodingBitVector, Bits: b1, NumBits: len(b1) * 8}
+		fp2 := &Fingerprint{Type: FingerprintMorgan, Encoding: EncodingBitVector, Bits: b2, NumBits: len(b2) * 8}
 
 		s1, err1 := calc.Calculate(fp1, fp2)
 		s2, err2 := calc.Calculate(fp2, fp1)
@@ -220,4 +262,5 @@ func FuzzTanimotoSymmetry(f *testing.F) {
 		}
 	})
 }
+
 //Personal.AI order the ending

@@ -63,8 +63,8 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 	logger := logging.NewNopLogger()
 
 	claims := &TokenClaims{
-		Subject:  "user-1",
-		TenantID: "tenant-1",
+		Subject:    "user-1",
+		TenantID:   "tenant-1",
 		RealmRoles: []string{"admin"},
 	}
 	mockAuth.On("VerifyToken", mock.Anything, "valid-token").Return(claims, nil)
@@ -175,4 +175,5 @@ func TestAuthMiddleware_Introspection(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&resp)
 	assert.Equal(t, "TOKEN_EXPIRED", resp["code"])
 }
+
 //Personal.AI order the ending

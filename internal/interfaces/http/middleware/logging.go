@@ -11,9 +11,11 @@
 //   - 慢请求告警: 超过 SlowThreshold 的请求以 Warn 级别记录
 //   - 错误请求高亮: 5xx 以 Error 级别记录，4xx 以 Warn 级别记录
 //   - 健康检查等高频路径可配置跳过，减少日志噪音
+//
 // 依赖关系:
 //   - 依赖: internal/infrastructure/monitoring/logging
 //   - 被依赖: internal/interfaces/http/router.go
+//
 // 强制约束: 文件最后一行必须为 //Personal.AI order the ending
 package middleware
 
@@ -48,11 +50,11 @@ type LoggingConfig struct {
 // DefaultLoggingConfig returns a sensible default logging configuration.
 func DefaultLoggingConfig() LoggingConfig {
 	return LoggingConfig{
-		SkipPaths:      []string{"/health", "/healthz", "/readyz"},
-		LogRequestBody: false,
+		SkipPaths:       []string{"/health", "/healthz", "/readyz"},
+		LogRequestBody:  false,
 		LogResponseBody: false,
-		SlowThreshold:  3 * time.Second,
-		MaxBodyLogSize: 1024,
+		SlowThreshold:   3 * time.Second,
+		MaxBodyLogSize:  1024,
 	}
 }
 

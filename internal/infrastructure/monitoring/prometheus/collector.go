@@ -73,12 +73,12 @@ type Summary interface {
 
 // CollectorConfig configuration for metrics collector.
 type CollectorConfig struct {
-	Namespace             string            `json:"namespace"`
-	Subsystem             string            `json:"subsystem"`
-	EnableProcessMetrics  bool              `json:"enable_process_metrics"`
-	EnableGoMetrics       bool              `json:"enable_go_metrics"`
+	Namespace               string            `json:"namespace"`
+	Subsystem               string            `json:"subsystem"`
+	EnableProcessMetrics    bool              `json:"enable_process_metrics"`
+	EnableGoMetrics         bool              `json:"enable_go_metrics"`
 	DefaultHistogramBuckets []float64         `json:"default_histogram_buckets"`
-	ConstLabels           map[string]string `json:"const_labels"`
+	ConstLabels             map[string]string `json:"const_labels"`
 }
 
 type prometheusCollector struct {

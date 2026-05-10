@@ -29,15 +29,15 @@ import (
 
 type tenantMockLogger struct{}
 
-func (l *tenantMockLogger) Debug(msg string, fields ...logging.Field) {}
-func (l *tenantMockLogger) Info(msg string, fields ...logging.Field)  {}
-func (l *tenantMockLogger) Warn(msg string, fields ...logging.Field)  {}
-func (l *tenantMockLogger) Error(msg string, fields ...logging.Field) {}
-func (l *tenantMockLogger) Fatal(msg string, fields ...logging.Field) {}
-func (l *tenantMockLogger) With(fields ...logging.Field) logging.Logger { return l }
+func (l *tenantMockLogger) Debug(msg string, fields ...logging.Field)      {}
+func (l *tenantMockLogger) Info(msg string, fields ...logging.Field)       {}
+func (l *tenantMockLogger) Warn(msg string, fields ...logging.Field)       {}
+func (l *tenantMockLogger) Error(msg string, fields ...logging.Field)      {}
+func (l *tenantMockLogger) Fatal(msg string, fields ...logging.Field)      {}
+func (l *tenantMockLogger) With(fields ...logging.Field) logging.Logger    { return l }
 func (l *tenantMockLogger) WithContext(ctx context.Context) logging.Logger { return l }
-func (l *tenantMockLogger) WithError(err error) logging.Logger { return l }
-func (l *tenantMockLogger) Sync() error { return nil }
+func (l *tenantMockLogger) WithError(err error) logging.Logger             { return l }
+func (l *tenantMockLogger) Sync() error                                    { return nil }
 
 func newTenantMockLogger() *tenantMockLogger {
 	return &tenantMockLogger{}
@@ -370,37 +370,37 @@ func TestValidateTenantID_ValidCases(t *testing.T) {
 
 func TestValidateTenantID_InvalidCases(t *testing.T) {
 	invalidIDs := []string{
-		"",                        // empty
-		strings.Repeat("a", 65),   // too long
-		"tenant id",               // space
-		"tenant@org",              // @
-		"tenant.org",              // dot
-		"tenant/path",             // slash
-		"tenant\\back",            // backslash
-		"tenant:colon",            // colon
-		"tenant;semi",             // semicolon
-		"<script>alert</script>",  // HTML injection
-		"tenant\ttab",             // tab
-		"tenant\nnewline",         // newline
-		"日本語テナント",              // unicode
-		"tenant=value",            // equals
-		"tenant&other",            // ampersand
-		"tenant#hash",             // hash
-		"tenant%20encoded",        // percent
-		"tenant+plus",             // plus
-		"tenant!bang",             // exclamation
-		"tenant$dollar",           // dollar
-		"tenant(paren)",           // parentheses
-		"tenant{brace}",           // braces
-		"tenant[bracket]",         // brackets
-		"tenant|pipe",             // pipe
-		"tenant~tilde",            // tilde
-		"tenant`backtick",         // backtick
-		"tenant'quote",            // single quote
-		"tenant\"dquote",          // double quote
-		"tenant,comma",            // comma
-		"tenant?question",         // question mark
-		"tenant*star",             // asterisk
+		"",                       // empty
+		strings.Repeat("a", 65),  // too long
+		"tenant id",              // space
+		"tenant@org",             // @
+		"tenant.org",             // dot
+		"tenant/path",            // slash
+		"tenant\\back",           // backslash
+		"tenant:colon",           // colon
+		"tenant;semi",            // semicolon
+		"<script>alert</script>", // HTML injection
+		"tenant\ttab",            // tab
+		"tenant\nnewline",        // newline
+		"日本語テナント",                // unicode
+		"tenant=value",           // equals
+		"tenant&other",           // ampersand
+		"tenant#hash",            // hash
+		"tenant%20encoded",       // percent
+		"tenant+plus",            // plus
+		"tenant!bang",            // exclamation
+		"tenant$dollar",          // dollar
+		"tenant(paren)",          // parentheses
+		"tenant{brace}",          // braces
+		"tenant[bracket]",        // brackets
+		"tenant|pipe",            // pipe
+		"tenant~tilde",           // tilde
+		"tenant`backtick",        // backtick
+		"tenant'quote",           // single quote
+		"tenant\"dquote",         // double quote
+		"tenant,comma",           // comma
+		"tenant?question",        // question mark
+		"tenant*star",            // asterisk
 	}
 
 	for _, id := range invalidIDs {

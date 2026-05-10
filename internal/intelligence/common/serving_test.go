@@ -219,14 +219,16 @@ type servingMockMetrics struct {
 	inferenceCount atomic.Int32
 }
 
-func (m *servingMockMetrics) RecordInference(_ context.Context, _ *InferenceMetricParams)       { m.inferenceCount.Add(1) }
-func (m *servingMockMetrics) RecordBatchProcessing(_ context.Context, _ *BatchMetricParams)      {}
-func (m *servingMockMetrics) RecordCacheAccess(_ context.Context, _ bool, _ string)              {}
-func (m *servingMockMetrics) RecordCircuitBreakerStateChange(_ context.Context, _, _, _ string)   {}
-func (m *servingMockMetrics) RecordRiskAssessment(_ context.Context, _ string, _ float64)         {}
-func (m *servingMockMetrics) RecordModelLoad(_ context.Context, _, _ string, _ float64, _ bool)   {}
-func (m *servingMockMetrics) GetInferenceLatencyHistogram() LatencyHistogram                      { return nil }
-func (m *servingMockMetrics) GetCurrentStats() *IntelligenceStats                                 { return &IntelligenceStats{} }
+func (m *servingMockMetrics) RecordInference(_ context.Context, _ *InferenceMetricParams) {
+	m.inferenceCount.Add(1)
+}
+func (m *servingMockMetrics) RecordBatchProcessing(_ context.Context, _ *BatchMetricParams)     {}
+func (m *servingMockMetrics) RecordCacheAccess(_ context.Context, _ bool, _ string)             {}
+func (m *servingMockMetrics) RecordCircuitBreakerStateChange(_ context.Context, _, _, _ string) {}
+func (m *servingMockMetrics) RecordRiskAssessment(_ context.Context, _ string, _ float64)       {}
+func (m *servingMockMetrics) RecordModelLoad(_ context.Context, _, _ string, _ float64, _ bool) {}
+func (m *servingMockMetrics) GetInferenceLatencyHistogram() LatencyHistogram                    { return nil }
+func (m *servingMockMetrics) GetCurrentStats() *IntelligenceStats                               { return &IntelligenceStats{} }
 
 type servingMockLogger struct {
 	mu      sync.Mutex
@@ -2659,4 +2661,3 @@ var (
 	_ = io.EOF
 	_ = math.MaxFloat64
 )
-

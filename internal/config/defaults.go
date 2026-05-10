@@ -6,69 +6,69 @@ import (
 
 // Default configuration values.
 const (
-	DefaultHTTPHost               = "0.0.0.0"
-	DefaultHTTPPort               = 8080
-	DefaultHTTPReadTimeout        = 30 * time.Second
-	DefaultHTTPWriteTimeout       = 30 * time.Second
-	DefaultHTTPMaxHeaderBytes     = 1 << 20 // 1MB
-	DefaultGRPCPort               = 9090
-	DefaultGRPCMaxRecvMsgSize     = 50 << 20 // 50MB
-	DefaultGRPCMaxSendMsgSize     = 50 << 20 // 50MB
-	DefaultPostgresPort           = 5432
-	DefaultPostgresSSLMode        = "disable"
-	DefaultPostgresMaxOpenConns   = 25
-	DefaultPostgresMaxIdleConns   = 10
-	DefaultPostgresConnMaxLifetime = 5 * time.Minute
-	DefaultNeo4jMaxPoolSize       = 50
-	DefaultNeo4jAcquisitionTimeout = 60 * time.Second
-	DefaultRedisDB                = 0
-	DefaultRedisPoolSize          = 10
-	DefaultRedisMinIdleConns      = 5
-	DefaultRedisDialTimeout       = 5 * time.Second
-	DefaultRedisReadTimeout       = 3 * time.Second
-	DefaultRedisWriteTimeout      = 3 * time.Second
-	DefaultOpenSearchMaxRetries   = 3
-	DefaultMilvusPort             = 19530
-	DefaultKafkaAutoOffsetReset   = "earliest"
-	DefaultKafkaMaxBytes          = 10 << 20 // 10MB
-	DefaultKafkaSessionTimeout    = 30 * time.Second
-	DefaultMinIOUseSSL            = false
-	DefaultMinIOPartSize          = 64 << 20 // 64MB
-	DefaultJWTExpiry              = 24 * time.Hour
-	DefaultJWTRefreshExpiry       = 7 * 24 * time.Hour
-	DefaultJWTSigningMethod       = "HS256"
-	DefaultMolPatentGNNBatchSize  = 32
-	DefaultMolPatentGNNTimeout    = 30 * time.Second
-	DefaultMolPatentGNNDevice     = "cpu"
-	DefaultClaimBERTMaxSeqLength  = 512
-	DefaultClaimBERTTimeout       = 30 * time.Second
-	DefaultStrategyGPTMaxTokens   = 4096
-	DefaultStrategyGPTTemperature = 0.7
-	DefaultStrategyGPTTopP        = 0.9
-	DefaultStrategyGPTTimeout     = 120 * time.Second
-	DefaultStrategyGPTRetryCount  = 3
-	DefaultStrategyGPTRetryDelay  = 2 * time.Second
-	DefaultChemExtractorTimeout   = 60 * time.Second
-	DefaultInfringeNetThreshold   = 0.85
-	DefaultInfringeNetBatchSize   = 16
-	DefaultInfringeNetTimeout     = 30 * time.Second
+	DefaultHTTPHost                    = "0.0.0.0"
+	DefaultHTTPPort                    = 8080
+	DefaultHTTPReadTimeout             = 30 * time.Second
+	DefaultHTTPWriteTimeout            = 30 * time.Second
+	DefaultHTTPMaxHeaderBytes          = 1 << 20 // 1MB
+	DefaultGRPCPort                    = 9090
+	DefaultGRPCMaxRecvMsgSize          = 50 << 20 // 50MB
+	DefaultGRPCMaxSendMsgSize          = 50 << 20 // 50MB
+	DefaultPostgresPort                = 5432
+	DefaultPostgresSSLMode             = "disable"
+	DefaultPostgresMaxOpenConns        = 25
+	DefaultPostgresMaxIdleConns        = 10
+	DefaultPostgresConnMaxLifetime     = 5 * time.Minute
+	DefaultNeo4jMaxPoolSize            = 50
+	DefaultNeo4jAcquisitionTimeout     = 60 * time.Second
+	DefaultRedisDB                     = 0
+	DefaultRedisPoolSize               = 10
+	DefaultRedisMinIdleConns           = 5
+	DefaultRedisDialTimeout            = 5 * time.Second
+	DefaultRedisReadTimeout            = 3 * time.Second
+	DefaultRedisWriteTimeout           = 3 * time.Second
+	DefaultOpenSearchMaxRetries        = 3
+	DefaultMilvusPort                  = 19530
+	DefaultKafkaAutoOffsetReset        = "earliest"
+	DefaultKafkaMaxBytes               = 10 << 20 // 10MB
+	DefaultKafkaSessionTimeout         = 30 * time.Second
+	DefaultMinIOUseSSL                 = false
+	DefaultMinIOPartSize               = 64 << 20 // 64MB
+	DefaultJWTExpiry                   = 24 * time.Hour
+	DefaultJWTRefreshExpiry            = 7 * 24 * time.Hour
+	DefaultJWTSigningMethod            = "HS256"
+	DefaultMolPatentGNNBatchSize       = 32
+	DefaultMolPatentGNNTimeout         = 30 * time.Second
+	DefaultMolPatentGNNDevice          = "cpu"
+	DefaultClaimBERTMaxSeqLength       = 512
+	DefaultClaimBERTTimeout            = 30 * time.Second
+	DefaultStrategyGPTMaxTokens        = 4096
+	DefaultStrategyGPTTemperature      = 0.7
+	DefaultStrategyGPTTopP             = 0.9
+	DefaultStrategyGPTTimeout          = 120 * time.Second
+	DefaultStrategyGPTRetryCount       = 3
+	DefaultStrategyGPTRetryDelay       = 2 * time.Second
+	DefaultChemExtractorTimeout        = 60 * time.Second
+	DefaultInfringeNetThreshold        = 0.85
+	DefaultInfringeNetBatchSize        = 16
+	DefaultInfringeNetTimeout          = 30 * time.Second
 	DefaultInfringeNetSimilarityMetric = "cosine"
-	DefaultPrometheusEnabled      = true
-	DefaultPrometheusPort         = 9091
-	DefaultPrometheusPath         = "/metrics"
-	DefaultPrometheusNamespace    = "keyip"
-	DefaultLogLevel               = "info"
-	DefaultLogFormat              = "json"
-	DefaultLogOutput              = "stdout"
-	DefaultLogMaxSize             = 100 // MB
-	DefaultLogMaxBackups          = 3
-	DefaultLogMaxAge              = 28 // days
-	DefaultLogCompress            = true
-	DefaultTracingSampleRate      = 0.1
-	DefaultTracingServiceName     = "keyip-intelligence"
-	DefaultEmailSMTPPort          = 587
-	DefaultEmailUseTLS            = true
-	DefaultEmailTimeout           = 10 * time.Second
+	DefaultPrometheusEnabled           = true
+	DefaultPrometheusPort              = 9091
+	DefaultPrometheusPath              = "/metrics"
+	DefaultPrometheusNamespace         = "keyip"
+	DefaultLogLevel                    = "info"
+	DefaultLogFormat                   = "json"
+	DefaultLogOutput                   = "stdout"
+	DefaultLogMaxSize                  = 100 // MB
+	DefaultLogMaxBackups               = 3
+	DefaultLogMaxAge                   = 28 // days
+	DefaultLogCompress                 = true
+	DefaultTracingSampleRate           = 0.1
+	DefaultTracingServiceName          = "keyip-intelligence"
+	DefaultEmailSMTPPort               = 587
+	DefaultEmailUseTLS                 = true
+	DefaultEmailTimeout                = 10 * time.Second
 )
 
 // ApplyDefaults fills in default values for empty configuration fields.
@@ -285,11 +285,11 @@ func ApplyDefaults(cfg *Config) *Config {
 	// I'll set it to true if it is false. This means user cannot disable compression via config unless we change logic.
 	// Ideally we use Viper's default mechanism, but `ApplyDefaults` is manual.
 	// I will skip setting `Compress` default here to avoid breaking explicit `false`.
-    // Wait, the requirement says "ApplyDefaults... default value ... DefaultLogCompress = true".
-    // I will assume the intention is to set it.
-    if !cfg.Monitoring.Logging.Compress {
-        cfg.Monitoring.Logging.Compress = DefaultLogCompress
-    }
+	// Wait, the requirement says "ApplyDefaults... default value ... DefaultLogCompress = true".
+	// I will assume the intention is to set it.
+	if !cfg.Monitoring.Logging.Compress {
+		cfg.Monitoring.Logging.Compress = DefaultLogCompress
+	}
 
 	if cfg.Monitoring.Tracing.SampleRate == 0 {
 		cfg.Monitoring.Tracing.SampleRate = DefaultTracingSampleRate

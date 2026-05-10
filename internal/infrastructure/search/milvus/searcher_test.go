@@ -31,11 +31,11 @@ func newTestSearcher(mock client.Client) *Searcher {
 type mockSearchClient struct {
 	mockCollectionClient // Embed previous mock capabilities
 
-	insertFunc func(ctx context.Context, collName, partitionName string, columns ...entity.Column) (entity.Column, error)
-	upsertFunc func(ctx context.Context, collName, partitionName string, columns ...entity.Column) (entity.Column, error)
-	searchFunc func(ctx context.Context, collName string, partitions []string, expr string, outputFields []string, vectors []entity.Vector, vectorField string, metricType entity.MetricType, topK int, sp entity.SearchParam, opts ...client.SearchQueryOptionFunc) ([]client.SearchResult, error)
+	insertFunc     func(ctx context.Context, collName, partitionName string, columns ...entity.Column) (entity.Column, error)
+	upsertFunc     func(ctx context.Context, collName, partitionName string, columns ...entity.Column) (entity.Column, error)
+	searchFunc     func(ctx context.Context, collName string, partitions []string, expr string, outputFields []string, vectors []entity.Vector, vectorField string, metricType entity.MetricType, topK int, sp entity.SearchParam, opts ...client.SearchQueryOptionFunc) ([]client.SearchResult, error)
 	queryByPksFunc func(ctx context.Context, collName string, partitions []string, ids entity.Column, outputFields []string, opts ...client.SearchQueryOptionFunc) (client.ResultSet, error)
-	deleteFunc func(ctx context.Context, collName, partitionName string, expr string) error
+	deleteFunc     func(ctx context.Context, collName, partitionName string, expr string) error
 }
 
 func (m *mockSearchClient) Insert(ctx context.Context, collName, partitionName string, columns ...entity.Column) (entity.Column, error) {
@@ -127,7 +127,7 @@ func TestSearch_Success(t *testing.T) {
 	}
 	res, err := s.Search(context.Background(), req)
 	assert.NoError(t, err)
-	assert.Len(t, res.Results, 1) // 1 query
+	assert.Len(t, res.Results, 1)    // 1 query
 	assert.Len(t, res.Results[0], 1) // 1 hit
 	assert.Equal(t, int64(1), res.Results[0][0].ID)
 }

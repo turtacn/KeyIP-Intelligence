@@ -76,9 +76,9 @@ type ReadinessResponse struct {
 
 // ComponentCheck represents the health status of a single component.
 type ComponentCheck struct {
-	Status   string `json:"status"`
-	Latency  string `json:"latency,omitempty"`
-	Error    string `json:"error,omitempty"`
+	Status  string `json:"status"`
+	Latency string `json:"latency,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 // Liveness handles GET /healthz - Kubernetes liveness probe.

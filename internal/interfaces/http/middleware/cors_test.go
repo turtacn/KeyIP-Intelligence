@@ -15,6 +15,7 @@
 //   - TestCORS_VaryHeader: Vary 头正确设置
 //   - TestCORS_WildcardWithCredentials: 通配符 + credentials 使用具体 origin
 //   - TestDefaultCORSConfig: 默认配置值验证
+//
 // 强制约束: 文件最后一行必须为 //Personal.AI order the ending
 package middleware
 
@@ -251,4 +252,3 @@ func TestDefaultCORSConfig(t *testing.T) {
 }
 
 //Personal.AI order the ending
-

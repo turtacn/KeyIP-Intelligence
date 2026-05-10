@@ -28,17 +28,17 @@ const (
 
 // WorkspaceSettings defines the settings of a workspace.
 type WorkspaceSettings struct {
-	DefaultCurrency          string   `json:"default_currency"`
-	DefaultJurisdiction      string   `json:"default_jurisdiction"`
-	AnnuityReminderDays      []int    `json:"annuity_reminder_days"`
-	DeadlineReminderDays     []int    `json:"deadline_reminder_days"`
-	EnableEmailNotifications bool     `json:"enable_email_notifications"`
-	EnableInAppNotifications bool     `json:"enable_in_app_notifications"`
-	MaxPortfolios            int      `json:"max_portfolios"`
-	MaxMembers               int      `json:"max_members"`
-	AIFeaturesEnabled        bool     `json:"ai_features_enabled"`
-	Language                 string   `json:"language"`
-	Timezone                 string   `json:"timezone"`
+	DefaultCurrency          string `json:"default_currency"`
+	DefaultJurisdiction      string `json:"default_jurisdiction"`
+	AnnuityReminderDays      []int  `json:"annuity_reminder_days"`
+	DeadlineReminderDays     []int  `json:"deadline_reminder_days"`
+	EnableEmailNotifications bool   `json:"enable_email_notifications"`
+	EnableInAppNotifications bool   `json:"enable_in_app_notifications"`
+	MaxPortfolios            int    `json:"max_portfolios"`
+	MaxMembers               int    `json:"max_members"`
+	AIFeaturesEnabled        bool   `json:"ai_features_enabled"`
+	Language                 string `json:"language"`
+	Timezone                 string `json:"timezone"`
 }
 
 // Workspace is the aggregate root for a collaboration unit.

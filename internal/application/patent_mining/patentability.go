@@ -34,9 +34,9 @@ import (
 type PatentabilityDimension string
 
 const (
-	DimensionNovelty     PatentabilityDimension = "novelty"
-	DimensionInventive   PatentabilityDimension = "inventive_step"
-	DimensionUtility     PatentabilityDimension = "utility"
+	DimensionNovelty   PatentabilityDimension = "novelty"
+	DimensionInventive PatentabilityDimension = "inventive_step"
+	DimensionUtility   PatentabilityDimension = "utility"
 )
 
 // PatentabilityGrade represents the overall patentability grade.
@@ -53,8 +53,8 @@ const (
 // DimensionScore holds the score and reasoning for a single dimension.
 type DimensionScore struct {
 	Dimension  PatentabilityDimension `json:"dimension"`
-	Score      float64                `json:"score"`       // 0.0 - 1.0
-	Confidence float64                `json:"confidence"`  // 0.0 - 1.0
+	Score      float64                `json:"score"`      // 0.0 - 1.0
+	Confidence float64                `json:"confidence"` // 0.0 - 1.0
 	Reasoning  string                 `json:"reasoning"`
 	PriorArts  []PriorArtReference    `json:"prior_arts,omitempty"`
 }
@@ -70,37 +70,37 @@ type PriorArtReference struct {
 
 // PatentabilityAssessment is the full assessment result.
 type PatentabilityAssessment struct {
-	ID              string             `json:"id"`
-	SubjectType     string             `json:"subject_type"` // "molecule", "technical_solution"
-	SubjectID       string             `json:"subject_id"`
-	SubjectDesc     string             `json:"subject_description"`
-	Dimensions      []DimensionScore   `json:"dimensions"`
-	OverallScore    float64            `json:"overall_score"`
-	Grade           PatentabilityGrade `json:"grade"`
-	Recommendation  string             `json:"recommendation"`
-	Jurisdiction    string             `json:"jurisdiction"`
-	AssessedAt      time.Time          `json:"assessed_at"`
-	ProcessingTimeMs int64             `json:"processing_time_ms"`
+	ID               string             `json:"id"`
+	SubjectType      string             `json:"subject_type"` // "molecule", "technical_solution"
+	SubjectID        string             `json:"subject_id"`
+	SubjectDesc      string             `json:"subject_description"`
+	Dimensions       []DimensionScore   `json:"dimensions"`
+	OverallScore     float64            `json:"overall_score"`
+	Grade            PatentabilityGrade `json:"grade"`
+	Recommendation   string             `json:"recommendation"`
+	Jurisdiction     string             `json:"jurisdiction"`
+	AssessedAt       time.Time          `json:"assessed_at"`
+	ProcessingTimeMs int64              `json:"processing_time_ms"`
 }
 
 // AssessMoleculeRequest is the request for molecule patentability assessment.
 type AssessMoleculeRequest struct {
-	MoleculeID    string            `json:"molecule_id"`
-	SMILES        string            `json:"smiles,omitempty"`
-	InChIKey      string            `json:"inchi_key,omitempty"`
-	ClaimedUse    string            `json:"claimed_use"`
-	Jurisdiction  string            `json:"jurisdiction"`
-	Options       AssessmentOptions `json:"options"`
+	MoleculeID   string            `json:"molecule_id"`
+	SMILES       string            `json:"smiles,omitempty"`
+	InChIKey     string            `json:"inchi_key,omitempty"`
+	ClaimedUse   string            `json:"claimed_use"`
+	Jurisdiction string            `json:"jurisdiction"`
+	Options      AssessmentOptions `json:"options"`
 }
 
 // AssessTechnicalSolutionRequest is the request for technical solution assessment.
 type AssessTechnicalSolutionRequest struct {
-	Title         string            `json:"title"`
-	Description   string            `json:"description"`
-	Claims        []string          `json:"claims"`
-	TechField     string            `json:"tech_field"`
-	Jurisdiction  string            `json:"jurisdiction"`
-	Options       AssessmentOptions `json:"options"`
+	Title        string            `json:"title"`
+	Description  string            `json:"description"`
+	Claims       []string          `json:"claims"`
+	TechField    string            `json:"tech_field"`
+	Jurisdiction string            `json:"jurisdiction"`
+	Options      AssessmentOptions `json:"options"`
 }
 
 // AssessmentOptions configures the assessment behavior.

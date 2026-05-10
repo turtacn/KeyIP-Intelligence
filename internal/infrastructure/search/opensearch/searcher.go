@@ -16,13 +16,13 @@ import (
 
 // SearcherConfig holds configuration for the Searcher.
 type SearcherConfig struct {
-	DefaultPageSize        int
-	MaxPageSize            int
-	DefaultHighlightPreTag string
+	DefaultPageSize         int
+	MaxPageSize             int
+	DefaultHighlightPreTag  string
 	DefaultHighlightPostTag string
-	SearchTimeout          time.Duration
-	ScrollKeepAlive        time.Duration
-	MaxScrollSize          int
+	SearchTimeout           time.Duration
+	ScrollKeepAlive         time.Duration
+	MaxScrollSize           int
 }
 
 // Searcher performs search operations.
@@ -465,10 +465,10 @@ func (s *Searcher) buildQueryDSL(req common.SearchRequest) (map[string]interface
 			fields[f] = map[string]interface{}{}
 		}
 		dsl["highlight"] = map[string]interface{}{
-			"fields":        fields,
-			"pre_tags":      []string{req.Highlight.PreTag},
-			"post_tags":     []string{req.Highlight.PostTag},
-			"fragment_size": req.Highlight.FragmentSize,
+			"fields":              fields,
+			"pre_tags":            []string{req.Highlight.PreTag},
+			"post_tags":           []string{req.Highlight.PostTag},
+			"fragment_size":       req.Highlight.FragmentSize,
 			"number_of_fragments": req.Highlight.NumberOfFragments,
 		}
 	}
@@ -616,8 +616,8 @@ func (s *Searcher) buildAggregations(aggs map[string]common.Aggregation) map[str
 			}
 		case "date_histogram":
 			aggDSL["date_histogram"] = map[string]interface{}{
-				"field":    agg.Field,
-				"interval": agg.Interval,
+				"field":             agg.Field,
+				"interval":          agg.Interval,
 				"calendar_interval": agg.Interval,
 			}
 		case "range":
@@ -659,11 +659,11 @@ func (s *Searcher) parseSearchResponse(body io.Reader) (*common.SearchResult, er
 			} `json:"total"`
 			MaxScore float64 `json:"max_score"`
 			Hits     []struct {
-				ID        string                 `json:"_id"`
-				Score     float64                `json:"_score"`
-				Source    json.RawMessage        `json:"_source"`
-				Highlight map[string][]string    `json:"highlight"`
-				Sort      []interface{}          `json:"sort"`
+				ID        string              `json:"_id"`
+				Score     float64             `json:"_score"`
+				Source    json.RawMessage     `json:"_source"`
+				Highlight map[string][]string `json:"highlight"`
+				Sort      []interface{}       `json:"sort"`
 			} `json:"hits"`
 		} `json:"hits"`
 		Aggregations map[string]json.RawMessage `json:"aggregations"`
@@ -708,8 +708,12 @@ func (s *Searcher) parseHits(hitsList []interface{}) ([]common.SearchHit, error)
 		}
 
 		h := common.SearchHit{}
-		if id, ok := m["_id"].(string); ok { h.ID = id }
-		if score, ok := m["_score"].(float64); ok { h.Score = score }
+		if id, ok := m["_id"].(string); ok {
+			h.ID = id
+		}
+		if score, ok := m["_score"].(float64); ok {
+			h.Score = score
+		}
 		if src, ok := m["_source"]; ok {
 			b, _ := json.Marshal(src)
 			h.Source = b
@@ -748,7 +752,9 @@ func (s *Searcher) parseAggregationResult(raw json.RawMessage) common.Aggregatio
 	if buckets, ok := asMap["buckets"].([]interface{}); ok {
 		for _, b := range buckets {
 			bMap, ok := b.(map[string]interface{})
-			if !ok { continue }
+			if !ok {
+				continue
+			}
 
 			bucket := common.AggBucket{}
 			if key, ok := bMap["key"]; ok {
@@ -765,7 +771,9 @@ func (s *Searcher) parseAggregationResult(raw json.RawMessage) common.Aggregatio
 
 			bucket.SubAggregations = make(map[string]common.AggregationResult)
 			for k, v := range bMap {
-				if k == "key" || k == "doc_count" || k == "key_as_string" { continue }
+				if k == "key" || k == "doc_count" || k == "key_as_string" {
+					continue
+				}
 
 				if subRaw, err := json.Marshal(v); err == nil {
 					// Check if it looks like an agg result

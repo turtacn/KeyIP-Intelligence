@@ -13,7 +13,6 @@ import (
 // Domain Types (Interfaces & Structs)
 // ---------------------------------------------------------------------------
 
-
 // ---------------------------------------------------------------------------
 // Similarity classification thresholds (configurable via PostprocessorConfig)
 // ---------------------------------------------------------------------------
@@ -341,4 +340,3 @@ func dotProduct(a, b []float32) float64 {
 	}
 	return sum
 }
-

@@ -27,8 +27,8 @@ import (
 
 // MockExtractor
 type MockExtractor struct {
-	ExtractFunc  func(ctx context.Context, text string) (*chemextractor.ExtractionResult, error)
-	ResolveFunc  func(ctx context.Context, entity *chemextractor.RawChemicalEntity) (*chemextractor.ResolvedChemicalEntity, error)
+	ExtractFunc func(ctx context.Context, text string) (*chemextractor.ExtractionResult, error)
+	ResolveFunc func(ctx context.Context, entity *chemextractor.RawChemicalEntity) (*chemextractor.ResolvedChemicalEntity, error)
 }
 
 func (m *MockExtractor) Extract(ctx context.Context, text string) (*chemextractor.ExtractionResult, error) {
@@ -45,9 +45,15 @@ func (m *MockExtractor) Resolve(ctx context.Context, entity *chemextractor.RawCh
 	return &chemextractor.ResolvedChemicalEntity{}, nil
 }
 
-func (m *MockExtractor) ExtractBatch(ctx context.Context, texts []string) ([]*chemextractor.ExtractionResult, error) { return nil, nil }
-func (m *MockExtractor) ExtractFromClaim(ctx context.Context, claim *chemextractor.ParsedClaim) (*chemextractor.ClaimExtractionResult, error) { return nil, nil }
-func (m *MockExtractor) LinkToMolecule(ctx context.Context, entity *chemextractor.ResolvedChemicalEntity) (*chemextractor.MoleculeLink, error) { return nil, nil }
+func (m *MockExtractor) ExtractBatch(ctx context.Context, texts []string) ([]*chemextractor.ExtractionResult, error) {
+	return nil, nil
+}
+func (m *MockExtractor) ExtractFromClaim(ctx context.Context, claim *chemextractor.ParsedClaim) (*chemextractor.ClaimExtractionResult, error) {
+	return nil, nil
+}
+func (m *MockExtractor) LinkToMolecule(ctx context.Context, entity *chemextractor.ResolvedChemicalEntity) (*chemextractor.MoleculeLink, error) {
+	return nil, nil
+}
 
 // MockMoleculeService
 type MockMoleculeService struct {
@@ -61,20 +67,44 @@ func (m *MockMoleculeService) CreateFromSMILES(ctx context.Context, smiles strin
 	return &molecule.Molecule{ID: googleUUID("1")}, nil
 }
 
-func (m *MockMoleculeService) RegisterMolecule(ctx context.Context, smiles string, source molecule.MoleculeSource, sourceRef string) (*molecule.Molecule, error) { return nil, nil }
-func (m *MockMoleculeService) BatchRegisterMolecules(ctx context.Context, requests []molecule.MoleculeRegistrationRequest) (*molecule.BatchRegistrationResult, error) { return nil, nil }
-func (m *MockMoleculeService) GetMolecule(ctx context.Context, id string) (*molecule.Molecule, error) { return nil, nil }
-func (m *MockMoleculeService) GetMoleculeByInChIKey(ctx context.Context, inchiKey string) (*molecule.Molecule, error) { return nil, nil }
-func (m *MockMoleculeService) SearchMolecules(ctx context.Context, query *molecule.MoleculeQuery) (*molecule.MoleculeSearchResult, error) { return nil, nil }
-func (m *MockMoleculeService) CalculateFingerprints(ctx context.Context, moleculeID string, fpTypes []molecule.FingerprintType) error { return nil }
-func (m *MockMoleculeService) FindSimilarMolecules(ctx context.Context, targetSMILES string, fpType molecule.FingerprintType, threshold float64, limit int) ([]*molecule.SimilarityResult, error) { return nil, nil }
-func (m *MockMoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2 string, fpTypes []molecule.FingerprintType) (*molecule.MoleculeComparisonResult, error) { return nil, nil }
+func (m *MockMoleculeService) RegisterMolecule(ctx context.Context, smiles string, source molecule.MoleculeSource, sourceRef string) (*molecule.Molecule, error) {
+	return nil, nil
+}
+func (m *MockMoleculeService) BatchRegisterMolecules(ctx context.Context, requests []molecule.MoleculeRegistrationRequest) (*molecule.BatchRegistrationResult, error) {
+	return nil, nil
+}
+func (m *MockMoleculeService) GetMolecule(ctx context.Context, id string) (*molecule.Molecule, error) {
+	return nil, nil
+}
+func (m *MockMoleculeService) GetMoleculeByInChIKey(ctx context.Context, inchiKey string) (*molecule.Molecule, error) {
+	return nil, nil
+}
+func (m *MockMoleculeService) SearchMolecules(ctx context.Context, query *molecule.MoleculeQuery) (*molecule.MoleculeSearchResult, error) {
+	return nil, nil
+}
+func (m *MockMoleculeService) CalculateFingerprints(ctx context.Context, moleculeID string, fpTypes []molecule.FingerprintType) error {
+	return nil
+}
+func (m *MockMoleculeService) FindSimilarMolecules(ctx context.Context, targetSMILES string, fpType molecule.FingerprintType, threshold float64, limit int) ([]*molecule.SimilarityResult, error) {
+	return nil, nil
+}
+func (m *MockMoleculeService) CompareMolecules(ctx context.Context, smiles1, smiles2 string, fpTypes []molecule.FingerprintType) (*molecule.MoleculeComparisonResult, error) {
+	return nil, nil
+}
 func (m *MockMoleculeService) ArchiveMolecule(ctx context.Context, id string) error { return nil }
-func (m *MockMoleculeService) DeleteMolecule(ctx context.Context, id string) error { return nil }
-func (m *MockMoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID string, properties []*molecule.MolecularProperty) error { return nil }
-func (m *MockMoleculeService) TagMolecule(ctx context.Context, moleculeID string, tags []string) error { return nil }
-func (m *MockMoleculeService) Canonicalize(ctx context.Context, smiles string) (string, string, error) { return "", "", nil }
-func (m *MockMoleculeService) CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error) { return "", "", nil }
+func (m *MockMoleculeService) DeleteMolecule(ctx context.Context, id string) error  { return nil }
+func (m *MockMoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID string, properties []*molecule.MolecularProperty) error {
+	return nil
+}
+func (m *MockMoleculeService) TagMolecule(ctx context.Context, moleculeID string, tags []string) error {
+	return nil
+}
+func (m *MockMoleculeService) Canonicalize(ctx context.Context, smiles string) (string, string, error) {
+	return "", "", nil
+}
+func (m *MockMoleculeService) CanonicalizeFromInChI(ctx context.Context, inchi string) (string, string, error) {
+	return "", "", nil
+}
 
 // MockMoleculeRepo
 type MockMoleculeRepo struct {
@@ -88,23 +118,49 @@ func (m *MockMoleculeRepo) FindByInChIKey(ctx context.Context, inchiKey string) 
 	return nil, apperrors.New(apperrors.ErrCodeNotFound, "not found")
 }
 
-func (m *MockMoleculeRepo) Save(ctx context.Context, molecule *molecule.Molecule) error { return nil }
+func (m *MockMoleculeRepo) Save(ctx context.Context, molecule *molecule.Molecule) error   { return nil }
 func (m *MockMoleculeRepo) Update(ctx context.Context, molecule *molecule.Molecule) error { return nil }
-func (m *MockMoleculeRepo) Delete(ctx context.Context, id string) error { return nil }
-func (m *MockMoleculeRepo) BatchSave(ctx context.Context, molecules []*molecule.Molecule) (int, error) { return 0, nil }
-func (m *MockMoleculeRepo) FindByID(ctx context.Context, id string) (*molecule.Molecule, error) { return nil, nil }
-func (m *MockMoleculeRepo) FindBySMILES(ctx context.Context, smiles string) ([]*molecule.Molecule, error) { return nil, nil }
-func (m *MockMoleculeRepo) FindByIDs(ctx context.Context, ids []string) ([]*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeRepo) Delete(ctx context.Context, id string) error                   { return nil }
+func (m *MockMoleculeRepo) BatchSave(ctx context.Context, molecules []*molecule.Molecule) (int, error) {
+	return 0, nil
+}
+func (m *MockMoleculeRepo) FindByID(ctx context.Context, id string) (*molecule.Molecule, error) {
+	return nil, nil
+}
+func (m *MockMoleculeRepo) FindBySMILES(ctx context.Context, smiles string) ([]*molecule.Molecule, error) {
+	return nil, nil
+}
+func (m *MockMoleculeRepo) FindByIDs(ctx context.Context, ids []string) ([]*molecule.Molecule, error) {
+	return nil, nil
+}
 func (m *MockMoleculeRepo) Exists(ctx context.Context, id string) (bool, error) { return false, nil }
-func (m *MockMoleculeRepo) ExistsByInChIKey(ctx context.Context, inchiKey string) (bool, error) { return false, nil }
-func (m *MockMoleculeRepo) Search(ctx context.Context, query *molecule.MoleculeQuery) (*molecule.MoleculeSearchResult, error) { return nil, nil }
-func (m *MockMoleculeRepo) Count(ctx context.Context, query *molecule.MoleculeQuery) (int64, error) { return 0, nil }
-func (m *MockMoleculeRepo) FindBySource(ctx context.Context, source molecule.MoleculeSource, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (m *MockMoleculeRepo) FindByStatus(ctx context.Context, status molecule.MoleculeStatus, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (m *MockMoleculeRepo) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (m *MockMoleculeRepo) FindByMolecularWeightRange(ctx context.Context, minWeight, maxWeight float64, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (m *MockMoleculeRepo) FindWithFingerprint(ctx context.Context, fpType molecule.FingerprintType, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
-func (m *MockMoleculeRepo) FindWithoutFingerprint(ctx context.Context, fpType molecule.FingerprintType, offset, limit int) ([]*molecule.Molecule, error) { return nil, nil }
+func (m *MockMoleculeRepo) ExistsByInChIKey(ctx context.Context, inchiKey string) (bool, error) {
+	return false, nil
+}
+func (m *MockMoleculeRepo) Search(ctx context.Context, query *molecule.MoleculeQuery) (*molecule.MoleculeSearchResult, error) {
+	return nil, nil
+}
+func (m *MockMoleculeRepo) Count(ctx context.Context, query *molecule.MoleculeQuery) (int64, error) {
+	return 0, nil
+}
+func (m *MockMoleculeRepo) FindBySource(ctx context.Context, source molecule.MoleculeSource, offset, limit int) ([]*molecule.Molecule, error) {
+	return nil, nil
+}
+func (m *MockMoleculeRepo) FindByStatus(ctx context.Context, status molecule.MoleculeStatus, offset, limit int) ([]*molecule.Molecule, error) {
+	return nil, nil
+}
+func (m *MockMoleculeRepo) FindByTags(ctx context.Context, tags []string, offset, limit int) ([]*molecule.Molecule, error) {
+	return nil, nil
+}
+func (m *MockMoleculeRepo) FindByMolecularWeightRange(ctx context.Context, minWeight, maxWeight float64, offset, limit int) ([]*molecule.Molecule, error) {
+	return nil, nil
+}
+func (m *MockMoleculeRepo) FindWithFingerprint(ctx context.Context, fpType molecule.FingerprintType, offset, limit int) ([]*molecule.Molecule, error) {
+	return nil, nil
+}
+func (m *MockMoleculeRepo) FindWithoutFingerprint(ctx context.Context, fpType molecule.FingerprintType, offset, limit int) ([]*molecule.Molecule, error) {
+	return nil, nil
+}
 
 // MockPatentRepo
 type MockPatentRepo struct {
@@ -119,9 +175,15 @@ func (m *MockPatentRepo) AssociateMolecule(ctx context.Context, patentID string,
 	return nil
 }
 
-func (m *MockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string) ([]*patent.Patent, error) { return nil, nil }
-func (m *MockPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*patent.Patent, error) { return nil, nil }
-func (m *MockPatentRepo) WithTx(ctx context.Context, fn func(patent.PatentRepository) error) error { return nil }
+func (m *MockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string) ([]*patent.Patent, error) {
+	return nil, nil
+}
+func (m *MockPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*patent.Patent, error) {
+	return nil, nil
+}
+func (m *MockPatentRepo) WithTx(ctx context.Context, fn func(patent.PatentRepository) error) error {
+	return nil
+}
 
 // MockStorage
 type MockStorage struct {
@@ -135,37 +197,66 @@ func (m *MockStorage) Get(ctx context.Context, path string) ([]byte, error) {
 	return nil, nil
 }
 
-func (m *MockStorage) Upload(ctx context.Context, req *storageminio.UploadRequest) (*storageminio.UploadResult, error) { return nil, nil }
-func (m *MockStorage) UploadStream(ctx context.Context, req *storageminio.StreamUploadRequest) (*storageminio.UploadResult, error) { return nil, nil }
-func (m *MockStorage) Download(ctx context.Context, bucket, objectKey string) (*storageminio.DownloadResult, error) { return nil, nil }
-func (m *MockStorage) DownloadToWriter(ctx context.Context, bucket, objectKey string, writer io.Writer) error { return nil }
+func (m *MockStorage) Upload(ctx context.Context, req *storageminio.UploadRequest) (*storageminio.UploadResult, error) {
+	return nil, nil
+}
+func (m *MockStorage) UploadStream(ctx context.Context, req *storageminio.StreamUploadRequest) (*storageminio.UploadResult, error) {
+	return nil, nil
+}
+func (m *MockStorage) Download(ctx context.Context, bucket, objectKey string) (*storageminio.DownloadResult, error) {
+	return nil, nil
+}
+func (m *MockStorage) DownloadToWriter(ctx context.Context, bucket, objectKey string, writer io.Writer) error {
+	return nil
+}
 func (m *MockStorage) Delete(ctx context.Context, bucket, objectKey string) error { return nil }
-func (m *MockStorage) DeleteBatch(ctx context.Context, bucket string, objectKeys []string) ([]storageminio.DeleteError, error) { return nil, nil }
-func (m *MockStorage) Exists(ctx context.Context, bucket, objectKey string) (bool, error) { return false, nil }
-func (m *MockStorage) GetMetadata(ctx context.Context, bucket, objectKey string) (*storageminio.ObjectMetadata, error) { return nil, nil }
-func (m *MockStorage) List(ctx context.Context, bucket, prefix string, opts *storageminio.ListOptions) (*storageminio.ListResult, error) { return nil, nil }
-func (m *MockStorage) Copy(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error { return nil }
-func (m *MockStorage) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error { return nil }
-func (m *MockStorage) GetPresignedDownloadURL(ctx context.Context, bucket, objectKey string, expiry time.Duration) (string, error) { return "", nil }
-func (m *MockStorage) GetPresignedUploadURL(ctx context.Context, bucket, objectKey string, expiry time.Duration) (string, error) { return "", nil }
-func (m *MockStorage) SetTags(ctx context.Context, bucket, objectKey string, tags map[string]string) error { return nil }
-func (m *MockStorage) GetTags(ctx context.Context, bucket, objectKey string) (map[string]string, error) { return nil, nil }
+func (m *MockStorage) DeleteBatch(ctx context.Context, bucket string, objectKeys []string) ([]storageminio.DeleteError, error) {
+	return nil, nil
+}
+func (m *MockStorage) Exists(ctx context.Context, bucket, objectKey string) (bool, error) {
+	return false, nil
+}
+func (m *MockStorage) GetMetadata(ctx context.Context, bucket, objectKey string) (*storageminio.ObjectMetadata, error) {
+	return nil, nil
+}
+func (m *MockStorage) List(ctx context.Context, bucket, prefix string, opts *storageminio.ListOptions) (*storageminio.ListResult, error) {
+	return nil, nil
+}
+func (m *MockStorage) Copy(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error {
+	return nil
+}
+func (m *MockStorage) Move(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error {
+	return nil
+}
+func (m *MockStorage) GetPresignedDownloadURL(ctx context.Context, bucket, objectKey string, expiry time.Duration) (string, error) {
+	return "", nil
+}
+func (m *MockStorage) GetPresignedUploadURL(ctx context.Context, bucket, objectKey string, expiry time.Duration) (string, error) {
+	return "", nil
+}
+func (m *MockStorage) SetTags(ctx context.Context, bucket, objectKey string, tags map[string]string) error {
+	return nil
+}
+func (m *MockStorage) GetTags(ctx context.Context, bucket, objectKey string) (map[string]string, error) {
+	return nil, nil
+}
 
 // MockLogger
 type MockLogger struct{}
-func (m *MockLogger) Info(msg string, fields ...logging.Field) {}
-func (m *MockLogger) Warn(msg string, fields ...logging.Field) {}
-func (m *MockLogger) Error(msg string, fields ...logging.Field) {}
-func (m *MockLogger) Fatal(msg string, fields ...logging.Field) {}
-func (m *MockLogger) Debug(msg string, fields ...logging.Field) {}
-func (m *MockLogger) With(fields ...logging.Field) logging.Logger { return m }
+
+func (m *MockLogger) Info(msg string, fields ...logging.Field)       {}
+func (m *MockLogger) Warn(msg string, fields ...logging.Field)       {}
+func (m *MockLogger) Error(msg string, fields ...logging.Field)      {}
+func (m *MockLogger) Fatal(msg string, fields ...logging.Field)      {}
+func (m *MockLogger) Debug(msg string, fields ...logging.Field)      {}
+func (m *MockLogger) With(fields ...logging.Field) logging.Logger    { return m }
 func (m *MockLogger) WithContext(ctx context.Context) logging.Logger { return m }
-func (m *MockLogger) WithError(err error) logging.Logger { return m }
-func (m *MockLogger) Sync() error { return nil }
+func (m *MockLogger) WithError(err error) logging.Logger             { return m }
+func (m *MockLogger) Sync() error                                    { return nil }
 
 // Helper
 func googleUUID(s string) uuid.UUID {
-    return uuid.New() // Just random for test
+	return uuid.New() // Just random for test
 }
 
 // ---------------------------------------------------------------------------
@@ -184,8 +275,8 @@ func TestExtractFromDocument_Success(t *testing.T) {
 		},
 		ResolveFunc: func(ctx context.Context, entity *chemextractor.RawChemicalEntity) (*chemextractor.ResolvedChemicalEntity, error) {
 			return &chemextractor.ResolvedChemicalEntity{
-				SMILES:   "c1ccccc1",
-				InChIKey: "UHOVQNZJYSORNB-UHFFFAOYSA-N",
+				SMILES:     "c1ccccc1",
+				InChIKey:   "UHOVQNZJYSORNB-UHFFFAOYSA-N",
 				IsResolved: true,
 			}, nil
 		},
@@ -248,8 +339,8 @@ func TestExtractFromText_Success(t *testing.T) {
 		},
 		ResolveFunc: func(ctx context.Context, entity *chemextractor.RawChemicalEntity) (*chemextractor.ResolvedChemicalEntity, error) {
 			return &chemextractor.ResolvedChemicalEntity{
-				SMILES:   "C",
-				InChIKey: "Methane",
+				SMILES:     "C",
+				InChIKey:   "Methane",
 				IsResolved: true,
 			}, nil
 		},

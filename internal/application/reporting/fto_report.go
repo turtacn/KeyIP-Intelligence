@@ -122,15 +122,15 @@ type ReportStatusInfo struct {
 // ============================================================================
 
 type ftoAnalysisResult struct {
-	MoleculeName     string
-	SMILES           string
-	AnalyzedPatents  int
-	HighRiskPatents  []string
+	MoleculeName      string
+	SMILES            string
+	AnalyzedPatents   int
+	HighRiskPatents   []string
 	MediumRiskPatents []string
-	LowRiskPatents   []string
-	DesignArounds    []string
-	ClaimCharts      []claimComparisonEntry
-	Errors           []string // To capture partial failures (e.g. invalid molecule format)
+	LowRiskPatents    []string
+	DesignArounds     []string
+	ClaimCharts       []claimComparisonEntry
+	Errors            []string // To capture partial failures (e.g. invalid molecule format)
 }
 
 type claimComparisonEntry struct {
@@ -293,7 +293,6 @@ func (s *ftoReportServiceImpl) validateRequest(req *FTOReportRequest) error {
 	return nil
 }
 
-// 
 func (s *ftoReportServiceImpl) Generate(ctx context.Context, req *FTOReportRequest) (*FTOReportResponse, error) {
 	startTime := time.Now()
 	if err := s.validateRequest(req); err != nil {
@@ -389,7 +388,7 @@ func (s *ftoReportServiceImpl) executePipelineWithProgress(ctx context.Context, 
 
 	// Step 1: Pre-process molecules
 	for i, molInput := range req.TargetMolecules {
-		_ = s.cache.Set(ctx, "fto_status:"+reportID, ReportStatusInfo{ReportID: reportID, Status: StatusProcessing, ProgressPct: 10 + (i*80/len(req.TargetMolecules))}, 24*time.Hour)
+		_ = s.cache.Set(ctx, "fto_status:"+reportID, ReportStatusInfo{ReportID: reportID, Status: StatusProcessing, ProgressPct: 10 + (i * 80 / len(req.TargetMolecules))}, 24*time.Hour)
 
 		res := ftoAnalysisResult{
 			MoleculeName: molInput.Name,
@@ -408,8 +407,12 @@ func (s *ftoReportServiceImpl) executePipelineWithProgress(ctx context.Context, 
 
 		// Determine search limit based on depth
 		limit := 10
-		if req.AnalysisDepth == DepthStandard { limit = 50 }
-		if req.AnalysisDepth == DepthComprehensive { limit = 200 }
+		if req.AnalysisDepth == DepthStandard {
+			limit = 50
+		}
+		if req.AnalysisDepth == DepthComprehensive {
+			limit = 200
+		}
 
 		// Step 2: Similarity Search
 		candidatePatents, err := s.simSearch.Search(ctx, smiles, req.Jurisdictions, req.CompetitorFilter, limit)
@@ -446,7 +449,11 @@ func (s *ftoReportServiceImpl) executePipelineWithProgress(ctx context.Context, 
 			// In reality, type assert assessment to strong types
 			riskLevel := "Low"
 			// mock risk distribution based on ID for simulation
-			if len(patID)%3 == 0 { riskLevel = "High" } else if len(patID)%2 == 0 { riskLevel = "Medium" }
+			if len(patID)%3 == 0 {
+				riskLevel = "High"
+			} else if len(patID)%2 == 0 {
+				riskLevel = "Medium"
+			}
 
 			switch riskLevel {
 			case "High":
@@ -518,8 +525,12 @@ func (s *ftoReportServiceImpl) GetStatus(ctx context.Context, reportID string) (
 	}
 
 	progress := 0
-	if meta.Status == StatusCompleted { progress = 100 }
-	if meta.Status == StatusFailed { progress = 0 }
+	if meta.Status == StatusCompleted {
+		progress = 100
+	}
+	if meta.Status == StatusFailed {
+		progress = 0
+	}
 
 	return &ReportStatusInfo{
 		ReportID:    meta.ReportID,
@@ -609,6 +620,7 @@ func (s *ftoReportServiceImpl) DeleteReport(ctx context.Context, reportID string
 	s.logger.Info(ctx, "Deleted FTO report", "reportID", reportID)
 	return nil
 }
+
 // ============================================================================
 // FTO Quick Check Types (for gRPC services)
 // ============================================================================
@@ -622,12 +634,12 @@ type FTOQuickCheckRequest struct {
 
 // FTOQuickCheckResult represents the result of a quick FTO check.
 type FTOQuickCheckResult struct {
-	CanOperate       bool               `json:"can_operate"`
-	RiskLevel        string             `json:"risk_level"`
-	Confidence       float64            `json:"confidence"`
-	BlockingPatents  []*BlockingPatent  `json:"blocking_patents"`
-	Recommendation   string             `json:"recommendation"`
-	CheckedAt        time.Time          `json:"checked_at"`
+	CanOperate      bool              `json:"can_operate"`
+	RiskLevel       string            `json:"risk_level"`
+	Confidence      float64           `json:"confidence"`
+	BlockingPatents []*BlockingPatent `json:"blocking_patents"`
+	Recommendation  string            `json:"recommendation"`
+	CheckedAt       time.Time         `json:"checked_at"`
 }
 
 // BlockingPatent represents a patent that may block operation.

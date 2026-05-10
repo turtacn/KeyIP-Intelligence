@@ -33,10 +33,10 @@ type Service interface {
 type LifecycleService = Service
 
 type lifecycleServiceImpl struct {
-	repo               LifecycleRepository
-	annuityService     AnnuityService
-	deadlineService    DeadlineService
-	jurisdictionReg    JurisdictionRegistry
+	repo            LifecycleRepository
+	annuityService  AnnuityService
+	deadlineService DeadlineService
+	jurisdictionReg JurisdictionRegistry
 }
 
 // NewService creates a new lifecycle Service.

@@ -27,16 +27,34 @@ func (m *mockModelRegistry) Register(ctx context.Context, meta *common.ModelMeta
 	return nil
 }
 
-func (m *mockModelRegistry) Unregister(ctx context.Context, modelID string, version string) error { return nil }
-func (m *mockModelRegistry) GetModel(ctx context.Context, modelID string) (*common.RegisteredModel, error) { return nil, nil }
-func (m *mockModelRegistry) GetModelVersion(ctx context.Context, modelID string, version string) (*common.RegisteredModel, error) { return nil, nil }
-func (m *mockModelRegistry) ListModels(ctx context.Context) ([]*common.RegisteredModel, error) { return nil, nil }
-func (m *mockModelRegistry) ListVersions(ctx context.Context, modelID string) ([]*common.ModelVersion, error) { return nil, nil }
-func (m *mockModelRegistry) SetActiveVersion(ctx context.Context, modelID string, version string) error { return nil }
+func (m *mockModelRegistry) Unregister(ctx context.Context, modelID string, version string) error {
+	return nil
+}
+func (m *mockModelRegistry) GetModel(ctx context.Context, modelID string) (*common.RegisteredModel, error) {
+	return nil, nil
+}
+func (m *mockModelRegistry) GetModelVersion(ctx context.Context, modelID string, version string) (*common.RegisteredModel, error) {
+	return nil, nil
+}
+func (m *mockModelRegistry) ListModels(ctx context.Context) ([]*common.RegisteredModel, error) {
+	return nil, nil
+}
+func (m *mockModelRegistry) ListVersions(ctx context.Context, modelID string) ([]*common.ModelVersion, error) {
+	return nil, nil
+}
+func (m *mockModelRegistry) SetActiveVersion(ctx context.Context, modelID string, version string) error {
+	return nil
+}
 func (m *mockModelRegistry) Rollback(ctx context.Context, modelID string) error { return nil }
-func (m *mockModelRegistry) ConfigureABTest(ctx context.Context, config *common.ABTestConfig) error { return nil }
-func (m *mockModelRegistry) ResolveModel(ctx context.Context, modelID string, requestID string) (*common.RegisteredModel, error) { return nil, nil }
-func (m *mockModelRegistry) HealthCheck(ctx context.Context) (*common.RegistryHealth, error) { return nil, nil }
+func (m *mockModelRegistry) ConfigureABTest(ctx context.Context, config *common.ABTestConfig) error {
+	return nil
+}
+func (m *mockModelRegistry) ResolveModel(ctx context.Context, modelID string, requestID string) (*common.RegisteredModel, error) {
+	return nil, nil
+}
+func (m *mockModelRegistry) HealthCheck(ctx context.Context) (*common.RegistryHealth, error) {
+	return nil, nil
+}
 func (m *mockModelRegistry) Close() error { return nil }
 
 // ---------------------------------------------------------------------------
@@ -735,5 +753,3 @@ func TestStrategyGPTConfig_Validate_PresencePenaltyBoundary(t *testing.T) {
 		t.Fatal("expected error for presence_penalty < -2.0")
 	}
 }
-
-

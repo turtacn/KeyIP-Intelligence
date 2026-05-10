@@ -36,7 +36,7 @@ import (
 
 type mockMoleculeSvc struct {
 	molecule.MoleculeDomainService
-	canonicalizeFn        func(ctx context.Context, smiles string) (string, string, error)
+	canonicalizeFn          func(ctx context.Context, smiles string) (string, string, error)
 	canonicalizeFromInChIFn func(ctx context.Context, inchi string) (string, string, error)
 }
 
@@ -80,14 +80,27 @@ func (m *mockPatentRepoForService) Search(ctx context.Context, criteria patent.P
 	}, nil
 }
 
-type mockMarkushRepoForService struct {}
-func (m *mockMarkushRepoForService) Save(ctx context.Context, markush *patent.MarkushStructure) error { return nil }
-func (m *mockMarkushRepoForService) FindByID(ctx context.Context, id string) (*patent.MarkushStructure, error) { return nil, nil }
-func (m *mockMarkushRepoForService) FindByPatentID(ctx context.Context, patentID string) ([]*patent.MarkushStructure, error) { return nil, nil }
-func (m *mockMarkushRepoForService) FindByClaimNumber(ctx context.Context, patentID string, claimNumber int) ([]*patent.MarkushStructure, error) { return nil, nil }
-func (m *mockMarkushRepoForService) FindMatchingMolecule(ctx context.Context, smiles string) ([]*patent.MarkushStructure, error) { return nil, nil }
+type mockMarkushRepoForService struct{}
+
+func (m *mockMarkushRepoForService) Save(ctx context.Context, markush *patent.MarkushStructure) error {
+	return nil
+}
+func (m *mockMarkushRepoForService) FindByID(ctx context.Context, id string) (*patent.MarkushStructure, error) {
+	return nil, nil
+}
+func (m *mockMarkushRepoForService) FindByPatentID(ctx context.Context, patentID string) ([]*patent.MarkushStructure, error) {
+	return nil, nil
+}
+func (m *mockMarkushRepoForService) FindByClaimNumber(ctx context.Context, patentID string, claimNumber int) ([]*patent.MarkushStructure, error) {
+	return nil, nil
+}
+func (m *mockMarkushRepoForService) FindMatchingMolecule(ctx context.Context, smiles string) ([]*patent.MarkushStructure, error) {
+	return nil, nil
+}
 func (m *mockMarkushRepoForService) Delete(ctx context.Context, id string) error { return nil }
-func (m *mockMarkushRepoForService) CountByPatentID(ctx context.Context, patentID string) (int64, error) { return 0, nil }
+func (m *mockMarkushRepoForService) CountByPatentID(ctx context.Context, patentID string) (int64, error) {
+	return 0, nil
+}
 
 // --- Mock InfringeNetAssessor ---
 
@@ -253,9 +266,9 @@ func (m *mockEventPublisher) Publish(ctx context.Context, event interface{}) err
 
 type mockCache struct {
 	redis.Cache
-	store  map[string][]byte
-	getFn  func(ctx context.Context, key string) ([]byte, error)
-	setFn  func(ctx context.Context, key string, value []byte, ttl time.Duration) error
+	store map[string][]byte
+	getFn func(ctx context.Context, key string) ([]byte, error)
+	setFn func(ctx context.Context, key string, value []byte, ttl time.Duration) error
 }
 
 func newMockCache() *mockCache {
@@ -301,15 +314,15 @@ func (m *mockCache) Set(ctx context.Context, key string, value interface{}, ttl 
 
 type mockLogger struct{}
 
-func (m *mockLogger) Debug(msg string, fields ...logging.Field) {}
-func (m *mockLogger) Info(msg string, fields ...logging.Field)  {}
-func (m *mockLogger) Warn(msg string, fields ...logging.Field)  {}
-func (m *mockLogger) Error(msg string, fields ...logging.Field) {}
-func (m *mockLogger) Fatal(msg string, fields ...logging.Field) {}
-func (m *mockLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockLogger) Debug(msg string, fields ...logging.Field)      {}
+func (m *mockLogger) Info(msg string, fields ...logging.Field)       {}
+func (m *mockLogger) Warn(msg string, fields ...logging.Field)       {}
+func (m *mockLogger) Error(msg string, fields ...logging.Field)      {}
+func (m *mockLogger) Fatal(msg string, fields ...logging.Field)      {}
+func (m *mockLogger) With(fields ...logging.Field) logging.Logger    { return m }
 func (m *mockLogger) WithContext(ctx context.Context) logging.Logger { return m }
-func (m *mockLogger) WithError(err error) logging.Logger { return m }
-func (m *mockLogger) Sync() error { return nil }
+func (m *mockLogger) WithError(err error) logging.Logger             { return m }
+func (m *mockLogger) Sync() error                                    { return nil }
 
 // --- Mock Metrics Collector ---
 
@@ -328,41 +341,49 @@ func (m *mockMetricsCollector) RegisterHistogram(name, help string, buckets []fl
 func (m *mockMetricsCollector) RegisterSummary(name, help string, objectives map[float64]float64, labels ...string) prom.SummaryVec {
 	return &mockSummaryVec{}
 }
-func (m *mockMetricsCollector) Handler() http.Handler { return nil }
+func (m *mockMetricsCollector) Handler() http.Handler                           { return nil }
 func (m *mockMetricsCollector) MustRegister(collectors ...prometheus.Collector) {}
-func (m *mockMetricsCollector) Unregister(collector prometheus.Collector) bool { return true }
+func (m *mockMetricsCollector) Unregister(collector prometheus.Collector) bool  { return true }
 
 type mockCounterVec struct{}
+
 func (v *mockCounterVec) WithLabelValues(lvs ...string) prom.Counter { return &mockCounter{} }
 func (v *mockCounterVec) With(labels map[string]string) prom.Counter { return &mockCounter{} }
 
 type mockCounter struct{}
-func (c *mockCounter) Inc() {}
+
+func (c *mockCounter) Inc()              {}
 func (c *mockCounter) Add(delta float64) {}
 
 type mockGaugeVec struct{}
+
 func (v *mockGaugeVec) WithLabelValues(lvs ...string) prom.Gauge { return &mockGauge{} }
 func (v *mockGaugeVec) With(labels map[string]string) prom.Gauge { return &mockGauge{} }
 
 type mockGauge struct{}
+
 func (g *mockGauge) Set(value float64) {}
-func (g *mockGauge) Inc() {}
-func (g *mockGauge) Dec() {}
+func (g *mockGauge) Inc()              {}
+func (g *mockGauge) Dec()              {}
 func (g *mockGauge) Add(delta float64) {}
 func (g *mockGauge) Sub(delta float64) {}
 
 type mockHistogramVec struct{}
+
 func (v *mockHistogramVec) WithLabelValues(lvs ...string) prom.Histogram { return &mockHistogram{} }
 func (v *mockHistogramVec) With(labels map[string]string) prom.Histogram { return &mockHistogram{} }
 
 type mockHistogram struct{}
+
 func (h *mockHistogram) Observe(value float64) {}
 
 type mockSummaryVec struct{}
+
 func (v *mockSummaryVec) WithLabelValues(lvs ...string) prom.Summary { return &mockSummary{} }
 func (v *mockSummaryVec) With(labels map[string]string) prom.Summary { return &mockSummary{} }
 
 type mockSummary struct{}
+
 func (s *mockSummary) Observe(value float64) {}
 
 // ===========================================================================
@@ -370,8 +391,8 @@ func (s *mockSummary) Observe(value float64) {}
 // ===========================================================================
 
 type testHarness struct {
-	svc            RiskAssessmentService
-	moleculeSvc    *mockMoleculeSvc
+	svc         RiskAssessmentService
+	moleculeSvc *mockMoleculeSvc
 	// patentSvc      *mockPatentSvc -- Removed as we use real service with mock repo
 	patentRepo     *mockPatentRepoForService
 	infringeNet    *mockInfringeNet
@@ -522,7 +543,7 @@ func TestAssessMolecule_CacheMiss_WithCandidates_StandardDepth(t *testing.T) {
 		// Use ClaimSet properly
 		return &patent.Patent{
 			PatentNumber: number,
-			Claims:       patent.ClaimSet{
+			Claims: patent.ClaimSet{
 				{Number: 1, Text: "A composition...", Type: patent.ClaimTypeIndependent},
 			},
 		}, nil
@@ -563,7 +584,7 @@ func TestAssessMolecule_CacheMiss_DeepDepth_WithInfringeNet(t *testing.T) {
 	h.patentRepo.getPatentByNumberFn = func(ctx context.Context, number string) (*patent.Patent, error) {
 		return &patent.Patent{
 			PatentNumber: number,
-			Claims:       patent.ClaimSet{
+			Claims: patent.ClaimSet{
 				{Number: 1, Text: "A compound...", Type: patent.ClaimTypeIndependent},
 			},
 		}, nil
@@ -571,7 +592,7 @@ func TestAssessMolecule_CacheMiss_DeepDepth_WithInfringeNet(t *testing.T) {
 
 	h.infringeNet.assessFn = func(ctx context.Context, req *infringe_net.AssessmentRequest) (*infringe_net.AssessmentResult, error) {
 		return &infringe_net.AssessmentResult{
-			LiteralAnalysis: &infringe_net.LiteralAnalysisResult{AllElementsMet: true, Score: 1.0},
+			LiteralAnalysis:     &infringe_net.LiteralAnalysisResult{AllElementsMet: true, Score: 1.0},
 			EquivalentsAnalysis: &infringe_net.EquivalentsAnalysisResult{Score: 1.0},
 			MatchedClaims: []*infringe_net.ClaimMatchResult{
 				{ClaimID: "US20200001-C1", LiteralScore: 1.0},

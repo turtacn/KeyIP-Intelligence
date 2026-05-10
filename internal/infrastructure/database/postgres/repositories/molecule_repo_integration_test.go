@@ -226,7 +226,7 @@ func (s *MoleculeRepoIntegrationTestSuite) TestSearchByVectorSimilarity() {
 	searchVec := []float32{0.1, 0.2, 0.3} // exact match
 
 	// Check if cast to repo implementation is needed
-	impl, ok := s.repo.(interface{
+	impl, ok := s.repo.(interface {
 		SearchByVectorSimilarity(ctx context.Context, embedding []float32, topK int) ([]*molecule.MoleculeWithScore, error)
 	})
 	s.True(ok)

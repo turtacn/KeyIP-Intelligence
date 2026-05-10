@@ -25,6 +25,7 @@
 //   - TestExtractBearerToken: 各种 Authorization header 格式
 //   - TestExtractAPIKey_Header: 从 header 提取
 //   - TestExtractAPIKey_QueryParam: 从 query 参数提取
+//
 // 强制约束: 文件最后一行必须为 //Personal.AI order the ending
 package middleware
 
@@ -78,14 +79,11 @@ func (m *mockMiddlewareLogger) Warn(msg string, fields ...logging.Field)  {}
 func (m *mockMiddlewareLogger) Error(msg string, fields ...logging.Field) {
 	m.Called(msg, fields)
 }
-func (m *mockMiddlewareLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockMiddlewareLogger) With(fields ...logging.Field) logging.Logger    { return m }
 func (m *mockMiddlewareLogger) WithContext(ctx context.Context) logging.Logger { return m }
-func (m *mockMiddlewareLogger) WithError(err error) logging.Logger { return m }
-func (m *mockMiddlewareLogger) Fatal(msg string, fields ...logging.Field) {}
-func (m *mockMiddlewareLogger) Sync() error { return nil }
-
-
-
+func (m *mockMiddlewareLogger) WithError(err error) logging.Logger             { return m }
+func (m *mockMiddlewareLogger) Fatal(msg string, fields ...logging.Field)      {}
+func (m *mockMiddlewareLogger) Sync() error                                    { return nil }
 
 // testHandler is a simple handler that records whether it was called.
 func testHandler(called *bool) http.Handler {

@@ -440,3 +440,149 @@ func TestGetStats(t *testing.T) {
 	assert.Equal(t, int64(10), result.ByJurisdiction["CN"])
 	assert.Equal(t, int64(5), result.TotalPatents)
 }
+
+func TestList_DefaultPagination(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	searchResult := &domainPatent.PatentSearchResult{
+		Patents: []*domainPatent.Patent{},
+		Total:   0,
+	}
+
+	mockRepo.On("Search", mock.Anything, mock.MatchedBy(func(c domainPatent.PatentSearchCriteria) bool {
+		return c.Offset == 0 && c.Limit == 20
+	})).Return(searchResult, nil)
+
+	result, err := service.List(context.Background(), &ListInput{})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 1, result.Page)
+	assert.Equal(t, 20, result.PageSize)
+}
+
+func TestList_PageSizeClamping(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	searchResult := &domainPatent.PatentSearchResult{
+		Patents: []*domainPatent.Patent{},
+		Total:   0,
+	}
+
+	mockRepo.On("Search", mock.Anything, mock.MatchedBy(func(c domainPatent.PatentSearchCriteria) bool {
+		return c.Offset == 0 && c.Limit == 100
+	})).Return(searchResult, nil)
+
+	result, err := service.List(context.Background(), &ListInput{PageSize: 200})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 100, result.PageSize)
+}
+
+func TestList_EmptyResult(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	searchResult := &domainPatent.PatentSearchResult{
+		Patents: []*domainPatent.Patent{},
+		Total:   0,
+	}
+
+	mockRepo.On("Search", mock.Anything, mock.Anything).Return(searchResult, nil)
+
+	result, err := service.List(context.Background(), &ListInput{Page: 1, PageSize: 10})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Empty(t, result.Patents)
+	assert.Equal(t, int64(0), result.Total)
+	assert.Equal(t, 0, result.TotalPages)
+}
+
+func TestSearch_DefaultPagination(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	searchResult := &domainPatent.PatentSearchResult{
+		Patents: []*domainPatent.Patent{},
+		Total:   0,
+	}
+
+	mockRepo.On("Search", mock.Anything, mock.MatchedBy(func(c domainPatent.PatentSearchCriteria) bool {
+		return c.Offset == 0 && c.Limit == 20
+	})).Return(searchResult, nil)
+
+	result, err := service.Search(context.Background(), &SearchInput{})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 1, result.Page)
+	assert.Equal(t, 20, result.PageSize)
+}
+
+func TestAdvancedSearch_DefaultPagination(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	searchResult := &domainPatent.PatentSearchResult{
+		Patents: []*domainPatent.Patent{},
+		Total:   0,
+	}
+
+	mockRepo.On("Search", mock.Anything, mock.MatchedBy(func(c domainPatent.PatentSearchCriteria) bool {
+		return c.Offset == 0 && c.Limit == 20
+	})).Return(searchResult, nil)
+
+	result, err := service.AdvancedSearch(context.Background(), &AdvancedSearchInput{})
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 1, result.Page)
+	assert.Equal(t, 20, result.PageSize)
+}
+
+func TestUpdate_NotFound(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	mockRepo.On("FindByID", mock.Anything, "nonexistent").Return(nil, errors.New("not found"))
+
+	result, err := service.Update(context.Background(), &UpdateInput{ID: "nonexistent"})
+	assert.Error(t, err)
+	assert.Nil(t, result)
+}
+
+func TestCreate_MissingApplicationNo(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	// Title provided but ApplicationNo missing
+	result, err := service.Create(context.Background(), &CreateInput{
+		Title: "Test Patent",
+	})
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "application_no is required")
+}
+
+func TestGetByID_EmptyID(t *testing.T) {
+	mockRepo := new(mockPatentRepository)
+	mockLogger := testutil.NewMockLogger()
+	service := NewService(mockRepo, mockLogger)
+
+	mockRepo.On("FindByID", mock.Anything, "").Return(nil, errors.New("not found"))
+
+	result, err := service.GetByID(context.Background(), "")
+	assert.Error(t, err)
+	assert.Nil(t, result)
+}
+
+func TestDomainToDTO_NilPatent(t *testing.T) {
+	result := domainToDTO(nil)
+	assert.Nil(t, result)
+}

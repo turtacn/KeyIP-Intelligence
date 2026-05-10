@@ -105,35 +105,83 @@ func TestPatentSearchResult_CurrentPage(t *testing.T) {
 
 type mockPatentRepo struct{}
 
-func (m *mockPatentRepo) Save(ctx context.Context, patent *Patent) error { return nil }
+func (m *mockPatentRepo) Save(ctx context.Context, patent *Patent) error           { return nil }
 func (m *mockPatentRepo) FindByID(ctx context.Context, id string) (*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) FindByPatentNumber(ctx context.Context, patentNumber string) (*Patent, error) { return nil, nil }
+func (m *mockPatentRepo) FindByPatentNumber(ctx context.Context, patentNumber string) (*Patent, error) {
+	return nil, nil
+}
 func (m *mockPatentRepo) Delete(ctx context.Context, id string) error { return nil }
-func (m *mockPatentRepo) Exists(ctx context.Context, patentNumber string) (bool, error) { return false, nil }
+func (m *mockPatentRepo) Exists(ctx context.Context, patentNumber string) (bool, error) {
+	return false, nil
+}
 func (m *mockPatentRepo) SaveBatch(ctx context.Context, patents []*Patent) error { return nil }
-func (m *mockPatentRepo) FindByIDs(ctx context.Context, ids []string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) FindByPatentNumbers(ctx context.Context, numbers []string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) Search(ctx context.Context, criteria PatentSearchCriteria) (*PatentSearchResult, error) { return nil, nil }
-func (m *mockPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) FindByFamilyID(ctx context.Context, familyID string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) FindByIPCCode(ctx context.Context, ipcCode string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) FindByApplicant(ctx context.Context, applicantName string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) FindCitedBy(ctx context.Context, patentNumber string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) FindCiting(ctx context.Context, patentNumber string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) CountByStatus(ctx context.Context) (map[PatentStatus]int64, error) { return nil, nil }
-func (m *mockPatentRepo) CountByOffice(ctx context.Context) (map[PatentOffice]int64, error) { return nil, nil }
-func (m *mockPatentRepo) CountByIPCSection(ctx context.Context) (map[string]int64, error) { return nil, nil }
-func (m *mockPatentRepo) CountByYear(ctx context.Context, field string) (map[int]int64, error) { return nil, nil }
-func (m *mockPatentRepo) CountByJurisdiction(ctx context.Context) (map[string]int64, error) { return nil, nil }
-func (m *mockPatentRepo) GetByFamilyID(ctx context.Context, familyID string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) GetByPatentNumber(ctx context.Context, number string) (*Patent, error) { return nil, nil }
+func (m *mockPatentRepo) FindByIDs(ctx context.Context, ids []string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) FindByPatentNumbers(ctx context.Context, numbers []string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) Search(ctx context.Context, criteria PatentSearchCriteria) (*PatentSearchResult, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) FindByMoleculeID(ctx context.Context, moleculeID string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) FindByFamilyID(ctx context.Context, familyID string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) FindByIPCCode(ctx context.Context, ipcCode string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) FindByApplicant(ctx context.Context, applicantName string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) FindCitedBy(ctx context.Context, patentNumber string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) FindCiting(ctx context.Context, patentNumber string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) CountByStatus(ctx context.Context) (map[PatentStatus]int64, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) CountByOffice(ctx context.Context) (map[PatentOffice]int64, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) CountByIPCSection(ctx context.Context) (map[string]int64, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) CountByYear(ctx context.Context, field string) (map[int]int64, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) CountByJurisdiction(ctx context.Context) (map[string]int64, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) GetByFamilyID(ctx context.Context, familyID string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) GetByPatentNumber(ctx context.Context, number string) (*Patent, error) {
+	return nil, nil
+}
 func (m *mockPatentRepo) GetByID(ctx context.Context, id uuid.UUID) (*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*Patent, int64, error) { return nil, 0, nil }
-func (m *mockPatentRepo) FindExpiringBefore(ctx context.Context, date time.Time) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) FindActiveByIPCCode(ctx context.Context, ipcCode string) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) FindWithMarkushStructures(ctx context.Context, offset, limit int) ([]*Patent, error) { return nil, nil }
-func (m *mockPatentRepo) AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error { return nil }
+func (m *mockPatentRepo) ListByPortfolio(ctx context.Context, portfolioID string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) SearchByAssigneeName(ctx context.Context, assigneeName string, limit, offset int) ([]*Patent, int64, error) {
+	return nil, 0, nil
+}
+func (m *mockPatentRepo) FindExpiringBefore(ctx context.Context, date time.Time) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) FindActiveByIPCCode(ctx context.Context, ipcCode string) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) FindWithMarkushStructures(ctx context.Context, offset, limit int) ([]*Patent, error) {
+	return nil, nil
+}
+func (m *mockPatentRepo) AssociateMolecule(ctx context.Context, patentID string, moleculeID string) error {
+	return nil
+}
 
 func TestPatentRepository_InterfaceCompile(t *testing.T) {
 	var _ PatentRepository = (*mockPatentRepo)(nil)
@@ -142,12 +190,22 @@ func TestPatentRepository_InterfaceCompile(t *testing.T) {
 type mockMarkushRepo struct{}
 
 func (m *mockMarkushRepo) Save(ctx context.Context, markush *MarkushStructure) error { return nil }
-func (m *mockMarkushRepo) FindByID(ctx context.Context, id string) (*MarkushStructure, error) { return nil, nil }
-func (m *mockMarkushRepo) FindByPatentID(ctx context.Context, patentID string) ([]*MarkushStructure, error) { return nil, nil }
-func (m *mockMarkushRepo) FindByClaimNumber(ctx context.Context, patentID string, claimNumber int) ([]*MarkushStructure, error) { return nil, nil }
-func (m *mockMarkushRepo) FindMatchingMolecule(ctx context.Context, smiles string) ([]*MarkushStructure, error) { return nil, nil }
+func (m *mockMarkushRepo) FindByID(ctx context.Context, id string) (*MarkushStructure, error) {
+	return nil, nil
+}
+func (m *mockMarkushRepo) FindByPatentID(ctx context.Context, patentID string) ([]*MarkushStructure, error) {
+	return nil, nil
+}
+func (m *mockMarkushRepo) FindByClaimNumber(ctx context.Context, patentID string, claimNumber int) ([]*MarkushStructure, error) {
+	return nil, nil
+}
+func (m *mockMarkushRepo) FindMatchingMolecule(ctx context.Context, smiles string) ([]*MarkushStructure, error) {
+	return nil, nil
+}
 func (m *mockMarkushRepo) Delete(ctx context.Context, id string) error { return nil }
-func (m *mockMarkushRepo) CountByPatentID(ctx context.Context, patentID string) (int64, error) { return 0, nil }
+func (m *mockMarkushRepo) CountByPatentID(ctx context.Context, patentID string) (int64, error) {
+	return 0, nil
+}
 
 func TestMarkushRepository_InterfaceCompile(t *testing.T) {
 	var _ MarkushRepository = (*mockMarkushRepo)(nil)
@@ -155,10 +213,18 @@ func TestMarkushRepository_InterfaceCompile(t *testing.T) {
 
 type mockPatentEventRepo struct{}
 
-func (m *mockPatentEventRepo) SaveEvents(ctx context.Context, events ...common.DomainEvent) error { return nil }
-func (m *mockPatentEventRepo) FindByAggregateID(ctx context.Context, aggregateID string) ([]common.DomainEvent, error) { return nil, nil }
-func (m *mockPatentEventRepo) FindByEventType(ctx context.Context, eventType common.EventType, offset, limit int) ([]common.DomainEvent, error) { return nil, nil }
-func (m *mockPatentEventRepo) FindSince(ctx context.Context, aggregateID string, version int) ([]common.DomainEvent, error) { return nil, nil }
+func (m *mockPatentEventRepo) SaveEvents(ctx context.Context, events ...common.DomainEvent) error {
+	return nil
+}
+func (m *mockPatentEventRepo) FindByAggregateID(ctx context.Context, aggregateID string) ([]common.DomainEvent, error) {
+	return nil, nil
+}
+func (m *mockPatentEventRepo) FindByEventType(ctx context.Context, eventType common.EventType, offset, limit int) ([]common.DomainEvent, error) {
+	return nil, nil
+}
+func (m *mockPatentEventRepo) FindSince(ctx context.Context, aggregateID string, version int) ([]common.DomainEvent, error) {
+	return nil, nil
+}
 
 func TestPatentEventRepository_InterfaceCompile(t *testing.T) {
 	var _ PatentEventRepository = (*mockPatentEventRepo)(nil)

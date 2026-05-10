@@ -290,12 +290,12 @@ func (h *PortfolioHandler) RunValuation(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"portfolio_id":   id,
-		"total_value":    analysis.TotalValue,
+		"portfolio_id":    id,
+		"total_value":     analysis.TotalValue,
 		"by_jurisdiction": analysis.ByJurisdiction,
-		"by_status":      analysis.ByStatus,
+		"by_status":       analysis.ByStatus,
 		"recommendations": analysis.Recommendations,
-		"message":        "valuation completed",
+		"message":         "valuation completed",
 	})
 }
 
@@ -315,12 +315,12 @@ func (h *PortfolioHandler) GetGapAnalysis(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"portfolio_id":   id,
-		"total_patents":  analysis.TotalPatents,
+		"portfolio_id":    id,
+		"total_patents":   analysis.TotalPatents,
 		"by_jurisdiction": analysis.ByJurisdiction,
-		"by_status":      analysis.ByStatus,
-		"by_year":        analysis.ByYear,
-		"top_ipc_codes":  analysis.TopIPCCodes,
+		"by_status":       analysis.ByStatus,
+		"by_year":         analysis.ByYear,
+		"top_ipc_codes":   analysis.TopIPCCodes,
 		"recommendations": analysis.Recommendations,
 	})
 }
@@ -341,10 +341,10 @@ func (h *PortfolioHandler) RunGapAnalysis(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"portfolio_id":   id,
-		"total_patents":  analysis.TotalPatents,
-		"gap_findings":   analysis.Recommendations,
-		"message":        "gap analysis completed",
+		"portfolio_id":  id,
+		"total_patents": analysis.TotalPatents,
+		"gap_findings":  analysis.Recommendations,
+		"message":       "gap analysis completed",
 	})
 }
 
@@ -364,11 +364,11 @@ func (h *PortfolioHandler) Optimize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"portfolio_id":          id,
-		"total_patents":         analysis.TotalPatents,
+		"portfolio_id":             id,
+		"total_patents":            analysis.TotalPatents,
 		"optimization_suggestions": analysis.Recommendations,
-		"estimated_value":       analysis.TotalValue,
-		"message":               "optimization completed",
+		"estimated_value":          analysis.TotalValue,
+		"message":                  "optimization completed",
 	})
 }
 

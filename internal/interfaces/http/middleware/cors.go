@@ -11,12 +11,15 @@
 //   - 简单请求处理: 验证 Origin 后设置响应头
 //   - Origin 匹配支持: 精确匹配、通配符 *、子域名模式 *.example.com
 //   - Vary 头正确设置，确保缓存行为正确
+//
 // 安全考量:
 //   - 默认不允许通配符 origin + credentials 组合
 //   - 严格验证 Origin 格式防止注入
 //   - 生产环境建议显式列出允许的 origins
+//
 // 依赖关系:
 //   - 被依赖: internal/interfaces/http/router.go
+//
 // 强制约束: 文件最后一行必须为 //Personal.AI order the ending
 package middleware
 

@@ -134,7 +134,7 @@ func (f OutputFormat) String() string {
 type DetailLevel int
 
 const (
-	DetailSummary  DetailLevel = iota
+	DetailSummary DetailLevel = iota
 	DetailStandard
 	DetailDetailed
 	DetailExpert
@@ -218,17 +218,17 @@ type RAGChunk struct {
 
 // PromptParams is the full parameter set for building a prompt.
 type PromptParams struct {
-	Task               AnalysisTask           `json:"task"`
-	TargetMolecule     *MoleculeContext       `json:"target_molecule,omitempty"`
-	RelevantPatents    []*PatentContext        `json:"relevant_patents,omitempty"`
-	ClaimAnalysis      []*ClaimAnalysisContext `json:"claim_analysis,omitempty"`
-	PriorArt           []*PriorArtContext      `json:"prior_art,omitempty"`
-	RAGContext         []*RAGChunk             `json:"rag_context,omitempty"`
-	UserQuery          string                 `json:"user_query"`
-	OutputFormat       OutputFormat           `json:"output_format"`
-	Language           string                 `json:"language"`
-	DetailLevel        DetailLevel            `json:"detail_level"`
-	JurisdictionFocus  []string               `json:"jurisdiction_focus,omitempty"`
+	Task              AnalysisTask            `json:"task"`
+	TargetMolecule    *MoleculeContext        `json:"target_molecule,omitempty"`
+	RelevantPatents   []*PatentContext        `json:"relevant_patents,omitempty"`
+	ClaimAnalysis     []*ClaimAnalysisContext `json:"claim_analysis,omitempty"`
+	PriorArt          []*PriorArtContext      `json:"prior_art,omitempty"`
+	RAGContext        []*RAGChunk             `json:"rag_context,omitempty"`
+	UserQuery         string                  `json:"user_query"`
+	OutputFormat      OutputFormat            `json:"output_format"`
+	Language          string                  `json:"language"`
+	DetailLevel       DetailLevel             `json:"detail_level"`
+	JurisdictionFocus []string                `json:"jurisdiction_focus,omitempty"`
 }
 
 // Message represents a single message in a chat-style prompt.
@@ -239,12 +239,12 @@ type Message struct {
 
 // BuiltPrompt is the fully assembled prompt ready for LLM invocation.
 type BuiltPrompt struct {
-	SystemPrompt       string    `json:"system_prompt"`
-	UserPrompt         string    `json:"user_prompt"`
-	Messages           []Message `json:"messages"`
-	EstimatedTokens    int       `json:"estimated_tokens"`
-	TruncationApplied  bool      `json:"truncation_applied"`
-	TemplateVersion    string    `json:"template_version"`
+	SystemPrompt      string    `json:"system_prompt"`
+	UserPrompt        string    `json:"user_prompt"`
+	Messages          []Message `json:"messages"`
+	EstimatedTokens   int       `json:"estimated_tokens"`
+	TruncationApplied bool      `json:"truncation_applied"`
+	TemplateVersion   string    `json:"template_version"`
 }
 
 // ---------------------------------------------------------------------------
@@ -253,17 +253,17 @@ type BuiltPrompt struct {
 
 // TemplateInfo describes a registered prompt template.
 type TemplateInfo struct {
-	Name        string    `json:"name"`
-	Version     string    `json:"version"`
-	Task        string    `json:"task,omitempty"`
-	Description string    `json:"description,omitempty"`
+	Name         string    `json:"name"`
+	Version      string    `json:"version"`
+	Task         string    `json:"task,omitempty"`
+	Description  string    `json:"description,omitempty"`
 	RegisteredAt time.Time `json:"registered_at"`
 }
 
 type templateEntry struct {
-	raw     string
-	parsed  *template.Template
-	info    TemplateInfo
+	raw    string
+	parsed *template.Template
+	info   TemplateInfo
 }
 
 // ---------------------------------------------------------------------------
@@ -286,9 +286,9 @@ type PromptManager interface {
 
 // PromptManagerConfig holds tuning knobs for the prompt manager.
 type PromptManagerConfig struct {
-	MaxContextTokens   int    `json:"max_context_tokens" yaml:"max_context_tokens"`
-	DefaultLanguage    string `json:"default_language" yaml:"default_language"`
-	TemplateVersion    string `json:"template_version" yaml:"template_version"`
+	MaxContextTokens int    `json:"max_context_tokens" yaml:"max_context_tokens"`
+	DefaultLanguage  string `json:"default_language" yaml:"default_language"`
+	TemplateVersion  string `json:"template_version" yaml:"template_version"`
 }
 
 // DefaultPromptManagerConfig returns production defaults.
@@ -1027,4 +1027,3 @@ func templateFormatList(items []string) string {
 	}
 	return b.String()
 }
-

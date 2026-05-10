@@ -34,9 +34,9 @@ import (
 type SimilarityMetric string
 
 const (
-	MetricTanimoto SimilarityMetric = "tanimoto"
-	MetricCosine   SimilarityMetric = "cosine"
-	MetricDice     SimilarityMetric = "dice"
+	MetricTanimoto  SimilarityMetric = "tanimoto"
+	MetricCosine    SimilarityMetric = "cosine"
+	MetricDice      SimilarityMetric = "dice"
 	MetricEuclidean SimilarityMetric = "euclidean"
 )
 
@@ -65,50 +65,50 @@ type SimilarityHit struct {
 
 // SimilaritySearchResult holds the full search result.
 type SimilaritySearchResult struct {
-	QueryID          string              `json:"query_id"`
+	QueryID          string               `json:"query_id"`
 	SearchType       SimilaritySearchType `json:"search_type"`
-	Hits             []SimilarityHit     `json:"hits"`
-	TotalHits        int                 `json:"total_hits"`
-	ProcessingTimeMs int64               `json:"processing_time_ms"`
-	Metadata         map[string]string   `json:"metadata,omitempty"`
+	Hits             []SimilarityHit      `json:"hits"`
+	TotalHits        int                  `json:"total_hits"`
+	ProcessingTimeMs int64                `json:"processing_time_ms"`
+	Metadata         map[string]string    `json:"metadata,omitempty"`
 }
 
 // SearchByStructureRequest is the request for structure-based search.
 type SearchByStructureRequest struct {
-	SMILES       string           `json:"smiles"`
-	Metric       SimilarityMetric `json:"metric"`
-	Threshold    float64          `json:"threshold"`
-	MaxResults   int              `json:"max_results"`
-	TargetDBs    []string         `json:"target_dbs,omitempty"`
+	SMILES     string           `json:"smiles"`
+	Metric     SimilarityMetric `json:"metric"`
+	Threshold  float64          `json:"threshold"`
+	MaxResults int              `json:"max_results"`
+	TargetDBs  []string         `json:"target_dbs,omitempty"`
 }
 
 // SearchByFingerprintRequest is the request for fingerprint-based search.
 type SearchByFingerprintRequest struct {
-	SMILES         string           `json:"smiles"`
-	FingerprintType string          `json:"fingerprint_type"` // "morgan", "maccs", "topological"
-	Radius         int              `json:"radius,omitempty"`
-	NBits          int              `json:"n_bits,omitempty"`
-	Metric         SimilarityMetric `json:"metric"`
-	Threshold      float64          `json:"threshold"`
-	MaxResults     int              `json:"max_results"`
+	SMILES          string           `json:"smiles"`
+	FingerprintType string           `json:"fingerprint_type"` // "morgan", "maccs", "topological"
+	Radius          int              `json:"radius,omitempty"`
+	NBits           int              `json:"n_bits,omitempty"`
+	Metric          SimilarityMetric `json:"metric"`
+	Threshold       float64          `json:"threshold"`
+	MaxResults      int              `json:"max_results"`
 }
 
 // SearchBySemanticRequest is the request for semantic similarity search.
 type SearchBySemanticRequest struct {
-	Query      string  `json:"query"`
-	EmbedModel string  `json:"embed_model,omitempty"`
-	Threshold  float64 `json:"threshold"`
-	MaxResults int     `json:"max_results"`
+	Query      string            `json:"query"`
+	EmbedModel string            `json:"embed_model,omitempty"`
+	Threshold  float64           `json:"threshold"`
+	MaxResults int               `json:"max_results"`
 	Filters    map[string]string `json:"filters,omitempty"`
 }
 
 // SearchByPatentRequest is the request for patent-based hybrid search.
 type SearchByPatentRequest struct {
-	PatentID       string  `json:"patent_id"`
+	PatentID        string  `json:"patent_id"`
 	StructureWeight float64 `json:"structure_weight"` // 0.0-1.0
-	TextWeight     float64  `json:"text_weight"`      // 0.0-1.0
-	Threshold      float64  `json:"threshold"`
-	MaxResults     int      `json:"max_results"`
+	TextWeight      float64 `json:"text_weight"`      // 0.0-1.0
+	Threshold       float64 `json:"threshold"`
+	MaxResults      int     `json:"max_results"`
 }
 
 // SearchHistoryEntry records a past search.
@@ -642,11 +642,11 @@ func (s *similaritySearchServiceImpl) Search(ctx context.Context, query *Similar
 
 // MoleculeSearchResult represents the result of a molecule search.
 type MoleculeSearchResult struct {
-	Molecules     []MoleculeInfo `json:"molecules"`
-	TotalCount    int            `json:"total_count"`
-	Page          int            `json:"page"`
-	PageSize      int            `json:"page_size"`
-	SearchTimeMs  int64          `json:"search_time_ms"`
+	Molecules    []MoleculeInfo `json:"molecules"`
+	TotalCount   int            `json:"total_count"`
+	Page         int            `json:"page"`
+	PageSize     int            `json:"page_size"`
+	SearchTimeMs int64          `json:"search_time_ms"`
 }
 
 // PatentSearchResult represents the result of a patent search.

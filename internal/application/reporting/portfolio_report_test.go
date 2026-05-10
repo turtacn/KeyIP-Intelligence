@@ -51,24 +51,33 @@ func assertErrCodePort(t *testing.T, err error, code errors.ErrorCode) {
 type portMockPortfolioDomainService struct {
 	getDetailsFunc func(ctx context.Context, portfolioID string) (interface{}, error)
 }
+
 func (m *portMockPortfolioDomainService) GetDetails(ctx context.Context, portfolioID string) (interface{}, error) {
-	if m.getDetailsFunc != nil { return m.getDetailsFunc(ctx, portfolioID) }
+	if m.getDetailsFunc != nil {
+		return m.getDetailsFunc(ctx, portfolioID)
+	}
 	return nil, nil
 }
 
 type portMockValuationDomainService struct {
 	evaluatePortfolioFunc func(ctx context.Context, portfolioID string) ([]interface{}, error)
 }
+
 func (m *portMockValuationDomainService) EvaluatePortfolio(ctx context.Context, portfolioID string) ([]interface{}, error) {
-	if m.evaluatePortfolioFunc != nil { return m.evaluatePortfolioFunc(ctx, portfolioID) }
+	if m.evaluatePortfolioFunc != nil {
+		return m.evaluatePortfolioFunc(ctx, portfolioID)
+	}
 	return []interface{}{}, nil
 }
 
 type portMockPatentRepo struct {
 	getDetailsFunc func(ctx context.Context, patentIDs []string) (interface{}, error)
 }
+
 func (m *portMockPatentRepo) GetDetails(ctx context.Context, patentIDs []string) (interface{}, error) {
-	if m.getDetailsFunc != nil { return m.getDetailsFunc(ctx, patentIDs) }
+	if m.getDetailsFunc != nil {
+		return m.getDetailsFunc(ctx, patentIDs)
+	}
 	return nil, nil
 }
 
@@ -77,6 +86,7 @@ type portMockMoleculeRepo struct{} // Placeholder for molecule interactions
 type portMockTemplateEngine struct {
 	renderFunc func(ctx context.Context, templateName string, data interface{}, format ReportFormat) ([]byte, error)
 }
+
 func (m *portMockTemplateEngine) Render(ctx context.Context, req *RenderRequest) (*RenderResult, error) {
 	return &RenderResult{Content: []byte("dummy-report")}, nil
 }
@@ -108,8 +118,11 @@ func (m *portMockTemplateEngine) PreviewTemplate(ctx context.Context, templateID
 type portMockStrategyGPTService struct {
 	generateFunc func(ctx context.Context, section ReportSection, data interface{}, lang ReportLanguage) (string, error)
 }
+
 func (m *portMockStrategyGPTService) GenerateSectionInsight(ctx context.Context, section ReportSection, data interface{}, lang ReportLanguage) (string, error) {
-	if m.generateFunc != nil { return m.generateFunc(ctx, section, data, lang) }
+	if m.generateFunc != nil {
+		return m.generateFunc(ctx, section, data, lang)
+	}
 	return "Mocked insight text for " + string(section), nil
 }
 
@@ -117,38 +130,50 @@ type portMockStorageRepo struct {
 	saveFunc      func(ctx context.Context, key string, data []byte, contentType string) error
 	getStreamFunc func(ctx context.Context, key string) (io.ReadCloser, error)
 }
+
 func (m *portMockStorageRepo) Save(ctx context.Context, key string, data []byte, contentType string) error {
-	if m.saveFunc != nil { return m.saveFunc(ctx, key, data, contentType) }
+	if m.saveFunc != nil {
+		return m.saveFunc(ctx, key, data, contentType)
+	}
 	return nil
 }
 func (m *portMockStorageRepo) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
-	if m.getStreamFunc != nil { return m.getStreamFunc(ctx, key) }
+	if m.getStreamFunc != nil {
+		return m.getStreamFunc(ctx, key)
+	}
 	return io.NopCloser(bytes.NewReader([]byte("dummy-file-content"))), nil
 }
 func (m *portMockStorageRepo) Delete(ctx context.Context, key string) error { return nil }
 
 type portMockMetadataRepo struct {
-	createFunc      func(ctx context.Context, meta *ReportMeta) error
+	createFunc       func(ctx context.Context, meta *ReportMeta) error
 	updateStatusFunc func(ctx context.Context, reportID string, status ReportStatus, urls map[ExportFormat]string) error
-	getFunc         func(ctx context.Context, reportID string) (*ReportMeta, error)
-	listFunc        func(ctx context.Context, portfolioID string, opts *ListReportOptions) ([]ReportMeta, int64, error)
-	enforceFunc     func(ctx context.Context, portfolioID string, keepCount int) error
+	getFunc          func(ctx context.Context, reportID string) (*ReportMeta, error)
+	listFunc         func(ctx context.Context, portfolioID string, opts *ListReportOptions) ([]ReportMeta, int64, error)
+	enforceFunc      func(ctx context.Context, portfolioID string, keepCount int) error
 
 	records map[string]*ReportMeta
 	mu      sync.RWMutex
 }
+
 func newPortMockMetadataRepo() *portMockMetadataRepo {
 	return &portMockMetadataRepo{records: make(map[string]*ReportMeta)}
 }
 func (m *portMockMetadataRepo) Create(ctx context.Context, meta *ReportMeta) error {
-	if m.createFunc != nil { return m.createFunc(ctx, meta) }
-	m.mu.Lock(); defer m.mu.Unlock()
+	if m.createFunc != nil {
+		return m.createFunc(ctx, meta)
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.records[meta.ReportID] = meta
 	return nil
 }
 func (m *portMockMetadataRepo) UpdateStatus(ctx context.Context, reportID string, status ReportStatus, urls map[ExportFormat]string) error {
-	m.mu.Lock(); defer m.mu.Unlock()
-	if m.updateStatusFunc != nil { return m.updateStatusFunc(ctx, reportID, status, urls) }
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.updateStatusFunc != nil {
+		return m.updateStatusFunc(ctx, reportID, status, urls)
+	}
 	if r, ok := m.records[reportID]; ok {
 		r.Status = status
 		r.ExportURLs = urls
@@ -156,14 +181,22 @@ func (m *portMockMetadataRepo) UpdateStatus(ctx context.Context, reportID string
 	return nil
 }
 func (m *portMockMetadataRepo) Get(ctx context.Context, reportID string) (*ReportMeta, error) {
-	if m.getFunc != nil { return m.getFunc(ctx, reportID) }
-	m.mu.RLock(); defer m.mu.RUnlock()
-	if r, ok := m.records[reportID]; ok { return r, nil }
+	if m.getFunc != nil {
+		return m.getFunc(ctx, reportID)
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if r, ok := m.records[reportID]; ok {
+		return r, nil
+	}
 	return nil, errors.NewNotFound("report not found")
 }
 func (m *portMockMetadataRepo) List(ctx context.Context, portfolioID string, opts *ListReportOptions) ([]ReportMeta, int64, error) {
-	if m.listFunc != nil { return m.listFunc(ctx, portfolioID, opts) }
-	m.mu.RLock(); defer m.mu.RUnlock()
+	if m.listFunc != nil {
+		return m.listFunc(ctx, portfolioID, opts)
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	var res []ReportMeta
 	for _, r := range m.records {
 		if r.PortfolioID == portfolioID {
@@ -178,7 +211,9 @@ func (m *portMockMetadataRepo) Delete(ctx context.Context, reportID string) erro
 func (m *portMockMetadataRepo) EnforceRetentionPolicy(ctx context.Context, portfolioID string, keepCount int) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.enforceFunc != nil { return m.enforceFunc(ctx, portfolioID, keepCount) }
+	if m.enforceFunc != nil {
+		return m.enforceFunc(ctx, portfolioID, keepCount)
+	}
 	return nil
 }
 
@@ -186,26 +221,35 @@ type portMockCache struct {
 	data map[string]interface{}
 	mu   sync.RWMutex
 }
+
 func newPortMockCache() *portMockCache { return &portMockCache{data: make(map[string]interface{})} }
 func (m *portMockCache) Get(ctx context.Context, key string, dest interface{}) error {
-	m.mu.RLock(); defer m.mu.RUnlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if val, ok := m.data[key]; ok {
 		switch d := dest.(type) {
-		case *ReportStatusInfo: *d = val.(ReportStatusInfo)
+		case *ReportStatusInfo:
+			*d = val.(ReportStatusInfo)
 		}
 		return nil
 	}
 	return errors.NewInternal("cache miss")
 }
 func (m *portMockCache) Set(ctx context.Context, key string, val interface{}, ttl time.Duration) error {
-	m.mu.Lock(); defer m.mu.Unlock(); m.data[key] = val; return nil
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.data[key] = val
+	return nil
 }
 
 type portMockDistributedLock struct {
 	acquireFunc func(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
+
 func (m *portMockDistributedLock) Acquire(ctx context.Context, key string, ttl time.Duration) (bool, error) {
-	if m.acquireFunc != nil { return m.acquireFunc(ctx, key, ttl) }
+	if m.acquireFunc != nil {
+		return m.acquireFunc(ctx, key, ttl)
+	}
 	return true, nil
 }
 func (m *portMockDistributedLock) Release(ctx context.Context, key string) error { return nil }
@@ -215,6 +259,7 @@ type portMockEventPublisher struct {
 	lastEvent interface{}
 	mu        sync.Mutex
 }
+
 func newPortMockEventPublisher() *portMockEventPublisher {
 	return &portMockEventPublisher{publishCh: make(chan struct{}, 10)}
 }
@@ -222,11 +267,15 @@ func (m *portMockEventPublisher) Publish(ctx context.Context, topic string, even
 	m.mu.Lock()
 	m.lastEvent = event
 	m.mu.Unlock()
-	select { case m.publishCh <- struct{}{}: default: }
+	select {
+	case m.publishCh <- struct{}{}:
+	default:
+	}
 	return nil
 }
 
 type portMockLogger struct{}
+
 func (l *portMockLogger) Info(ctx context.Context, msg string, keysAndValues ...interface{})  {}
 func (l *portMockLogger) Error(ctx context.Context, msg string, keysAndValues ...interface{}) {}
 func (l *portMockLogger) Warn(ctx context.Context, msg string, keysAndValues ...interface{})  {}
@@ -327,8 +376,8 @@ func TestGenerateFullReport_PortfolioNotFound(t *testing.T) {
 	t.Parallel()
 	svc, m := newTestPortfolioReportService()
 
-	// Assuming initial sync metadata creation checks portfolio existance, 
-	// but the current implementation blindly creates the task. 
+	// Assuming initial sync metadata creation checks portfolio existance,
+	// but the current implementation blindly creates the task.
 	// Let's test what happens if metadata creation fails to simulate a DB error.
 	m.metaRepo.createFunc = func(ctx context.Context, meta *ReportMeta) error {
 		return errors.NewNotFound("portfolio not found")
@@ -431,7 +480,9 @@ func TestGenerateSummaryReport_Success(t *testing.T) {
 
 	req := &PortfolioSummaryRequest{PortfolioID: "port-sum", TopN: 5}
 	resp, err := svc.GenerateSummaryReport(context.Background(), req)
-	if err != nil { t.Fatalf("Unexpected error") }
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
 
 	<-m.events.publishCh
 	meta, _ := m.metaRepo.Get(context.Background(), resp.ReportID)
@@ -447,7 +498,9 @@ func TestGenerateSummaryReport_TopNExceedsTotal(t *testing.T) {
 	req := &PortfolioSummaryRequest{PortfolioID: "port-sum", TopN: 100} // Request 100, assuming only 3 exist
 	// In reality, logic handles slicing safely. We verify it doesn't crash.
 	_, err := svc.GenerateSummaryReport(context.Background(), req)
-	if err != nil { t.Errorf("Should handle TopN > Total without error") }
+	if err != nil {
+		t.Errorf("Should handle TopN > Total without error")
+	}
 }
 
 // ============================================================================
@@ -473,7 +526,9 @@ func TestGenerateGapReport_DeepAnalysis(t *testing.T) {
 	svc, _ := newTestPortfolioReportService()
 	req := &GapReportRequest{PortfolioID: "port-gap", AnalysisDepth: DepthComprehensive}
 	_, err := svc.GenerateGapReport(context.Background(), req)
-	if err != nil { t.Errorf("Deep analysis should trigger successfully") }
+	if err != nil {
+		t.Errorf("Deep analysis should trigger successfully")
+	}
 }
 
 func TestGenerateGapReport_NoCompetitors(t *testing.T) {
@@ -483,7 +538,9 @@ func TestGenerateGapReport_NoCompetitors(t *testing.T) {
 	// We'll simulate it executes successfully without competitors.
 	req := &GapReportRequest{PortfolioID: "port-gap", CompetitorIDs: []string{}}
 	_, err := svc.GenerateGapReport(context.Background(), req)
-	if err != nil { t.Errorf("No competitors should be allowed for self-analysis") }
+	if err != nil {
+		t.Errorf("No competitors should be allowed for self-analysis")
+	}
 }
 
 func TestGenerateCompetitiveReport_Success(t *testing.T) {
@@ -517,7 +574,9 @@ func TestGenerateCompetitiveReport_SingleDimension(t *testing.T) {
 	svc, _ := newTestPortfolioReportService()
 	req := &CompetitiveReportRequest{PortfolioID: "port-comp", CompetitorIDs: []string{"C1"}, Dimensions: []CompetitiveDimension{DimPatentCount}}
 	_, err := svc.GenerateCompetitiveReport(context.Background(), req)
-	if err != nil { t.Errorf("Single dimension should work") }
+	if err != nil {
+		t.Errorf("Single dimension should work")
+	}
 }
 
 // ============================================================================
@@ -530,8 +589,12 @@ func TestGetReportStatus_Exists(t *testing.T) {
 	_ = m.cache.Set(context.Background(), "prpt_status:R1", ReportStatusInfo{ReportID: "R1", Status: StatusProcessing}, 1*time.Minute)
 
 	info, err := svc.GetReportStatus(context.Background(), "R1")
-	if err != nil { t.Fatalf("Unexpected error") }
-	if info.Status != StatusProcessing { t.Errorf("Expected StatusProcessing") }
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
+	if info.Status != StatusProcessing {
+		t.Errorf("Expected StatusProcessing")
+	}
 }
 
 func TestGetReportStatus_NotFound(t *testing.T) {
@@ -556,11 +619,17 @@ func TestListReports_Success(t *testing.T) {
 
 	opts := &ListReportOptions{Pagination: common.Pagination{Page: 1, PageSize: 10}}
 	res, err := svc.ListReports(context.Background(), "P1", opts)
-	if err != nil { t.Fatalf("Unexpected error") }
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
 
-	if res.Pagination.Total != 15 { t.Errorf("Expected 15 total reports, got %d", res.Pagination.Total) }
+	if res.Pagination.Total != 15 {
+		t.Errorf("Expected 15 total reports, got %d", res.Pagination.Total)
+	}
 	// In a real DB mock, it would paginate. Our simple map mock returns all 15, but we check logic.
-	if len(res.Items) != 15 { t.Errorf("Mock returns all, expected 15") }
+	if len(res.Items) != 15 {
+		t.Errorf("Mock returns all, expected 15")
+	}
 }
 
 func TestListReports_FilterByType(t *testing.T) {
@@ -574,8 +643,12 @@ func TestListReports_FilterByType(t *testing.T) {
 	opts := &ListReportOptions{Type: &rtype, Pagination: common.Pagination{Page: 1, PageSize: 10}}
 	res, _ := svc.ListReports(context.Background(), "P1", opts)
 
-	if res.Pagination.Total != 1 { t.Errorf("Expected 1 filtered result") }
-	if res.Items[0].Type != TypeFullReport { t.Errorf("Filter failed") }
+	if res.Pagination.Total != 1 {
+		t.Errorf("Expected 1 filtered result")
+	}
+	if res.Items[0].Type != TypeFullReport {
+		t.Errorf("Filter failed")
+	}
 }
 
 func TestExportReport_SameFormat(t *testing.T) {
@@ -587,8 +660,12 @@ func TestExportReport_SameFormat(t *testing.T) {
 	})
 
 	bytes, err := svc.ExportReport(context.Background(), "R1", FormatPortfolioPDF)
-	if err != nil { t.Fatalf("Unexpected error: %v", err) }
-	if len(bytes) == 0 { t.Errorf("Expected non-empty byte slice") }
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if len(bytes) == 0 {
+		t.Errorf("Expected non-empty byte slice")
+	}
 }
 
 func TestExportReport_DifferentFormat(t *testing.T) {
@@ -686,7 +763,9 @@ func TestReportRetentionPolicy(t *testing.T) {
 	var mu sync.Mutex
 	enforceCalled := false
 	m.metaRepo.enforceFunc = func(ctx context.Context, portfolioID string, keepCount int) error {
-		if keepCount != 50 { t.Errorf("Expected default retention limit 50") }
+		if keepCount != 50 {
+			t.Errorf("Expected default retention limit 50")
+		}
 		mu.Lock()
 		enforceCalled = true
 		mu.Unlock()
@@ -700,7 +779,9 @@ func TestReportRetentionPolicy(t *testing.T) {
 	mu.Lock()
 	called := enforceCalled
 	mu.Unlock()
-	if !called { t.Errorf("Expected retention policy to be enforced post-generation") }
+	if !called {
+		t.Errorf("Expected retention policy to be enforced post-generation")
+	}
 }
 
 func TestReportRetentionPolicy_CustomLimit(t *testing.T) {
@@ -713,7 +794,9 @@ func TestReportRetentionPolicy_CustomLimit(t *testing.T) {
 	var mu sync.Mutex
 	enforceCalled := false
 	m.metaRepo.enforceFunc = func(ctx context.Context, portfolioID string, keepCount int) error {
-		if keepCount != 10 { t.Errorf("Expected custom retention limit 10, got %d", keepCount) }
+		if keepCount != 10 {
+			t.Errorf("Expected custom retention limit 10, got %d", keepCount)
+		}
 		mu.Lock()
 		enforceCalled = true
 		mu.Unlock()
@@ -727,7 +810,9 @@ func TestReportRetentionPolicy_CustomLimit(t *testing.T) {
 	mu.Lock()
 	called := enforceCalled
 	mu.Unlock()
-	if !called { t.Errorf("Expected custom retention policy to be enforced post-generation") }
+	if !called {
+		t.Errorf("Expected custom retention policy to be enforced post-generation")
+	}
 }
 
 //Personal.AI order the ending

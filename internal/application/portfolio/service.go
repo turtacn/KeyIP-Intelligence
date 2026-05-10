@@ -84,20 +84,20 @@ type IPCCount struct {
 
 // ValuationResult represents the result of portfolio valuation.
 type ValuationResult struct {
-	PortfolioID   string             `json:"portfolio_id"`
-	TotalValue    float64            `json:"total_value"`
-	PatentValues  []PatentValue      `json:"patent_values"`
-	Methodology   string             `json:"methodology"`
-	Confidence    float64            `json:"confidence"`
-	CalculatedAt  time.Time          `json:"calculated_at"`
+	PortfolioID  string        `json:"portfolio_id"`
+	TotalValue   float64       `json:"total_value"`
+	PatentValues []PatentValue `json:"patent_values"`
+	Methodology  string        `json:"methodology"`
+	Confidence   float64       `json:"confidence"`
+	CalculatedAt time.Time     `json:"calculated_at"`
 }
 
 // PatentValue represents the value of a single patent.
 type PatentValue struct {
-	PatentID    string  `json:"patent_id"`
-	PatentNo    string  `json:"patent_no"`
-	Value       float64 `json:"value"`
-	Factors     map[string]float64 `json:"factors"`
+	PatentID string             `json:"patent_id"`
+	PatentNo string             `json:"patent_no"`
+	Value    float64            `json:"value"`
+	Factors  map[string]float64 `json:"factors"`
 }
 
 // PortfolioAssessRequest is the input for portfolio assessment.
@@ -108,12 +108,12 @@ type PortfolioAssessRequest struct {
 
 // PortfolioAssessResult is the output from portfolio assessment.
 type PortfolioAssessResult struct {
-	PortfolioID   string              `json:"portfolio_id"`
-	TotalValue    float64             `json:"total_value"`
-	RiskScore     float64             `json:"risk_score"`
-	Items         []*ValuationItem    `json:"items"`
-	Summary       string              `json:"summary"`
-	CalculatedAt  time.Time           `json:"calculated_at"`
+	PortfolioID  string           `json:"portfolio_id"`
+	TotalValue   float64          `json:"total_value"`
+	RiskScore    float64          `json:"risk_score"`
+	Items        []*ValuationItem `json:"items"`
+	Summary      string           `json:"summary"`
+	CalculatedAt time.Time        `json:"calculated_at"`
 }
 
 // ValuationItem represents a single patent valuation item.

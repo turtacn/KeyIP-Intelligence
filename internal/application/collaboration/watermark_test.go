@@ -27,11 +27,11 @@ import (
 // --- Mock WatermarkRepository ---
 
 type mockWatermarkRepo struct {
-	createFn                     func(ctx context.Context, record *WatermarkRecord) error
-	getByIDFn                    func(ctx context.Context, id string) (*WatermarkRecord, error)
-	getByDocAndFingerprintFn     func(ctx context.Context, documentID, fingerprint string) (*WatermarkRecord, error)
-	listByDocumentFn             func(ctx context.Context, documentID string, p commontypes.Pagination) ([]*WatermarkRecord, int, error)
-	updateFn                     func(ctx context.Context, record *WatermarkRecord) error
+	createFn                 func(ctx context.Context, record *WatermarkRecord) error
+	getByIDFn                func(ctx context.Context, id string) (*WatermarkRecord, error)
+	getByDocAndFingerprintFn func(ctx context.Context, documentID, fingerprint string) (*WatermarkRecord, error)
+	listByDocumentFn         func(ctx context.Context, documentID string, p commontypes.Pagination) ([]*WatermarkRecord, int, error)
+	updateFn                 func(ctx context.Context, record *WatermarkRecord) error
 }
 
 func (m *mockWatermarkRepo) Create(ctx context.Context, record *WatermarkRecord) error {
@@ -71,15 +71,15 @@ func (m *mockWatermarkRepo) Update(ctx context.Context, record *WatermarkRecord)
 
 type mockWatermarkLogger struct{}
 
-func (m *mockWatermarkLogger) Debug(msg string, fields ...logging.Field) {}
-func (m *mockWatermarkLogger) Info(msg string, fields ...logging.Field)  {}
-func (m *mockWatermarkLogger) Warn(msg string, fields ...logging.Field)  {}
-func (m *mockWatermarkLogger) Error(msg string, fields ...logging.Field) {}
-func (m *mockWatermarkLogger) Fatal(msg string, fields ...logging.Field) {}
-func (m *mockWatermarkLogger) With(fields ...logging.Field) logging.Logger { return m }
+func (m *mockWatermarkLogger) Debug(msg string, fields ...logging.Field)      {}
+func (m *mockWatermarkLogger) Info(msg string, fields ...logging.Field)       {}
+func (m *mockWatermarkLogger) Warn(msg string, fields ...logging.Field)       {}
+func (m *mockWatermarkLogger) Error(msg string, fields ...logging.Field)      {}
+func (m *mockWatermarkLogger) Fatal(msg string, fields ...logging.Field)      {}
+func (m *mockWatermarkLogger) With(fields ...logging.Field) logging.Logger    { return m }
 func (m *mockWatermarkLogger) WithContext(ctx context.Context) logging.Logger { return m }
-func (m *mockWatermarkLogger) WithError(err error) logging.Logger { return m }
-func (m *mockWatermarkLogger) Sync() error { return nil }
+func (m *mockWatermarkLogger) WithError(err error) logging.Logger             { return m }
+func (m *mockWatermarkLogger) Sync() error                                    { return nil }
 
 func newTestWatermarkService(repo *mockWatermarkRepo) WatermarkService {
 	if repo == nil {

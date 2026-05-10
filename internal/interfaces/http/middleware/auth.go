@@ -16,13 +16,16 @@
 //   - 实现 OptionalAuth() 中间件: 认证可选，未提供凭证时以匿名身份继续
 //   - 实现 contextKey 类型和 ContextGetClaims/ContextGetAPIKeyInfo 辅助函数
 //   - 支持路径白名单配置，跳过特定路径的认证（如 /health, /metrics）
+//
 // 安全考量:
 //   - Token 过期自动拒绝
 //   - 不在错误响应中泄露认证细节
 //   - 支持 token 黑名单检查
+//
 // 依赖关系:
 //   - 依赖: internal/infrastructure/monitoring/logging
 //   - 被依赖: internal/interfaces/http/router.go, middleware chain
+//
 // 测试要求: Bearer token 正常/过期/格式错误、API key 正常/无效、白名单跳过、context 注入
 // 强制约束: 文件最后一行必须为 //Personal.AI order the ending
 package middleware
@@ -290,4 +293,3 @@ func (m *AuthMiddleware) Handler(next http.Handler) http.Handler {
 }
 
 //Personal.AI order the ending
-

@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	ErrCacheMiss         = errors.New(errors.ErrCodeNotFound, "cache miss")
-	ErrCacheUnavailable  = errors.New(errors.ErrCodeServiceUnavailable, "cache unavailable")
+	ErrCacheMiss           = errors.New(errors.ErrCodeNotFound, "cache miss")
+	ErrCacheUnavailable    = errors.New(errors.ErrCodeServiceUnavailable, "cache unavailable")
 	ErrSerializationFailed = errors.New(errors.ErrCodeSerialization, "serialization failed")
 )
 
@@ -300,7 +300,9 @@ func (c *redisCache) DeleteByPrefix(ctx context.Context, prefix string) (int64, 
 // Hash operations
 func (c *redisCache) HGet(ctx context.Context, key, field string) (string, error) {
 	val, err := c.client.HGet(ctx, c.fullKey(key), field).Result()
-	if err == redis.Nil { return "", ErrCacheMiss }
+	if err == redis.Nil {
+		return "", ErrCacheMiss
+	}
 	return val, err
 }
 
@@ -352,7 +354,9 @@ func (c *redisCache) ZRangeByScore(ctx context.Context, key string, min, max flo
 
 func (c *redisCache) ZRevRangeWithScores(ctx context.Context, key string, start, stop int64) ([]*ZMember, error) {
 	vals, err := c.client.ZRevRangeWithScores(ctx, c.fullKey(key), start, stop).Result()
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	result := make([]*ZMember, len(vals))
 	for i, v := range vals {
 		result[i] = &ZMember{Score: v.Score, Member: v.Member.(string)}
@@ -363,13 +367,17 @@ func (c *redisCache) ZRevRangeWithScores(ctx context.Context, key string, start,
 func (c *redisCache) ZRem(ctx context.Context, key string, members ...string) error {
 	// Need to cast members to interface{}
 	ifaces := make([]interface{}, len(members))
-	for i, m := range members { ifaces[i] = m }
+	for i, m := range members {
+		ifaces[i] = m
+	}
 	return c.client.ZRem(ctx, c.fullKey(key), ifaces...).Err()
 }
 
 func (c *redisCache) ZScore(ctx context.Context, key, member string) (float64, error) {
 	val, err := c.client.ZScore(ctx, c.fullKey(key), member).Result()
-	if err == redis.Nil { return 0, ErrCacheMiss }
+	if err == redis.Nil {
+		return 0, ErrCacheMiss
+	}
 	return val, err
 }
 

@@ -45,6 +45,7 @@ func (m *MockSession) Close(ctx context.Context) error {
 type MockTransaction struct {
 	mock.Mock
 }
+
 func (m *MockTransaction) Run(ctx context.Context, cypher string, params map[string]any) (Result, error) {
 	return new(MockResult), nil
 }
@@ -53,9 +54,10 @@ func (m *MockTransaction) Run(ctx context.Context, cypher string, params map[str
 type MockResult struct {
 	mock.Mock
 }
-func (m *MockResult) Next(ctx context.Context) bool { return false }
-func (m *MockResult) Record() *neo4j.Record { return nil }
-func (m *MockResult) Err() error { return nil }
+
+func (m *MockResult) Next(ctx context.Context) bool                            { return false }
+func (m *MockResult) Record() *neo4j.Record                                    { return nil }
+func (m *MockResult) Err() error                                               { return nil }
 func (m *MockResult) Consume(ctx context.Context) (neo4j.ResultSummary, error) { return nil, nil }
 
 func TestDriver_HealthCheck(t *testing.T) {

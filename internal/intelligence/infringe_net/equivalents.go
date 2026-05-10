@@ -96,23 +96,23 @@ type StructuralElement struct {
 // ProsecutionHistoryEntry records a single event from the patent prosecution
 // file wrapper that may trigger prosecution-history estoppel.
 type ProsecutionHistoryEntry struct {
-	EventType        string `json:"event_type"`          // e.g. "amendment", "argument", "restriction"
-	AbandonedScope   string `json:"abandoned_scope"`     // human-readable description
-	AbandonedSMILES  string `json:"abandoned_smiles,omitempty"`
-	AbandonedType    ElementType `json:"abandoned_type"`
-	Reason           string `json:"reason,omitempty"`
+	EventType       string      `json:"event_type"`      // e.g. "amendment", "argument", "restriction"
+	AbandonedScope  string      `json:"abandoned_scope"` // human-readable description
+	AbandonedSMILES string      `json:"abandoned_smiles,omitempty"`
+	AbandonedType   ElementType `json:"abandoned_type"`
+	Reason          string      `json:"reason,omitempty"`
 }
 
 // EquivalentsRequest is the input to a full equivalents analysis.
 type EquivalentsRequest struct {
 	QueryMolecule      []*StructuralElement       `json:"query_molecule"`
 	ClaimElements      []*StructuralElement       `json:"claim_elements"`
-	ProsecutionHistory []*ProsecutionHistoryEntry  `json:"prosecution_history,omitempty"`
+	ProsecutionHistory []*ProsecutionHistoryEntry `json:"prosecution_history,omitempty"`
 }
 
 // EquivalentsResult is the output of a full equivalents analysis.
 type EquivalentsResult struct {
-	OverallEquivalenceScore float64              `json:"overall_equivalence_score"`
+	OverallEquivalenceScore float64               `json:"overall_equivalence_score"`
 	ElementResults          []*ElementEquivalence `json:"element_results"`
 	EquivalentElementCount  int                   `json:"equivalent_element_count"`
 	TotalElementCount       int                   `json:"total_element_count"`
@@ -130,14 +130,14 @@ type NonEquivalentInfo struct {
 
 // ElementEquivalence is the result of a single element-pair FWR test.
 type ElementEquivalence struct {
-	QueryElement *StructuralElement `json:"query_element"`
-	ClaimElement *StructuralElement `json:"claim_element"`
-	FunctionScore float64           `json:"function_score"`
-	WayScore      float64           `json:"way_score"`
-	ResultScore   float64           `json:"result_score"`
-	OverallScore  float64           `json:"overall_score"`
-	IsEquivalent  bool              `json:"is_equivalent"`
-	Reasoning     string            `json:"reasoning"`
+	QueryElement  *StructuralElement `json:"query_element"`
+	ClaimElement  *StructuralElement `json:"claim_element"`
+	FunctionScore float64            `json:"function_score"`
+	WayScore      float64            `json:"way_score"`
+	ResultScore   float64            `json:"result_score"`
+	OverallScore  float64            `json:"overall_score"`
+	IsEquivalent  bool               `json:"is_equivalent"`
+	Reasoning     string             `json:"reasoning"`
 	// Internal flags indicating which steps were actually executed.
 	functionEvaluated bool
 	wayEvaluated      bool
@@ -760,4 +760,3 @@ func determineFailedStep(eq *ElementEquivalence) string {
 	}
 	return "unknown"
 }
-

@@ -37,10 +37,9 @@ import (
 	domainmol "github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	domainpatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
 	domainportfolio "github.com/turtacn/KeyIP-Intelligence/internal/domain/portfolio"
-	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/molpatent_gnn"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
+	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/molpatent_gnn"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
-	commontypes "github.com/turtacn/KeyIP-Intelligence/pkg/types/common"
 )
 
 // -----------------------------------------------------------------------
@@ -49,19 +48,19 @@ import (
 
 // ConstellationRequest defines parameters for generating a portfolio constellation view.
 type ConstellationRequest struct {
-	PortfolioID   string                `json:"portfolio_id" validate:"required"`
-	Filters       ConstellationFilters  `json:"filters,omitempty"`
-	Reduction     DimensionReduction    `json:"reduction,omitempty"`
-	IncludeWhiteSpaces bool             `json:"include_white_spaces"`
+	PortfolioID        string               `json:"portfolio_id" validate:"required"`
+	Filters            ConstellationFilters `json:"filters,omitempty"`
+	Reduction          DimensionReduction   `json:"reduction,omitempty"`
+	IncludeWhiteSpaces bool                 `json:"include_white_spaces"`
 }
 
 // ConstellationFilters provides optional filtering criteria for constellation generation.
 type ConstellationFilters struct {
-	TechDomains   []string              `json:"tech_domains,omitempty"`
-	FilingYearMin int                   `json:"filing_year_min,omitempty"`
-	FilingYearMax int                   `json:"filing_year_max,omitempty"`
-	LegalStatuses []string              `json:"legal_statuses,omitempty"`
-	Assignees     []string              `json:"assignees,omitempty"`
+	TechDomains   []string `json:"tech_domains,omitempty"`
+	FilingYearMin int      `json:"filing_year_min,omitempty"`
+	FilingYearMax int      `json:"filing_year_max,omitempty"`
+	LegalStatuses []string `json:"legal_statuses,omitempty"`
+	Assignees     []string `json:"assignees,omitempty"`
 }
 
 // DimensionReduction specifies the algorithm and target dimensions for embedding reduction.
@@ -83,75 +82,75 @@ const (
 
 // ConstellationResponse contains the full constellation view data.
 type ConstellationResponse struct {
-	PortfolioID   string                `json:"portfolio_id"`
-	Points        []ConstellationPoint  `json:"points"`
+	PortfolioID   string                 `json:"portfolio_id"`
+	Points        []ConstellationPoint   `json:"points"`
 	Clusters      []ConstellationCluster `json:"clusters,omitempty"`
-	WhiteSpaces   []WhiteSpaceRegion    `json:"white_spaces,omitempty"`
-	CoverageStats CoverageStatistics    `json:"coverage_stats"`
-	GeneratedAt   time.Time             `json:"generated_at"`
-	CacheKey      string                `json:"cache_key,omitempty"`
+	WhiteSpaces   []WhiteSpaceRegion     `json:"white_spaces,omitempty"`
+	CoverageStats CoverageStatistics     `json:"coverage_stats"`
+	GeneratedAt   time.Time              `json:"generated_at"`
+	CacheKey      string                 `json:"cache_key,omitempty"`
 }
 
 // ConstellationPoint represents a single point (molecule/patent) in the constellation.
 type ConstellationPoint struct {
-	ID            string    `json:"id"`
-	PatentNumber  string    `json:"patent_number,omitempty"`
-	MoleculeID    string    `json:"molecule_id,omitempty"`
-	SMILES        string    `json:"smiles,omitempty"`
-	X             float64   `json:"x"`
-	Y             float64   `json:"y"`
-	Z             float64   `json:"z,omitempty"`
-	TechDomain    string    `json:"tech_domain,omitempty"`
-	LegalStatus   string    `json:"legal_status,omitempty"`
-	Assignee      string    `json:"assignee,omitempty"`
-	FilingYear    int       `json:"filing_year,omitempty"`
-	ValueScore    float64   `json:"value_score,omitempty"`
-	PointType     PointType `json:"point_type"`
+	ID           string    `json:"id"`
+	PatentNumber string    `json:"patent_number,omitempty"`
+	MoleculeID   string    `json:"molecule_id,omitempty"`
+	SMILES       string    `json:"smiles,omitempty"`
+	X            float64   `json:"x"`
+	Y            float64   `json:"y"`
+	Z            float64   `json:"z,omitempty"`
+	TechDomain   string    `json:"tech_domain,omitempty"`
+	LegalStatus  string    `json:"legal_status,omitempty"`
+	Assignee     string    `json:"assignee,omitempty"`
+	FilingYear   int       `json:"filing_year,omitempty"`
+	ValueScore   float64   `json:"value_score,omitempty"`
+	PointType    PointType `json:"point_type"`
 }
 
 // PointType enumerates the type of a constellation point.
 type PointType string
 
 const (
-	PointTypeOwnPatent       PointType = "own_patent"
+	PointTypeOwnPatent        PointType = "own_patent"
 	PointTypeCompetitorPatent PointType = "competitor_patent"
-	PointTypePublicPatent    PointType = "public_patent"
-	PointTypeMolecule        PointType = "molecule"
+	PointTypePublicPatent     PointType = "public_patent"
+	PointTypeMolecule         PointType = "molecule"
 )
 
 // ConstellationCluster represents a cluster of related points in the constellation.
 type ConstellationCluster struct {
-	ClusterID   string    `json:"cluster_id"`
-	Label       string    `json:"label"`
-	CenterX     float64   `json:"center_x"`
-	CenterY     float64   `json:"center_y"`
-	Radius      float64   `json:"radius"`
-	PointCount  int       `json:"point_count"`
-	TechDomains []string  `json:"tech_domains,omitempty"`
-	Density     float64   `json:"density"`
+	ClusterID   string   `json:"cluster_id"`
+	Label       string   `json:"label"`
+	CenterX     float64  `json:"center_x"`
+	CenterY     float64  `json:"center_y"`
+	Radius      float64  `json:"radius"`
+	PointCount  int      `json:"point_count"`
+	TechDomains []string `json:"tech_domains,omitempty"`
+	Density     float64  `json:"density"`
 }
 
 // WhiteSpaceRegion represents an identified gap in the patent landscape.
 type WhiteSpaceRegion struct {
-	RegionID    string    `json:"region_id"`
-	CenterX     float64   `json:"center_x"`
-	CenterY     float64   `json:"center_y"`
-	Area        float64   `json:"area"`
-	NearestTech []string  `json:"nearest_tech_domains,omitempty"`
-	Opportunity string    `json:"opportunity_description,omitempty"`
-	Score       float64   `json:"score"`
+	RegionID    string   `json:"region_id"`
+	CenterX     float64  `json:"center_x"`
+	CenterY     float64  `json:"center_y"`
+	Area        float64  `json:"area"`
+	NearestTech []string `json:"nearest_tech_domains,omitempty"`
+	Opportunity string   `json:"opportunity_description,omitempty"`
+	Score       float64  `json:"score"`
 }
 
 // CoverageStatistics provides aggregate statistics about the constellation.
 type CoverageStatistics struct {
-	TotalPoints       int     `json:"total_points"`
-	OwnPatentCount    int     `json:"own_patent_count"`
-	CompetitorCount   int     `json:"competitor_count"`
-	CoverageRatio     float64 `json:"coverage_ratio"`
-	WhiteSpaceCount   int     `json:"white_space_count"`
-	ClusterCount      int     `json:"cluster_count"`
-	DensityMean       float64 `json:"density_mean"`
-	DensityStdDev     float64 `json:"density_std_dev"`
+	TotalPoints     int     `json:"total_points"`
+	OwnPatentCount  int     `json:"own_patent_count"`
+	CompetitorCount int     `json:"competitor_count"`
+	CoverageRatio   float64 `json:"coverage_ratio"`
+	WhiteSpaceCount int     `json:"white_space_count"`
+	ClusterCount    int     `json:"cluster_count"`
+	DensityMean     float64 `json:"density_mean"`
+	DensityStdDev   float64 `json:"density_std_dev"`
 }
 
 // CompetitorCompareRequest defines parameters for comparing portfolios with a competitor.
@@ -164,50 +163,50 @@ type CompetitorCompareRequest struct {
 
 // CompetitorCompareResponse contains the comparison result.
 type CompetitorCompareResponse struct {
-	PortfolioID     string              `json:"portfolio_id"`
-	CompetitorName  string              `json:"competitor_name"`
-	OverlapZones    []OverlapZone       `json:"overlap_zones"`
-	OwnExclusive    []ExclusiveZone     `json:"own_exclusive_zones"`
-	CompExclusive   []ExclusiveZone     `json:"competitor_exclusive_zones"`
-	StrengthIndex   float64             `json:"strength_index"`
-	Summary         ComparisonSummary   `json:"summary"`
-	GeneratedAt     time.Time           `json:"generated_at"`
+	PortfolioID    string            `json:"portfolio_id"`
+	CompetitorName string            `json:"competitor_name"`
+	OverlapZones   []OverlapZone     `json:"overlap_zones"`
+	OwnExclusive   []ExclusiveZone   `json:"own_exclusive_zones"`
+	CompExclusive  []ExclusiveZone   `json:"competitor_exclusive_zones"`
+	StrengthIndex  float64           `json:"strength_index"`
+	Summary        ComparisonSummary `json:"summary"`
+	GeneratedAt    time.Time         `json:"generated_at"`
 }
 
 // OverlapZone represents a region where both portfolios have coverage.
 type OverlapZone struct {
-	ZoneID      string   `json:"zone_id"`
-	TechDomain  string   `json:"tech_domain"`
-	OwnCount    int      `json:"own_patent_count"`
-	CompCount   int      `json:"competitor_patent_count"`
-	Intensity   float64  `json:"competition_intensity"`
+	ZoneID     string  `json:"zone_id"`
+	TechDomain string  `json:"tech_domain"`
+	OwnCount   int     `json:"own_patent_count"`
+	CompCount  int     `json:"competitor_patent_count"`
+	Intensity  float64 `json:"competition_intensity"`
 }
 
 // ExclusiveZone represents a region where only one party has coverage.
 type ExclusiveZone struct {
-	ZoneID      string   `json:"zone_id"`
-	TechDomain  string   `json:"tech_domain"`
-	PatentCount int      `json:"patent_count"`
-	Strength    float64  `json:"strength_score"`
+	ZoneID      string  `json:"zone_id"`
+	TechDomain  string  `json:"tech_domain"`
+	PatentCount int     `json:"patent_count"`
+	Strength    float64 `json:"strength_score"`
 }
 
 // ComparisonSummary provides a high-level summary of the comparison.
 type ComparisonSummary struct {
-	TotalOwnPatents      int     `json:"total_own_patents"`
-	TotalCompPatents     int     `json:"total_competitor_patents"`
-	OverlapDomainCount   int     `json:"overlap_domain_count"`
-	OwnExclusiveCount    int     `json:"own_exclusive_domain_count"`
-	CompExclusiveCount   int     `json:"competitor_exclusive_domain_count"`
-	OverallAdvantage     string  `json:"overall_advantage"`
-	AdvantageScore       float64 `json:"advantage_score"`
+	TotalOwnPatents    int     `json:"total_own_patents"`
+	TotalCompPatents   int     `json:"total_competitor_patents"`
+	OverlapDomainCount int     `json:"overlap_domain_count"`
+	OwnExclusiveCount  int     `json:"own_exclusive_domain_count"`
+	CompExclusiveCount int     `json:"competitor_exclusive_domain_count"`
+	OverallAdvantage   string  `json:"overall_advantage"`
+	AdvantageScore     float64 `json:"advantage_score"`
 }
 
 // DomainDistribution contains the distribution of patents across technology domains.
 type DomainDistribution struct {
-	PortfolioID string                `json:"portfolio_id"`
-	Domains     []DomainEntry         `json:"domains"`
-	TotalCount  int                   `json:"total_count"`
-	GeneratedAt time.Time             `json:"generated_at"`
+	PortfolioID string        `json:"portfolio_id"`
+	Domains     []DomainEntry `json:"domains"`
+	TotalCount  int           `json:"total_count"`
+	GeneratedAt time.Time     `json:"generated_at"`
 }
 
 // DomainEntry represents a single technology domain's statistics.
@@ -233,13 +232,13 @@ type heatmapConfig struct {
 
 // CoverageHeatmap contains the heatmap data for patent coverage visualization.
 type CoverageHeatmap struct {
-	PortfolioID string          `json:"portfolio_id"`
-	Grid        [][]float64     `json:"grid"`
-	XRange      [2]float64      `json:"x_range"`
-	YRange      [2]float64      `json:"y_range"`
-	Resolution  int             `json:"resolution"`
-	MaxDensity  float64         `json:"max_density"`
-	GeneratedAt time.Time       `json:"generated_at"`
+	PortfolioID string      `json:"portfolio_id"`
+	Grid        [][]float64 `json:"grid"`
+	XRange      [2]float64  `json:"x_range"`
+	YRange      [2]float64  `json:"y_range"`
+	Resolution  int         `json:"resolution"`
+	MaxDensity  float64     `json:"max_density"`
+	GeneratedAt time.Time   `json:"generated_at"`
 }
 
 // WithResolution sets the heatmap grid resolution.
@@ -299,15 +298,15 @@ type ConstellationService interface {
 // -----------------------------------------------------------------------
 
 type constellationServiceImpl struct {
-	portfolioSvc   domainportfolio.Service
-	portfolioRepo  domainportfolio.PortfolioRepository
-	moleculeSvc    domainmol.Service
-	patentRepo     domainpatent.Repository
-	moleculeRepo   domainmol.Repository
-	gnnInference   molpatent_gnn.GNNInferenceService
-	logger         logging.Logger
-	cache          ConstellationCache
-	cacheTTL       time.Duration
+	portfolioSvc  domainportfolio.Service
+	portfolioRepo domainportfolio.PortfolioRepository
+	moleculeSvc   domainmol.Service
+	patentRepo    domainpatent.Repository
+	moleculeRepo  domainmol.Repository
+	gnnInference  molpatent_gnn.GNNInferenceService
+	logger        logging.Logger
+	cache         ConstellationCache
+	cacheTTL      time.Duration
 }
 
 // ConstellationServiceConfig holds configuration for constructing the service.
@@ -351,15 +350,15 @@ func NewConstellationService(cfg ConstellationServiceConfig) (ConstellationServi
 	}
 
 	return &constellationServiceImpl{
-		portfolioSvc:   cfg.PortfolioService,
-		portfolioRepo:  cfg.PortfolioRepository,
-		moleculeSvc:    cfg.MoleculeService,
-		patentRepo:     cfg.PatentRepository,
-		moleculeRepo:   cfg.MoleculeRepository,
-		gnnInference:   cfg.GNNInference,
-		logger:         cfg.Logger,
-		cache:          cfg.Cache,
-		cacheTTL:       ttl,
+		portfolioSvc:  cfg.PortfolioService,
+		portfolioRepo: cfg.PortfolioRepository,
+		moleculeSvc:   cfg.MoleculeService,
+		patentRepo:    cfg.PatentRepository,
+		moleculeRepo:  cfg.MoleculeRepository,
+		gnnInference:  cfg.GNNInference,
+		logger:        cfg.Logger,
+		cache:         cfg.Cache,
+		cacheTTL:      ttl,
 	}, nil
 }
 
@@ -1626,14 +1625,14 @@ func toStringSet(items []string) map[string]struct{} {
 // In production this would consult a classification database; here we provide a basic mapping.
 func resolveDomainName(code string) string {
 	knownDomains := map[string]string{
-		"A61K": "Preparations for Medical Purposes",
-		"A61P": "Therapeutic Activity of Chemical Compounds",
-		"C07D": "Heterocyclic Compounds",
-		"C07C": "Acyclic or Carbocyclic Compounds",
-		"C07K": "Peptides",
-		"C12N": "Microorganisms or Enzymes",
-		"G01N": "Investigating or Analysing Materials",
-		"G16B": "Bioinformatics",
+		"A61K":         "Preparations for Medical Purposes",
+		"A61P":         "Therapeutic Activity of Chemical Compounds",
+		"C07D":         "Heterocyclic Compounds",
+		"C07C":         "Acyclic or Carbocyclic Compounds",
+		"C07K":         "Peptides",
+		"C12N":         "Microorganisms or Enzymes",
+		"G01N":         "Investigating or Analysing Materials",
+		"G16B":         "Bioinformatics",
 		"unclassified": "Unclassified",
 	}
 	if name, ok := knownDomains[code]; ok {
@@ -1819,11 +1818,4 @@ func computeBoundingBox(points [][]float64) (xMin, xMax, yMin, yMax float64) {
 	return xMin, xMax, yMin, yMax
 }
 
-// Ensure unused imports are referenced (compile guard).
-var (
-	_ commontypes.ID = ""
-)
-
 //Personal.AI order the ending
-
-

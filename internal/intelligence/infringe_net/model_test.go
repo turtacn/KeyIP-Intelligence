@@ -24,7 +24,9 @@ type mockModelRegistry struct{}
 func (m *mockModelRegistry) Register(ctx context.Context, meta *common.ModelMetadata) error {
 	return nil
 }
-func (m *mockModelRegistry) Unregister(ctx context.Context, modelID string, version string) error { return nil }
+func (m *mockModelRegistry) Unregister(ctx context.Context, modelID string, version string) error {
+	return nil
+}
 func (m *mockModelRegistry) GetModel(ctx context.Context, modelID string) (*common.RegisteredModel, error) {
 	return nil, nil
 }
@@ -1623,5 +1625,3 @@ var _ InfringeModel = (*remoteInfringeModel)(nil)
 var _ SMARTSMatcher = (*mockSMARTSMatcher)(nil)
 var _ MoleculeValidator = (*mockMoleculeValidator)(nil)
 var _ ServingClient = (*mockServingClient)(nil)
-
-

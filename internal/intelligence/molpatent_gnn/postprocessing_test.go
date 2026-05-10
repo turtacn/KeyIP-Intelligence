@@ -729,4 +729,3 @@ func TestIntegration_EmbedThenClassify(t *testing.T) {
 		t.Errorf("expected MEDIUM for cos(45°)≈0.707, got %s (sim=%f)", level, sim)
 	}
 }
-

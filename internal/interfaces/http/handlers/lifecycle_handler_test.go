@@ -20,14 +20,14 @@ import (
 
 // mockLifecycleService implements lifecycle.TrackingService for testing.
 type mockLifecycleService struct {
-	getLifecycleFn          func(context.Context, string) (*lifecycle.Lifecycle, error)
-	advancePhaseFn          func(context.Context, *lifecycle.AdvancePhaseInput) (*lifecycle.Lifecycle, error)
-	addMilestoneFn          func(context.Context, *lifecycle.AddMilestoneInput) (*lifecycle.Milestone, error)
-	listMilestonesFn        func(context.Context, string) (*lifecycle.MilestoneList, error)
-	recordFeeFn             func(context.Context, *lifecycle.RecordFeeInput) (*lifecycle.Fee, error)
-	listFeesFn              func(context.Context, string) (*lifecycle.FeeList, error)
-	getTimelineFn           func(context.Context, string) (*lifecycle.Timeline, error)
-	getUpcomingDeadlinesFn  func(context.Context, *lifecycle.UpcomingDeadlinesInput) ([]*lifecycle.DeadlineInfo, error)
+	getLifecycleFn         func(context.Context, string) (*lifecycle.Lifecycle, error)
+	advancePhaseFn         func(context.Context, *lifecycle.AdvancePhaseInput) (*lifecycle.Lifecycle, error)
+	addMilestoneFn         func(context.Context, *lifecycle.AddMilestoneInput) (*lifecycle.Milestone, error)
+	listMilestonesFn       func(context.Context, string) (*lifecycle.MilestoneList, error)
+	recordFeeFn            func(context.Context, *lifecycle.RecordFeeInput) (*lifecycle.Fee, error)
+	listFeesFn             func(context.Context, string) (*lifecycle.FeeList, error)
+	getTimelineFn          func(context.Context, string) (*lifecycle.Timeline, error)
+	getUpcomingDeadlinesFn func(context.Context, *lifecycle.UpcomingDeadlinesInput) ([]*lifecycle.DeadlineInfo, error)
 }
 
 func (m *mockLifecycleService) GetLifecycle(ctx context.Context, patentID string) (*lifecycle.Lifecycle, error) {

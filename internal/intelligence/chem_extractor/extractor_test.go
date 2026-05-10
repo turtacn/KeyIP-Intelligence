@@ -181,8 +181,8 @@ func newMockMoleculeDB() *mockMoleculeDatabase {
 	}
 	return &mockMoleculeDatabase{
 		byCASSMILES: map[string]*MoleculeRecord{
-			"50-78-2":                      rec,
-			"CC(=O)Oc1ccccc1C(=O)O":       rec,
+			"50-78-2":               rec,
+			"CC(=O)Oc1ccccc1C(=O)O": rec,
 		},
 		byInChIKey: map[string]*MoleculeRecord{
 			"BSYNRYMUTXBXSQ-UHFFFAOYSA-N": rec,
@@ -1393,7 +1393,7 @@ func TestFilterByConfidence(t *testing.T) {
 func TestComputeCoverage(t *testing.T) {
 	entities := []*RawChemicalEntity{
 		{StartOffset: 0, EndOffset: 7},   // 7 chars
-		{StartOffset: 12, EndOffset: 21},  // 9 chars
+		{StartOffset: 12, EndOffset: 21}, // 9 chars
 	}
 	// Total covered = 16, text length = 30 → coverage = 16/30 ≈ 0.533
 	cov := computeCoverage(entities, 30)
@@ -1428,10 +1428,10 @@ func TestLooksLikeMolecularFormula(t *testing.T) {
 	}{
 		{"C9H8O4", true},
 		{"H2O", true},
-		{"NaCl", false},   // no digit → false
+		{"NaCl", false}, // no digit → false
 		{"C13H18O2", true},
-		{"DNA", false},    // false positive list
-		{"Hello", false},  // no digit
+		{"DNA", false},   // false positive list
+		{"Hello", false}, // no digit
 		{"", false},
 		{"C", false},      // too short
 		{"CH3COOH", true}, // no digits after elements (depends on pattern)

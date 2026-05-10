@@ -217,7 +217,9 @@ func (d *Driver) HealthCheck(ctx context.Context) error {
 	// Execute simple query
 	_, err := d.ExecuteRead(ctx, func(tx Transaction) (interface{}, error) {
 		result, err := tx.Run(ctx, "RETURN 1 AS health", nil)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		if result.Next(ctx) {
 			return result.Record().Values[0], nil
 		}
