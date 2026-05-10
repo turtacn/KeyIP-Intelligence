@@ -222,7 +222,7 @@ func TestNewMoleculeService(t *testing.T) {
 	logger := &mockLogger{}
 
 	t.Run("success", func(t *testing.T) {
-		svc, err := NewMoleculeService(repo, fpCalc, simEngine, logger)
+		svc, err := NewMoleculeService(repo, fpCalc, simEngine, nil, logger)
 		if err != nil {
 			t.Errorf("NewMoleculeService failed: %v", err)
 		}
@@ -232,7 +232,7 @@ func TestNewMoleculeService(t *testing.T) {
 	})
 
 	t.Run("nil dependency", func(t *testing.T) {
-		_, err := NewMoleculeService(nil, fpCalc, simEngine, logger)
+		_, err := NewMoleculeService(nil, fpCalc, simEngine, nil, logger)
 		if err == nil {
 			t.Error("NewMoleculeService allowed nil repo")
 		}
@@ -244,7 +244,7 @@ func TestMoleculeService_RegisterMolecule(t *testing.T) {
 	fpCalc := &mockFingerprintCalculator{}
 	simEngine := &mockSimilarityEngine{}
 	logger := &mockLogger{}
-	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, nil, logger)
 
 	t.Run("success_new", func(t *testing.T) {
 		repo.ExistsByInChIKeyFunc = func(ctx context.Context, k string) (bool, error) { return false, nil }
@@ -293,7 +293,7 @@ func TestMoleculeService_BatchRegisterMolecules(t *testing.T) {
 	fpCalc := &mockFingerprintCalculator{}
 	simEngine := &mockSimilarityEngine{}
 	logger := &mockLogger{}
-	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, nil, logger)
 
 	reqs := []MoleculeRegistrationRequest{
 		{SMILES: "C"},
@@ -324,7 +324,7 @@ func TestMoleculeService_FindSimilarMolecules(t *testing.T) {
 	fpCalc := &mockFingerprintCalculator{}
 	simEngine := &mockSimilarityEngine{}
 	logger := &mockLogger{}
-	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, nil, logger)
 
 	t.Run("success", func(t *testing.T) {
 		simEngine.SearchSimilarFunc = func(ctx context.Context, t *Fingerprint, m SimilarityMetric, th float64, l int) ([]*SimilarityResult, error) {
@@ -349,7 +349,7 @@ func TestMoleculeService_CompareMolecules(t *testing.T) {
 	fpCalc := &mockFingerprintCalculator{}
 	simEngine := &mockSimilarityEngine{}
 	logger := &mockLogger{}
-	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, nil, logger)
 
 	t.Run("success", func(t *testing.T) {
 		fpCalc.StandardizeFunc = func(ctx context.Context, s string) (string, string, string, string, float64, error) {
@@ -377,7 +377,7 @@ func TestMoleculeService_CalculateFingerprints(t *testing.T) {
 	fpCalc := &mockFingerprintCalculator{}
 	simEngine := &mockSimilarityEngine{}
 	logger := &mockLogger{}
-	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, logger)
+	svc, _ := NewMoleculeService(repo, fpCalc, simEngine, nil, logger)
 
 	t.Run("success", func(t *testing.T) {
 		mol, _ := NewMolecule("C", SourceManual, "ref")

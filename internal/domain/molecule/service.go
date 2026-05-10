@@ -3,6 +3,7 @@ package molecule
 import (
 	"context"
 
+	"github.com/turtacn/KeyIP-Intelligence/internal/domain/events"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
@@ -38,11 +39,14 @@ type MoleculeService struct {
 	repo             MoleculeRepository
 	fpCalculator     FingerprintCalculator
 	similarityEngine SimilarityEngine
+	eventBus         events.EventBus
 	logger           logging.Logger
 }
 
 // NewMoleculeService constructs a new MoleculeService.
-func NewMoleculeService(repo MoleculeRepository, fpCalc FingerprintCalculator, simEngine SimilarityEngine, logger logging.Logger) (*MoleculeService, error) {
+// eventBus is optional (may be nil); when provided, domain events are published
+// on molecule registration, indexing, archiving, and deletion.
+func NewMoleculeService(repo MoleculeRepository, fpCalc FingerprintCalculator, simEngine SimilarityEngine, eventBus events.EventBus, logger logging.Logger) (*MoleculeService, error) {
 	if repo == nil || fpCalc == nil || simEngine == nil || logger == nil {
 		return nil, errors.New(errors.ErrCodeValidation, "all dependencies must be provided")
 	}
@@ -50,8 +54,20 @@ func NewMoleculeService(repo MoleculeRepository, fpCalc FingerprintCalculator, s
 		repo:             repo,
 		fpCalculator:     fpCalc,
 		similarityEngine: simEngine,
+		eventBus:         eventBus,
 		logger:           logger,
 	}, nil
+}
+
+// publishEvents publishes domain events through the event bus.
+// If the event bus is nil, this is a no-op.
+func (s *MoleculeService) publishEvents(ctx context.Context, events ...events.Event) {
+	if s.eventBus == nil {
+		return
+	}
+	if err := s.eventBus.Publish(ctx, events...); err != nil {
+		s.logger.Error("failed to publish molecule events", logging.Err(err))
+	}
 }
 
 // RegisterMolecule handles the complete registration process for a new molecule.
@@ -107,6 +123,12 @@ func (s *MoleculeService) RegisterMolecule(ctx context.Context, smiles string, s
 	if err := s.repo.Save(ctx, mol); err != nil {
 		return nil, err
 	}
+
+	// Publish molecule registered and indexed events
+	s.publishEvents(ctx,
+		NewMoleculeRegisteredEvent(mol),
+		NewMoleculeIndexedEvent(mol),
+	)
 
 	return mol, nil
 }
@@ -256,6 +278,14 @@ func (s *MoleculeService) BatchRegisterMolecules(ctx context.Context, requests [
 				return result, errors.Wrap(err, errors.ErrCodeInternal, "batch save failed")
 			}
 			result.Succeeded = append(result.Succeeded, batchToSave[:count]...)
+
+			// Publish events for each successfully saved molecule
+			for _, m := range batchToSave[:count] {
+				s.publishEvents(ctx,
+					NewMoleculeRegisteredEvent(m),
+					NewMoleculeIndexedEvent(m),
+				)
+			}
 		}
 	}
 
@@ -320,7 +350,10 @@ func (s *MoleculeService) CalculateFingerprints(ctx context.Context, moleculeID 
 	}
 
 	if updated {
-		return s.repo.Update(ctx, mol)
+		if err := s.repo.Update(ctx, mol); err != nil {
+			return err
+		}
+		s.publishEvents(ctx, NewMoleculeIndexedEvent(mol))
 	}
 	return nil
 }
@@ -424,7 +457,11 @@ func (s *MoleculeService) ArchiveMolecule(ctx context.Context, id string) error 
 	if err := mol.Archive(); err != nil {
 		return err
 	}
-	return s.repo.Update(ctx, mol)
+	if err := s.repo.Update(ctx, mol); err != nil {
+		return err
+	}
+	s.publishEvents(ctx, NewMoleculeArchivedEvent(mol))
+	return nil
 }
 
 // DeleteMolecule transitions a molecule to Deleted status.
@@ -437,7 +474,11 @@ func (s *MoleculeService) DeleteMolecule(ctx context.Context, id string) error {
 	if err := mol.MarkDeleted(); err != nil {
 		return err
 	}
-	return s.repo.Update(ctx, mol)
+	if err := s.repo.Update(ctx, mol); err != nil {
+		return err
+	}
+	s.publishEvents(ctx, NewMoleculeDeletedEvent(mol))
+	return nil
 }
 
 // AddMoleculeProperties adds properties to a molecule.
@@ -456,7 +497,10 @@ func (s *MoleculeService) AddMoleculeProperties(ctx context.Context, moleculeID 
 	}
 
 	if updated {
-		return s.repo.Update(ctx, mol)
+		if err := s.repo.Update(ctx, mol); err != nil {
+			return err
+		}
+		s.publishEvents(ctx, NewMoleculeIndexedEvent(mol))
 	}
 	return nil
 }
@@ -477,7 +521,10 @@ func (s *MoleculeService) TagMolecule(ctx context.Context, moleculeID string, ta
 	}
 
 	if updated {
-		return s.repo.Update(ctx, mol)
+		if err := s.repo.Update(ctx, mol); err != nil {
+			return err
+		}
+		s.publishEvents(ctx, NewMoleculeIndexedEvent(mol))
 	}
 	return nil
 }
