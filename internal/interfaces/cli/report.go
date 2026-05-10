@@ -47,12 +47,34 @@ func NewReportCmd(
 		Use:   "report",
 		Short: "Generate IP reports",
 		Long:  `Generate FTO, infringement, portfolio, and annual IP reports in various formats`,
+		Example: `  # Generate an FTO report
+  keyip report generate --type fto --target "CCO" --format pdf
+
+  # Generate an infringement report
+  keyip report generate --type infringement --target "US12345678" --language en
+
+  # List available templates
+  keyip report list-templates
+
+  # Check report generation status
+  keyip report status --job-id "report-abc-123"`,
 	}
 
 	// Subcommand: report generate
 	generateCmd := &cobra.Command{
 		Use:   "generate",
 		Short: "Generate a report",
+		Example: `  # Generate an FTO report in PDF
+  keyip report generate --type fto --target "CCOC(=O)c1ccccc1" --format pdf
+
+  # Generate an infringement report in DOCX
+  keyip report generate --type infringement --target "US12345678" --format docx
+
+  # Generate in English with appendix
+  keyip report generate --type fto --target "CCO" --language en --include-appendix
+
+  # Generate a portfolio report
+  keyip report generate --type portfolio --target "port-oled-2024"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runReportGenerate(
 				cmd.Context(),
@@ -78,6 +100,11 @@ func NewReportCmd(
 	listTemplatesCmd := &cobra.Command{
 		Use:   "list-templates",
 		Short: "List available report templates",
+		Example: `  # List all templates
+  keyip report list-templates
+
+  # Filter by type
+  keyip report list-templates --type fto`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runReportListTemplates(cmd.Context(), templateService, logger)
 		},
@@ -89,6 +116,8 @@ func NewReportCmd(
 	statusCmd := &cobra.Command{
 		Use:   "status",
 		Short: "Check report generation status",
+		Example: `  # Check status of a report generation job
+  keyip report status --job-id "report-abc-123"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runReportStatus(cmd.Context(), ftoReportService, logger)
 		},

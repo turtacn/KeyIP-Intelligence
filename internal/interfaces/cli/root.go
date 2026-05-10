@@ -92,6 +92,32 @@ func NewRootCommand() *cobra.Command {
 		Use:     "keyip",
 		Short:   "KeyIP-Intelligence CLI — AI-driven IP lifecycle management for OLED materials",
 		Long:    "KeyIP-Intelligence is an AI-powered intellectual property management platform\nspecialized for OLED organic materials, providing patent mining, infringement\nmonitoring, portfolio optimization, and lifecycle management capabilities.",
+		Example: `  # Search patents by molecule similarity
+  keyip search molecule --smiles "CCO" --threshold 0.8
+
+  # Search patents by text query
+  keyip search patent --query "OLED" --offices "CN,US"
+
+  # Assess patent value
+  keyip assess patent --patent-number "US12345678" --dimensions "technical,legal"
+
+  # Assess portfolio
+  keyip assess portfolio --portfolio-id "port-oled-2024"
+
+  # List upcoming deadlines
+  keyip lifecycle deadlines --days-ahead 90
+
+  # Generate an FTO report
+  keyip report generate --type fto --target "CCOC(=O)c1ccccc1" --format pdf
+
+  # Validate configuration
+  keyip config validate
+
+  # Print version
+  keyip version
+
+  # Generate bash completion
+  keyip completion bash`,
 		Version: fmt.Sprintf("%s (commit: %s, built: %s)", Version, GitCommit, BuildDate),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return persistentPreRun(cmd, opts)
@@ -134,6 +160,9 @@ func RegisterCommands(rootCmd *cobra.Command, deps CommandDependencies) {
 	// But `cli` package already imports them in search.go, assess.go, etc. so they are available in the package scope.
 
 	rootCmd.AddCommand(
+		NewCompletionCmd(),
+		NewVersionCmd(),
+		NewConfigCmd(),
 		NewSearchCmd(deps.SimilaritySearchService, deps.Logger),
 		NewAssessCmd(deps.ValuationService, deps.Logger),
 		NewLifecycleCmd(

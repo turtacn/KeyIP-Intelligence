@@ -19,9 +19,17 @@ NC='\033[0m'
 
 # ---- docker-machine 检测 ----
 IS_DOCKER_MACHINE=false
-if docker info 2>/dev/null | grep -q "docker-machine\|boot2docker"; then
+# 检查多种 docker-machine 特征
+if [ -n "${DOCKER_MACHINE_NAME:-}" ] || \
+   [ -n "${DOCKER_HOST:-}" ] && echo "$DOCKER_HOST" | grep -q "192\.168\.99\.\|docker-machine" ; then
+  IS_DOCKER_MACHINE=true
+elif docker info 2>/dev/null | grep -qi "docker-machine\|boot2docker"; then
+  IS_DOCKER_MACHINE=true
+elif uname -s | grep -q "Darwin" && ! docker info 2>/dev/null | grep -qi "Docker Desktop"; then
+  # macOS 上用了 docker 但不是 Docker Desktop → 大概率是 docker-machine
   IS_DOCKER_MACHINE=true
 fi
+_log "检测到 IS_DOCKER_MACHINE=$IS_DOCKER_MACHINE"
 
 # ---- 公共参数 ----
 LOGGING="--log-driver=json-file --log-opt max-size=10m --log-opt max-file=3"

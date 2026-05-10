@@ -32,12 +32,31 @@ func NewAssessCmd(valuationService portfolio.ValuationService, logger logging.Lo
 		Use:   "assess",
 		Short: "Assess patent or portfolio value",
 		Long:  `Perform multi-dimensional valuation assessment for patents or portfolios`,
+		Example: `  # Assess a single patent
+  keyip assess patent --patent-number "US12345678"
+
+  # Assess with custom dimensions
+  keyip assess patent --patent-number "CN2023100000,US2023100000" --dimensions "technical,legal,commercial"
+
+  # Assess a portfolio
+  keyip assess portfolio --portfolio-id "port-oled-2024"
+
+  # Output as JSON to file
+  keyip assess patent --patent-number "EP123456" --output json --file assessment.json`,
 	}
 
 	// Subcommand: assess patent
 	patentCmd := &cobra.Command{
 		Use:   "patent",
 		Short: "Assess value of one or more patents",
+		Example: `  # Assess a single patent
+  keyip assess patent --patent-number "US12345678"
+
+  # Assess multiple patents with all dimensions
+  keyip assess patent --patent-number "CN2023100000,EP987654" --dimensions "technical,legal,commercial,strategic"
+
+  # Output as JSON
+  keyip assess patent --patent-number "JP2022000111" --output json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runAssessPatent(cmd.Context(), valuationService, logger)
 		},
@@ -53,6 +72,14 @@ func NewAssessCmd(valuationService portfolio.ValuationService, logger logging.Lo
 	portfolioCmd := &cobra.Command{
 		Use:   "portfolio",
 		Short: "Assess portfolio value and provide optimization recommendations",
+		Example: `  # Assess a portfolio with recommendations
+  keyip assess portfolio --portfolio-id "port-oled-2024"
+
+  # Assess without recommendations
+  keyip assess portfolio --portfolio-id "port-oled-2024" --include-recommendations=false
+
+  # Output as CSV
+  keyip assess portfolio --portfolio-id "port-oled-2024" --output csv`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runAssessPortfolio(cmd.Context(), valuationService, logger)
 		},

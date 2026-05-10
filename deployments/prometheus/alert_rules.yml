@@ -1,0 +1,199 @@
+# =============================================================================
+# KeyIP-Intelligence - Prometheus Alerting Rules
+# =============================================================================
+# This file defines alert rules for monitoring the KeyIP-Intelligence platform.
+# Alerts are grouped by severity: critical, warning, and info.
+#
+# References:
+#   - Application metrics: internal/infrastructure/monitoring/prometheus/metrics.go
+#   - OTel metrics:        internal/infrastructure/monitoring/metrics/
+#   - Docker services:     deployments/docker/docker-compose.yml
+# =============================================================================
+
+groups:
+  - name: keyip_high_priority
+    interval: 30s
+    rules:
+      # ---------------------------------------------------------------------------
+      # High Priority: API Error Rate > 1%
+      # Triggers when the proportion of 5xx responses over the last 5 minutes
+      # exceeds 1% of total requests.
+      # ---------------------------------------------------------------------------
+      - alert: APIErrorRateHigh
+        expr: |
+          (
+            sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.01
+        for: 3m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "API error rate exceeds 1%"
+          description: >
+            The HTTP 5xx error rate is {{ $value | humanizePercentage }} over the
+            last 5 minutes, exceeding the 1% threshold. Immediate investigation
+            is required to identify the root cause (e.g., deployment regression,
+            upstream dependency failure, or resource exhaustion).
+
+      # ---------------------------------------------------------------------------
+      # High Priority: p99 Latency > 2s
+      # Triggers when the 99th percentile HTTP request latency exceeds 2 seconds
+      # over a 5-minute window.
+      # ---------------------------------------------------------------------------
+      - alert: APILatencyHigh
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 3m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "p99 HTTP latency exceeds 2s"
+          description: >
+            The 99th percentile HTTP request latency is {{ $value | humanizeDuration }}
+            over the last 5 minutes, exceeding the 2s threshold. This may indicate
+            database bottlenecks, LLM provider degradation, or insufficient
+            application concurrency.
+
+      # ---------------------------------------------------------------------------
+      # High Priority: Database Pool Saturation > 90%
+      # Triggers when more than 90% of database connections are actively in use,
+      # indicating the connection pool is near exhaustion.
+      # ---------------------------------------------------------------------------
+      - alert: DBPoolSaturationHigh
+        expr: |
+          (
+            sum by (db) (db_pool_active)
+            /
+            sum by (db) (db_pool_size)
+          ) > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Database connection pool saturation exceeds 90% ({{ $labels.db }})"
+          description: >
+            The connection pool for database {{ $labels.db }} is at
+            {{ $value | humanizePercentage }} saturation. Connection requests
+            may begin queueing or timing out, which will cascade into elevated
+            API latency and error rates.
+
+  - name: keyip_medium_priority
+    interval: 30s
+    rules:
+      # ---------------------------------------------------------------------------
+      # Medium Priority: Memory Usage > 80%
+      # Triggers when the application process resident memory exceeds 80% of
+      # the host's total memory. For containerized environments, prefer the
+      # container_memory_working_set_bytes metric if cgroup metrics are available.
+      # ---------------------------------------------------------------------------
+      - alert: MemoryUsageHigh
+        expr: |
+          (
+            process_resident_memory_bytes
+            /
+            node_memory_MemTotal_bytes
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Process memory usage exceeds 80%"
+          description: >
+            The application process is using {{ $value | humanizePercentage }}
+            of total host memory ({{ $value | humanize1024 }}). Investigate
+            potential memory leaks or consider increasing memory limits.
+
+      # ---------------------------------------------------------------------------
+      # Medium Priority: Disk Usage > 85%
+      # Triggers when any filesystem's used space exceeds 85%, warning of
+      # impending disk exhaustion.
+      # ---------------------------------------------------------------------------
+      - alert: DiskUsageHigh
+        expr: |
+          (
+            1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"})
+          ) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Disk usage exceeds 85% on {{ $labels.mountpoint }}"
+          description: >
+            Filesystem {{ $labels.mountpoint }} ({{ $labels.device }}) is
+            {{ $value | humanizePercentage }} full. Service degradation or
+            data loss may occur if disk space is exhausted. Consider cleaning
+            old logs, temporary files, or expanding storage.
+
+      # ---------------------------------------------------------------------------
+      # Medium Priority: Goroutine Leak (> 1000)
+      # Triggers when the number of active goroutines exceeds 1000, which may
+      # indicate a goroutine leak or excessive concurrency.
+      # ---------------------------------------------------------------------------
+      - alert: GoroutineCountHigh
+        expr: go_goroutines > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Goroutine count exceeds 1000"
+          description: >
+            The number of active goroutines is {{ $value }}, exceeding the
+            1000 threshold. This may indicate a goroutine leak from unchecked
+            goroutine spawning, blocked I/O operations, or channel deadlocks.
+            Inspect the goroutine profile via /debug/pprof/goroutine.
+
+  - name: keyip_info_priority
+    interval: 60s
+    rules:
+      # ---------------------------------------------------------------------------
+      # Info: Service Restart Detected
+      # Triggers when the service uptime resets (drops below the previous value),
+      # indicating the process was restarted.
+      # ---------------------------------------------------------------------------
+      - alert: ServiceRestartDetected
+        expr: |
+          service_uptime_seconds < service_uptime_seconds offset 5m
+        for: 0m
+        labels:
+          severity: info
+          team: backend
+        annotations:
+          summary: "Service {{ $labels.service }} has restarted"
+          description: >
+            The service {{ $labels.service }} uptime dropped from
+            {{ $value | humanizeDuration }} to a lower value, indicating a
+            process restart. This is informational; check deployment logs
+            and recent changes if the restart was unexpected.
+
+      # ---------------------------------------------------------------------------
+      # Info: Slow Database Queries > 500ms
+      # Triggers when the average database query duration exceeds 500ms over a
+      # 5-minute window, highlighting queries that may need optimization.
+      # ---------------------------------------------------------------------------
+      - alert: SlowDatabaseQueries
+        expr: |
+          rate(db_query_duration_seconds_sum[5m])
+          /
+          rate(db_query_duration_seconds_count[5m])
+          > 0.5
+        for: 5m
+        labels:
+          severity: info
+          team: backend
+        annotations:
+          summary: "Average DB query duration exceeds 500ms ({{ $labels.db }}/{{ $labels.operation }})"
+          description: >
+            The average query duration for database {{ $labels.db }},
+            operation {{ $labels.operation }} is {{ $value | humanizeDuration }},
+            exceeding the 500ms threshold. Consider reviewing query plans,
+            adding indexes, or optimizing the operation logic.

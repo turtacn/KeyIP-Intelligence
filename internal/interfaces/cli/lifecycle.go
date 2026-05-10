@@ -46,12 +46,34 @@ func NewLifecycleCmd(
 		Use:   "lifecycle",
 		Short: "Manage patent lifecycle operations",
 		Long:  `Query deadlines, calculate annuities, sync legal status, and configure reminders`,
+		Example: `  # List upcoming deadlines
+  keyip lifecycle deadlines --days-ahead 90
+
+  # Calculate annuity fees
+  keyip lifecycle annuity --patent-number "US12345678" --year 2025
+
+  # Sync legal status
+  keyip lifecycle sync-status --patent-number "CN2023100000"
+
+  # Manage reminders
+  keyip lifecycle reminders --action list`,
 	}
 
 	// Subcommand: lifecycle deadlines
 	deadlinesCmd := &cobra.Command{
 		Use:   "deadlines",
 		Short: "List upcoming patent deadlines",
+		Example: `  # List all deadlines in the next 90 days
+  keyip lifecycle deadlines
+
+  # Filter by patent and status
+  keyip lifecycle deadlines --patent-number "US12345678" --status overdue
+
+  # Filter by jurisdiction
+  keyip lifecycle deadlines --jurisdiction "CN,US" --days-ahead 30
+
+  # Output as JSON
+  keyip lifecycle deadlines --output json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runLifecycleDeadlines(cmd.Context(), deadlineService, logger)
 		},
@@ -67,6 +89,11 @@ func NewLifecycleCmd(
 	annuityCmd := &cobra.Command{
 		Use:   "annuity",
 		Short: "Calculate patent annuity fees",
+		Example: `  # Calculate annuity for a US patent
+  keyip lifecycle annuity --patent-number "US12345678" --year 2025
+
+  # Calculate in EUR with forecast
+  keyip lifecycle annuity --patent-number "EP987654" --year 2025 --currency EUR --include-forecast`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runLifecycleAnnuity(cmd.Context(), annuityService, logger)
 		},
@@ -82,6 +109,11 @@ func NewLifecycleCmd(
 	syncStatusCmd := &cobra.Command{
 		Use:   "sync-status",
 		Short: "Sync legal status from patent offices",
+		Example: `  # Sync status for a single patent
+  keyip lifecycle sync-status --patent-number "CN2023100000"
+
+  # Preview changes without applying
+  keyip lifecycle sync-status --patent-number "US12345678" --dry-run`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runLifecycleSyncStatus(cmd.Context(), legalStatusService, logger)
 		},
@@ -95,6 +127,14 @@ func NewLifecycleCmd(
 	remindersCmd := &cobra.Command{
 		Use:   "reminders",
 		Short: "Manage deadline reminders",
+		Example: `  # List all reminders
+  keyip lifecycle reminders --action list
+
+  # Add a reminder for a patent
+  keyip lifecycle reminders --action add --patent-number "US12345678" --channels "email,wechat"
+
+  # Remove a reminder
+  keyip lifecycle reminders --action remove --patent-number "US12345678"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runLifecycleReminders(cmd.Context(), calendarService, logger)
 		},

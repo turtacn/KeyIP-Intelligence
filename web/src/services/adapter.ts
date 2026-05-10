@@ -9,6 +9,8 @@ export interface RetryPolicy {
    * If not provided, the default logic retries on 5xx and network errors only.
    */
   shouldRetry?: (error: unknown) => boolean;
+  /** When true, suppresses the automatic error toast for this request */
+  suppressToast?: boolean;
 }
 
 export interface ApiAdapter {
@@ -124,6 +126,17 @@ class FetchAdapter implements ApiAdapter {
               `[API] Request failed after ${attempt + 1} attempt(s) for ${path}:`,
               error,
             );
+          }
+          // Show error toast unless suppressed
+          if (!policy.suppressToast) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : 'An unexpected network error occurred. Please try again.';
+            // Dynamically import to avoid circular dependency at module level
+            import('../utils/notificationBridge').then(({ notify }) => {
+              notify('error', 'API Error', message);
+            });
           }
           throw error;
         }

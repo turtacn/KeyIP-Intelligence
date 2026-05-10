@@ -98,7 +98,7 @@ func TestNewRootCommand_SubcommandsMounted(t *testing.T) {
 	deps := CommandDependencies{}
 	RegisterCommands(cmd, deps)
 
-	expectedSubs := []string{"search", "assess", "lifecycle", "report"}
+	expectedSubs := []string{"completion", "version", "config", "search", "assess", "lifecycle", "report"}
 	subNames := make([]string, 0, len(cmd.Commands()))
 	for _, sub := range cmd.Commands() {
 		subNames = append(subNames, sub.Name())

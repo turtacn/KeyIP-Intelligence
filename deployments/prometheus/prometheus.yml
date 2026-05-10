@@ -1,0 +1,126 @@
+# =============================================================================
+# KeyIP-Intelligence - Prometheus Server Configuration
+# =============================================================================
+# Global settings and scrape targets for monitoring the KeyIP-Intelligence
+# platform. The application exposes Prometheus metrics via the OTel Prometheus
+# exporter on port 9090 (configurable in meter.go DefaultConfig).
+#
+# References:
+#   - Application metrics: internal/infrastructure/monitoring/prometheus/metrics.go
+#   - OTel setup:          internal/infrastructure/monitoring/metrics/meter.go
+#   - Alert rules:         deployments/prometheus/alert_rules.yml
+# =============================================================================
+
+global:
+  # How frequently to scrape targets.
+  scrape_interval: 15s
+
+  # How frequently to evaluate alerting rules.
+  evaluation_interval: 30s
+
+  # How long to retain data in the local TSDB.
+  retention: 15d
+
+# ---------------------------------------------------------------------------
+# Alerting configuration
+# ---------------------------------------------------------------------------
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            # Uncomment and configure when an Alertmanager instance is deployed:
+            # - "alertmanager:9093"
+          labels:
+            alertmanager: keyip
+
+# ---------------------------------------------------------------------------
+# Rule files loaded for alerting and recording
+# ---------------------------------------------------------------------------
+rule_files:
+  - "alert_rules.yml"
+
+# ---------------------------------------------------------------------------
+# Scrape configurations
+# ---------------------------------------------------------------------------
+scrape_configs:
+
+  # ---------------------------------------------------------------------------
+  # KeyIP Application (Self-Metrics)
+  # Scrapes the application's Prometheus metrics endpoint exposed by the
+  # OpenTelemetry Prometheus exporter.
+  # ---------------------------------------------------------------------------
+  - job_name: "keyip-app"
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - "keyip-api:9090"
+        labels:
+          service: "keyip-intelligence"
+          env: "production"
+
+  # ---------------------------------------------------------------------------
+  # Node Exporter (Host-level metrics: CPU, memory, disk, network)
+  # Provides system-level metrics used by alerts such as MemoryUsageHigh,
+  # DiskUsageHigh, and GoroutineCountHigh.
+  # ---------------------------------------------------------------------------
+  - job_name: "node-exporter"
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - "node-exporter:9100"
+        labels:
+          service: "node-exporter"
+          env: "production"
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Exporter
+  # Scrapes PostgreSQL database metrics for connection pool and query monitoring.
+  # ---------------------------------------------------------------------------
+  - job_name: "postgres-exporter"
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - "postgres-exporter:9187"
+        labels:
+          service: "postgres"
+          env: "production"
+
+  # ---------------------------------------------------------------------------
+  # Additional scrape targets (commented out - enable as needed)
+  # ---------------------------------------------------------------------------
+
+  # Uncomment to monitor the Kafka exporter
+  # - job_name: "kafka-exporter"
+  #   scrape_interval: 30s
+  #   static_configs:
+  #     - targets: ["kafka-exporter:9308"]
+  #       labels:
+  #         service: "kafka"
+  #         env: "production"
+
+  # Uncomment to monitor OpenSearch
+  # - job_name: "opensearch"
+  #   scrape_interval: 30s
+  #   static_configs:
+  #     - targets: ["opensearch:9200"]
+  #       labels:
+  #         service: "opensearch"
+  #         env: "production"
+
+  # Uncomment to monitor Redis
+  # - job_name: "redis-exporter"
+  #   scrape_interval: 30s
+  #   static_configs:
+  #     - targets: ["redis-exporter:9121"]
+  #       labels:
+  #         service: "redis"
+  #         env: "production"

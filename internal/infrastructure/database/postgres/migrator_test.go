@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -943,5 +944,347 @@ func TestMigration_CheckConstraintsExist(t *testing.T) {
 			assert.Equal(t, "CHECK", constraintType)
 		})
 	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TestDownMigration_EachStepVerification — verify each migration's down script
+// correctly drops tables from that migration while preserving earlier ones
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestDownMigration_EachStepVerification(t *testing.T) {
+	dbURL := getTestDBURL(t)
+
+	// Reset and apply all migrations.
+	err := postgres.ResetDatabase(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+
+	db, cleanup := getTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Map migration version -> tables it creates.
+	migrationTables := map[uint][]string{
+		1: {"patents", "patent_claims", "patent_inventors", "patent_priority_claims"},
+		2: {"molecules", "molecule_fingerprints", "molecule_properties", "patent_molecule_relations"},
+		3: {"portfolios", "portfolio_patents", "patent_valuations", "portfolio_health_scores", "portfolio_optimization_suggestions"},
+		4: {"patent_annuities", "patent_deadlines", "patent_lifecycle_events", "patent_cost_records"},
+		5: {"users", "organizations", "organization_members", "roles", "user_roles", "api_keys", "audit_logs"},
+		6: {"workspaces", "workspace_members", "workspace_projects", "project_patents", "project_molecules", "comments", "notifications", "saved_searches"},
+	}
+
+	// Collect all table names.
+	allTables := make([]string, 0)
+	for _, tables := range migrationTables {
+		allTables = append(allTables, tables...)
+	}
+
+	// tablesThatShouldExistAt returns true if the given table should exist
+	// after rolling back to the specified version.
+	// Version 6+ means all tables exist (007 down is a no-op).
+	tablesThatShouldExistAt := func(version uint, table string) bool {
+		if version >= 6 {
+			return true
+		}
+		for v := uint(1); v <= version; v++ {
+			for _, t := range migrationTables[v] {
+				if t == table {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	verifyTables := func(version uint) {
+		for _, table := range allTables {
+			expected := tablesThatShouldExistAt(version, table)
+			var exists bool
+			err := db.QueryRowContext(ctx, `
+				SELECT EXISTS (
+					SELECT FROM information_schema.tables
+					WHERE table_schema = 'public' AND table_name = $1
+				)
+			`, table).Scan(&exists)
+			require.NoError(t, err, "error checking table %s at version %d", table, version)
+			if expected {
+				assert.True(t, exists, "table %s should exist at version %d", table, version)
+			} else {
+				assert.False(t, exists, "table %s should NOT exist at version %d", table, version)
+			}
+		}
+	}
+
+	// Verify starting state: version 7, all tables exist.
+	ver, dirty, err := postgres.MigrationStatus(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+	assert.False(t, dirty)
+	assert.Equal(t, uint(7), ver)
+	verifyTables(7)
+
+	// Step down one migration at a time from 7 to 1.
+	for expectedVersion := uint(6); expectedVersion >= 1; expectedVersion-- {
+		err = postgres.RollbackMigration(dbURL, testMigrationsPath, 1)
+		require.NoError(t, err, "rollback 1 step to version %d should succeed", expectedVersion)
+
+		ver, dirty, err = postgres.MigrationStatus(dbURL, testMigrationsPath)
+		require.NoError(t, err)
+		assert.False(t, dirty)
+		assert.Equal(t, expectedVersion, ver, "should be at version %d after rollback", expectedVersion)
+
+		verifyTables(expectedVersion)
+	}
+
+	// Final step: rollback to version 0.
+	err = postgres.RollbackMigration(dbURL, testMigrationsPath, 1)
+	require.NoError(t, err)
+
+	ver, dirty, err = postgres.MigrationStatus(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+	assert.False(t, dirty)
+	assert.Equal(t, uint(0), ver)
+	verifyTables(0)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TestRollbackMigration_PartialRollback — verify rolling back multiple steps
+// at once (partial rollback to a specific version)
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestRollbackMigration_PartialRollback(t *testing.T) {
+	dbURL := getTestDBURL(t)
+
+	// Reset and apply all migrations.
+	err := postgres.ResetDatabase(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+
+	// Verify version is at max.
+	version, dirty, err := postgres.MigrationStatus(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+	assert.False(t, dirty)
+	assert.GreaterOrEqual(t, version, uint(7))
+
+	// Rollback 4 steps (from 7 to 3).
+	err = postgres.RollbackMigration(dbURL, testMigrationsPath, 4)
+	require.NoError(t, err)
+
+	// Verify version is 3.
+	version, dirty, err = postgres.MigrationStatus(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+	assert.False(t, dirty)
+	assert.Equal(t, uint(3), version)
+
+	// Verify that migration 004+ tables are gone but 001-003 tables remain.
+	db, cleanup := getTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Tables from migrations 1-3 that should exist.
+	mig1to3Tables := []string{
+		"patents", "patent_claims", "patent_inventors", "patent_priority_claims",
+		"molecules", "molecule_fingerprints", "molecule_properties", "patent_molecule_relations",
+		"portfolios", "portfolio_patents", "patent_valuations", "portfolio_health_scores",
+		"portfolio_optimization_suggestions",
+	}
+
+	// Tables from migrations 4-6 that should NOT exist.
+	mig4to6Tables := []string{
+		"patent_annuities", "patent_deadlines", "patent_lifecycle_events", "patent_cost_records",
+		"users", "organizations", "organization_members", "roles", "user_roles", "api_keys", "audit_logs",
+		"workspaces", "workspace_members", "workspace_projects", "project_patents", "project_molecules",
+		"comments", "notifications", "saved_searches",
+	}
+
+	for _, table := range mig1to3Tables {
+		var exists bool
+		err := db.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT FROM information_schema.tables
+				WHERE table_schema = 'public' AND table_name = $1
+			)
+		`, table).Scan(&exists)
+		require.NoError(t, err)
+		assert.True(t, exists, "table %s should exist at version 3", table)
+	}
+
+	for _, table := range mig4to6Tables {
+		var exists bool
+		err := db.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT FROM information_schema.tables
+				WHERE table_schema = 'public' AND table_name = $1
+			)
+		`, table).Scan(&exists)
+		require.NoError(t, err)
+		assert.False(t, exists, "table %s should NOT exist at version 3", table)
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TestRunMigrations_InvalidDbURL — verify error with invalid database URL
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestRunMigrations_InvalidDbURL(t *testing.T) {
+	err := postgres.RunMigrations(
+		"postgres://invalid:invalid@127.0.0.1:1/nonexistent?sslmode=disable",
+		"file://./migrations",
+	)
+	require.Error(t, err)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TestRunMigrations_InvalidMigrationsPath — verify error with non-existent path
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestRunMigrations_InvalidMigrationsPath(t *testing.T) {
+	dbURL := getTestDBURL(t)
+
+	err := postgres.RunMigrations(dbURL, "file:///nonexistent/migrations/path")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create migrate instance")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TestRunMigrations_EmptyDirectory — verify empty migrations list succeeds
+// with ErrNoChange
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestRunMigrations_EmptyDirectory(t *testing.T) {
+	dbURL := getTestDBURL(t)
+
+	// Ensure clean state.
+	err := postgres.ResetDatabase(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+
+	// Create empty temp migration directory.
+	emptyDir := t.TempDir()
+	emptyPath := "file://" + emptyDir
+
+	// Running with empty dir should succeed (no change).
+	err = postgres.RunMigrations(dbURL, emptyPath)
+	require.NoError(t, err)
+
+	// Verify version is still 0 (no migrations applied).
+	version, dirty, err := postgres.MigrationStatus(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+	assert.False(t, dirty)
+	assert.Equal(t, uint(0), version)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TestForceMigrationVersion_WithNegativeVersion — verify force to -1 (no version)
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestForceMigrationVersion_WithNegativeVersion(t *testing.T) {
+	dbURL := getTestDBURL(t)
+
+	// Reset database to ensure clean state.
+	err := postgres.ResetDatabase(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+
+	// Force version to -1 (no version).
+	err = postgres.ForceMigrationVersion(dbURL, testMigrationsPath, -1)
+	require.NoError(t, err)
+
+	// MigrationStatus should handle ErrNilVersion and return 0, false, nil.
+	version, dirty, err := postgres.MigrationStatus(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+	assert.False(t, dirty)
+	assert.Equal(t, uint(0), version)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TestMigration_RecoverFromDirtyState — verify ForceMigrationVersion can recover
+// from a dirty migration state after a failed migration
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestMigration_RecoverFromDirtyState(t *testing.T) {
+	dbURL := getTestDBURL(t)
+
+	// Create a temporary migration directory with a deliberately broken down migration.
+	dir := t.TempDir()
+
+	// Migration 001: creates and drops a simple table.
+	err := os.WriteFile(filepath.Join(dir, "001_test.up.sql"), []byte(`
+		CREATE TABLE IF NOT EXISTS _test_dirty_recovery (id INT PRIMARY KEY);
+	`), 0644)
+	require.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(dir, "001_test.down.sql"), []byte(`
+		DROP TABLE IF EXISTS _test_dirty_recovery;
+	`), 0644)
+	require.NoError(t, err)
+
+	// Migration 002: valid UP but a DOWN that deliberately fails (column does not exist).
+	err = os.WriteFile(filepath.Join(dir, "002_test.up.sql"), []byte(`
+		CREATE TABLE IF NOT EXISTS _test_dirty_trigger (id INT PRIMARY KEY);
+	`), 0644)
+	require.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(dir, "002_test.down.sql"), []byte(`
+		ALTER TABLE _test_dirty_trigger DROP COLUMN nonexistent_column;
+	`), 0644)
+	require.NoError(t, err)
+
+	migPath := "file://" + dir
+
+	// Deferred cleanup: remove temp tables and reset database state.
+	defer func() {
+		d, cleanup := getTestDB(t)
+		defer cleanup()
+		_, _ = d.Exec("DROP TABLE IF EXISTS _test_dirty_recovery, _test_dirty_trigger")
+		_ = postgres.ResetDatabase(dbURL, testMigrationsPath)
+	}()
+
+	// Apply both migrations.
+	err = postgres.RunMigrations(dbURL, migPath)
+	require.NoError(t, err)
+
+	// Verify version is 2.
+	version, dirty, err := postgres.MigrationStatus(dbURL, migPath)
+	require.NoError(t, err)
+	assert.False(t, dirty)
+	assert.Equal(t, uint(2), version)
+
+	// Attempt to rollback 1 step — 002 down will fail, creating a dirty state.
+	err = postgres.RollbackMigration(dbURL, migPath, 1)
+	require.Error(t, err, "rollback should fail due to bad down migration")
+
+	// Verify dirty state.
+	version, dirty, err = postgres.MigrationStatus(dbURL, migPath)
+	require.NoError(t, err)
+	assert.True(t, dirty, "database should be in dirty state after failed migration")
+
+	// Recover by forcing to version 1 (clean).
+	err = postgres.ForceMigrationVersion(dbURL, migPath, 1)
+	require.NoError(t, err)
+
+	// Verify clean at version 1.
+	version, dirty, err = postgres.MigrationStatus(dbURL, migPath)
+	require.NoError(t, err)
+	assert.False(t, dirty)
+	assert.Equal(t, uint(1), version)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TestRollbackMigration_WithNoMigrationsApplied — verify behavior when trying
+// to roll back a database that has never had any migrations applied
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestRollbackMigration_WithNoMigrationsApplied(t *testing.T) {
+	dbURL := getTestDBURL(t)
+
+	// Reset database to version 0.
+	err := postgres.ResetDatabase(dbURL, testMigrationsPath)
+	require.NoError(t, err)
+
+	// Force to -1 to simulate a fresh database with no migration version.
+	err = postgres.ForceMigrationVersion(dbURL, testMigrationsPath, -1)
+	require.NoError(t, err)
+
+	// Attempt to rollback should error.
+	err = postgres.RollbackMigration(dbURL, testMigrationsPath, 1)
+	require.Error(t, err)
 }
 

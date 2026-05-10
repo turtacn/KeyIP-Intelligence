@@ -42,12 +42,34 @@ func NewSearchCmd(
 		Use:   "search",
 		Short: "Search patents by molecule similarity or text query",
 		Long:  `Perform similarity search using molecular structures (SMILES/InChI) or text-based patent search`,
+		Example: `  # Search by molecular similarity
+  keyip search molecule --smiles "CCO" --threshold 0.8
+
+  # Search by InChI with custom fingerprints
+  keyip search molecule --inchi "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3" --fingerprints "morgan,maccs"
+
+  # Search patents by text query
+  keyip search patent --query "OLED display" --offices "CN,US,EP" --max-results 100
+
+  # Search with date range and sorting
+  keyip search patent --query "organic light emitting" --date-from 2020-01-01 --date-to 2024-12-31 --sort date`,
 	}
 
 	// Subcommand: search molecule
 	moleculeCmd := &cobra.Command{
 		Use:   "molecule",
 		Short: "Search patents by molecular similarity",
+		Example: `  # Search by SMILES
+  keyip search molecule --smiles "CCO"
+
+  # Search by InChI with threshold
+  keyip search molecule --inchi "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3" --threshold 0.9
+
+  # Include infringement risk assessment
+  keyip search molecule --smiles "C1=CC=CC=C1" --include-risk
+
+  # Output as JSON
+  keyip search molecule --smiles "CCO" --output json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearchMolecule(cmd.Context(), similaritySearchService, logger)
 		},
@@ -66,6 +88,17 @@ func NewSearchCmd(
 	patentCmd := &cobra.Command{
 		Use:   "patent",
 		Short: "Search patents by text query",
+		Example: `  # Basic keyword search
+  keyip search patent --query "OLED"
+
+  # Search with filters
+  keyip search patent --query "organic light emitting" --offices "CN,US" --ipc "H01L"
+
+  # Search with date range
+  keyip search patent --query "quantum dot" --date-from 2022-01-01 --date-to 2024-12-31
+
+  # Sort by filing date
+  keyip search patent --query "phosphorescent" --sort date --max-results 50`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSearchPatent(cmd.Context(), similaritySearchService, logger)
 		},
