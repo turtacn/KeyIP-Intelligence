@@ -42,12 +42,14 @@ const (
 	DefaultMolPatentGNNDevice          = "cpu"
 	DefaultClaimBERTMaxSeqLength       = 512
 	DefaultClaimBERTTimeout            = 30 * time.Second
-	DefaultStrategyGPTMaxTokens        = 4096
-	DefaultStrategyGPTTemperature      = 0.7
-	DefaultStrategyGPTTopP             = 0.9
-	DefaultStrategyGPTTimeout          = 120 * time.Second
-	DefaultStrategyGPTRetryCount       = 3
-	DefaultStrategyGPTRetryDelay       = 2 * time.Second
+	DefaultStrategyGPTEndpoint          = "https://api.deepseek.com/v1"
+	DefaultStrategyGPTModelName         = "deepseek-chat"
+	DefaultStrategyGPTMaxTokens         = 65536
+	DefaultStrategyGPTTemperature       = 0.7
+	DefaultStrategyGPTTopP              = 0.9
+	DefaultStrategyGPTTimeout           = 120 * time.Second
+	DefaultStrategyGPTRetryCount        = 3
+	DefaultStrategyGPTRetryDelay        = 2 * time.Second
 	DefaultChemExtractorTimeout        = 60 * time.Second
 	DefaultInfringeNetThreshold        = 0.85
 	DefaultInfringeNetBatchSize        = 16
@@ -213,6 +215,12 @@ func ApplyDefaults(cfg *Config) *Config {
 	if cfg.Intelligence.StrategyGPT.MaxTokens == 0 {
 		cfg.Intelligence.StrategyGPT.MaxTokens = DefaultStrategyGPTMaxTokens
 	}
+		if cfg.Intelligence.StrategyGPT.Endpoint == "" {
+			cfg.Intelligence.StrategyGPT.Endpoint = DefaultStrategyGPTEndpoint
+		}
+		if cfg.Intelligence.StrategyGPT.ModelName == "" {
+			cfg.Intelligence.StrategyGPT.ModelName = DefaultStrategyGPTModelName
+		}
 	if cfg.Intelligence.StrategyGPT.Temperature == 0 {
 		cfg.Intelligence.StrategyGPT.Temperature = DefaultStrategyGPTTemperature
 	}

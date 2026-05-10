@@ -116,6 +116,11 @@ start_opensearch() {
     opensearchproject/opensearch:2.14.0
 
   _log "启动 OpenSearch Dashboards (UI: 5601)"
+  # docker-machine 下 Dashboards 可能缺 Node.js，跳过不影响后端
+  if $IS_DOCKER_MACHINE; then
+    _warn "docker-machine 环境跳过 Dashboards（可能缺少 Node.js 运行时）"
+    return 0
+  fi
   docker run -d --name keyip-os-dashboards \
     $RESTART $LOGGING --network "$NETWORK" \
     -p 5601:5601 \
