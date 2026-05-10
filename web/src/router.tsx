@@ -12,6 +12,7 @@ const LifecycleConsole = React.lazy(() => import('./pages/LifecycleConsole'));
 const PartnerPortal = React.lazy(() => import('./pages/PartnerPortal'));
 const Search = React.lazy(() => import('./pages/Search'));
 const KnowledgeGraph = React.lazy(() => import('./pages/KnowledgeGraph'));
+const Health = React.lazy(() => import('./pages/Health'));
 const PatentDetail = React.lazy(() => import('./pages/PatentDetail'));
 const MoleculeDetail = React.lazy(() => import('./pages/MoleculeDetail'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
@@ -68,6 +69,10 @@ const router = createBrowserRouter([
       {
         path: 'molecules/:id',
         element: <MoleculeDetail />,
+      },
+      {
+        path: 'health',
+        element: <Health />,
       },
       {
         path: '*',

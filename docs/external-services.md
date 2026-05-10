@@ -368,7 +368,55 @@ auth:
     client_secret: "dev-secret"
 ```
 
+### Keycloak 自动初始化
+
+容器启动后，运行初始化脚本自动完成 realm、客户端、角色和测试用户的创建：
+
+```bash
+# 等待 Keycloak 完全就绪后执行初始化
+./scripts/init-keycloak.sh
+
+# 仅健康检查
+./scripts/init-keycloak.sh --check-only
+
+# 删除现有 realm 并重建
+./scripts/init-keycloak.sh --recreate
+```
+
+**初始化内容**：
+
+| 资源 | 名称 | 说明 |
+|------|------|------|
+| Realm | `keyip` | 平台统一认证域 |
+| Client | `keyip-api` | OIDC 客户端（支持 authorization_code + client_credentials + password grants） |
+| 角色 | `researcher` | 研究人员 — 专利检索与告警查看 |
+| 角色 | `ip_manager` | IP 管理员 — 专利全生命周期管理 |
+| 角色 | `executive` | 高管 — 报表与仪表板只读访问 |
+| 角色 | `partner_agent` | 合作伙伴代理 — 受限范围的专利与分析读取 |
+| 角色 | `super_admin` | 超级管理员 — 系统全部权限 |
+| 用户 | `admin / admin` | 测试管理员（`super_admin` 角色） |
+| 用户 | `researcher / researcher` | 测试研究人员（`researcher` 角色） |
+| 用户 | `manager / manager` | 测试 IP 管理员（`ip_manager` 角色） |
+
+**脚本说明**：
+- 幂等设计，可重复执行不会产生重复资源
+- 依赖 `curl` + `jq`，无需安装额外工具
+- 通过环境变量覆写默认值：`KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`
+- 角色定义与 `internal/infrastructure/auth/keycloak/rbac.go` 中的 `DefaultRolePermissionMapping()` 保持一致
+
+**验证令牌获取**：
+```bash
+# 获取 admin 用户 access_token
+curl -s -X POST http://localhost:8180/realms/keyip/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d 'client_id=keyip-api' \
+  -d 'client_secret=dev-secret' \
+  -d 'username=admin' -d 'password=admin' -d 'grant_type=password' | jq .
+```
+
 ---
+
+## 9. MailHog
 
 ## 9. MailHog
 

@@ -127,22 +127,22 @@ build-keyip:
 ## test: Run all unit tests
 test: test-unit
 
-## test-unit: Run unit tests for all packages
+## test-unit: Run unit tests for all packages (with race detection)
 test-unit:
-	@echo "$(BLUE)>> Running unit tests...$(NC)"
-	bash scripts/test.sh --level unit --coverage
+	@echo "$(BLUE)>> Running unit tests with race detection...$(NC)"
+	bash scripts/test.sh --level unit --race --coverage
 	@echo "$(GREEN)>> Unit tests passed.$(NC)"
 
-## test-integration: Run integration tests
+## test-integration: Run integration tests (with race detection)
 test-integration:
-	@echo "$(BLUE)>> Running integration tests...$(NC)"
-	bash scripts/test.sh --level integration
+	@echo "$(BLUE)>> Running integration tests with race detection...$(NC)"
+	bash scripts/test.sh --level integration --race
 	@echo "$(GREEN)>> Integration tests passed.$(NC)"
 
-## test-e2e: Run end-to-end tests
+## test-e2e: Run end-to-end tests (with race detection)
 test-e2e:
-	@echo "$(BLUE)>> Running E2E tests...$(NC)"
-	bash scripts/test.sh --level e2e
+	@echo "$(BLUE)>> Running E2E tests with race detection...$(NC)"
+	bash scripts/test.sh --level e2e --race
 	@echo "$(GREEN)>> E2E tests passed.$(NC)"
 
 ## test-coverage: Generate and open HTML coverage report

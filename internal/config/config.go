@@ -245,6 +245,12 @@ type MonitoringConfig struct {
 	Prometheus PrometheusConfig `mapstructure:"prometheus"`
 	Logging    LoggingConfig    `mapstructure:"logging"`
 	Tracing    TracingConfig    `mapstructure:"tracing"`
+	Pprof      PprofConfig      `mapstructure:"pprof"`
+}
+
+// PprofConfig holds pprof profiling endpoint configuration.
+type PprofConfig struct {
+	Enabled bool `mapstructure:"enabled"`
 }
 
 type PrometheusConfig struct {

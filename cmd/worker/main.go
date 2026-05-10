@@ -50,6 +50,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -140,6 +141,8 @@ func main() {
 		logging.String("topics", strings.Join(topics, ",")),
 	)
 
+	var shuttingDown atomic.Bool
+
 	// Initialize Prometheus metrics
 	promCfg := prometheus.CollectorConfig{
 		Namespace:            cfg.Monitoring.Prometheus.Namespace,
@@ -222,7 +225,7 @@ func main() {
 	g, ctx := errgroup.WithContext(parentCtx)
 
 	// Start health check server
-	healthSrv := startHealthServer(cfg, logger, metricsCollector)
+	healthSrv := startHealthServer(cfg, logger, metricsCollector, &shuttingDown)
 
 	// Message channel
 	msgChan := make(chan *common.Message, numWorkers*2)
@@ -253,29 +256,40 @@ func main() {
 		select {
 		case sig := <-stopChan:
 			logger.Info("received shutdown signal", logging.String("signal", sig.String()))
+			shuttingDown.Store(true)
 			cancel() // Cancel parent context, stopping all errgroup goroutines
 		case <-ctx.Done():
 			// Context cancelled elsewhere (e.g. error in group)
 		}
 	}()
 
-	// Wait for all goroutines to finish
+	shutdownStart := time.Now()
+
+	// Wait for all workers and consumer goroutines to finish
 	if err := g.Wait(); err != nil {
 		if err != context.Canceled {
 			logger.Error("worker group exited with error", logging.Err(err))
 		}
 	}
-
-	logger.Info("all workers finished")
+	logger.Info("workers stopped", logging.Duration("elapsed", time.Since(shutdownStart)))
 
 	// Shutdown health server
+	t := time.Now()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	if err := healthSrv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("health server shutdown error", logging.Err(err))
 	}
+	logger.Info("health server stopped", logging.Duration("elapsed", time.Since(t)))
 
-	logger.Info("KeyIP-Intelligence worker stopped")
+	// Shutdown infrastructure connections (reverse init order, DB last)
+	t = time.Now()
+	infra.Close()
+	logger.Info("infrastructure connections closed",
+		logging.Duration("elapsed", time.Since(t)))
+
+	logger.Info("KeyIP-Intelligence worker stopped",
+		logging.Duration("total_elapsed", time.Since(shutdownStart)))
 }
 
 // MessageHandler processes a single Kafka message.
@@ -534,11 +548,11 @@ func (h *patentNewHandler) Handle(ctx context.Context, msg *common.Message) erro
 	// Store patent metadata in PostgreSQL
 	_, err := h.infra.pg.DB().ExecContext(ctx,
 		`INSERT INTO patents (patent_id, patent_number, title, abstract, source, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-		 ON CONFLICT (patent_id) DO UPDATE SET
-		   title = EXCLUDED.title,
-		   abstract = EXCLUDED.abstract,
-		   updated_at = NOW()`,
+			 VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+			 ON CONFLICT (patent_id) DO UPDATE SET
+			   title = EXCLUDED.title,
+			   abstract = EXCLUDED.abstract,
+			   updated_at = NOW()`,
 		payload.PatentID, payload.PatentNumber, payload.Title, payload.Abstract, payload.Source,
 	)
 	if err != nil {
@@ -555,7 +569,7 @@ func (h *patentNewHandler) Handle(ctx context.Context, msg *common.Message) erro
 
 		_, extractErr := h.infra.pg.DB().ExecContext(ctx,
 			`INSERT INTO extraction_queue (patent_id, patent_number, text_content, status, created_at)
-			 VALUES ($1, $2, $3, 'pending', NOW())`,
+				 VALUES ($1, $2, $3, 'pending', NOW())`,
 			payload.PatentID, payload.PatentNumber, textContent,
 		)
 		if extractErr != nil {
@@ -633,7 +647,7 @@ func (h *patentStatusChangedHandler) Handle(ctx context.Context, msg *common.Mes
 	// Record status change history
 	_, err = h.infra.pg.DB().ExecContext(ctx,
 		`INSERT INTO patent_status_history (patent_id, old_status, new_status, reason, changed_at)
-		 VALUES ($1, $2, $3, $4, $5)`,
+			 VALUES ($1, $2, $3, $4, $5)`,
 		payload.PatentID, payload.OldStatus, payload.NewStatus, payload.Reason, payload.ChangedAt,
 	)
 	if err != nil {
@@ -701,12 +715,12 @@ func (h *moleculeIndexedHandler) Handle(ctx context.Context, msg *common.Message
 	// Query active watch rules that contain this molecule from PostgreSQL
 	rows, err := h.infra.pg.DB().QueryContext(ctx,
 		`SELECT w.id, w.name, w.similarity_threshold, w.owner_id
-		 FROM watchlists w
-		 WHERE w.status = 'active'
-		   AND EXISTS (
-		     SELECT 1 FROM watchlist_molecules wm
-		     WHERE wm.watchlist_id = w.id AND wm.molecule_id = $1
-		   )`,
+			 FROM watchlists w
+			 WHERE w.status = 'active'
+			   AND EXISTS (
+			     SELECT 1 FROM watchlist_molecules wm
+			     WHERE wm.watchlist_id = w.id AND wm.molecule_id = $1
+			   )`,
 		payload.MoleculeID,
 	)
 	if err != nil {
@@ -992,11 +1006,11 @@ func (h *reportGenerateHandler) Handle(ctx context.Context, msg *common.Message)
 	// Store report metadata in PostgreSQL
 	_, err := h.infra.pg.DB().ExecContext(ctx,
 		`INSERT INTO report_jobs (report_id, report_type, format, portfolio_id, requested_by, status, summary, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-		 ON CONFLICT (report_id) DO UPDATE SET
-		   status = EXCLUDED.status,
-		   summary = EXCLUDED.summary,
-		   updated_at = NOW()`,
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+			 ON CONFLICT (report_id) DO UPDATE SET
+			   status = EXCLUDED.status,
+			   summary = EXCLUDED.summary,
+			   updated_at = NOW()`,
 		payload.ReportID, payload.ReportType, payload.Format,
 		payload.PortfolioID, payload.RequestedBy,
 		reportStatus, reportSummary,
@@ -1158,13 +1172,23 @@ func (h *infrastructureHealthHandler) Handle(ctx context.Context, msg *common.Me
 	return nil
 }
 
-func startHealthServer(cfg *config.Config, logger logging.Logger, metrics prometheus.MetricsCollector) *http.Server {
+func startHealthServer(cfg *config.Config, logger logging.Logger, metrics prometheus.MetricsCollector, shuttingDown *atomic.Bool) *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if shuttingDown.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("shutting_down"))
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if shuttingDown.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("shutting_down"))
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ready"))
 	})
@@ -1311,7 +1335,7 @@ func consumerLoop(
 			return err
 		}
 	}
-	
+
 	logger.Info("consumer loop stopping")
 	return nil
 }

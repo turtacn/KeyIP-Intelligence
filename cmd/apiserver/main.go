@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -40,6 +41,12 @@ const (
 	shutdownTimeout   = 30 * time.Second
 )
 
+// shutdownStep represents a single resource to close during graceful shutdown.
+type shutdownStep struct {
+	name  string
+	close func()
+}
+
 func main() {
 	// Parse command-line flags
 	configPath := flag.String("config", defaultConfigPath, "path to configuration file")
@@ -71,7 +78,13 @@ func main() {
 	}
 	logger.Info("starting KeyIP-Intelligence API server", logging.String("version", config.Version))
 
+	// shuttingDown is set atomically so health checks can read it concurrently.
+	var shuttingDown atomic.Bool
+
 	// --- Infrastructure Initialization ---
+
+	// Collect resources to close in order (servers close first, DB last).
+	var shutdownSteps []shutdownStep
 
 	// Postgres
 	pgCfg := postgres.PostgresConfig{
@@ -90,7 +103,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("failed to connect to postgres", logging.Err(err))
 	}
-	defer pgConn.Close()
+	shutdownSteps = append(shutdownSteps, shutdownStep{name: "postgres", close: func() { pgConn.Close() }})
 
 	// Neo4j (Optional)
 	neo4jCfg := neo4j.Neo4jConfig{
@@ -104,7 +117,7 @@ func main() {
 	if err != nil {
 		logger.Warn("failed to connect to neo4j (optional)", logging.Err(err))
 	} else {
-		defer neo4jDriver.Close()
+		shutdownSteps = append(shutdownSteps, shutdownStep{name: "neo4j", close: func() { neo4jDriver.Close() }})
 	}
 
 	// Redis (Required for some features, but we can make it optional for the minimal baseline)
@@ -122,23 +135,23 @@ func main() {
 	if err != nil {
 		logger.Warn("failed to connect to redis (optional)", logging.Err(err))
 	} else {
-		defer redisClient.Close()
+		shutdownSteps = append(shutdownSteps, shutdownStep{name: "redis", close: func() { redisClient.Close() }})
 	}
 
 	// MinIO (Optional)
 	minioCfg := &minio.MinIOConfig{
-		Endpoint:      cfg.Storage.MinIO.Endpoint,
-		AccessKeyID:   cfg.Storage.MinIO.AccessKey,
+		Endpoint:        cfg.Storage.MinIO.Endpoint,
+		AccessKeyID:     cfg.Storage.MinIO.AccessKey,
 		SecretAccessKey: cfg.Storage.MinIO.SecretKey,
-		UseSSL:        cfg.Storage.MinIO.UseSSL,
-		DefaultBucket: cfg.Storage.MinIO.BucketName,
-		Region:        cfg.Storage.MinIO.Region,
+		UseSSL:          cfg.Storage.MinIO.UseSSL,
+		DefaultBucket:   cfg.Storage.MinIO.BucketName,
+		Region:          cfg.Storage.MinIO.Region,
 	}
 	minioClient, err := minio.NewMinIOClient(minioCfg, logger)
 	if err != nil {
 		logger.Warn("failed to connect to minio (optional)", logging.Err(err))
 	} else {
-		defer minioClient.Close()
+		shutdownSteps = append(shutdownSteps, shutdownStep{name: "minio", close: func() { minioClient.Close() }})
 	}
 
 	// OpenSearch (Optional)
@@ -151,7 +164,7 @@ func main() {
 	if err != nil {
 		logger.Warn("failed to connect to opensearch (optional)", logging.Err(err))
 	} else {
-		defer osClient.Close()
+		shutdownSteps = append(shutdownSteps, shutdownStep{name: "opensearch", close: func() { osClient.Close() }})
 	}
 
 	// Milvus (Optional)
@@ -164,7 +177,7 @@ func main() {
 	if err != nil {
 		logger.Warn("failed to connect to milvus (optional)", logging.Err(err))
 	} else {
-		defer milvusClient.Close()
+		shutdownSteps = append(shutdownSteps, shutdownStep{name: "milvus", close: func() { milvusClient.Close() }})
 	}
 
 	// Kafka Producer (for async tasks)
@@ -177,7 +190,7 @@ func main() {
 	if err != nil {
 		logger.Warn("failed to create kafka producer, async tasks will fail", logging.Err(err))
 	} else {
-		defer kafkaProducer.Close()
+		shutdownSteps = append(shutdownSteps, shutdownStep{name: "kafka", close: func() { kafkaProducer.Close() }})
 	}
 
 	// Metrics
@@ -216,11 +229,13 @@ func main() {
 	)
 
 	// --- Router ---
+	pprofEnabled := cfg.Monitoring.Pprof.Enabled || os.Getenv("DEBUG") == "true"
 	routerCfg := httpserver.RouterConfig{
 		MoleculeHandler:  moleculeHandler,
 		HealthHandler:    healthHandler,
 		Logger:           logger,
 		MetricsCollector: metrics,
+		PprofEnabled:     pprofEnabled,
 	}
 	httpRouter := httpserver.NewRouter(routerCfg)
 
@@ -278,20 +293,41 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("shutting down servers...")
+	shuttingDown.Store(true)
+	shutdownStart := time.Now()
+	logger.Info("initiating graceful shutdown with 30s timeout")
 
-	// Graceful shutdown
+	// Mark shutting down so health checks immediately return 503.
+	healthHandler.SetShuttingDown()
+
+	// Graceful shutdown with global timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
+	// 1. HTTP server first (stop accepting new requests)
+	t := time.Now()
 	if err := httpServer.Shutdown(ctx); err != nil {
 		logger.Error("HTTP server shutdown error", logging.Err(err))
 	}
+	logger.Info("HTTP server stopped", logging.Duration("elapsed", time.Since(t)))
+
+	// 2. gRPC server
+	t = time.Now()
 	if err := grpcSrv.Stop(ctx); err != nil {
 		logger.Error("gRPC server shutdown error", logging.Err(err))
 	}
+	logger.Info("gRPC server stopped", logging.Duration("elapsed", time.Since(t)))
 
-	logger.Info("servers stopped")
+	// 3. Infrastructure resources in reverse init order (DB closed last)
+	for i := len(shutdownSteps) - 1; i >= 0; i-- {
+		t = time.Now()
+		shutdownSteps[i].close()
+		logger.Info(shutdownSteps[i].name+" connection closed",
+			logging.Duration("elapsed", time.Since(t)))
+	}
+
+	logger.Info("graceful shutdown complete",
+		logging.Duration("total_elapsed", time.Since(shutdownStart)))
 }
 
 // loadConfig attempts to load configuration from file.

@@ -9,7 +9,8 @@ import {
   Clock,
   Users,
   GitBranch,
-  Globe
+  Globe,
+  Activity,
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
@@ -34,7 +35,7 @@ const Sidebar: React.FC = () => {
         </span>
       </div>
 
-      <nav className="flex-1 py-6 px-3 space-y-1">
+      <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -52,6 +53,23 @@ const Sidebar: React.FC = () => {
           </NavLink>
         ))}
       </nav>
+
+      {/* Bottom navigation */}
+      <div className="px-3 pb-2">
+        <NavLink
+          to="/health"
+          className={({ isActive }) =>
+            `flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              isActive
+                ? 'bg-blue-800 text-white shadow-md'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            }`
+          }
+        >
+          <Activity className="w-5 h-5 mr-3" />
+          系统健康
+        </NavLink>
+      </div>
 
       <div className="p-4 border-t border-slate-800">
         <div className="flex items-center">

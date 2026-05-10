@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/middleware"
@@ -41,9 +42,16 @@ type HealthChecker interface {
 
 // HealthHandler handles health check HTTP requests.
 type HealthHandler struct {
-	checkers []HealthChecker
-	version  string
-	startAt  time.Time
+	checkers     []HealthChecker
+	version      string
+	startAt      time.Time
+	shuttingDown atomic.Bool
+}
+
+// SetShuttingDown marks the server as shutting down, causing health checks
+// to immediately return 503 with a "shutting_down" status.
+func (h *HealthHandler) SetShuttingDown() {
+	h.shuttingDown.Store(true)
 }
 
 // NewHealthHandler creates a new HealthHandler.
@@ -83,8 +91,13 @@ type ComponentCheck struct {
 }
 
 // Liveness handles GET /healthz - Kubernetes liveness probe.
-// Always returns 200 if the process is running.
+// Always returns 200 if the process is running, unless the server is
+// shutting down, in which case it returns 503.
 func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
+	if h.shuttingDown.Load() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "shutting_down"})
+		return
+	}
 	resp := LivenessResponse{
 		Status:  "alive",
 		Version: h.version,
@@ -95,7 +108,13 @@ func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
 
 // Readiness handles GET /readyz - Kubernetes readiness probe.
 // Returns 200 if all dependencies are healthy, 503 otherwise.
+// Immediately returns 503 when the server is shutting down.
 func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
+	if h.shuttingDown.Load() {
+		writeJSON(w, http.StatusServiceUnavailable, ReadinessResponse{Status: "shutting_down"})
+		return
+	}
+
 	if len(h.checkers) == 0 {
 		writeJSON(w, http.StatusOK, ReadinessResponse{Status: "ready"})
 		return

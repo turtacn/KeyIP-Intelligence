@@ -332,4 +332,65 @@ func TestNewRouter_DocsRoutes(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "KeyIP-Intelligence API")
 }
 
+func TestNewRouter_Pprof_DisabledByDefault(t *testing.T) {
+	// Pprof should return 404 when disabled (default)
+	cfg := RouterConfig{
+		Logger: &stubLogger{},
+	}
+	router := NewRouter(cfg)
+
+	endpoints := []string{
+		"/debug/pprof/",
+		"/debug/pprof/heap",
+		"/debug/pprof/goroutine",
+		"/debug/pprof/profile",
+		"/debug/pprof/trace",
+	}
+
+	for _, ep := range endpoints {
+		t.Run(ep, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, ep, nil)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			assert.Equal(t, http.StatusNotFound, rec.Code,
+				"pprof endpoint %s should return 404 when disabled", ep)
+		})
+	}
+}
+
+func TestNewRouter_Pprof_Enabled(t *testing.T) {
+	// Pprof endpoints should respond when explicitly enabled
+	cfg := RouterConfig{
+		Logger:        &stubLogger{},
+		PprofEnabled:  true,
+		HealthHandler: newMinimalHealthHandler(),
+	}
+	router := NewRouter(cfg)
+
+	// Test index page (returns HTML listing profiles)
+	t.Run("/debug/pprof/", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/debug/pprof/", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "Types of profiles available")
+	})
+
+	// Test heap profile (handled by pprof.Index via subtree match)
+	t.Run("/debug/pprof/heap", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/debug/pprof/heap", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	// Test goroutine profile (handled by pprof.Index via subtree match)
+	t.Run("/debug/pprof/goroutine", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/debug/pprof/goroutine", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+}
+
 //Personal.AI order the ending

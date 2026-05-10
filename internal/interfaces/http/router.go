@@ -15,6 +15,7 @@ package http
 
 import (
 	"net/http"
+	"net/http/pprof"
 	"strings"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
@@ -54,6 +55,10 @@ type RouterConfig struct {
 	// Infrastructure
 	Logger           logging.Logger
 	MetricsCollector prometheus.MetricsCollector
+
+	// PprofEnabled enables pprof profiling endpoints at /debug/pprof/...
+	// Default is false. Enable only in development/debug environments.
+	PprofEnabled bool
 }
 
 // MiddlewareFunc defines the standard middleware signature.
@@ -101,6 +106,15 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	// --- Metrics endpoint (protected by internal firewall usually, here public for simplicity) ---
 	if cfg.MetricsCollector != nil {
 		mux.Handle("GET /metrics", cfg.MetricsCollector.Handler())
+	}
+
+	// --- Pprof profiling endpoints (only when explicitly enabled) ---
+	if cfg.PprofEnabled {
+		mux.Handle("GET /debug/pprof/", http.HandlerFunc(pprof.Index))
+		mux.Handle("GET /debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+		mux.Handle("GET /debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+		mux.Handle("GET /debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+		mux.Handle("GET /debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
 	}
 
 	// --- API version endpoint (no auth required) ---
