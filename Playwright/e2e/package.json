@@ -1,0 +1,15 @@
+{
+  "name": "keyip-playwright-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report ../artifacts/playwright-report || true"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.41.2",
+    "typescript": "^5.4.5"
+  }
+}

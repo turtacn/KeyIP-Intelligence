@@ -1620,6 +1620,24 @@ func TestRemoteModel_ComputeSimilarity_EmptySMILES(t *testing.T) {
 // Interface compliance compile-time checks
 // =========================================================================
 
+// =========================================================================
+// Benchmarks
+// =========================================================================
+
+func BenchmarkStubPropertyPredictions(b *testing.B) {
+	smiles := "Cc1ccc2c(c1)c1ccc3ccccc3c1n2C" // carbazole fragment
+	allProps := AllPropertyTypes()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		preds := stubPropertyPredictions(smiles, allProps)
+		if len(preds) != len(allProps) {
+			b.Fatalf("expected %d predictions, got %d", len(allProps), len(preds))
+		}
+	}
+}
+
 var _ InfringeModel = (*localInfringeModel)(nil)
 var _ InfringeModel = (*remoteInfringeModel)(nil)
 var _ SMARTSMatcher = (*mockSMARTSMatcher)(nil)

@@ -37,11 +37,12 @@ type RouterConfig struct {
 	HealthHandler        *handlers.HealthHandler
 
 	// Middleware
-	AuthMiddleware      *middleware.AuthMiddleware
-	CORSMiddleware      *middleware.CORSMiddleware
-	LoggingMiddleware   *middleware.LoggingMiddleware
-	RateLimitMiddleware *middleware.RateLimitMiddleware
-	TenantMiddleware    *middleware.TenantMiddleware
+	AuthMiddleware               *middleware.AuthMiddleware
+	CORSMiddleware               *middleware.CORSMiddleware
+	LoggingMiddleware            *middleware.LoggingMiddleware
+	RateLimitMiddleware          *middleware.RateLimitMiddleware
+	SecurityHeadersMiddleware    *middleware.SecurityHeadersMiddleware
+	TenantMiddleware             *middleware.TenantMiddleware
 
 	// Infrastructure
 	Logger           logging.Logger
@@ -134,7 +135,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 
 	// --- Global Middleware Chain ---
 	// Applied to ALL requests.
-	// Order: Recovery -> RequestID -> Logging -> CORS -> RateLimit -> [Conditional: Tenant -> Auth] -> Mux
+	// Order: Recovery -> RequestID -> Logging -> CORS -> SecurityHeaders -> RateLimit -> [Conditional: Tenant -> Auth] -> Mux
 
 	// Build the middleware stack.
 	// Since ServeMux matches strictly, we wrap the entire mux.
@@ -159,12 +160,17 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		globalMiddlewares = append(globalMiddlewares, cfg.CORSMiddleware.Handler)
 	}
 
-	// 5. RateLimit
+	// 5. SecurityHeaders (applied to ALL responses)
+	if cfg.SecurityHeadersMiddleware != nil {
+		globalMiddlewares = append(globalMiddlewares, cfg.SecurityHeadersMiddleware.Handler)
+	}
+
+	// 6. RateLimit
 	if cfg.RateLimitMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, cfg.RateLimitMiddleware.Handler)
 	}
 
-	// 6. Tenant & Auth (Conditional)
+	// 7. Tenant & Auth (Conditional)
 	// We wrap these to only apply if path starts with /api/.
 	if cfg.TenantMiddleware != nil {
 		globalMiddlewares = append(globalMiddlewares, conditionalMiddleware("/api/", cfg.TenantMiddleware.Handler))

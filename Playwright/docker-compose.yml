@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  webui:
+    image: keyip-webui:demo
+    container_name: keyip-webui
+    ports:
+      - "19666:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.41.2-jammy
+    container_name: keyip-e2e
+    depends_on:
+      webui:
+        condition: service_healthy
+    working_dir: /work/Playwright/e2e
+    volumes:
+      - ./:/work
+    environment:
+      - BASE_URL=http://webui
+    command: ["bash", "-lc", "npm ci && npx playwright install --with-deps chromium && npx playwright test"]

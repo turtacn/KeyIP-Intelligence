@@ -257,7 +257,7 @@ func (m *mockExternalChemDB) LookupBySMILES(ctx context.Context, smiles string) 
 // Helper: build extractor with all mocks wired
 // =========================================================================
 
-func newTestExtractor(t *testing.T) (ChemicalExtractor, *mockNERModel) {
+func newTestExtractor(t testing.TB) (ChemicalExtractor, *mockNERModel) {
 	t.Helper()
 	ner := &mockNERModel{}
 	resolver := &mockEntityResolver{}
@@ -274,7 +274,7 @@ func newTestExtractor(t *testing.T) (ChemicalExtractor, *mockNERModel) {
 	return ext, ner
 }
 
-func newTestExtractorWithNER(t *testing.T, nerFn func(ctx context.Context, text string) ([]*RawChemicalEntity, error)) ChemicalExtractor {
+func newTestExtractorWithNER(t testing.TB, nerFn func(ctx context.Context, text string) ([]*RawChemicalEntity, error)) ChemicalExtractor {
 	t.Helper()
 	ner := &mockNERModel{predictFn: nerFn}
 	resolver := &mockEntityResolver{}
@@ -1758,6 +1758,28 @@ func TestMockDictionary_Lookup(t *testing.T) {
 	_, found = dict.Lookup("nonexistent")
 	if found {
 		t.Error("expected not to find 'nonexistent'")
+	}
+}
+
+// =========================================================================
+// Benchmarks
+// =========================================================================
+
+func BenchmarkChemicalExtraction(b *testing.B) {
+	ext, _ := newTestExtractor(b)
+	ctx := context.Background()
+	text := "The pharmaceutical composition according to claim 1, wherein the compound is selected from the group consisting of aspirin (50-78-2), ibuprofen (C13H18O2), and acetaminophen, and wherein the concentration of said compound is between about 10 mg and about 500 mg."
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		res, err := ext.Extract(ctx, text)
+		if err != nil {
+			b.Fatalf("Extract failed: %v", err)
+		}
+		if res == nil {
+			b.Fatal("expected non-nil result")
+		}
 	}
 }
 

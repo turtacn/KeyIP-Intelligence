@@ -2813,6 +2813,44 @@ func BenchmarkCosineSimilarity(b *testing.B) {
 	}
 }
 
+// BenchmarkClaimParsing benchmarks the full claim parsing pipeline.
+func BenchmarkClaimParsing(b *testing.B) {
+	text := "A compound of formula (I) or a pharmaceutically acceptable salt thereof, wherein R1 is selected from the group consisting of hydrogen, C1-C6 alkyl, C2-C6 alkenyl, and C3-C10 cycloalkyl; and R2 is halogen, cyano, or nitro."
+
+	words := strings.Fields(text)
+	bioTags := make([]int, len(words))
+	for i := range bioTags {
+		if i%4 == 0 {
+			bioTags[i] = bioBStructural
+		} else if i%4 == 1 || i%4 == 2 {
+			bioTags[i] = bioIStructural
+		} else {
+			bioTags[i] = bioO
+		}
+	}
+
+	backend := &mockClaimModelBackend{
+		classificationProbs: []float64{0.80, 0.05, 0.03, 0.10, 0.02},
+		bioTags:             bioTags,
+		scopeScore:          0.65,
+	}
+
+	parser := newTestParser(backend)
+	ctx := context.Background()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result, err := parser.ParseClaim(ctx, text)
+		if err != nil {
+			b.Fatalf("ParseClaim failed: %v", err)
+		}
+		if result == nil {
+			b.Fatal("expected non-nil result")
+		}
+	}
+}
+
 func BenchmarkCorrectBIOSequence(b *testing.B) {
 	tags := make([]int, 128)
 	for i := range tags {

@@ -254,4 +254,104 @@ func BenchmarkBitAnd_2048(b *testing.B) {
 	}
 }
 
+// Benchmarks for fingerprint generation and operations
+
+func BenchmarkMorganFingerprint(b *testing.B) {
+	// Simulate realistic 2048-bit Morgan fingerprint data with ~12.5% bit density
+	// Typical Morgan fingerprints for drug-like molecules have 10-20% density.
+	bits := make([]byte, 256) // 2048 bits
+	for i := range bits {
+		bits[i] = 0x12 // ~12.5% density
+	}
+	radius := 2
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		fp, err := NewBitFingerprint(FingerprintMorgan, bits, 2048, radius)
+		if err != nil {
+			b.Fatalf("NewBitFingerprint failed: %v", err)
+		}
+		// Exercise performance-critical operations
+		_ = fp.BitCount()
+		_ = fp.Density()
+		_, _ = fp.GetBit(1024)
+		_ = fp.ToFloat32Slice()
+		_ = fp.Dimension()
+		_ = fp.String()
+	}
+}
+
+func BenchmarkMorganFingerprint_MACCS166(b *testing.B) {
+	// MACCS keys are 166-bit fingerprints, common in drug discovery
+	bits := make([]byte, 21) // 166 bits = 21 bytes
+	for i := range bits {
+		bits[i] = 0xFF
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		fp, err := NewBitFingerprint(FingerprintMACCS, bits, 166, 0)
+		if err != nil {
+			b.Fatalf("NewBitFingerprint failed: %v", err)
+		}
+		_ = fp.BitCount()
+		_ = fp.ToFloat32Slice()
+	}
+}
+
+func BenchmarkDenseFingerprint_Creation(b *testing.B) {
+	// GNN embedding vectors are typically 128-512 dimensional
+	vec := make([]float32, 256)
+	for i := range vec {
+		vec[i] = float32(i) / 256.0
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		fp, err := NewDenseFingerprint(vec, "v1")
+		if err != nil {
+			b.Fatalf("NewDenseFingerprint failed: %v", err)
+		}
+		_ = fp.ToFloat32Slice()
+	}
+}
+
+func BenchmarkPopCount_512(b *testing.B) {
+	data := make([]byte, 64)
+	for i := range data {
+		data[i] = 0xAA
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		PopCount(data)
+	}
+}
+
+func BenchmarkWeightedAverageFusion(b *testing.B) {
+	strategy := &WeightedAverageFusion{}
+	scores := map[FingerprintType]float64{
+		FingerprintMorgan: 0.85,
+		FingerprintMACCS:  0.72,
+		FingerprintRDKit:  0.91,
+		FingerprintAtomPair: 0.65,
+		FingerprintFCFP:  0.78,
+	}
+	weights := map[FingerprintType]float64{
+		FingerprintMorgan: 2.0,
+		FingerprintMACCS:  1.0,
+		FingerprintRDKit:  1.5,
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := strategy.Fuse(scores, weights)
+		if err != nil {
+			b.Fatalf("Fuse failed: %v", err)
+		}
+	}
+}
+
 //Personal.AI order the ending

@@ -2,6 +2,8 @@ package molpatent_gnn
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -700,5 +702,336 @@ func TestLookupAtomicNumber_Known(t *testing.T) {
 func TestLookupAtomicNumber_Unknown(t *testing.T) {
 	if lookupAtomicNumber("Xx") != 0 {
 		t.Error("expected unknown → 0")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Benchmarks
+// ---------------------------------------------------------------------------
+
+func BenchmarkSMILESPreprocessing(b *testing.B) {
+	pp, err := NewGNNPreprocessor(DefaultGNNModelConfig())
+	if err != nil {
+		b.Fatalf("NewGNNPreprocessor: %v", err)
+	}
+
+	// Realistic SMILES for carbazole — a common OLED host material
+	smilesCarbazole := "C12=CC=CC=C1NC3=C2C=CC=C3"
+	ctx := context.Background()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		graph, err := pp.PreprocessSMILES(ctx, smilesCarbazole)
+		if err != nil {
+			b.Fatalf("PreprocessSMILES failed: %v", err)
+		}
+		_ = graph.NumAtoms
+		_ = graph.EdgeIndex
+	}
+}
+
+func BenchmarkSMILESPreprocessing_LargeMolecule(b *testing.B) {
+	pp, err := NewGNNPreprocessor(DefaultGNNModelConfig())
+	if err != nil {
+		b.Fatalf("NewGNNPreprocessor: %v", err)
+	}
+
+	// Simulated larger molecule: Ir(ppy)3-like SMILES fragment (tris(2-phenylpyridine)iridium)
+	smilesLarge := "c1ccc(c2cc3ccccc3[n+]12)[Ir]"
+	ctx := context.Background()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		graph, err := pp.PreprocessSMILES(ctx, smilesLarge)
+		if err != nil {
+			b.Fatalf("PreprocessSMILES failed: %v", err)
+		}
+		_ = graph.NumAtoms
+	}
+}
+
+func BenchmarkSMILESPreprocessing_MultipleMolecules(b *testing.B) {
+	pp, err := NewGNNPreprocessor(DefaultGNNModelConfig())
+	if err != nil {
+		b.Fatalf("NewGNNPreprocessor: %v", err)
+	}
+
+	smilesList := []string{
+		"C12=CC=CC=C1NC3=C2C=CC=C3",           // Carbazole
+		"CC(=O)Oc1ccccc1C(=O)O",                // Aspirin
+		"CN1C=NC2=C1C(=O)N(C(=O)N2C)C",        // Caffeine
+		"CC(C)Cc1ccc(cc1)C(C)C(=O)O",           // Ibuprofen
+		"c1ccccc1",                              // Benzene
+		"CCO",                                   // Ethanol
+		"c1ccc2c(c1)c3ccc4ccccc4c3n2",
+	}
+	ctx := context.Background()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		for _, smiles := range smilesList {
+			graph, err := pp.PreprocessSMILES(ctx, smiles)
+			if err != nil {
+				b.Fatalf("PreprocessSMILES(%q) failed: %v", smiles, err)
+			}
+			_ = graph
+		}
+	}
+}
+
+func BenchmarkMOLParsing(b *testing.B) {
+	pp, err := NewGNNPreprocessor(DefaultGNNModelConfig())
+	if err != nil {
+		b.Fatalf("NewGNNPreprocessor: %v", err)
+	}
+
+	// Realistic V2000 MOL block for carbazole (12 atoms, 13 bonds)
+	molBlock := "\n" +
+		"  AP03082023142222\n" +
+		"\n" +
+		" 12 13  0  0  0  0  0  0  0  0999 V2000\n" +
+		"    1.2247    0.7071    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"    1.2247   -0.7071    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"    0.0000    1.4142    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"    0.0000   -1.4142    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"   -1.2247   -0.7071    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"   -1.2247    0.7071    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"    0.0000    0.0000    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"    2.4747    1.4142    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"    2.4747    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"    2.4747   -1.4142    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"   -2.4747   -1.4142    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"   -2.4747    1.4142    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"  1  2  2  0  0  0  0\n" +
+		"  1  3  1  0  0  0  0\n" +
+		"  2  4  1  0  0  0  0\n" +
+		"  3  5  2  0  0  0  0\n" +
+		"  3  7  1  0  0  0  0\n" +
+		"  4  6  2  0  0  0  0\n" +
+		"  4  7  1  0  0  0  0\n" +
+		"  5  6  1  0  0  0  0\n" +
+		"  1  8  1  0  0  0  0\n" +
+		"  8  9  2  0  0  0  0\n" +
+		"  9 10  1  0  0  0  0\n" +
+		"  5 11  1  0  0  0  0\n" +
+		"  6 12  1  0  0  0  0\n" +
+		"M  END\n"
+	ctx := context.Background()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		graph, err := pp.PreprocessMOL(ctx, molBlock)
+		if err != nil {
+			b.Fatalf("PreprocessMOL failed: %v", err)
+		}
+		_ = graph.NumAtoms
+	}
+}
+
+func BenchmarkMOLParsing_LargeMolecule(b *testing.B) {
+	pp, err := NewGNNPreprocessor(DefaultGNNModelConfig())
+	if err != nil {
+		b.Fatalf("NewGNNPreprocessor: %v", err)
+	}
+
+	// Larger MOL block: Ir(ppy)3 fragment (28 atoms)
+	var sb strings.Builder
+	sb.WriteString("\n  AP03082023142222\n\n")
+	sb.WriteString(" 28 30  0  0  0  0  0  0  0  0999 V2000\n")
+	for i := 0; i < 28; i++ {
+		x := float64(i%7) * 1.2
+		y := float64(i/7) * 1.2
+		sym := "C"
+		if i == 12 || i == 25 {
+			sym = "N"
+		}
+		if i == 27 {
+			sym = "Ir"
+		}
+		sb.WriteString(fmt.Sprintf("    %.4f    %.4f    0.0000 %s   0  0  0  0  0  0  0  0  0  0  0  0\n", x, y, sym))
+	}
+	for i := 0; i < 30; i++ {
+		src := (i % 27) + 1
+		dst := (i+1)%27 + 1
+		bType := 1
+		if i%5 == 0 {
+			bType = 2
+		}
+		sb.WriteString(fmt.Sprintf("%3d%3d%3d  0  0  0  0\n", src, dst, bType))
+	}
+	sb.WriteString("M  END\n")
+	molBlock := sb.String()
+	ctx := context.Background()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		graph, err := pp.PreprocessMOL(ctx, molBlock)
+		if err != nil {
+			b.Fatalf("PreprocessMOL failed: %v", err)
+		}
+		_ = graph.NumAtoms
+	}
+}
+
+func BenchmarkMOLParsing_V3000(b *testing.B) {
+	pp, err := NewGNNPreprocessor(DefaultGNNModelConfig())
+	if err != nil {
+		b.Fatalf("NewGNNPreprocessor: %v", err)
+	}
+
+	// Minimal V3000 MOL block
+	molBlock := "\n" +
+		"  AP03082023142222\n" +
+		"\n" +
+		"  0  0  0  0  0  0  0  0  0  0  0 V3000\n" +
+		"M  V30 BEGIN CTAB\n" +
+		"M  V30 COUNTS 6 6 0 0 0\n" +
+		"M  V30 BEGIN ATOM\n" +
+		"M  V30 1 C 1.0 0.0 0.0 0\n" +
+		"M  V30 2 C 0.0 1.0 0.0 0\n" +
+		"M  V30 3 C -1.0 0.0 0.0 0\n" +
+		"M  V30 4 C 0.0 -1.0 0.0 0\n" +
+		"M  V30 5 C 0.5 0.5 0.0 0\n" +
+		"M  V30 6 C -0.5 -0.5 0.0 0\n" +
+		"M  V30 END ATOM\n" +
+		"M  V30 BEGIN BOND\n" +
+		"M  V30 1 1 1 2\n" +
+		"M  V30 2 1 2 3\n" +
+		"M  V30 3 2 3 4\n" +
+		"M  V30 4 1 4 1\n" +
+		"M  V30 5 1 1 5\n" +
+		"M  V30 6 1 3 6\n" +
+		"M  V30 END BOND\n" +
+		"M  V30 END CTAB\n" +
+		"M  END\n"
+	ctx := context.Background()
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		graph, err := pp.PreprocessMOL(ctx, molBlock)
+		if err != nil {
+			b.Fatalf("PreprocessMOL failed: %v", err)
+		}
+		_ = graph.NumAtoms
+	}
+}
+
+func BenchmarkSMILESValidation(b *testing.B) {
+	pp, err := NewGNNPreprocessor(DefaultGNNModelConfig())
+	if err != nil {
+		b.Fatalf("NewGNNPreprocessor: %v", err)
+	}
+
+	smiles := "C12=CC=CC=C1NC3=C2C=CC=C3"
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if err := pp.ValidateSMILES(smiles); err != nil {
+			b.Fatalf("ValidateSMILES failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkParseSMILES(b *testing.B) {
+	smiles := "C12=CC=CC=C1NC3=C2C=CC=C3"
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		atoms, bonds, err := parseSMILES(smiles)
+		if err != nil {
+			b.Fatalf("parseSMILES failed: %v", err)
+		}
+		_ = len(atoms)
+		_ = len(bonds)
+	}
+}
+
+func BenchmarkEncodeAtomFeatures(b *testing.B) {
+	atom := parsedAtom{
+		Symbol:    "C",
+		AtomicNum: 6,
+		Degree:    2,
+		NumH:      2,
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		features := encodeAtomFeatures(atom)
+		_ = features[0]
+	}
+}
+
+func BenchmarkEncodeBondFeatures(b *testing.B) {
+	bond := parsedBond{
+		Src:      0,
+		Dst:      1,
+		BondType: 1,
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		features := encodeBondFeatures(bond)
+		_ = features[0]
+	}
+}
+
+func BenchmarkComputeGlobalFeatures(b *testing.B) {
+	atoms := []parsedAtom{
+		{Symbol: "C", AtomicNum: 6, Degree: 2},
+		{Symbol: "C", AtomicNum: 6, Degree: 2},
+		{Symbol: "C", AtomicNum: 6, Degree: 1},
+		{Symbol: "C", AtomicNum: 6, Degree: 1},
+		{Symbol: "N", AtomicNum: 7, IsAromatic: true},
+		{Symbol: "O", AtomicNum: 8, Degree: 1},
+	}
+	bonds := []parsedBond{
+		{Src: 0, Dst: 1, BondType: 1},
+		{Src: 1, Dst: 2, BondType: 2},
+		{Src: 2, Dst: 3, BondType: 1},
+		{Src: 3, Dst: 4, BondType: 1},
+		{Src: 0, Dst: 5, BondType: 1},
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		features := computeGlobalFeatures(atoms, bonds)
+		_ = features[0]
+	}
+}
+
+func BenchmarkParseMOLBlock(b *testing.B) {
+	molBlock := "\n" +
+		"  AP03082023142222\n" +
+		"\n" +
+		"  4  3  0  0  0  0  0  0  0  0999 V2000\n" +
+		"    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"    1.2000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"    2.4000    0.0000    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"   -0.6000    1.0392    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n" +
+		"  1  2  1  0  0  0  0\n" +
+		"  2  3  2  0  0  0  0\n" +
+		"  1  4  2  0  0  0  0\n" +
+		"M  END\n"
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		atoms, bonds, err := parseMOLBlock(molBlock)
+		if err != nil {
+			b.Fatalf("parseMOLBlock failed: %v", err)
+		}
+		_ = len(atoms)
+		_ = len(bonds)
 	}
 }

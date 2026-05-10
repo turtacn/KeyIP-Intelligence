@@ -263,4 +263,214 @@ func FuzzTanimotoSymmetry(f *testing.F) {
 	})
 }
 
+// Benchmarks
+
+func BenchmarkTanimotoSimilarity(b *testing.B) {
+	// Create two 2048-bit fingerprints with known overlap pattern
+	bits1 := make([]byte, 256)
+	bits2 := make([]byte, 256)
+	for i := range bits1 {
+		bits1[i] = 0xAA // 10101010
+		bits2[i] = 0xCC // 11001100
+	}
+	fp1, err := NewBitFingerprint(FingerprintMorgan, bits1, 2048, 2)
+	if err != nil {
+		b.Fatalf("NewBitFingerprint failed: %v", err)
+	}
+	fp2, err := NewBitFingerprint(FingerprintMorgan, bits2, 2048, 2)
+	if err != nil {
+		b.Fatalf("NewBitFingerprint failed: %v", err)
+	}
+	calc := &TanimotoCalculator{}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		score, err := calc.Calculate(fp1, fp2)
+		if err != nil {
+			b.Fatalf("Calculate failed: %v", err)
+		}
+		_ = score
+	}
+}
+
+func BenchmarkTanimotoSimilarity_Dense(b *testing.B) {
+	// Benchmarks Tanimoto on dense vectors (GNN embeddings)
+	vec1 := make([]float32, 256)
+	vec2 := make([]float32, 256)
+	for i := range vec1 {
+		vec1[i] = float32(i) / 256.0
+		vec2[i] = float32(256-i) / 256.0
+	}
+	fp1, err := NewDenseFingerprint(vec1, "v1")
+	if err != nil {
+		b.Fatalf("NewDenseFingerprint failed: %v", err)
+	}
+	fp2, err := NewDenseFingerprint(vec2, "v1")
+	if err != nil {
+		b.Fatalf("NewDenseFingerprint failed: %v", err)
+	}
+	calc := &TanimotoCalculator{}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		score, err := calc.Calculate(fp1, fp2)
+		if err != nil {
+			b.Fatalf("Calculate failed: %v", err)
+		}
+		_ = score
+	}
+}
+
+func BenchmarkSimilarityMatrix(b *testing.B) {
+	// Create 20 fingerprints for pairwise matrix computation
+	n := 20
+	fps := make([]*Fingerprint, n)
+	for j := 0; j < n; j++ {
+		bits := make([]byte, 256)
+		// Generate diverse fingerprint patterns
+		for k := range bits {
+			bits[k] = byte((j*37 + k*53) % 256)
+		}
+		var err error
+		fps[j], err = NewBitFingerprint(FingerprintMorgan, bits, 2048, 2)
+		if err != nil {
+			b.Fatalf("NewBitFingerprint failed: %v", err)
+		}
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		matrix, err := SimilarityMatrix(fps, MetricTanimoto)
+		if err != nil {
+			b.Fatalf("SimilarityMatrix failed: %v", err)
+		}
+		_ = matrix[0][0]
+	}
+}
+
+func BenchmarkSimilarityMatrix_Dense(b *testing.B) {
+	n := 20
+	fps := make([]*Fingerprint, n)
+	for j := 0; j < n; j++ {
+		vec := make([]float32, 128)
+		for k := range vec {
+			vec[k] = float32((j*17 + k*31) % 1000) / 1000.0
+		}
+		var err error
+		fps[j], err = NewDenseFingerprint(vec, "v1")
+		if err != nil {
+			b.Fatalf("NewDenseFingerprint failed: %v", err)
+		}
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		matrix, err := SimilarityMatrix(fps, MetricTanimoto)
+		if err != nil {
+			b.Fatalf("SimilarityMatrix failed: %v", err)
+		}
+		_ = matrix[0][0]
+	}
+}
+
+func BenchmarkDiceSimilarity(b *testing.B) {
+	bits1 := make([]byte, 256)
+	bits2 := make([]byte, 256)
+	for i := range bits1 {
+		bits1[i] = 0xAA
+		bits2[i] = 0xCC
+	}
+	fp1, _ := NewBitFingerprint(FingerprintMorgan, bits1, 2048, 2)
+	fp2, _ := NewBitFingerprint(FingerprintMorgan, bits2, 2048, 2)
+	calc := &DiceCalculator{}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		score, _ := calc.Calculate(fp1, fp2)
+		_ = score
+	}
+}
+
+func BenchmarkCosineSimilarity_Dense(b *testing.B) {
+	vec1 := make([]float32, 256)
+	vec2 := make([]float32, 256)
+	for i := range vec1 {
+		vec1[i] = float32(i) / 256.0
+		vec2[i] = float32(256-i) / 256.0
+	}
+	fp1, _ := NewDenseFingerprint(vec1, "v1")
+	fp2, _ := NewDenseFingerprint(vec2, "v1")
+	calc := &CosineCalculator{}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		score, _ := calc.Calculate(fp1, fp2)
+		_ = score
+	}
+}
+
+func BenchmarkSearchSimilar(b *testing.B) {
+	// Create target and candidate fingerprints
+	targetBits := make([]byte, 256)
+	for i := range targetBits {
+		targetBits[i] = 0xAA
+	}
+	target, _ := NewBitFingerprint(FingerprintMorgan, targetBits, 2048, 2)
+
+	nCandidates := 100
+	candidates := make([]*Fingerprint, nCandidates)
+	for j := 0; j < nCandidates; j++ {
+		bits := make([]byte, 256)
+		for k := range bits {
+			bits[k] = byte((j*13 + k*7) % 256)
+		}
+		candidates[j], _ = NewBitFingerprint(FingerprintMorgan, bits, 2048, 2)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		results, err := SearchSimilar(target, candidates, MetricTanimoto, 0.5, 10)
+		if err != nil {
+			b.Fatalf("SearchSimilar failed: %v", err)
+		}
+		_ = results
+	}
+}
+
+func BenchmarkBatchComputeSimilarity(b *testing.B) {
+	targetBits := make([]byte, 256)
+	for i := range targetBits {
+		targetBits[i] = 0xAA
+	}
+	target, _ := NewBitFingerprint(FingerprintMorgan, targetBits, 2048, 2)
+
+	engine := NewDefaultSimilarityEngine()
+	nCandidates := 50
+	candidates := make([]*Fingerprint, nCandidates)
+	for j := 0; j < nCandidates; j++ {
+		bits := make([]byte, 256)
+		for k := range bits {
+			bits[k] = byte((j*19 + k*23) % 256)
+		}
+		candidates[j], _ = NewBitFingerprint(FingerprintMorgan, bits, 2048, 2)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		scores, err := engine.BatchComputeSimilarity(target, candidates, MetricTanimoto)
+		if err != nil {
+			b.Fatalf("BatchComputeSimilarity failed: %v", err)
+		}
+		_ = scores[0]
+	}
+}
+
 //Personal.AI order the ending
