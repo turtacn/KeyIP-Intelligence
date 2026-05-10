@@ -306,4 +306,30 @@ func TestNewRouter_VersionEndpoint(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "commit1")
 }
 
+func TestNewRouter_DocsRoutes(t *testing.T) {
+	vCfg := middleware.DefaultVersioningConfig()
+	vMw := middleware.NewVersioningMiddleware(vCfg)
+
+	cfg := RouterConfig{
+		DocsHandler:         handlers.NewDocsHandler(),
+		VersioningMiddleware: vMw,
+		Logger:              &stubLogger{},
+	}
+	router := NewRouter(cfg)
+
+	// Swagger UI page
+	req := httptest.NewRequest(http.MethodGet, "/api/docs", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "swagger-ui")
+
+	// OpenAPI spec
+	req = httptest.NewRequest(http.MethodGet, "/api/openapi.json", nil)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "KeyIP-Intelligence API")
+}
+
 //Personal.AI order the ending

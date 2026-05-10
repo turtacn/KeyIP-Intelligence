@@ -103,6 +103,46 @@ export interface PortfolioScore {
   healthGrade: 'A' | 'B' | 'C' | 'D' | 'F';
 }
 
+export interface ConstellationPoint {
+  id: string;
+  patent_number: string;
+  x: number;
+  y: number;
+  point_type: 'own_patent' | 'competitor_patent' | 'public_patent' | 'molecule';
+  assignee?: string;
+  tech_domain?: string;
+  value_score?: number;
+  filing_year?: number;
+  legal_status?: string;
+  cluster_label?: string;
+}
+
+export interface ConstellationCluster {
+  cluster_id: string;
+  label: string;
+  center_x: number;
+  center_y: number;
+  point_count: number;
+  tech_domain?: string;
+}
+
+export interface WhiteSpaceRegion {
+  region_id: string;
+  center_x: number;
+  center_y: number;
+  description?: string;
+  tech_domains?: string[];
+  score: number;
+}
+
+export interface ConstellationData {
+  portfolio_id: string;
+  points: ConstellationPoint[];
+  clusters?: ConstellationCluster[];
+  white_spaces?: WhiteSpaceRegion[];
+  total_points: number;
+}
+
 export interface DashboardMetrics {
   totalPatents: number;
   activePatents: number;

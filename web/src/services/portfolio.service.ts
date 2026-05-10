@@ -1,5 +1,5 @@
 import { api } from './adapter';
-import { PortfolioScore } from '../types/domain';
+import { PortfolioScore, ConstellationData } from '../types/domain';
 import { ApiResponse } from '../types/api';
 
 export const portfolioService = {
@@ -13,5 +13,9 @@ export const portfolioService = {
 
   async getCoverage(): Promise<ApiResponse<any>> {
     return api.get<ApiResponse<any>>('/portfolio/coverage');
+  },
+
+  async getConstellation(portfolioId: string): Promise<ConstellationData> {
+    return api.get<ConstellationData>(`/portfolios/${portfolioId}/constellation`);
   }
 };

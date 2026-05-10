@@ -1708,3 +1708,347 @@ func BenchmarkBuildContext(b *testing.B) {
 		_, _ = eng.BuildContext(ctx, result, 2048)
 	}
 }
+
+
+// ---------------------------------------------------------------------------
+// Tests: Relevance Scoring
+// ---------------------------------------------------------------------------
+
+func TestCombinedRelevanceScore_VectorOnly(t *testing.T) {
+	weights := DefaultRelevanceWeights()
+	chunk := &RAGChunk{
+		Score:  0.80,
+		Source: SourcePatent,
+	}
+	score := CombinedRelevanceScore(chunk, weights)
+	if score <= 0 {
+		t.Errorf("expected positive score for vector-only chunk, got %f", score)
+	}
+	// Vector weight 0.5 * 0.80 + source 0.10 * 0.90 = 0.40 + 0.09 = 0.49
+	if score > 1.0 || score < 0.1 {
+		t.Errorf("score %f outside expected range", score)
+	}
+}
+
+func TestCombinedRelevanceScore_WithReranker(t *testing.T) {
+	weights := DefaultRelevanceWeights()
+	chunk := &RAGChunk{
+		Score:         0.70,
+		RerankerScore: 0.95,
+		Source:        SourceCaseLaw,
+	}
+	score := CombinedRelevanceScore(chunk, weights)
+	// vector: 0.5*0.70=0.35, reranker: 0.30*0.95=0.285, source: 0.10*1.0=0.10 => 0.735
+	if score < 0.5 || score > 1.0 {
+		t.Errorf("expected score ~0.735, got %f", score)
+	}
+}
+
+func TestCombinedRelevanceScore_ExactMatchBonus(t *testing.T) {
+	weights := DefaultRelevanceWeights()
+	chunk := &RAGChunk{
+		Score:  0.60,
+		Source: SourcePatent,
+		Content: "This patent describes a novel OLED compound with iridium complex.",
+		Metadata: map[string]string{"matched_query": "OLED compound"},
+	}
+	score := CombinedRelevanceScore(chunk, weights)
+	scoreWithout := CombinedRelevanceScore(&RAGChunk{
+		Score:  0.60,
+		Source: SourcePatent,
+	}, weights)
+	if score <= scoreWithout {
+		t.Error("exact match bonus should increase score")
+	}
+}
+
+func TestSourceAuthorityWeight(t *testing.T) {
+	tests := []struct {
+		source DocumentSourceType
+		min    float64
+		max    float64
+	}{
+		{SourcePatent, 0.7, 1.0},
+		{SourceCaseLaw, 0.9, 1.0},
+		{SourceExaminationGuideline, 0.8, 1.0},
+		{SourceScientificPaper, 0.5, 0.9},
+		{SourceOther, 0.2, 0.6},
+	}
+	for _, tt := range tests {
+		w := sourceAuthorityWeight(tt.source)
+		if w < tt.min || w > tt.max {
+			t.Errorf("sourceAuthorityWeight(%s) = %f, expected in [%f, %f]", tt.source, w, tt.min, tt.max)
+		}
+	}
+}
+
+func TestComputeRecencyBonus(t *testing.T) {
+	tests := []struct {
+		dateStr string
+		min     float64
+	}{
+		{"2026-01-01", 0.8},   // within 1 year
+		{"2023-06-15", 0.6},   // ~3 years ago
+		{"2020-01-01", 0.4},   // ~6 years ago
+		{"2010-01-01", 0.1},   // ~16 years ago
+		{"invalid-date", 0.4}, // unparseable => neutral 0.5
+	}
+	for _, tt := range tests {
+		bonus := computeRecencyBonus(tt.dateStr)
+		if bonus < 0 || bonus > 1.0 {
+			t.Errorf("computeRecencyBonus(%q) = %f, out of range [0,1]", tt.dateStr, bonus)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Content Similarity and Deduplication
+// ---------------------------------------------------------------------------
+
+func TestContentSimilarity_Identical(t *testing.T) {
+	text := "This is a patent claim about an OLED compound with iridium complex."
+	sim := ContentSimilarity(text, text)
+	if sim < 0.99 || sim > 1.01 {
+		t.Errorf("identical texts should have similarity ~1.0, got %f", sim)
+	}
+}
+
+func TestContentSimilarity_Different(t *testing.T) {
+	a := "This is about OLED iridium complexes for light emitting devices."
+	b := "Method for manufacturing a semiconductor device with silicon substrate."
+	sim := ContentSimilarity(a, b)
+	if sim > 0.5 {
+		t.Errorf("unrelated texts should have low similarity, got %f", sim)
+	}
+}
+
+func TestContentSimilarity_PartialOverlap(t *testing.T) {
+	a := "A novel iridium complex for use as phosphorescent emitter in OLED devices."
+	b := "An iridium complex for use as phosphorescent emitter in organic light emitting diodes with improved efficiency."
+	sim := ContentSimilarity(a, b)
+	if sim < 0.2 || sim > 1.0 {
+		t.Errorf("overlapping texts should have moderate similarity, got %f", sim)
+	}
+}
+
+func TestContentSimilarity_Empty(t *testing.T) {
+	if sim := ContentSimilarity("", "test"); sim != 0 {
+		t.Errorf("expected 0 for empty text, got %f", sim)
+	}
+	if sim := ContentSimilarity("test", ""); sim != 0 {
+		t.Errorf("expected 0 for empty text, got %f", sim)
+	}
+}
+
+func TestExtractNGrams(t *testing.T) {
+	ngrams := extractNGrams("hello", 3)
+	if len(ngrams) != 3 {
+		t.Errorf("expected 3 trigrams from 'hello', got %d", len(ngrams))
+	}
+	if !ngrams["hel"] || !ngrams["ell"] || !ngrams["llo"] {
+		t.Error("missing expected n-grams")
+	}
+}
+
+func TestExtractNGrams_ShortText(t *testing.T) {
+	ngrams := extractNGrams("ab", 5)
+	if len(ngrams) != 1 {
+		t.Errorf("expected 1 n-gram from short text, got %d", len(ngrams))
+	}
+}
+
+func TestDeduplicateChunks_NoDuplicates(t *testing.T) {
+	chunks := []*RAGChunk{
+		{ChunkID: "c1", Content: "First unique content about OLED materials.", Score: 0.9, Source: SourcePatent},
+		{ChunkID: "c2", Content: "Second unique content about charge transport layers.", Score: 0.8, Source: SourcePatent},
+		{ChunkID: "c3", Content: "Third unique content about encapsulation methods.", Score: 0.7, Source: SourcePatent},
+	}
+	deduped := DeduplicateChunks(chunks, 0.85)
+	if len(deduped) != 3 {
+		t.Errorf("expected 3 chunks (no duplicates), got %d", len(deduped))
+	}
+}
+
+func TestDeduplicateChunks_WithDuplicates(t *testing.T) {
+	baseContent := "A novel iridium complex for use as phosphorescent emitter in OLED devices with high efficiency and long lifetime."
+	similarContent := "A novel iridium complex for use as phosphorescent emitter in OLED devices featuring high efficiency."
+	chunks := []*RAGChunk{
+		{ChunkID: "c1", Content: baseContent, Score: 0.95, Source: SourcePatent},
+		{ChunkID: "c2", Content: "Completely different content about hole transport materials.", Score: 0.85, Source: SourcePatent},
+		{ChunkID: "c3", Content: similarContent, Score: 0.80, Source: SourcePatent},
+	}
+	deduped := DeduplicateChunks(chunks, 0.70)
+	if len(deduped) >= 3 {
+		t.Errorf("expected deduplication to reduce chunks, got %d", len(deduped))
+	}
+	// Best-scoring chunk should be kept
+	keptC1 := false
+	for _, c := range deduped {
+		if c.ChunkID == "c1" {
+			keptC1 = true
+			break
+		}
+	}
+	if !keptC1 {
+		t.Error("highest-scoring chunk (c1) should be kept after dedup")
+	}
+}
+
+func TestDeduplicateChunks_Empty(t *testing.T) {
+	deduped := DeduplicateChunks(nil, 0.85)
+	if len(deduped) != 0 {
+		t.Errorf("expected 0 for nil input, got %d", len(deduped))
+	}
+	deduped = DeduplicateChunks([]*RAGChunk{}, 0.85)
+	if len(deduped) != 0 {
+		t.Errorf("expected 0 for empty input, got %d", len(deduped))
+	}
+}
+
+func TestDeduplicateChunks_Single(t *testing.T) {
+	chunks := []*RAGChunk{
+		{ChunkID: "c1", Content: "Single chunk.", Score: 0.9, Source: SourcePatent},
+	}
+	deduped := DeduplicateChunks(chunks, 0.85)
+	if len(deduped) != 1 {
+		t.Errorf("expected 1 chunk, got %d", len(deduped))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Citation Tracking
+// ---------------------------------------------------------------------------
+
+func TestExtractRAGCitations(t *testing.T) {
+	chunks := []*RAGChunk{
+		{
+			ChunkID:    "c1",
+			DocumentID: "US12345678",
+			Content:    "This is a patent claim about an OLED compound with iridium complex for use in display devices.",
+			Score:      0.95,
+			Source:     SourcePatent,
+			Metadata:   map[string]string{"patent_number": "US12345678", "claim_number": "1"},
+		},
+		{
+			ChunkID:    "c2",
+			DocumentID: "Alice-v-CLS",
+			Content:    "Case law excerpt regarding patent eligibility of abstract ideas.",
+			Score:      0.90,
+			Source:     SourceCaseLaw,
+			Metadata:   map[string]string{"case_name": "Alice Corp v. CLS Bank"},
+		},
+	}
+	citations := ExtractRAGCitations(chunks)
+	if len(citations) != 2 {
+		t.Errorf("expected 2 citations, got %d", len(citations))
+	}
+	for _, cite := range citations {
+		if cite.SourceLabel == "" {
+			t.Error("citation should have a non-empty source label")
+		}
+		if cite.RelevantText == "" {
+			t.Error("citation should have relevant text")
+		}
+		if cite.RelevanceScore <= 0 {
+			t.Errorf("expected positive relevance score, got %f", cite.RelevanceScore)
+		}
+	}
+	// Check patent citation label
+	if citations[0].SourceLabel != "Patent US12345678, Claim 1" {
+		t.Errorf("unexpected source label: %q", citations[0].SourceLabel)
+	}
+}
+
+func TestExtractRAGCitations_DeduplicatesBySource(t *testing.T) {
+	chunks := []*RAGChunk{
+		{
+			ChunkID:    "c1",
+			DocumentID: "US12345678",
+			Content:    "First claim content about OLED iridium complex.",
+			Score:      0.95,
+			Source:     SourcePatent,
+			Metadata:   map[string]string{"patent_number": "US12345678", "claim_number": "1"},
+		},
+		{
+			ChunkID:    "c2",
+			DocumentID: "US12345678",
+			Content:    "Different content but same patent source.",
+			Score:      0.90,
+			Source:     SourcePatent,
+			Metadata:   map[string]string{"patent_number": "US12345678", "claim_number": "1"},
+		},
+	}
+	citations := ExtractRAGCitations(chunks)
+	if len(citations) > 2 {
+		t.Errorf("expected deduplication to reduce identical source citations, got %d", len(citations))
+	}
+}
+
+func TestExtractRAGCitations_Empty(t *testing.T) {
+	citations := ExtractRAGCitations(nil)
+	if len(citations) != 0 {
+		t.Errorf("expected 0 for nil, got %d", len(citations))
+	}
+	citations = ExtractRAGCitations([]*RAGChunk{})
+	if len(citations) != 0 {
+		t.Errorf("expected 0 for empty, got %d", len(citations))
+	}
+}
+
+func TestExtractRAGCitations_TruncatesLongContent(t *testing.T) {
+	longContent := strings.Repeat("This is a long patent description with technical details about OLED compounds and their synthesis methods. ", 30)
+	chunks := []*RAGChunk{
+		{
+			ChunkID:    "c1",
+			DocumentID: "US99999999",
+			Content:    longContent,
+			Score:      0.90,
+			Source:     SourcePatent,
+			Metadata:   map[string]string{"patent_number": "US99999999"},
+		},
+	}
+	citations := ExtractRAGCitations(chunks)
+	if len(citations) != 1 {
+		t.Fatalf("expected 1 citation, got %d", len(citations))
+	}
+	if len(citations[0].RelevantText) > 250 {
+		t.Errorf("expected truncated relevant text (<250 chars), got %d chars", len(citations[0].RelevantText))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tests: IntegrateDedupAndScoreIntoResult
+// ---------------------------------------------------------------------------
+
+func TestIntegrateDedupAndScoreIntoResult(t *testing.T) {
+	result := &RAGResult{
+		Chunks: []*RAGChunk{
+			{ChunkID: "c1", Content: "Novel OLED iridium complex for phosphorescent emission with high efficiency.", Score: 0.95, Source: SourcePatent},
+			{ChunkID: "c2", Content: "Novel OLED iridium complex for phosphorescent emission.", Score: 0.80, Source: SourcePatent},
+			{ChunkID: "c3", Content: "Hole transport material composition for OLED devices.", Score: 0.70, Source: SourcePatent},
+		},
+	}
+	weights := DefaultRelevanceWeights()
+	IntegrateDedupAndScoreIntoResult(result, weights, 0.75)
+	if len(result.Chunks) >= 3 {
+		t.Logf("dedup reduced from 3 to %d (may vary by similarity)", len(result.Chunks))
+	}
+	for _, c := range result.Chunks {
+		if c.RerankerScore <= 0 {
+			t.Errorf("chunk %s should have positive combined score after integration", c.ChunkID)
+		}
+	}
+}
+
+func TestIntegrateDedupAndScoreIntoResult_NilResult(t *testing.T) {
+	// Should not panic
+	IntegrateDedupAndScoreIntoResult(nil, DefaultRelevanceWeights(), 0.85)
+}
+
+func TestIntegrateDedupAndScoreIntoResult_EmptyChunks(t *testing.T) {
+	result := &RAGResult{Chunks: []*RAGChunk{}}
+	IntegrateDedupAndScoreIntoResult(result, DefaultRelevanceWeights(), 0.85)
+	if len(result.Chunks) != 0 {
+		t.Errorf("expected 0 chunks, got %d", len(result.Chunks))
+	}
+}

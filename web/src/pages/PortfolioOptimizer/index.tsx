@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { usePartners } from '../../hooks/usePartner';
 import { usePatents } from '../../hooks/usePatents';
+import { usePortfolioConstellation } from '../../hooks/usePortfolioConstellation';
 import PanoramaView from './PanoramaView';
 import GapAnalysis from './GapAnalysis';
 import ValueScoring from './ValueScoring';
 import BudgetOptimizer from './BudgetOptimizer';
 import WhatIfSimulator from './WhatIfSimulator';
+import ConstellationMap from '../../components/visualization/ConstellationMap';
 import PageError from '../../components/ui/PageError';
 import EmptyState from '../../components/ui/EmptyState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
@@ -19,10 +21,13 @@ const PortfolioOptimizer: React.FC = () => {
   const { data: companies, loading: partnersLoading, error: partnersError } = usePartners();
   const { data: patents, loading: patentsLoading, error: patentsError } = usePatents();
 
+  const portfolioId = (summary.data as { id?: string } | null)?.id;
+  const { data: constellation, loading: constellationLoading, error: constellationError, refetch: refetchConstellation } = usePortfolioConstellation(portfolioId);
+
   const [activeSection, setActiveSection] = useState('panorama');
 
-  const isLoading = summary.loading || scores.loading || coverage.loading || partnersLoading || patentsLoading;
-  const error = summary.error || scores.error || coverage.error || partnersError || patentsError;
+  const isLoading = summary.loading || scores.loading || coverage.loading || partnersLoading || patentsLoading || constellationLoading;
+  const error = summary.error || scores.error || coverage.error || partnersError || patentsError || constellationError;
 
   const scrollToSection = (id: string) => {
     setActiveSection(id);
@@ -98,6 +103,7 @@ const PortfolioOptimizer: React.FC = () => {
         <nav className="flex space-x-8 px-1 overflow-x-auto" aria-label="Portfolio Sections">
           {[
             { id: 'panorama', label: t('portfolio.nav.panorama') },
+            { id: 'constellation', label: 'Constellation' },
             { id: 'gap', label: t('portfolio.nav.gap') },
             { id: 'scoring', label: t('portfolio.nav.scoring') },
             { id: 'budget', label: t('portfolio.nav.budget') },
@@ -136,7 +142,23 @@ const PortfolioOptimizer: React.FC = () => {
             />
           </div>
 
-          {/* Section 2: Gap Analysis */}
+          {/* Section 2: Constellation Map */}
+          <div id="constellation" className="scroll-mt-6">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Patent Constellation Map</h2>
+              <p className="text-slate-500">
+                Explore patent positioning in molecular space. Self-owned patents (green) are shown alongside competitor patents (red). Bubble size reflects patent value score.
+              </p>
+            </div>
+            <ConstellationMap
+              data={constellation}
+              loading={constellationLoading}
+              error={constellationError}
+              onRetry={refetchConstellation}
+            />
+          </div>
+
+          {/* Section 3: Gap Analysis */}
           <div id="gap" className="scroll-mt-6">
             <div className="mb-6">
               <h2 className="text-xl font-bold text-slate-900 mb-2">{t('portfolio.gap.title')}</h2>
@@ -147,7 +169,7 @@ const PortfolioOptimizer: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 3: Value Scoring */}
+          {/* Section 4: Value Scoring */}
           <div id="scoring" className="scroll-mt-6">
             <div className="mb-6">
               <h2 className="text-xl font-bold text-slate-900 mb-2">{t('portfolio.scoring.title')}</h2>
@@ -156,7 +178,7 @@ const PortfolioOptimizer: React.FC = () => {
             <ValueScoring patents={patents || []} />
           </div>
 
-          {/* Section 4: Budget */}
+          {/* Section 5: Budget */}
           <div id="budget" className="scroll-mt-6">
             <div className="mb-6">
               <h2 className="text-xl font-bold text-slate-900 mb-2">{t('portfolio.budget.title')}</h2>
@@ -167,7 +189,7 @@ const PortfolioOptimizer: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 5: Simulator */}
+          {/* Section 6: Simulator */}
           <div id="simulator" className="scroll-mt-6">
             <div className="mb-6">
               <h2 className="text-xl font-bold text-slate-900 mb-2">{t('portfolio.simulator.title')}</h2>

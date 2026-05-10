@@ -1085,3 +1085,278 @@ func (n *noopRAGMetrics) RecordRetrievalLatency(ctx context.Context, durationMs 
 func (n *noopRAGMetrics) RecordRerankLatency(ctx context.Context, durationMs float64) {}
 func (n *noopRAGMetrics) RecordIndexLatency(ctx context.Context, durationMs float64)  {}
 func (n *noopRAGMetrics) RecordChunkCount(ctx context.Context, count int)             {}
+
+// ---------------------------------------------------------------------------
+// Relevance Scoring — combines vector similarity, reranker score, and metadata signals
+// ---------------------------------------------------------------------------
+
+// RelevanceWeights controls how different signals are weighted in the combined score.
+type RelevanceWeights struct {
+	VectorWeight     float64 `json:"vector_weight"`
+	RerankerWeight   float64 `json:"reranker_weight"`
+	RecencyWeight    float64 `json:"recency_weight"`
+	SourceAuthority  float64 `json:"source_authority_weight"`
+	ExactMatchBonus  float64 `json:"exact_match_bonus"`
+}
+
+// DefaultRelevanceWeights returns sensible defaults for patent-domain relevance scoring.
+func DefaultRelevanceWeights() RelevanceWeights {
+	return RelevanceWeights{
+		VectorWeight:    0.50,
+		RerankerWeight:  0.30,
+		RecencyWeight:   0.05,
+		SourceAuthority: 0.10,
+		ExactMatchBonus: 0.05,
+	}
+}
+
+// CombinedRelevanceScore computes a single relevance score from multiple signals.
+func CombinedRelevanceScore(chunk *RAGChunk, weights RelevanceWeights) float64 {
+	score := 0.0
+
+	// Vector similarity score (always available)
+	if chunk.Score > 0 {
+		score += chunk.Score * weights.VectorWeight
+	}
+
+	// Reranker score (if available)
+	if chunk.RerankerScore > 0 {
+		score += chunk.RerankerScore * weights.RerankerWeight
+	}
+
+	// Source authority weighting
+	authWeight := sourceAuthorityWeight(chunk.Source)
+	score += authWeight * weights.SourceAuthority
+
+	// Recency bonus from metadata date if available
+	if dateStr, ok := chunk.Metadata["publication_date"]; ok && dateStr != "" {
+		if recencyBonus := computeRecencyBonus(dateStr); recencyBonus > 0 {
+			score += recencyBonus * weights.RecencyWeight
+		}
+	}
+
+	// Exact match bonus: if the query text appears literally in the content
+	if queryText, ok := chunk.Metadata["matched_query"]; ok && queryText != "" {
+		if strings.Contains(chunk.Content, queryText) {
+			score += weights.ExactMatchBonus
+		}
+	}
+
+	// Normalize to [0, 1]
+	if score > 1.0 {
+		score = 1.0
+	}
+	return score
+}
+
+// sourceAuthorityWeight returns a weight between 0 and 1 indicating a document source's
+// inherent authority in patent analysis contexts.
+func sourceAuthorityWeight(source DocumentSourceType) float64 {
+	switch source {
+	case SourcePatent:
+		return 0.90
+	case SourceCaseLaw:
+		return 1.0
+	case SourceExaminationGuideline, SourceMPEP:
+		return 0.95
+	case SourceStatute:
+		return 1.0
+	case SourceScientificPaper:
+		return 0.70
+	case SourceRegulatory:
+		return 0.85
+	case SourceLiterature:
+		return 0.50
+	default:
+		return 0.40
+	}
+}
+
+// computeRecencyBonus calculates a recency factor based on publication date.
+// Returns a value between 0 and 1. More recent documents score higher.
+func computeRecencyBonus(dateStr string) float64 {
+	layouts := []string{
+		"2006-01-02",
+		"2006-01",
+		"2006",
+		time.RFC3339,
+	}
+	var pubDate time.Time
+	for _, layout := range layouts {
+		var err error
+		pubDate, err = time.Parse(layout, dateStr)
+		if err == nil {
+			break
+		}
+	}
+	if pubDate.IsZero() {
+		return 0.5 // neutral if unparseable
+	}
+	yearsSince := time.Since(pubDate).Hours() / (24 * 365.25)
+	switch {
+	case yearsSince <= 1:
+		return 1.0
+	case yearsSince <= 3:
+		return 0.9
+	case yearsSince <= 5:
+		return 0.75
+	case yearsSince <= 10:
+		return 0.5
+	default:
+		return 0.25
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Chunk Deduplication — removes near-duplicate chunks based on content similarity
+// ---------------------------------------------------------------------------
+
+// ContentSimilarity computes a simple n-gram overlap coefficient between two texts.
+// Returns a value in [0, 1] where 1 = identical and 0 = no overlap.
+func ContentSimilarity(a, b string) float64 {
+	ngramsA := extractNGrams(a, 3)
+	ngramsB := extractNGrams(b, 3)
+	if len(ngramsA) == 0 || len(ngramsB) == 0 {
+		return 0
+	}
+	intersection := 0
+	for ngram := range ngramsA {
+		if ngramsB[ngram] {
+			intersection++
+		}
+	}
+	minLen := len(ngramsA)
+	if len(ngramsB) < minLen {
+		minLen = len(ngramsB)
+	}
+	if minLen == 0 {
+		return 0
+	}
+	return float64(intersection) / float64(minLen)
+}
+
+func extractNGrams(text string, n int) map[string]bool {
+	runes := []rune(text)
+	if len(runes) < n {
+		n = len(runes)
+	}
+	ngrams := make(map[string]bool)
+	for i := 0; i <= len(runes)-n; i++ {
+		ngrams[string(runes[i:i+n])] = true
+	}
+	return ngrams
+}
+
+// DeduplicateChunks removes chunks that are near-duplicates of higher-scoring ones.
+// The similarityThreshold determines what counts as a duplicate (e.g., 0.80 = 80% similar).
+// The highest-scoring chunk (by effectiveScore) in each similarity group is kept.
+func DeduplicateChunks(chunks []*RAGChunk, similarityThreshold float64) []*RAGChunk {
+	if len(chunks) <= 1 {
+		return chunks
+	}
+	if similarityThreshold <= 0 {
+		similarityThreshold = 0.85
+	}
+
+	// Sort descending by effective score
+	sorted := make([]*RAGChunk, len(chunks))
+	copy(sorted, chunks)
+	sort.Slice(sorted, func(i, j int) bool {
+		return effectiveScore(sorted[i]) > effectiveScore(sorted[j])
+	})
+
+	var result []*RAGChunk
+	seen := make([]bool, len(sorted))
+
+	for i := 0; i < len(sorted); i++ {
+		if seen[i] {
+			continue
+		}
+		result = append(result, sorted[i])
+		// Mark all similar chunks as seen
+		for j := i + 1; j < len(sorted); j++ {
+			if seen[j] {
+				continue
+			}
+			sim := ContentSimilarity(sorted[i].Content, sorted[j].Content)
+			if sim >= similarityThreshold {
+				seen[j] = true
+			}
+		}
+	}
+	return result
+}
+
+// ---------------------------------------------------------------------------
+// Source Citation Tracking
+// ---------------------------------------------------------------------------
+
+// CitationInfo holds structured citation data extracted from a RAG chunk.
+type CitationInfo struct {
+	ChunkID         string             `json:"chunk_id"`
+	DocumentID      string             `json:"document_id"`
+	SourceType      DocumentSourceType `json:"source_type"`
+	SourceLabel     string             `json:"source_label"`
+	RelevantText    string             `json:"relevant_text"`
+	RelevanceScore  float64            `json:"relevance_score"`
+}
+
+// ExtractRAGCitations converts RAG chunks into structured CitationInfo records
+// suitable for inclusion in report citations.
+func ExtractRAGCitations(chunks []*RAGChunk) []*CitationInfo {
+	citations := make([]*CitationInfo, 0, len(chunks))
+	seen := make(map[string]bool)
+
+	for _, chunk := range chunks {
+		label := formatSourceAnnotation(chunk)
+		if label == "" || seen[label] {
+			continue
+		}
+		seen[label] = true
+
+		// Extract a succinct relevant text snippet (first ~200 chars)
+		snippet := strings.TrimSpace(chunk.Content)
+		runes := []rune(snippet)
+		if len(runes) > 200 {
+			// Try to cut at a sentence boundary
+			truncated := string(runes[:200])
+			if idx := strings.LastIndexAny(truncated, ".。"); idx > 100 {
+				snippet = truncated[:idx+1]
+			} else {
+				snippet = truncated + "..."
+			}
+		}
+
+		citations = append(citations, &CitationInfo{
+			ChunkID:        chunk.ChunkID,
+			DocumentID:     chunk.DocumentID,
+			SourceType:     chunk.Source,
+			SourceLabel:    label,
+			RelevantText:   snippet,
+			RelevanceScore: effectiveScore(chunk),
+		})
+	}
+	return citations
+}
+
+// IntegrateDedupAndScoreIntoResult applies deduplication and combined scoring to
+// the chunks in a RAGResult. This should be called after retrieval and/or reranking.
+func IntegrateDedupAndScoreIntoResult(result *RAGResult, weights RelevanceWeights, similarityThreshold float64) {
+	if result == nil || len(result.Chunks) == 0 {
+		return
+	}
+
+	// 1. Compute combined scores
+	for _, chunk := range result.Chunks {
+		combined := CombinedRelevanceScore(chunk, weights)
+		// Store combined score in RerankerScore field (if reranker not already applied)
+		// or update the Score field
+		if chunk.RerankerScore == 0 {
+			chunk.RerankerScore = combined
+		}
+	}
+
+	// 2. Deduplicate
+	deduped := DeduplicateChunks(result.Chunks, similarityThreshold)
+	result.Chunks = deduped
+}

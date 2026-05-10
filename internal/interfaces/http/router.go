@@ -49,6 +49,7 @@ type RouterConfig struct {
 
 	// Handlers
 	VersionHandler *handlers.VersionHandler
+	DocsHandler    *handlers.DocsHandler
 
 	// Infrastructure
 	Logger           logging.Logger
@@ -118,6 +119,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	// --- API version endpoint (no auth required) ---
 	if cfg.VersionHandler != nil {
 		cfg.VersionHandler.RegisterRoutes(mux)
+	}
+
+	// --- Documentation Routes ---
+	if cfg.DocsHandler != nil {
+		cfg.DocsHandler.RegisterRoutes(mux)
 	}
 
 	// --- API v1 Routes ---

@@ -1262,3 +1262,255 @@ func TestIsCJK(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// New specialized prompt template tests
+// ---------------------------------------------------------------------------
+
+func TestBuildPrompt_Patentability(t *testing.T) {
+	pm := newTestPromptManager(t)
+	params := &PromptParams{
+		TargetMolecule: sampleMolecule(),
+		UserQuery:      "Assess patentability of this novel OLED host material",
+		Language:       "en",
+	}
+	built, err := pm.BuildPrompt(context.Background(), TaskPatentability, params)
+	if err != nil {
+		t.Fatalf("BuildPrompt: %v", err)
+	}
+	if !strings.Contains(built.SystemPrompt, "patentability") && !strings.Contains(built.SystemPrompt, "Patentability") {
+		t.Error("system prompt should mention patentability")
+	}
+	if !strings.Contains(built.SystemPrompt, "Novelty") && !strings.Contains(built.SystemPrompt, "Inventive Step") {
+		t.Error("system prompt should mention novelty/inventive step analysis")
+	}
+	if !strings.Contains(built.UserPrompt, "Aspirin") {
+		t.Error("user prompt should contain molecule name")
+	}
+	if built.EstimatedTokens <= 0 {
+		t.Error("estimated tokens should be positive")
+	}
+}
+
+func TestBuildPrompt_CompetitiveLandscape(t *testing.T) {
+	pm := newTestPromptManager(t)
+	params := &PromptParams{
+		RelevantPatents: samplePatents(),
+		UserQuery:       "Map the OLED emitter competitive landscape",
+		Language:        "en",
+	}
+	built, err := pm.BuildPrompt(context.Background(), TaskCompetitiveLandscape, params)
+	if err != nil {
+		t.Fatalf("BuildPrompt: %v", err)
+	}
+	if !strings.Contains(built.SystemPrompt, "competitive") && !strings.Contains(built.SystemPrompt, "Competitive") {
+		t.Error("system prompt should mention competitive landscape")
+	}
+	if !strings.Contains(built.SystemPrompt, "Key Player") {
+		t.Error("system prompt should mention key player analysis")
+	}
+}
+
+func TestBuildPrompt_InfringementNarrative(t *testing.T) {
+	pm := newTestPromptManager(t)
+	params := &PromptParams{
+		TargetMolecule:  sampleMolecule(),
+		RelevantPatents: samplePatents()[:1],
+		ClaimAnalysis:   sampleClaims(),
+		UserQuery:       "Generate infringement narrative report",
+		Language:        "en",
+	}
+	built, err := pm.BuildPrompt(context.Background(), TaskInfringementNarrative, params)
+	if err != nil {
+		t.Fatalf("BuildPrompt: %v", err)
+	}
+	if !strings.Contains(built.SystemPrompt, "narrative") && !strings.Contains(built.SystemPrompt, "litigation") {
+		t.Error("system prompt should mention narrative or litigation")
+	}
+	if !strings.Contains(built.SystemPrompt, "Claim-by-Claim") && !strings.Contains(built.SystemPrompt, "CLAIM-BY-CLAIM") {
+		t.Error("system prompt should reference claim-by-claim analysis sections")
+	}
+}
+
+func TestBuildPrompt_EnhancedFTO_OLED(t *testing.T) {
+	pm := newTestPromptManager(t)
+	params := &PromptParams{
+		TargetMolecule:  sampleMolecule(),
+		RelevantPatents: samplePatents(),
+		UserQuery:       "FTO for OLED emitter compound",
+		Language:        "en",
+	}
+	built, err := pm.BuildPrompt(context.Background(), TaskFTO, params)
+	if err != nil {
+		t.Fatalf("BuildPrompt: %v", err)
+	}
+	// Check enhanced content: OLED, Markush, design-around with structural modifications
+	if !strings.Contains(built.SystemPrompt, "OLED") {
+		t.Error("enhanced FTO prompt should mention OLED")
+	}
+	if !strings.Contains(built.SystemPrompt, "Markush") {
+		t.Error("enhanced FTO prompt should mention Markush")
+	}
+	if !strings.Contains(built.SystemPrompt, "terminal disclaimers") {
+		t.Error("enhanced FTO prompt should mention terminal disclaimers")
+	}
+}
+
+func TestBuildPrompt_EnhancedPortfolioStrategy(t *testing.T) {
+	pm := newTestPromptManager(t)
+	params := &PromptParams{
+		RelevantPatents: samplePatents(),
+		UserQuery:       "Analyze portfolio for OLED display company",
+		Language:        "en",
+	}
+	built, err := pm.BuildPrompt(context.Background(), TaskPortfolioStrategy, params)
+	if err != nil {
+		t.Fatalf("BuildPrompt: %v", err)
+	}
+	if !strings.Contains(built.SystemPrompt, "OLED") {
+		t.Error("enhanced PortfolioStrategy prompt should mention OLED")
+	}
+	if !strings.Contains(built.SystemPrompt, "Gap Analysis") {
+		t.Error("enhanced PortfolioStrategy prompt should mention Gap Analysis")
+	}
+	if !strings.Contains(built.SystemPrompt, "quantitative KPI") {
+		t.Error("enhanced PortfolioStrategy prompt should mention quantitative KPIs")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ValidatePromptParams tests
+// ---------------------------------------------------------------------------
+
+func TestValidatePromptParams_Valid(t *testing.T) {
+	pm := newTestPromptManager(t)
+	params := &PromptParams{
+		Task:         TaskFTO,
+		UserQuery:    "Test FTO analysis",
+		Language:     "en",
+		OutputFormat: OutputStructured,
+	}
+	result := pm.(*promptManagerImpl).ValidatePromptParams(params)
+	if !result.IsValid {
+		t.Errorf("expected valid params, got errors: %v", result.Errors)
+	}
+	if len(result.Errors) > 0 {
+		t.Errorf("expected no errors, got: %v", result.Errors)
+	}
+}
+
+func TestValidatePromptParams_NilParams(t *testing.T) {
+	pm := newTestPromptManager(t)
+	result := pm.(*promptManagerImpl).ValidatePromptParams(nil)
+	if result.IsValid {
+		t.Error("expected invalid for nil params")
+	}
+	if len(result.Errors) == 0 {
+		t.Error("expected at least one error for nil params")
+	}
+}
+
+func TestValidatePromptParams_InvalidTask(t *testing.T) {
+	pm := newTestPromptManager(t)
+	params := &PromptParams{
+		Task:      AnalysisTask(999),
+		UserQuery: "Test",
+	}
+	result := pm.(*promptManagerImpl).ValidatePromptParams(params)
+	if result.IsValid {
+		t.Error("expected invalid for unknown task")
+	}
+	hasTaskError := false
+	for _, e := range result.Errors {
+		if strings.Contains(e, "invalid") {
+			hasTaskError = true
+			break
+		}
+	}
+	if !hasTaskError {
+		t.Error("expected an error mentioning invalid task")
+	}
+}
+
+func TestValidatePromptParams_EmptyUserQuery(t *testing.T) {
+	pm := newTestPromptManager(t)
+	params := &PromptParams{
+		Task: TaskFTO,
+	}
+	result := pm.(*promptManagerImpl).ValidatePromptParams(params)
+	hasWarning := false
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "empty") {
+			hasWarning = true
+			break
+		}
+	}
+	if !hasWarning {
+		t.Error("expected warning for empty user query")
+	}
+}
+
+func TestValidatePromptParams_ExcessiveQueryLength(t *testing.T) {
+	pm := newTestPromptManager(t)
+	longQuery := strings.Repeat("A", 10001)
+	params := &PromptParams{
+		Task:      TaskFTO,
+		UserQuery: longQuery,
+	}
+	result := pm.(*promptManagerImpl).ValidatePromptParams(params)
+	if result.IsValid {
+		t.Error("expected invalid for excessive query length")
+	}
+}
+
+func TestValidatePromptParams_LargeRAGContext(t *testing.T) {
+	pm := newTestPromptManager(t)
+	largeChunks := longRAGChunks(50) // ~50 large chunks
+	params := &PromptParams{
+		Task:      TaskFTO,
+		UserQuery: "Test",
+		RAGContext: largeChunks,
+	}
+	result := pm.(*promptManagerImpl).ValidatePromptParams(params)
+	// May have token budget warnings
+	if len(result.Warnings) == 0 {
+		t.Log("large RAG context did not trigger warnings (may be within budget)")
+	}
+	if result.TotalTokens <= 0 {
+		t.Errorf("expected positive total token estimate, got %d", result.TotalTokens)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ValidatePromptParams_AllNewTasks tests
+// ---------------------------------------------------------------------------
+
+func TestValidatePromptParams_NewTasks(t *testing.T) {
+	pm := newTestPromptManager(t)
+	newTasks := []AnalysisTask{
+		TaskPatentability,
+		TaskCompetitiveLandscape,
+		TaskInfringementNarrative,
+	}
+	for _, task := range newTasks {
+		params := &PromptParams{
+			Task:      task,
+			UserQuery: "Test analysis for " + task.String(),
+		}
+		built, err := pm.BuildPrompt(context.Background(), task, params)
+		if err != nil {
+			t.Errorf("BuildPrompt(%s): %v", task, err)
+			continue
+		}
+		if built.SystemPrompt == "" {
+			t.Errorf("empty system prompt for %s", task)
+		}
+		if built.EstimatedTokens <= 0 {
+			t.Errorf("zero estimated tokens for %s", task)
+		}
+		result := pm.(*promptManagerImpl).ValidatePromptParams(params)
+		if !result.IsValid {
+			t.Errorf("ValidatePromptParams(%s): expected valid, got errors: %v", task, result.Errors)
+		}
+	}
+}

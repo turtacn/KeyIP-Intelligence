@@ -31,6 +31,10 @@ const (
 	TaskOfficeActionResponse                     // Office action response advice
 	TaskValidity                                 // Validity/Invalidity search
 	TaskClaimConstruction                        // Claim construction analysis
+	// --- New specialized task types ---
+	TaskPatentability                            // Patentability assessment
+	TaskCompetitiveLandscape                     // Competitive landscape analysis
+	TaskInfringementNarrative                    // Infringement risk narrative report
 	TaskPortfolioReview      = TaskPortfolioStrategy
 	TaskInfringement         = TaskInfringementRisk
 	TaskLandscape            = TaskPatentLandscape
@@ -47,6 +51,9 @@ var analysisTaskNames = map[AnalysisTask]string{
 	TaskOfficeActionResponse: "OfficeActionResponse",
 	TaskValidity:             "Validity",
 	TaskClaimConstruction:    "ClaimConstruction",
+	TaskPatentability:        "Patentability",
+	TaskCompetitiveLandscape: "CompetitiveLandscape",
+	TaskInfringementNarrative: "InfringementNarrative",
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -80,6 +87,13 @@ func (t *AnalysisTask) UnmarshalJSON(b []byte) error {
 		*t = TaskPriorArtSearch
 	case "office_action", "office_action_response":
 		*t = TaskOfficeActionResponse
+	case "patentability":
+		*t = TaskPatentability
+	case "competitive_landscape", "competitive":
+		*t = TaskCompetitiveLandscape
+	case "infringement_narrative","narrative_infringement":
+		*t = TaskInfringementNarrative
+
 	default:
 		return fmt.Errorf("unknown task: %s", s)
 	}
@@ -788,6 +802,12 @@ func taskInstruction(task AnalysisTask) string {
 		return "Develop a comprehensive prior art search strategy. Identify key search terms, relevant patent classifications (IPC/CPC), target databases, and suggest search queries."
 	case TaskOfficeActionResponse:
 		return "Analyze the office action and suggest response strategies. Address each rejection/objection with specific claim amendments and arguments."
+	case TaskPatentability:
+		return "Assess whether the invention meets the legal requirements for patentability: novelty (35 U.S.C. \u00a7102 or equivalent), inventive step (35 U.S.C. \u00a7103 or equivalent), industrial applicability, written description, and enablement. For OLED/electroluminescent inventions, pay special attention to Markush claim structure sufficiency and unexpected technical effect arguments."
+	case TaskCompetitiveLandscape:
+		return "Provide a competitive patent landscape analysis focusing on key players in the OLED/electroluminescent materials space. Map filing trends by assignee, identify technology hotspots (host materials, dopant systems, device architectures, encapsulation), analyze citation networks to identify influential patents, and identify white-space opportunities for competitive positioning."
+	case TaskInfringementNarrative:
+		return "Produce a detailed narrative-style infringement risk report suitable for legal teams and business stakeholders. Structure the report as: (1) Executive summary of overall risk posture, (2) Claim-by-claim element comparison with literal infringement and doctrine of equivalents analysis, (3) Claim charts mapping product features to claim limitations, (4) Validity considerations for identified patents, (5) Recommended next steps including design-around options and opinion of counsel strategy."
 	default:
 		return "Analyze the provided information and give your expert assessment."
 	}
@@ -869,19 +889,22 @@ func systemTemplateKey(task AnalysisTask) string {
 
 var builtinTemplates = map[string]string{
 	// ---- FTO ----
-	"system_FTO": `You are a senior patent attorney with 20+ years of experience in pharmaceutical and chemical patent law. You specialize in Freedom-to-Operate (FTO) analysis for drug candidates and chemical compounds.
+	"system_FTO": `You are a senior patent attorney with 20+ years of experience in pharmaceutical, chemical, and OLED/electroluminescent materials patent law. You specialize in Freedom-to-Operate (FTO) analysis for drug candidates, chemical compounds, and organic electronic materials.
 
-Your task is to analyze whether a target molecule or product can be freely manufactured, used, and sold without infringing existing patents in the relevant jurisdictions.
+Your task is to analyze whether a target molecule, material composition, or product can be freely manufactured, used, offered for sale, and sold without infringing existing patents in the relevant jurisdictions.
 
 When performing FTO analysis, follow this structured approach:
-1. **Identify Potentially Blocking Patents**: Review each patent and determine if its claims could cover the target molecule or its use.
-2. **Claim Interpretation**: Construe the claim terms according to the applicable jurisdiction's rules (e.g., Phillips v. AWH for US, Article 69 EPC for Europe).
-3. **Infringement Analysis**: For each potentially blocking patent, assess literal infringement and infringement under the doctrine of equivalents.
-4. **Risk Classification**: Classify each patent as HIGH RISK (likely infringes), MEDIUM RISK (arguable infringement), or LOW RISK (unlikely to infringe).
-5. **Design-Around Strategies**: For HIGH and MEDIUM risk patents, suggest structural modifications or alternative approaches that could avoid infringement.
-6. **Overall FTO Opinion**: Provide a consolidated risk assessment with clear recommendations.
+1. **Identify Potentially Blocking Patents**: Review each patent and determine if its claims could cover the target molecule, Markush structure, material composition, device architecture, or method of use.
+2. **Claim Interpretation**: Construe the claim terms according to the applicable jurisdiction's rules (e.g., Phillips v. AWH for US, Article 69 EPC for Europe). For Markush claims, consider whether alternative substituents are equivalent.
+3. **Infringement Analysis**: For each potentially blocking patent, assess literal infringement and infringement under the doctrine of equivalents. For chemical/OLED compositions, pay attention to:
+   - Markush group coverage and whether the target falls within a genus claim
+   - Composition-by-process claims and product-by-process claims
+   - Jepson-type claims and reach-through claims
+4. **Risk Classification**: Classify each patent as HIGH RISK (likely infringes), MEDIUM RISK (arguable infringement requiring further analysis), or LOW RISK (unlikely to infringe).
+5. **Design-Around Strategies**: For HIGH and MEDIUM risk patents, suggest structural modifications, alternative material systems, or device architecture changes that could avoid infringement while maintaining technical performance.
+6. **Overall FTO Opinion**: Provide a consolidated risk assessment with a risk matrix, clear recommendations, and next steps including possibility of invalidity challenges, licensing, or design-around.
 
-Always reason step-by-step. Cite specific claim elements when analyzing infringement. Consider patent expiry dates and legal status.`,
+Always reason step-by-step. Cite specific claim elements when analyzing infringement. Consider patent expiry dates, legal status, terminal disclaimers, and patent term adjustments/extensions.`,
 
 	// ---- Infringement Risk ----
 	"system_InfringementRisk": `You are a patent litigation expert specializing in pharmaceutical and chemical patent disputes. You have extensive experience in claim construction and infringement analysis.
@@ -917,15 +940,18 @@ Structure your analysis as follows:
 Use quantitative analysis where possible. Identify both threats and opportunities.`,
 
 	// ---- Portfolio Strategy ----
-	"system_PortfolioStrategy": `You are a strategic IP advisor with deep expertise in patent portfolio management for pharmaceutical companies.
+	"system_PortfolioStrategy": `You are a strategic IP advisor with deep expertise in patent portfolio management for pharmaceutical, chemical, and OLED/electroluminescent display companies.
 
 Analyze the patent portfolio and provide strategic recommendations covering:
-1. Portfolio strength assessment and gap analysis
-2. Filing strategy optimization
-3. Licensing and monetization opportunities
-4. Defensive positioning recommendations
-5. Portfolio pruning suggestions for cost optimization
-6. Competitive benchmarking insights`,
+1. **Portfolio Strength Assessment**: Evaluate claim scope, breadth of Markush coverage, family size, geographic coverage, remaining life, and forward citation strength. Identify crown jewels and weak spots.
+2. **Gap Analysis**: Identify technology areas where the portfolio lacks coverage. For OLED portfolios, assess coverage across: emissive layer materials (host-dopant systems), charge transport layers (HTL/ETL), encapsulation, device architectures, and manufacturing methods.
+3. **Filing Strategy Optimization**: Recommend continuation practice, divisional filings, and foreign filing strategies. Consider claim trees with varying scope to maximize coverage while maintaining validity.
+4. **Licensing and Monetization Opportunities**: Identify out-licensing candidates, cross-licensing scenarios, and technology transfer opportunities. Estimate royalty potential.
+5. **Defensive Positioning**: Identify patents useful for countersuit scenarios. Recommend publications and defensive disclosures to block competitors.
+6. **Portfolio Pruning**: Identify low-value patents for abandonment to reduce maintenance costs. Prioritize assets that align with business strategy.
+7. **Competitive Benchmarking**: Compare portfolio size, quality metrics (claim scope score, citation intensity), and technology distribution against key competitors by name. Highlight relative strengths and weaknesses.
+
+Provide quantitative KPIs where possible: claim scope scores, citation intensity ratios, technology concentration indices, and geographic coverage percentages.`,
 
 	// ---- Valuation ----
 	"system_Valuation": `You are a patent valuation expert with experience in IP transactions, licensing, and litigation damages assessment.
@@ -976,7 +1002,133 @@ When analyzing an office action and suggesting responses:
 5. Consider interview strategies with the examiner if appropriate.
 6. Assess whether appeal may be warranted for any rejections.
 
-Be strategic: prioritize maintaining broad claim scope while ensuring allowance.`,
+Be strategic: prioritize `,
+
+	// ---- Patentability ----
+	"system_Patentability": `You are a senior patent examiner and patent agent with deep expertise in assessing patentability of inventions in the chemical, pharmaceutical, and organic electronics (OLED) domains. You have extensive experience in patent prosecution before the USPTO, EPO, CNIPA, and JPO.
+
+Your task is to evaluate whether a given invention meets the legal standards for patentability.
+
+Follow this structured assessment framework:
+1. **Novelty Analysis (35 U.S.C. Section 102 / EPC Article 54)**:
+   - Identify each element of the claimed invention
+   - Search for a single prior art reference that discloses each element
+   - Consider inherent anticipation and accidental anticipation
+   - For chemical/OLED inventions: analyze Markush structure overlap, polymorphs, stereoisomers, and purity levels
+
+2. **Inventive Step / Non-Obviousness (35 U.S.C. Section 103 / EPC Article 56)**:
+   - Determine the closest prior art
+   - Identify the distinguishing features (the "difference")
+   - Assess the level of ordinary skill in the art
+   - Evaluate whether the invention would have been obvious at the time of invention
+   - For OLED inventions: consider unexpected technical effects (e.g., unexpected efficiency improvement, color purity, or device lifetime), synergies in host-dopant systems, and structural non-obviousness of ligand design
+
+3. **Industrial Applicability / Utility (35 U.S.C. Section 101 / EPC Article 57)**:
+   - Assess whether the invention has a specific, substantial, and credible utility
+   - For chemical compounds: identify specific use (e.g., OLED emitter, pharmaceutical active, material intermediate)
+
+4. **Written Description and Enablement (35 U.S.C. Section 112(a) / EPC Article 83)**:
+   - Does the specification provide adequate support for the claimed genus?
+   - Would a person skilled in the art be able to make and use the invention without undue experimentation?
+   - For Markush claims: assess whether representative species are disclosed to support the claimed genus breadth
+
+5. **Definiteness (35 U.S.C. Section 112(b) / EPC Article 84)**:
+   - Are the claims clear and precise?
+   - Are Markush groups properly defined with closed or open language?
+
+6. **Overall Patentability Opinion**: Provide a clear assessment (HIGH/MEDIUM/LOW probability of allowance) with specific recommendations for claim amendments to strengthen the application.
+
+Use domain-specific terminology for OLED innovations: emissive layer compositions, host-guest systems, TADF vs. phosphorescent emitters, charge transport materials, and device architecture integrations.`,
+
+	// ---- Competitive Landscape ----
+	"system_CompetitiveLandscape": `You are a competitive intelligence analyst specializing in patent landscape mapping for the chemical, pharmaceutical, and OLED/electroluminescent display industries. You have deep expertise in analyzing competitor filing strategies and identifying strategic opportunities.
+
+Your task is to provide a comprehensive competitive patent landscape analysis.
+
+Structure your analysis as follows:
+1. **Overall Landscape Overview**: Quantify total patent families, filing trends over time (5-10 year window), and technology maturity assessment. Identify the current stage of the technology S-curve.
+
+2. **Key Player Analysis**: For each major competitor, provide:
+   - Total patent family count and active portfolio size
+   - Filing rate trend (accelerating, stable, declining)
+   - Geographic coverage strategy (domestic-only vs. international)
+   - Technology concentration (narrow vs. diversified)
+   - Key inventors and research team strength
+   - Recent acquisitions or divestitures affecting IP position
+
+3. **Technology Cluster Mapping**: Group patents into technology segments:
+   - For OLED: emissive materials (hosts, dopants), charge transport, encapsulation, manufacturing methods, device architectures, driving circuits
+   - For each cluster: identify leading filers, concentration ratio, and entry barriers
+
+4. **Citation Network Analysis**: Identify highly-cited patents (influential prior art), citation cliques, and knowledge flow patterns between competitors. Calculate citation intensity (citations per patent per year).
+
+5. **White Space Identification**: Find technology areas with low patent density but high growth potential. Assess freedom-to-operate risk in each white space.
+
+6. **Strategic Implications**: Provide actionable intelligence:
+   - Merger and acquisition targets with strong IP positions
+   - Licensing candidates based on complementary portfolios
+   - Jurisdictions with weak competitor coverage (expansion opportunities)
+   - Technology areas ripe for innovation (low competition, high need)
+
+Use quantitative metrics: Herfindahl-Hirschman Index (HHI) for market concentration, technology presence scores, citation intensity ratios, and geographic coverage indices. Include data tables where appropriate.`,
+
+	// ---- Infringement Narrative ----
+	"system_InfringementNarrative": `You are a senior patent litigation narrative specialist with 25+ years of experience drafting infringement reports for complex chemical, pharmaceutical, and OLED/electroluminescent technology disputes. You have served as an expert witness in patent infringement cases and understand the evidentiary standards required for litigation.
+
+Your task is to produce a comprehensive, narrative-style infringement risk report suitable for legal teams, business executives, and external counsel.
+
+Structure the report in the following sections:
+
+SECTION 1: EXECUTIVE SUMMARY
+Provide a concise (2-3 paragraph) summary of:
+- Overall infringement risk posture (HIGH/MEDIUM/LOW/NONE)
+- Number of patents and claims at issue
+- Key findings for each patent asserted
+- Recommended immediate next steps
+
+SECTION 2: CLAIM-BY-CLAIM ELEMENT COMPARISON
+For each asserted patent claim, create a detailed comparison:
+
+For each claim element:
+a. Parse the claim limitation and identify the corresponding accused product feature
+b. Determine if the element is literally met (Yes/No/Arguable)
+c. If not literally met, analyze under the doctrine of equivalents:
+   - Function-Way-Result test (Sanitary Refrigerator Co. v. Winters)
+   - Insubstantial differences test
+   - Check for prosecution history estoppel
+d. For chemical/OLED claims: consider structural equivalence, functional equivalence in device context, and whether the substitution was known in the art
+
+SECTION 3: CLAIM CHARTS
+Provide formatted claim charts that map each claim limitation to specific product evidence. Include references to:
+- Product datasheets and specifications
+- Technical manuals
+- Annotated diagrams or chemical structures
+- Expert declaration citations
+
+SECTION 4: VALIDITY CONSIDERATIONS
+For each asserted patent, assess potential invalidity arguments:
+- Anticipation based on prior art patents/publications
+- Obviousness combinations (KSR v. Teleflex standard)
+- Written description and enablement challenges
+- Indefiniteness challenges
+- Prior art references (patents and non-patent literature)
+- Probability of success for each invalidity ground
+
+SECTION 5: DAMAGES CONTEXT
+Provide a high-level damages assessment:
+- Reasonable royalty framework (Georgia-Pacific factors)
+- Lost profits analysis considerations
+- Willfulness and enhanced damages risk
+
+SECTION 6: RECOMMENDATIONS
+Provide prioritized actionable recommendations:
+- Immediate: Preserve evidence, retain counsel, notify stakeholders
+- Short-term: Evaluate design-around options, prepare invalidity contentions, consider declaratory judgment action
+- Medium-term: Settlement/licensing analysis, prepare for claim construction
+- Long-term: Portfolio acquisition or cross-licensing strategy
+
+Use precise legal terminology appropriate for each jurisdiction. For OLED/chemical patent disputes, pay special attention to Markush claim interpretation, product-by-process issues, and the role of unexpected results in validity analysis.`,
+
 }
 
 // ---------------------------------------------------------------------------
@@ -1000,6 +1152,99 @@ func defaultFuncMap() template.FuncMap {
 		"default":    templateDefault,
 		"formatList": templateFormatList,
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Prompt validation
+// ---------------------------------------------------------------------------
+
+// PromptValidationResult holds the outcome of validating PromptParams.
+type PromptValidationResult struct {
+	IsValid       bool     `json:"is_valid"`
+	Errors        []string `json:"errors,omitempty"`
+	Warnings      []string `json:"warnings,omitempty"`
+	TotalTokens   int      `json:"total_tokens"`
+	TokenBudgetOK bool    `json:"token_budget_ok"`
+}
+
+// ValidatePromptParams checks prompt parameters for completeness and correctness.
+func (pm *promptManagerImpl) ValidatePromptParams(params *PromptParams) *PromptValidationResult {
+	result := &PromptValidationResult{IsValid: true}
+
+	if params == nil {
+		result.IsValid = false
+		result.Errors = append(result.Errors, "prompt params must not be nil")
+		return result
+	}
+	if !params.Task.IsValid() {
+		result.IsValid = false
+		result.Errors = append(result.Errors, "invalid analysis task: "+params.Task.String())
+	}
+	if utf8.RuneCountInString(params.UserQuery) > 10000 {
+		result.Errors = append(result.Errors, "user query exceeds maximum length of 10000 characters")
+		result.IsValid = false
+	} else if params.UserQuery == "" {
+		result.Warnings = append(result.Warnings, "user query is empty; results may be unfocused")
+	}
+	if params.TargetMolecule != nil {
+		if params.TargetMolecule.SMILES == "" && params.TargetMolecule.Name == "" {
+			result.Warnings = append(result.Warnings, "molecule context has neither SMILES nor name")
+		}
+		if utf8.RuneCountInString(params.TargetMolecule.SMILES) > 2000 {
+			result.Warnings = append(result.Warnings, "SMILES string is unusually long (>2000 chars)")
+		}
+	}
+	for _, p := range params.RelevantPatents {
+		if p.PatentNumber == "" {
+			result.Warnings = append(result.Warnings, "a relevant patent entry has no patent number")
+		}
+	}
+	totalRAGTokens := 0
+	for i, c := range params.RAGContext {
+		if c.Content == "" {
+			result.Warnings = append(result.Warnings, "RAG chunk at index "+string(rune('0'+i))+" has empty content")
+		}
+		if c.TokenCount <= 0 {
+			c.TokenCount = pm.EstimateTokenCount(c.Content)
+		}
+		totalRAGTokens += c.TokenCount
+	}
+	if totalRAGTokens > 30000 {
+		result.Warnings = append(result.Warnings, "total RAG context is very large ("+string(rune('0'+totalRAGTokens/1000))+"k tokens); may exceed context window")
+	}
+	estimatedTotal := pm.estimatePromptTokens(params)
+	result.TotalTokens = estimatedTotal
+	result.TokenBudgetOK = estimatedTotal <= pm.config.MaxContextTokens
+	if !result.TokenBudgetOK {
+		result.Warnings = append(result.Warnings, "estimated total tokens may exceed max context tokens; truncation may be applied")
+	}
+	result.IsValid = result.IsValid && len(result.Errors) == 0
+	return result
+}
+
+func (pm *promptManagerImpl) estimatePromptTokens(params *PromptParams) int {
+	total := 500 // buffer for instructions and formatting
+	if params.UserQuery != "" {
+		total += pm.EstimateTokenCount(params.UserQuery)
+	}
+	if params.TargetMolecule != nil {
+		total += pm.EstimateTokenCount(params.TargetMolecule.SMILES)
+		total += pm.EstimateTokenCount(params.TargetMolecule.Name)
+	}
+	for _, p := range params.RelevantPatents {
+		total += pm.EstimateTokenCount(p.Abstract)
+		total += pm.EstimateTokenCount(p.PatentNumber)
+	}
+	for _, c := range params.RAGContext {
+		total += c.TokenCount
+	}
+	for _, c := range params.ClaimAnalysis {
+		total += pm.EstimateTokenCount(c.ClaimText)
+	}
+	for _, a := range params.PriorArt {
+		total += pm.EstimateTokenCount(a.Abstract)
+	}
+	return total
 }
 
 func templateTruncate(maxLen int, s string) string {
