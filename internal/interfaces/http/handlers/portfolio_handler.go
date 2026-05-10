@@ -9,6 +9,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
@@ -64,12 +65,17 @@ func (h *PortfolioHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *PortfolioHandler) CreatePortfolio(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req CreatePortfolioRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
-	if req.Name == "" {
+	if strings.TrimSpace(req.Name) == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "name is required"))
 		return
 	}
@@ -134,6 +140,11 @@ func (h *PortfolioHandler) UpdatePortfolio(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req UpdatePortfolioRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -181,6 +192,11 @@ func (h *PortfolioHandler) AddPatents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req AddPatentsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -204,6 +220,11 @@ func (h *PortfolioHandler) RemovePatents(w http.ResponseWriter, r *http.Request)
 	id := r.PathValue("id")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "portfolio id is required"))
+		return
+	}
+
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
 		return
 	}
 

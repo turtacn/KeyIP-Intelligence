@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -267,6 +268,30 @@ func writeAppError(w http.ResponseWriter, err error) {
 		// Mask internal errors
 		writeError(w, http.StatusInternalServerError, errors.New(errors.ErrCodeInternal, "internal server error"))
 	}
+}
+
+// --- Input Validation Helpers ---
+
+// isContentTypeJSON checks if the request Content-Type is application/json.
+// Accepts application/json with optional parameters (e.g., charset).
+func isContentTypeJSON(r *http.Request) bool {
+	ct := r.Header.Get("Content-Type")
+	return strings.HasPrefix(strings.ToLower(ct), "application/json")
+}
+
+// hasValidSMILESChars performs basic SMILES character validation at the HTTP boundary.
+// Checks for null bytes, control characters, and reasonable length.
+// Full SMILES syntax validation is performed by the domain layer.
+func hasValidSMILESChars(smiles string) bool {
+	if len(smiles) == 0 || len(smiles) > 10000 {
+		return false
+	}
+	for _, c := range smiles {
+		if c < 32 || c > 126 {
+			return false
+		}
+	}
+	return true
 }
 
 //Personal.AI order the ending

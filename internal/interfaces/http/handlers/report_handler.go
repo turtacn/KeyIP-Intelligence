@@ -137,6 +137,11 @@ func (h *ReportHandler) RegisterRoutes(mux *http.ServeMux) {
 // GenerateFTOReport handles POST /api/v1/reports/fto.
 // It initiates asynchronous FTO report generation and returns 202 Accepted with a report ID.
 func (h *ReportHandler) GenerateFTOReport(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "Content-Type must be application/json")
+		return
+	}
+
 	var req GenerateFTOReportRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("failed to decode FTO report request", logging.Err(err))
@@ -146,6 +151,10 @@ func (h *ReportHandler) GenerateFTOReport(w http.ResponseWriter, r *http.Request
 
 	if req.TargetSMILES == "" {
 		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "target_smiles is required")
+		return
+	}
+	if !hasValidSMILESChars(req.TargetSMILES) {
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "invalid SMILES format in target_smiles")
 		return
 	}
 	if req.Jurisdiction == "" {
@@ -187,6 +196,11 @@ func (h *ReportHandler) GenerateFTOReport(w http.ResponseWriter, r *http.Request
 
 // GenerateInfringementReport handles POST /api/v1/reports/infringement.
 func (h *ReportHandler) GenerateInfringementReport(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "Content-Type must be application/json")
+		return
+	}
+
 	var req GenerateInfringementReportRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("failed to decode infringement report request", logging.Err(err))
@@ -201,6 +215,13 @@ func (h *ReportHandler) GenerateInfringementReport(w http.ResponseWriter, r *htt
 	if len(req.TargetSMILES) == 0 {
 		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "target_smiles is required")
 		return
+	}
+	for i, smiles := range req.TargetSMILES {
+		if !hasValidSMILESChars(smiles) {
+			writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation,
+				fmt.Sprintf("invalid SMILES format in target_smiles[%d]", i))
+			return
+		}
 	}
 	if req.Format == "" {
 		req.Format = "pdf"
@@ -238,6 +259,11 @@ func (h *ReportHandler) GenerateInfringementReport(w http.ResponseWriter, r *htt
 
 // GeneratePortfolioReport handles POST /api/v1/reports/portfolio.
 func (h *ReportHandler) GeneratePortfolioReport(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeReportError(w, http.StatusBadRequest, errors.ErrCodeValidation, "Content-Type must be application/json")
+		return
+	}
+
 	var req GeneratePortfolioReportRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("failed to decode portfolio report request", logging.Err(err))

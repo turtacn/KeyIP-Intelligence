@@ -1,0 +1,41 @@
+# =============================================================================
+# KeyIP-Intelligence API Server Docker Image
+# Multi-stage: build in golang:1.22-alpine, run in minimal alpine
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build the apiserver binary
+# -----------------------------------------------------------------------------
+FROM golang:1.22-alpine AS builder
+
+ARG VERSION=dev
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 go build \
+    -ldflags="-s -w \
+      -X github.com/turtacn/KeyIP-Intelligence/internal/config.Version=${VERSION} \
+      -X github.com/turtacn/KeyIP-Intelligence/internal/config.CommitSHA=${GIT_COMMIT} \
+      -X github.com/turtacn/KeyIP-Intelligence/internal/config.BuildTime=${BUILD_TIME}" \
+    -o /usr/local/bin/apiserver \
+    ./cmd/apiserver
+
+# -----------------------------------------------------------------------------
+# Stage 2: Minimal runtime image
+# -----------------------------------------------------------------------------
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=builder /usr/local/bin/apiserver /usr/local/bin/apiserver
+
+EXPOSE 8080
+
+ENTRYPOINT ["apiserver"]

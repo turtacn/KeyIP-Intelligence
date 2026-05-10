@@ -10,6 +10,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/molecule"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
@@ -78,13 +79,26 @@ func (h *MoleculeHandler) RegisterRoutes(mux *http.ServeMux) {
 
 // CreateMolecule handles POST /api/v1/molecules
 func (h *MoleculeHandler) CreateMolecule(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req CreateMoleculeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
+	if strings.TrimSpace(req.Name) == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("name", "name is required"))
+		return
+	}
 	if req.SMILES == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "smiles is required"))
+		return
+	}
+	if !hasValidSMILESChars(req.SMILES) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid SMILES format"))
 		return
 	}
 
@@ -131,6 +145,16 @@ func (h *MoleculeHandler) ListMolecules(w http.ResponseWriter, r *http.Request) 
 	query := r.URL.Query().Get("q")
 	tag := r.URL.Query().Get("tag")
 
+	// Limit query parameter lengths to prevent abuse / SQL injection
+	if len(query) > 500 {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("q", "query too long"))
+		return
+	}
+	if len(tag) > 100 {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("tag", "tag too long"))
+		return
+	}
+
 	input := &molecule.ListInput{
 		Page:     page,
 		PageSize: pageSize,
@@ -152,6 +176,11 @@ func (h *MoleculeHandler) UpdateMolecule(w http.ResponseWriter, r *http.Request)
 	id := r.PathValue("id")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "molecule id is required"))
+		return
+	}
+
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
 		return
 	}
 
@@ -198,6 +227,11 @@ func (h *MoleculeHandler) DeleteMolecule(w http.ResponseWriter, r *http.Request)
 
 // SearchByStructure handles POST /api/v1/molecules/search/structure
 func (h *MoleculeHandler) SearchByStructure(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req StructureSearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -205,6 +239,10 @@ func (h *MoleculeHandler) SearchByStructure(w http.ResponseWriter, r *http.Reque
 	}
 	if req.SMILES == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "smiles is required"))
+		return
+	}
+	if !hasValidSMILESChars(req.SMILES) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid SMILES format"))
 		return
 	}
 	if req.SearchType == "" {
@@ -231,6 +269,11 @@ func (h *MoleculeHandler) SearchByStructure(w http.ResponseWriter, r *http.Reque
 
 // SearchBySimilarity handles POST /api/v1/molecules/search/similarity
 func (h *MoleculeHandler) SearchBySimilarity(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req SimilaritySearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -238,6 +281,10 @@ func (h *MoleculeHandler) SearchBySimilarity(w http.ResponseWriter, r *http.Requ
 	}
 	if req.SMILES == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "smiles is required"))
+		return
+	}
+	if !hasValidSMILESChars(req.SMILES) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid SMILES format"))
 		return
 	}
 	if req.SimilarityThreshold <= 0 || req.SimilarityThreshold > 1.0 {
@@ -264,6 +311,11 @@ func (h *MoleculeHandler) SearchBySimilarity(w http.ResponseWriter, r *http.Requ
 
 // CalculateProperties handles POST /api/v1/molecules/properties/calculate
 func (h *MoleculeHandler) CalculateProperties(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req CalculatePropertiesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -271,6 +323,10 @@ func (h *MoleculeHandler) CalculateProperties(w http.ResponseWriter, r *http.Req
 	}
 	if req.SMILES == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "smiles is required"))
+		return
+	}
+	if !hasValidSMILESChars(req.SMILES) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid SMILES format"))
 		return
 	}
 

@@ -106,6 +106,11 @@ func (h *LifecycleHandler) AdvancePhase(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req AdvancePhaseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
@@ -141,6 +146,11 @@ func (h *LifecycleHandler) AddMilestone(w http.ResponseWriter, r *http.Request) 
 	patentID := r.PathValue("patentId")
 	if patentID == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("patentId", "patent id is required"))
+		return
+	}
+
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
 		return
 	}
 
@@ -197,6 +207,11 @@ func (h *LifecycleHandler) RecordFee(w http.ResponseWriter, r *http.Request) {
 	patentID := r.PathValue("patentId")
 	if patentID == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("patentId", "patent id is required"))
+		return
+	}
+
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
 		return
 	}
 

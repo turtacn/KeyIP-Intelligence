@@ -1,0 +1,123 @@
+# =============================================================================
+# KeyIP-Intelligence Release Pipeline
+# =============================================================================
+# Triggered by tags matching v*.
+# Builds cross-platform binaries, Docker images, and creates a GitHub Release.
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  GO_VERSION: "1.22.1"
+  REGISTRY: ghcr.io
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Binaries: cross-compile apiserver, worker, keyip for 4 platform/arch combos
+  # ---------------------------------------------------------------------------
+  binaries:
+    name: Binaries (${{ matrix.os }}/${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux, darwin]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build Binaries
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p dist
+          for cmd in apiserver worker keyip; do
+            go build -ldflags="-s -w" \
+              -o "dist/keyip-${cmd}-${{ matrix.os }}-${{ matrix.arch }}" \
+              ./cmd/${cmd}/...
+          done
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/*
+
+  # ---------------------------------------------------------------------------
+  # Docker: build and push apiserver and worker images to GHCR
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Docker (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [apiserver, worker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deployments/docker/Dockerfile.${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/keyip-${{ matrix.service }}:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/keyip-${{ matrix.service }}:latest
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.event.repository.updated_at }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Release: collect all artifacts and create a GitHub Release with release notes
+  # ---------------------------------------------------------------------------
+  release:
+    name: Release
+    needs: [binaries, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f -exec mv {} release-assets/ \;
+          cd release-assets
+          sha256sum * > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true

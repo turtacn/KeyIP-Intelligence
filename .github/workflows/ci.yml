@@ -1,0 +1,130 @@
+# =============================================================================
+# KeyIP-Intelligence CI Pipeline
+# =============================================================================
+# Runs on pushes to main and pull requests targeting main.
+# Jobs: lint, test, build, security
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.22.1"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint: golangci-lint for Go + TypeScript typecheck for frontend
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.56.2
+          args: --timeout=5m
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          cache: true
+          cache-dependency-path: web/bun.lock
+
+      - name: Typecheck Frontend
+        working-directory: web
+        run: |
+          bun install --frozen-lockfile
+          bunx tsc --noEmit
+
+  # ---------------------------------------------------------------------------
+  # Test: run all Go tests with race detector and upload coverage
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run Tests
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v5
+        with:
+          file: ./coverage.out
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Build: compile Go binaries and the frontend
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build Go Binaries
+        run: go build -v ./cmd/...
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          cache: true
+          cache-dependency-path: web/bun.lock
+
+      - name: Build Frontend
+        working-directory: web
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+  # ---------------------------------------------------------------------------
+  # Security: gosec scan on Go source code
+  # ---------------------------------------------------------------------------
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run Gosec
+        uses: securego/gosec@master
+        with:
+          args: ./...

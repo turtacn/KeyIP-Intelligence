@@ -32,6 +32,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/collaboration"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/monitoring/logging"
@@ -114,13 +115,18 @@ func (h *CollaborationHandler) RegisterRoutes(mux *http.ServeMux) {
 
 // CreateWorkspace handles POST /api/v1/workspaces
 func (h *CollaborationHandler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req CreateWorkspaceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
 		return
 	}
 
-	if req.Name == "" {
+	if strings.TrimSpace(req.Name) == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("name", "name is required"))
 		return
 	}
@@ -190,6 +196,11 @@ func (h *CollaborationHandler) UpdateWorkspace(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req UpdateWorkspaceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
@@ -243,6 +254,11 @@ func (h *CollaborationHandler) ShareDocument(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req ShareDocumentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("body", "invalid request body"))
@@ -251,6 +267,14 @@ func (h *CollaborationHandler) ShareDocument(w http.ResponseWriter, r *http.Requ
 
 	if req.DocumentID == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("document_id", "document_id is required"))
+		return
+	}
+	if req.MaxDownloads < 0 {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("max_downloads", "max_downloads must be non-negative"))
+		return
+	}
+	if req.ExpiresInHours < 0 {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("expires_in_hours", "expires_in_hours must be non-negative"))
 		return
 	}
 
@@ -308,6 +332,11 @@ func (h *CollaborationHandler) InviteMember(w http.ResponseWriter, r *http.Reque
 	workspaceID := r.PathValue("id")
 	if workspaceID == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id is required"))
+		return
+	}
+
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
 		return
 	}
 
@@ -376,6 +405,11 @@ func (h *CollaborationHandler) UpdateMemberRole(w http.ResponseWriter, r *http.R
 
 	if workspaceID == "" || memberID == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("id", "workspace id and member id are required"))
+		return
+	}
+
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
 		return
 	}
 

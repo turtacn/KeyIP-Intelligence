@@ -187,13 +187,26 @@ func (h *PatentHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *PatentHandler) CreatePatent(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req CreatePatentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
 		return
 	}
-	if req.Title == "" || req.ApplicationNo == "" {
+	if strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.ApplicationNo) == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "title and application_no are required"))
+		return
+	}
+	if strings.TrimSpace(req.Applicant) == "" {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("applicant", "applicant is required"))
+		return
+	}
+	if len(req.ApplicationNo) > 64 {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("application_no", "application_no too long"))
 		return
 	}
 
@@ -267,6 +280,11 @@ func (h *PatentHandler) UpdatePatent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req UpdatePatentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -310,6 +328,11 @@ func (h *PatentHandler) DeletePatent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PatentHandler) SearchPatents(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req SearchPatentsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -317,6 +340,10 @@ func (h *PatentHandler) SearchPatents(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Query == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "query is required"))
+		return
+	}
+	if len(req.Query) > 2000 {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("query", "query too long"))
 		return
 	}
 	if req.Page <= 0 {
@@ -353,6 +380,11 @@ func (h *PatentHandler) SearchPatents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PatentHandler) AdvancedSearch(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req AdvancedSearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -441,6 +473,11 @@ func (h *PatentHandler) Search(w http.ResponseWriter, r *http.Request) {
 // AnalyzeClaims parses and analyzes patent claims.
 // Accepts either a patent_id to fetch from the service or raw claim_texts.
 func (h *PatentHandler) AnalyzeClaims(w http.ResponseWriter, r *http.Request) {
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req AnalyzeClaimsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -641,6 +678,11 @@ func (h *PatentHandler) CheckFTO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req CheckFTORequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -649,6 +691,10 @@ func (h *PatentHandler) CheckFTO(w http.ResponseWriter, r *http.Request) {
 
 	if req.MoleculeSMILES == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "molecule_smiles is required"))
+		return
+	}
+	if !hasValidSMILESChars(req.MoleculeSMILES) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid SMILES format"))
 		return
 	}
 	if len(req.Jurisdictions) == 0 {
@@ -687,6 +733,11 @@ func (h *PatentHandler) AssessInfringementRisk(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if !isContentTypeJSON(r) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("content-type", "Content-Type must be application/json"))
+		return
+	}
+
 	var req AssessInfringementRiskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid request body"))
@@ -695,6 +746,10 @@ func (h *PatentHandler) AssessInfringementRisk(w http.ResponseWriter, r *http.Re
 
 	if req.MoleculeSMILES == "" {
 		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "molecule_smiles is required"))
+		return
+	}
+	if !hasValidSMILESChars(req.MoleculeSMILES) {
+		writeError(w, http.StatusBadRequest, errors.NewValidationError("field", "invalid SMILES format"))
 		return
 	}
 	if req.PatentID == "" {
