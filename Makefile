@@ -60,6 +60,10 @@ MIGRATIONS_DIR   := internal/infrastructure/database/postgres/migrations
 GOLANGCI_LINT    := $(shell which golangci-lint 2>/dev/null)
 GOLANGCI_VERSION := v1.56.2
 
+# Security scanning tools
+GOVULNCHECK_VERSION := v1.1.3
+GOSEC_VERSION       := v2.21.4
+
 # Colors for output
 RED    := \033[0;31m
 GREEN  := \033[0;32m
@@ -77,6 +81,8 @@ NC     := \033[0m # No Color
 .PHONY: all build build-apiserver build-worker build-keyip \
         test test-unit test-integration test-e2e test-coverage test-race \
         lint fmt vet check \
+        security-scan security-scan-go security-scan-code security-scan-frontend \
+        install-security-tools \
         proto proto-clean proto-deps \
         migrate-up migrate-down migrate-down-all migrate-status migrate-create \
         docker-build docker-push docker-compose-up docker-compose-down docker-logs \
@@ -187,6 +193,38 @@ lint:
 
 ## check: Run fmt, vet, and lint
 check: fmt vet lint
+
+# -----------------------------------------------------------------------------
+# Security Targets
+# -----------------------------------------------------------------------------
+
+## security-scan: Run all security scanners (govulncheck, gosec, npm audit)
+security-scan: security-scan-go security-scan-code security-scan-frontend
+
+## security-scan-go: Run govulncheck on Go dependencies
+security-scan-go:
+	@echo "$(BLUE)>> Running Govulncheck (Go vulnerability scan)...$(NC)"
+	go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
+	@echo "$(GREEN)>> Govulncheck passed.$(NC)"
+
+## security-scan-code: Run gosec on Go source code
+security-scan-code:
+	@echo "$(BLUE)>> Running Gosec (Go code security scan)...$(NC)"
+	go run github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION) ./...
+	@echo "$(GREEN)>> Gosec passed.$(NC)"
+
+## security-scan-frontend: Run npm audit on frontend dependencies
+security-scan-frontend:
+	@echo "$(BLUE)>> Running npm audit (frontend dependency scan)...$(NC)"
+	cd web && npm audit --audit-level=high
+	@echo "$(GREEN)>> npm audit passed.$(NC)"
+
+## install-security-tools: Install govulncheck and gosec binaries
+install-security-tools:
+	@echo "$(BLUE)>> Installing security scanning tools...$(NC)"
+	$(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+	$(GO) install github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION)
+	@echo "$(GREEN)>> Security tools installed.$(NC)"
 
 # -----------------------------------------------------------------------------
 # Database Targets
@@ -333,6 +371,8 @@ install-tools:
 	$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@v1.32.0
 	$(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 	$(GO) install go.uber.org/mock/mockgen@latest
+	$(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+	$(GO) install github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION)
 
 ## help: Display available targets
 help:

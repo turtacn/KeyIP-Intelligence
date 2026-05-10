@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "keyip.fullname" . }}-worker
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "keyip.worker.labels" . | nindent 4 }}
+    {{- include "keyip.partOf" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "keyip.worker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "keyip.worker.selectorLabels" . | nindent 8 }}
+        {{- include "keyip.partOf" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+      annotations:
+        {{- if .Values.worker.annotations }}
+        {{- toYaml .Values.worker.annotations | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "keyip.worker.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.worker.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.worker.name }}
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          args:
+            {{- toYaml .Values.worker.args | nindent 12 }}
+          ports:
+            - name: health
+              containerPort: {{ .Values.worker.ports.health }}
+              protocol: TCP
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: postgres-password
+                  optional: true
+            - name: NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: neo4j-password
+                  optional: true
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: redis-password
+                  optional: true
+            - name: OPENSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: opensearch-username
+                  optional: true
+            - name: OPENSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: opensearch-password
+                  optional: true
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: minio-access-key
+                  optional: true
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: minio-secret-key
+                  optional: true
+          envFrom:
+            {{- toYaml .Values.worker.envFrom | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/configs
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.worker.probes.liveness.path }}
+              port: {{ .Values.worker.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.worker.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.worker.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.worker.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.worker.probes.readiness.path }}
+              port: {{ .Values.worker.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.worker.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.worker.probes.readiness.timeoutSeconds }}
+            successThreshold: {{ .Values.worker.probes.readiness.successThreshold }}
+            failureThreshold: {{ .Values.worker.probes.readiness.failureThreshold }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.worker.probes.startup.path }}
+              port: {{ .Values.worker.probes.startup.port }}
+            initialDelaySeconds: {{ .Values.worker.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.worker.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.worker.probes.startup.failureThreshold }}
+          securityContext:
+            {{- toYaml .Values.worker.securityContext | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "keyip.fullname" . }}-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+        - name: tmp
+          emptyDir: {}

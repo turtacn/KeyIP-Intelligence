@@ -49,8 +49,9 @@ type RouterConfig struct {
 	CompressionMiddleware        *middleware.CompressionMiddleware
 
 	// Handlers
-	VersionHandler *handlers.VersionHandler
-	DocsHandler    *handlers.DocsHandler
+	VersionHandler    *handlers.VersionHandler
+	DocsHandler       *handlers.DocsHandler
+	CSPReportHandler  *handlers.CSPReportHandler
 
 	// Infrastructure
 	Logger           logging.Logger
@@ -125,6 +126,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	// --- Documentation Routes ---
 	if cfg.DocsHandler != nil {
 		cfg.DocsHandler.RegisterRoutes(mux)
+	}
+
+	// --- CSP Report Endpoint (no auth required, accepts POST from browsers) ---
+	if cfg.CSPReportHandler != nil {
+		cfg.CSPReportHandler.RegisterRoutes(mux)
 	}
 
 	// --- API v1 Routes ---

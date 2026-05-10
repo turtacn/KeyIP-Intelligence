@@ -1,0 +1,162 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "keyip.fullname" . }}-apiserver
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "keyip.apiserver.labels" . | nindent 4 }}
+    {{- include "keyip.partOf" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.apiserver.replicas }}
+  selector:
+    matchLabels:
+      {{- include "keyip.apiserver.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "keyip.apiserver.selectorLabels" . | nindent 8 }}
+        {{- include "keyip.partOf" . | nindent 8 }}
+        app.kubernetes.io/component: api
+      annotations:
+        {{- if .Values.apiserver.annotations }}
+        {{- toYaml .Values.apiserver.annotations | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "keyip.apiserver.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.apiserver.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.apiserver.name }}
+          image: "{{ .Values.apiserver.image.repository }}:{{ .Values.apiserver.image.tag }}"
+          imagePullPolicy: {{ .Values.apiserver.image.pullPolicy }}
+          args:
+            {{- toYaml .Values.apiserver.args | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.apiserver.ports.http }}
+              protocol: TCP
+            - name: grpc
+              containerPort: {{ .Values.apiserver.ports.grpc }}
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.apiserver.ports.metrics }}
+              protocol: TCP
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: postgres-password
+                  optional: true
+            - name: NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: neo4j-password
+                  optional: true
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: redis-password
+                  optional: true
+            - name: OPENSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: opensearch-username
+                  optional: true
+            - name: OPENSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: opensearch-password
+                  optional: true
+            - name: MILVUS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: milvus-username
+                  optional: true
+            - name: MILVUS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: milvus-password
+                  optional: true
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: minio-access-key
+                  optional: true
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: minio-secret-key
+                  optional: true
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: keycloak-client-secret
+                  optional: true
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: jwt-secret
+                  optional: true
+            - name: STRATEGY_GPT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: strategy-gpt-api-key
+                  optional: true
+          envFrom:
+            {{- toYaml .Values.apiserver.envFrom | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/configs
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.apiserver.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.apiserver.probes.liveness.path }}
+              port: {{ .Values.apiserver.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.apiserver.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.apiserver.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.apiserver.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.apiserver.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.apiserver.probes.readiness.path }}
+              port: {{ .Values.apiserver.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.apiserver.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.apiserver.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.apiserver.probes.readiness.timeoutSeconds }}
+            successThreshold: {{ .Values.apiserver.probes.readiness.successThreshold }}
+            failureThreshold: {{ .Values.apiserver.probes.readiness.failureThreshold }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.apiserver.probes.startup.path }}
+              port: {{ .Values.apiserver.probes.startup.port }}
+            initialDelaySeconds: {{ .Values.apiserver.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.apiserver.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.apiserver.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.apiserver.probes.startup.failureThreshold }}
+          securityContext:
+            {{- toYaml .Values.apiserver.securityContext | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "keyip.fullname" . }}-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,25 @@
+apiVersion: v2
+name: keyip
+description: |
+  KeyIP-Intelligence — an AI-powered patent intelligence platform.
+  Deploys the API server (HTTP/gRPC), background worker, and supporting
+  infrastructure configs (ConfigMap, Ingress, HPA, PDB).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+keywords:
+  - patent
+  - intelligence
+  - ai
+  - ip
+
+home: https://github.com/turtacn/KeyIP-Intelligence
+sources:
+  - https://github.com/turtacn/KeyIP-Intelligence
+
+maintainers:
+  - name: KeyIP Team
+    email: team@keyip.example.com
+
+icon: https://raw.githubusercontent.com/turtacn/KeyIP-Intelligence/main/docs/logo.png

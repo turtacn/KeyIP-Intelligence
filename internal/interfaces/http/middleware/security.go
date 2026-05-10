@@ -32,6 +32,23 @@ type SecurityConfig struct {
 	// If empty, the default restrictive policy is used.
 	ContentSecurityPolicy string
 
+	// ContentSecurityPolicyReportOnly defines the Content-Security-Policy-Report-Only
+	// header value. When set, browsers report CSP violations without blocking resources.
+	// If empty, report-only mode is disabled.
+	ContentSecurityPolicyReportOnly string
+
+	// CSPReportURI defines the report-uri directive for CSP violation reporting.
+	// When non-empty, it is appended to both the Content-Security-Policy and
+	// Content-Security-Policy-Report-Only headers.
+	// Default: "/api/v1/csp-report"
+	CSPReportURI string
+
+	// CSPReportTo defines the report-to directive for CSP violation reporting.
+	// This is part of the Reporting API and replaces report-uri in modern browsers.
+	// When non-empty, it is appended to both CSP headers.
+	// Requires a matching Report-To header or endpoint configuration on the server.
+	CSPReportTo string
+
 	// XContentTypeOptions defines the X-Content-Type-Options header value.
 	// Default: "nosniff"
 	XContentTypeOptions string
@@ -74,6 +91,14 @@ func DefaultCSP() string {
 	}, "; ")
 }
 
+// DefaultCSPReportOnly returns the default Content-Security-Policy-Report-Only string.
+// By default it uses the same policy as DefaultCSP so that violations are reported
+// for the same set of rules currently being enforced. Users typically customize
+// this to test a stricter policy before switching to enforcement mode.
+func DefaultCSPReportOnly() string {
+	return DefaultCSP()
+}
+
 // DefaultPermissionsPolicy returns the default Permissions-Policy string
 // that restricts camera, microphone, and geolocation access.
 func DefaultPermissionsPolicy() string {
@@ -87,14 +112,36 @@ func DefaultPermissionsPolicy() string {
 // DefaultSecurityConfig returns a secure default security headers configuration.
 func DefaultSecurityConfig() SecurityConfig {
 	return SecurityConfig{
-		ContentSecurityPolicy:   DefaultCSP(),
-		XContentTypeOptions:     "nosniff",
-		XFrameOptions:           "DENY",
-		XXSSProtection:          "1; mode=block",
-		StrictTransportSecurity: "max-age=31536000; includeSubDomains",
-		ReferrerPolicy:          "strict-origin-when-cross-origin",
-		PermissionsPolicy:       DefaultPermissionsPolicy(),
+		ContentSecurityPolicy:     DefaultCSP(),
+		XContentTypeOptions:       "nosniff",
+		XFrameOptions:             "DENY",
+		XXSSProtection:            "1; mode=block",
+		StrictTransportSecurity:   "max-age=31536000; includeSubDomains",
+		ReferrerPolicy:            "strict-origin-when-cross-origin",
+		PermissionsPolicy:         DefaultPermissionsPolicy(),
+		CSPReportURI:              "/api/v1/csp-report",
 	}
+}
+
+// buildCSPWithReports appends report-uri and/or report-to directives to a base
+// CSP policy string. If both reportURI and reportTo are empty, the base string
+// is returned unmodified. If baseCSP is empty, an empty string is returned so
+// the header is not set.
+func buildCSPWithReports(baseCSP, reportURI, reportTo string) string {
+	if baseCSP == "" {
+		return ""
+	}
+	if reportURI == "" && reportTo == "" {
+		return baseCSP
+	}
+	parts := []string{baseCSP}
+	if reportURI != "" {
+		parts = append(parts, "report-uri "+reportURI)
+	}
+	if reportTo != "" {
+		parts = append(parts, "report-to "+reportTo)
+	}
+	return strings.Join(parts, "; ")
 }
 
 // SecurityHeaders returns middleware that adds security-related HTTP response headers.
@@ -103,9 +150,16 @@ func DefaultSecurityConfig() SecurityConfig {
 func SecurityHeaders(config SecurityConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Content-Security-Policy
+			// Content-Security-Policy (enforcement mode)
 			if config.ContentSecurityPolicy != "" {
-				w.Header().Set("Content-Security-Policy", config.ContentSecurityPolicy)
+				csp := buildCSPWithReports(config.ContentSecurityPolicy, config.CSPReportURI, config.CSPReportTo)
+				w.Header().Set("Content-Security-Policy", csp)
+			}
+
+			// Content-Security-Policy-Report-Only (report-only mode)
+			if config.ContentSecurityPolicyReportOnly != "" {
+				cspRO := buildCSPWithReports(config.ContentSecurityPolicyReportOnly, config.CSPReportURI, config.CSPReportTo)
+				w.Header().Set("Content-Security-Policy-Report-Only", cspRO)
 			}
 
 			// X-Content-Type-Options
@@ -158,6 +212,15 @@ func NewSecurityHeadersMiddleware(config *SecurityConfig) *SecurityHeadersMiddle
 		// Merge: copy non-zero fields from provided config into defaults.
 		if config.ContentSecurityPolicy != "" {
 			cfg.ContentSecurityPolicy = config.ContentSecurityPolicy
+		}
+		if config.ContentSecurityPolicyReportOnly != "" {
+			cfg.ContentSecurityPolicyReportOnly = config.ContentSecurityPolicyReportOnly
+		}
+		if config.CSPReportURI != "" {
+			cfg.CSPReportURI = config.CSPReportURI
+		}
+		if config.CSPReportTo != "" {
+			cfg.CSPReportTo = config.CSPReportTo
 		}
 		if config.XContentTypeOptions != "" {
 			cfg.XContentTypeOptions = config.XContentTypeOptions

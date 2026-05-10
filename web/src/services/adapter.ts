@@ -1,3 +1,5 @@
+import { getBaseUrl } from '../utils/apiMode';
+
 /** Retry policy for API requests */
 export interface RetryPolicy {
   /** Maximum number of retry attempts (default: 3) */
@@ -39,12 +41,16 @@ function isRetryableError(error: unknown): boolean {
 }
 
 class FetchAdapter implements ApiAdapter {
-  baseUrl: string;
   private defaultRetryPolicy: RetryPolicy;
 
-  constructor(baseUrl: string, retryPolicy?: RetryPolicy) {
-    this.baseUrl = baseUrl;
+  /** Dynamic base URL — always reads from the current apiMode. */
+  get baseUrl(): string {
+    return getBaseUrl();
+  }
+
+  constructor(retryPolicy?: RetryPolicy) {
     this.defaultRetryPolicy = retryPolicy ?? {};
+    console.log('[ApiAdapter] Initialized (dynamic baseUrl)');
   }
 
   /** Update the default retry policy at runtime */
@@ -189,13 +195,6 @@ class FetchAdapter implements ApiAdapter {
   }
 }
 
-// Environment-based base URL
-// Always use the full path prefix to match MSW handlers, even in mock mode.
-const mode = import.meta.env.VITE_API_MODE || 'mock';
-const isMock = mode === 'mock' || import.meta.env.DEV;
-// Ensure consistent API prefix across frontend and backend (/api/v1 instead of /api/openapi/v1)
-const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+console.log('[ApiAdapter] Creating API client (dynamic mode)...');
 
-console.log('[ApiAdapter] Initialized', { mode, isMock, baseUrl });
-
-export const api = new FetchAdapter(baseUrl);
+export const api = new FetchAdapter();

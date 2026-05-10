@@ -261,7 +261,7 @@ func TestSecurityHeadersMiddleware_WrapperCustomConfig(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	handler.ServeHTTP(w, r)
 
-	assert.Equal(t, "default-src 'none'", w.Header().Get("Content-Security-Policy"))
+	assert.Equal(t, "default-src 'none'; report-uri /api/v1/csp-report", w.Header().Get("Content-Security-Policy"))
 	assert.Equal(t, "SAMEORIGIN", w.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "nosniff", w.Header().Get("X-Content-Type-Options"))
 	assert.Equal(t, "1; mode=block", w.Header().Get("X-XSS-Protection"))
@@ -349,6 +349,182 @@ func TestSecurityHeaders_CSPFormat(t *testing.T) {
 		trimmed := strings.TrimSpace(d)
 		assert.NotEmpty(t, trimmed, "CSP directive should not be empty")
 	}
+}
+
+func TestSecurityHeaders_CSPReportOnly(t *testing.T) {
+	cfg := DefaultSecurityConfig()
+	cfg.ContentSecurityPolicyReportOnly = DefaultCSPReportOnly()
+	handler := SecurityHeaders(cfg)(okHandler())
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(w, r)
+
+	// The enforcement CSP header should still be present
+	csp := w.Header().Get("Content-Security-Policy")
+	assert.NotEmpty(t, csp)
+	assert.Contains(t, csp, "default-src 'self'")
+
+	// The report-only header should also be present
+	cspRO := w.Header().Get("Content-Security-Policy-Report-Only")
+	assert.NotEmpty(t, cspRO)
+	assert.Contains(t, cspRO, "default-src 'self'")
+
+	// Both are separate HTTP headers with different header names
+	assert.Contains(t, w.Header(), "Content-Security-Policy")
+	assert.Contains(t, w.Header(), "Content-Security-Policy-Report-Only")
+}
+
+func TestSecurityHeaders_CSPReportOnlyExclusive(t *testing.T) {
+	// When only report-only is set and enforcement is empty, only the
+	// report-only header should appear.
+	cfg := SecurityConfig{
+		ContentSecurityPolicyReportOnly: "default-src 'none'",
+		CSPReportURI:                    "/api/v1/csp-report",
+	}
+	handler := SecurityHeaders(cfg)(okHandler())
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(w, r)
+
+	assert.Empty(t, w.Header().Get("Content-Security-Policy"))
+	assert.NotEmpty(t, w.Header().Get("Content-Security-Policy-Report-Only"))
+}
+
+func TestSecurityHeaders_CSPReportURI(t *testing.T) {
+	cfg := DefaultSecurityConfig()
+	cfg.CSPReportURI = "/api/v1/csp-report"
+	handler := SecurityHeaders(cfg)(okHandler())
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(w, r)
+
+	csp := w.Header().Get("Content-Security-Policy")
+	assert.Contains(t, csp, "report-uri /api/v1/csp-report")
+}
+
+func TestSecurityHeaders_CSPReportTo(t *testing.T) {
+	cfg := DefaultSecurityConfig()
+	cfg.CSPReportURI = ""
+	cfg.CSPReportTo = "csp-endpoint"
+	handler := SecurityHeaders(cfg)(okHandler())
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(w, r)
+
+	csp := w.Header().Get("Content-Security-Policy")
+	assert.Contains(t, csp, "report-to csp-endpoint")
+	// Without report-uri, report-to should be the only report directive
+	assert.NotContains(t, csp, "report-uri")
+}
+
+func TestSecurityHeaders_CSPBothReportDirectives(t *testing.T) {
+	cfg := DefaultSecurityConfig()
+	cfg.CSPReportURI = "/api/v1/csp-report"
+	cfg.CSPReportTo = "csp-endpoint"
+	handler := SecurityHeaders(cfg)(okHandler())
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(w, r)
+
+	csp := w.Header().Get("Content-Security-Policy")
+	assert.Contains(t, csp, "report-uri /api/v1/csp-report")
+	assert.Contains(t, csp, "report-to csp-endpoint")
+	// report-uri should come before report-to (order in buildCSPWithReports)
+	uriIdx := strings.Index(csp, "report-uri")
+	toIdx := strings.Index(csp, "report-to")
+	assert.Less(t, uriIdx, toIdx, "report-uri should appear before report-to")
+}
+
+func TestSecurityHeaders_CSPReportWithReportOnly(t *testing.T) {
+	cfg := DefaultSecurityConfig()
+	cfg.ContentSecurityPolicyReportOnly = DefaultCSPReportOnly()
+	cfg.CSPReportURI = "/api/v1/csp-report"
+	handler := SecurityHeaders(cfg)(okHandler())
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(w, r)
+
+	// Both CSP headers should contain the report-uri directive
+	csp := w.Header().Get("Content-Security-Policy")
+	cspRO := w.Header().Get("Content-Security-Policy-Report-Only")
+	assert.Contains(t, csp, "report-uri /api/v1/csp-report")
+	assert.Contains(t, cspRO, "report-uri /api/v1/csp-report")
+}
+
+func TestDefaultSecurityConfig_CSPReportURI(t *testing.T) {
+	cfg := DefaultSecurityConfig()
+
+	// By default, the report-uri should point to the csp-report endpoint
+	assert.Equal(t, "/api/v1/csp-report", cfg.CSPReportURI)
+	// Report-only should be empty by default (opt-in)
+	assert.Empty(t, cfg.ContentSecurityPolicyReportOnly)
+	// Report-to should be empty by default (requires server config)
+	assert.Empty(t, cfg.CSPReportTo)
+}
+
+func TestDefaultCSPReportOnly(t *testing.T) {
+	cspRO := DefaultCSPReportOnly()
+
+	assert.NotEmpty(t, cspRO)
+	assert.Contains(t, cspRO, "default-src 'self'")
+	assert.Contains(t, cspRO, "script-src 'self'")
+	assert.Contains(t, cspRO, "style-src 'self'")
+}
+
+func TestBuildCSPWithReports_EmptyBase(t *testing.T) {
+	assert.Empty(t, buildCSPWithReports("", "/report", ""))
+	assert.Empty(t, buildCSPWithReports("", "", "endpoint"))
+	assert.Empty(t, buildCSPWithReports("", "", ""))
+}
+
+func TestBuildCSPWithReports_NoDirectives(t *testing.T) {
+	result := buildCSPWithReports("default-src 'self'", "", "")
+	assert.Equal(t, "default-src 'self'", result)
+}
+
+func TestBuildCSPWithReports_ReportURIOnly(t *testing.T) {
+	result := buildCSPWithReports("default-src 'self'", "/api/v1/csp-report", "")
+	assert.Equal(t, "default-src 'self'; report-uri /api/v1/csp-report", result)
+}
+
+func TestBuildCSPWithReports_ReportToOnly(t *testing.T) {
+	result := buildCSPWithReports("default-src 'self'", "", "csp-endpoint")
+	assert.Equal(t, "default-src 'self'; report-to csp-endpoint", result)
+}
+
+func TestBuildCSPWithReports_BothDirectives(t *testing.T) {
+	result := buildCSPWithReports("default-src 'self'", "/report", "csp-endpoint")
+	assert.Equal(t, "default-src 'self'; report-uri /report; report-to csp-endpoint", result)
+}
+
+func TestNewSecurityHeadersMiddleware_WithReportOnly(t *testing.T) {
+	cfg := &SecurityConfig{
+		ContentSecurityPolicyReportOnly: DefaultCSPReportOnly(),
+		CSPReportURI:                    "/custom-report",
+	}
+	mw := NewSecurityHeadersMiddleware(cfg)
+	require.NotNil(t, mw)
+
+	handler := mw.Handler(okHandler())
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(w, r)
+
+	// Enforcement CSP should still have the default value
+	assert.NotEmpty(t, w.Header().Get("Content-Security-Policy"))
+	// Report-only should be set with custom report-uri
+	cspRO := w.Header().Get("Content-Security-Policy-Report-Only")
+	assert.Contains(t, cspRO, "report-uri /custom-report")
+	// Default enforcement CSP should also get the custom report-uri
+	csp := w.Header().Get("Content-Security-Policy")
+	assert.Contains(t, csp, "report-uri /custom-report")
 }
 
 //Personal.AI order the ending

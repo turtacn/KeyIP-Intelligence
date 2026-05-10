@@ -1,0 +1,56 @@
+Thank you for installing {{ .Chart.Name }} {{ .Chart.Version }} (appVersion: {{ .Chart.AppVersion }}).
+
+The KeyIP-Intelligence platform has been deployed to namespace "{{ .Values.global.namespace }}".
+
+== Components deployed ==
+
+  - API Server:     {{ include "keyip.fullname" . }}-apiserver
+  - Worker:         {{ include "keyip.fullname" . }}-worker
+  - ConfigMap:      {{ include "keyip.fullname" . }}-config
+{{- if .Values.ingress.enabled }}
+  - Ingress:        {{ include "keyip.fullname" . }}-ingress
+    Host:           {{ .Values.ingress.host }}
+{{- end }}
+{{- if .Values.pdb.apiserver.enabled }}
+  - PDB (API):      {{ include "keyip.fullname" . }}-apiserver-pdb
+{{- end }}
+{{- if .Values.autoscaling.apiserver.enabled }}
+  - HPA (API):      {{ include "keyip.fullname" . }}-apiserver ({{ .Values.autoscaling.apiserver.minReplicas }}-{{ .Values.autoscaling.apiserver.maxReplicas }} replicas)
+{{- end }}
+
+== Prerequisites ==
+
+Before the application can start, you must ensure the following external
+dependencies are available:
+
+  1. PostgreSQL, Neo4j, Redis, OpenSearch, Milvus, Kafka, MinIO, and Keycloak
+     services are reachable at the addresses configured in config.yaml.
+  2. A Kubernetes Secret named "{{ .Values.secrets.existingSecretName }}" exists
+     in namespace "{{ .Values.global.namespace }}" with all required keys
+     (postgres-password, neo4j-password, redis-password, opensearch-username,
+     opensearch-password, milvus-username, milvus-password, minio-access-key,
+     minio-secret-key, keycloak-client-secret, jwt-secret, strategy-gpt-api-key,
+     etc.).
+  3. (Optional) A ConfigMap named "keyip-env" in namespace
+     "{{ .Values.global.namespace }}" for additional environment variables.
+
+== Verifying the deployment ==
+
+  kubectl get pods -n {{ .Values.global.namespace }}
+  kubectl get svc -n {{ .Values.global.namespace }}
+
+== Accessing the API ==
+
+  {{- if .Values.ingress.enabled }}
+  The API is exposed via ingress at:
+    https://{{ .Values.ingress.host }}
+  {{- else }}
+  Port-forward to the API server:
+    kubectl port-forward -n {{ .Values.global.namespace }} svc/{{ include "keyip.fullname" . }}-apiserver 8080:80
+  Then access: http://localhost:8080
+  {{- end }}
+
+== Additional resources ==
+
+  Source code: https://github.com/turtacn/KeyIP-Intelligence
+  Documentation: https://github.com/turtacn/KeyIP-Intelligence/blob/main/README.md

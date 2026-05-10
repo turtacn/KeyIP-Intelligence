@@ -1,0 +1,61 @@
+{{- if .Values.autoscaling.apiserver.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "keyip.fullname" . }}-apiserver
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "keyip.apiserver.labels" . | nindent 4 }}
+    {{- include "keyip.partOf" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "keyip.fullname" . }}-apiserver
+  minReplicas: {{ .Values.autoscaling.apiserver.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.apiserver.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.apiserver.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.apiserver.targetMemoryUtilizationPercentage }}
+{{- end }}
+{{- if .Values.autoscaling.worker.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "keyip.fullname" . }}-worker
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "keyip.worker.labels" . | nindent 4 }}
+    {{- include "keyip.partOf" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "keyip.fullname" . }}-worker
+  minReplicas: {{ .Values.autoscaling.worker.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.worker.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.worker.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.worker.targetMemoryUtilizationPercentage }}
+{{- end }}

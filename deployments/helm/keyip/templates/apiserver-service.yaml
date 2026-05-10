@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "keyip.fullname" . }}-apiserver
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "keyip.apiserver.labels" . | nindent 4 }}
+    {{- include "keyip.partOf" . | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9091"
+    prometheus.io/path: "/metrics"
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "keyip.apiserver.selectorLabels" . | nindent 4 }}
+  ports:
+    {{- toYaml .Values.service.apiserver.ports | nindent 4 }}

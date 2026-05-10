@@ -1,0 +1,41 @@
+{{- if .Values.pdb.apiserver.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "keyip.fullname" . }}-apiserver-pdb
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "keyip.apiserver.labels" . | nindent 4 }}
+    {{- include "keyip.partOf" . | nindent 4 }}
+spec:
+  {{- if .Values.pdb.apiserver.minAvailable }}
+  minAvailable: {{ .Values.pdb.apiserver.minAvailable }}
+  {{- end }}
+  {{- if .Values.pdb.apiserver.maxUnavailable }}
+  maxUnavailable: {{ .Values.pdb.apiserver.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "keyip.apiserver.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- if .Values.pdb.worker.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "keyip.fullname" . }}-worker-pdb
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "keyip.worker.labels" . | nindent 4 }}
+    {{- include "keyip.partOf" . | nindent 4 }}
+spec:
+  {{- if .Values.pdb.worker.minAvailable }}
+  minAvailable: {{ .Values.pdb.worker.minAvailable }}
+  {{- end }}
+  {{- if .Values.pdb.worker.maxUnavailable }}
+  maxUnavailable: {{ .Values.pdb.worker.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "keyip.worker.selectorLabels" . | nindent 6 }}
+{{- end }}

@@ -6,19 +6,14 @@ import './i18n/i18n' // Import i18n config
 
 // Prepare MSW
 async function enableMocking() {
-  const isMockMode = import.meta.env.VITE_API_MODE === 'mock';
-  const isDev = import.meta.env.DEV;
+  const { getApiMode } = await import('./utils/apiMode');
+  const mode = getApiMode();
 
-  console.log('[App] Starting...', { isDev, isMockMode, VITE_API_MODE: import.meta.env.VITE_API_MODE });
+  console.log('[App] Starting...', { mode });
 
-  // Logic:
-  // 1. If VITE_API_MODE is 'mock', we MUST start MSW (Production Demo or Local Mock).
-  // 2. If DEV mode and VITE_API_MODE is NOT 'real', we start MSW (Default Local Dev).
-
-  const shouldStartMSW = isMockMode || (isDev && import.meta.env.VITE_API_MODE !== 'real');
-
-  if (!shouldStartMSW) {
-    console.log('[App] MSW skipped.');
+  // Only start MSW in mock mode
+  if (mode !== 'mock') {
+    console.log(`[App] MSW skipped (mode: ${mode})`);
     return;
   }
 
