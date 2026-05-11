@@ -3,7 +3,11 @@ package opensearch
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -145,6 +149,76 @@ func (c *Client) IsHealthy() bool {
 // GetClient returns the underlying OpenSearch client.
 func (c *Client) GetClient() *opensearch.Client {
 	return c.client
+}
+
+// ClusterInfo holds information about the connected cluster.
+type ClusterInfo struct {
+	Name        string `json:"name"`
+	ClusterName string `json:"cluster_name"`
+	ClusterUUID string `json:"cluster_uuid"`
+	Version     struct {
+		Number       string `json:"number"`
+		Distribution string `json:"distribution"`
+	} `json:"version"`
+	Tagline string `json:"tagline"`
+}
+
+// IsOpenSearch returns true if the cluster is OpenSearch (not Elasticsearch).
+func (ci *ClusterInfo) IsOpenSearch() bool {
+	return ci.Version.Distribution == "opensearch" || ci.Tagline == "The OpenSearch Project: https://opensearch.org/"
+}
+
+// ConnectionTest performs a detailed connection test by querying the root endpoint
+// and returns cluster information including version. This provides stronger validation
+// than Ping alone and works with both OpenSearch and Elasticsearch 8.x.
+func (c *Client) ConnectionTest(ctx context.Context) (*ClusterInfo, error) {
+	if len(c.config.Addresses) == 0 {
+		return nil, ErrInvalidConfig
+	}
+
+	// Use a raw GET request to the root endpoint to retrieve cluster info.
+	// PingRequest uses HEAD which never has a body, so we need GET here.
+	baseURL := strings.TrimRight(c.config.Addresses[0], "/") + "/"
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to create connection test request")
+	}
+
+	httpResp, err := c.client.Perform(httpReq)
+	if err != nil {
+		c.healthy.Store(false)
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "connection test request failed")
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode >= 300 {
+		c.healthy.Store(false)
+		c.logger.Warn("Connection test returned error status", logging.Int("status", httpResp.StatusCode))
+		return nil, fmt.Errorf("connection test returned HTTP %d", httpResp.StatusCode)
+	}
+
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeSerialization, "failed to read connection test response")
+	}
+
+	var info ClusterInfo
+	if err := json.Unmarshal(body, &info); err != nil {
+		// Non-JSON response — might be an older ES or proxy; return minimal info
+		c.healthy.Store(true)
+		return &ClusterInfo{Name: "unknown", ClusterName: "unknown", Version: struct {
+			Number       string `json:"number"`
+			Distribution string `json:"distribution"`
+		}{Number: "unknown"}}, nil
+	}
+
+	c.healthy.Store(true)
+	c.logger.Info("OpenSearch connection test succeeded",
+		logging.String("name", info.Name),
+		logging.String("cluster", info.ClusterName),
+		logging.String("version", info.Version.Number))
+	return &info, nil
 }
 
 // Close closes the client and stops the health check.

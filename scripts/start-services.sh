@@ -77,6 +77,10 @@ start_postgres() {
 }
 
 start_neo4j() {
+  if $IS_DOCKER_MACHINE; then
+    _warn "docker-machine: 跳过 Neo4j（捆绑 JDK 不兼容，知识图谱功能不可用）"
+    return 0
+  fi
   _log "启动 Neo4j 5 (Bolt: 7687, HTTP: 7474)"
   docker run -d --name keyip-neo4j \
     $RESTART $LOGGING --network "$NETWORK" \

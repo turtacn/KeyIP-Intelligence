@@ -10,10 +10,15 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  define: {
+    // Ensure tests always run in mock mode regardless of host env
+    'import.meta.env.VITE_API_MODE': JSON.stringify('mock'),
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(''),
+  },
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: './src/__tests__/setup.ts',
+    setupFiles: ['./src/__tests__/testSetup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'html', 'lcov'],

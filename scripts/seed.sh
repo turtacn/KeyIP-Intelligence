@@ -121,7 +121,7 @@ seed_postgres() {
 
   if [ "${CLEAN}" = true ]; then
     info "  Cleaning existing data..."
-    psql -c "TRUNCATE TABLE molecules, patents, portfolios, claims, inventors, assignees CASCADE" 2>/dev/null || true
+    psql -c "TRUNCATE TABLE molecules, patents, portfolios, patent_claims, patent_inventors CASCADE" 2>/dev/null || true
   fi
 
   # Seed molecules fixture
@@ -132,16 +132,16 @@ seed_postgres() {
       name=$(echo "$mol" | jq -r '.name' | sed "s/'/''/g")
       smiles=$(echo "$mol" | jq -r '.smiles' | sed "s/'/''/g")
       formula=$(echo "$mol" | jq -r '.molecular_formula // ""' | sed "s/'/''/g")
-      psql -c "INSERT INTO molecules (id, name, smiles, molecular_formula, raw_json)
+      psql -c "INSERT INTO molecules (id, name, smiles, molecular_formula, metadata)
                VALUES ('$id', '$name', '$smiles', '$formula', '$(echo "$mol" | sed "s/'/''/g")')
-               ON CONFLICT (id) DO UPDATE SET raw_json = EXCLUDED.raw_json;" 2>/dev/null || true
+               ON CONFLICT (id) DO UPDATE SET metadata = EXCLUDED.metadata;" 2>/dev/null || true
     done
   else
     warn "  jq not found; install jq for structured seeding. Falling back to bulk copy."
     # Minimal fallback: copy the whole file as reference
-    psql -c "CREATE TABLE IF NOT EXISTS _seed_ref (fixture_name text, raw_json jsonb);" 2>/dev/null
+    psql -c "CREATE TABLE IF NOT EXISTS _seed_ref (fixture_name text, metadata jsonb);" 2>/dev/null
     psql -c "TRUNCATE _seed_ref;" 2>/dev/null
-    psql -c "INSERT INTO _seed_ref (fixture_name, raw_json) VALUES ('molecule_fixtures', '$(cat "$MOLECULE_FIXTURES" | sed "s/'/''/g")');" 2>/dev/null || true
+    psql -c "INSERT INTO _seed_ref (fixture_name, metadata) VALUES ('molecule_fixtures', '$(cat "$MOLECULE_FIXTURES" | sed "s/'/''/g")');" 2>/dev/null || true
   fi
 
   # Seed patents fixture
@@ -151,12 +151,12 @@ seed_postgres() {
       pat_id=$(echo "$pat" | jq -r '.id // ""')
       pat_num=$(echo "$pat" | jq -r '.patent_number // ""' | sed "s/'/''/g")
       title=$(echo "$pat" | jq -r '.title // ""' | sed "s/'/''/g")
-      psql -c "INSERT INTO patents (id, patent_number, title, raw_json)
+      psql -c "INSERT INTO patents (id, patent_number, title, raw_data)
                VALUES ('$pat_id', '$pat_num', '$title', '$(echo "$pat" | sed "s/'/''/g")')
-               ON CONFLICT (id) DO UPDATE SET raw_json = EXCLUDED.raw_json;" 2>/dev/null || true
+               ON CONFLICT (id) DO UPDATE SET raw_data = EXCLUDED.raw_data;" 2>/dev/null || true
     done
   else
-    psql -c "INSERT INTO _seed_ref (fixture_name, raw_json) VALUES ('patent_fixtures', '$(cat "$PATENT_FIXTURES" | sed "s/'/''/g")');" 2>/dev/null || true
+    psql -c "INSERT INTO _seed_ref (fixture_name, raw_data) VALUES ('patent_fixtures', '$(cat "$PATENT_FIXTURES" | sed "s/'/''/g")');" 2>/dev/null || true
   fi
 
   ok "PostgreSQL seeding completed."

@@ -87,6 +87,36 @@ func TestCreateIndex_AlreadyExists(t *testing.T) {
 	assert.Equal(t, ErrIndexAlreadyExists, err)
 }
 
+func TestCreateIndex_RaceCondition_AlreadyExists(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "HEAD" {
+			// Index doesn't exist at check time
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.Method == "PUT" {
+			// But between HEAD and PUT, another client created it
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{
+				"error": {
+					"type": "resource_already_exists_exception",
+					"reason": "index [test-index/UUID] already exists",
+					"index": "test-index"
+				},
+				"status": 400
+			}`))
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer server.Close()
+
+	indexer := newTestIndexer(server.URL)
+	err := indexer.CreateIndex(context.Background(), "test-index", common.IndexMapping{})
+	assert.Error(t, err)
+	assert.Equal(t, ErrIndexAlreadyExists, err)
+}
+
 func TestDeleteIndex_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "DELETE" {

@@ -367,11 +367,14 @@ func (i *Indexer) handleErrorResponse(resp *opensearchapi.Response, defaultErr e
 			Reason string `json:"reason"`
 		} `json:"error"`
 	}
-	// Try to decode error
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	// Reset body for potential re-read? No, we consumed it.
 
 	if err := json.Unmarshal(bodyBytes, &errResp); err == nil && errResp.Error.Reason != "" {
+		// Detect race condition where another client created the index between HEAD check and PUT.
+		// This ensures we return the specific AlreadyExists error rather than a generic creation failure.
+		if errResp.Error.Type == "resource_already_exists_exception" {
+			return ErrIndexAlreadyExists
+		}
 		return errors.Wrapf(defaultErr, errors.ErrCodeInternal, "OpenSearch error: %s - %s", errResp.Error.Type, errResp.Error.Reason)
 	}
 
