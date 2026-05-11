@@ -4,15 +4,15 @@ import { ApiResponse } from '../types/api';
 
 export const portfolioService = {
   async getSummary(): Promise<ApiResponse<any>> {
-    return api.get<ApiResponse<any>>('/portfolio/summary');
+    return api.get<ApiResponse<any>>('/portfolios/summary');
   },
 
   async getScores(): Promise<ApiResponse<PortfolioScore>> {
-    return api.get<ApiResponse<PortfolioScore>>('/portfolio/scores');
+    return api.get<ApiResponse<PortfolioScore>>('/portfolios/scores');
   },
 
   async getCoverage(): Promise<ApiResponse<any>> {
-    return api.get<ApiResponse<any>>('/portfolio/coverage');
+    return api.get<ApiResponse<any>>('/portfolios/coverage');
   },
 
   async getConstellation(portfolioId: string): Promise<ConstellationData> {

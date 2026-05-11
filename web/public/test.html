@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API 连接测试 — KeyIP Intelligence</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a; color: #e2e8f0; padding: 24px; min-height: 100vh;
+    }
+    h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 4px; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-bottom: 20px; }
+    .card {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      padding: 16px; margin-bottom: 16px; max-width: 720px;
+    }
+    label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 6px; }
+    input, select {
+      width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #475569;
+      background: #0f172a; color: #e2e8f0; font-size: 0.875rem; font-family: inherit;
+    }
+    input:focus, select:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
+    .row { display: flex; gap: 12px; align-items: flex-end; }
+    .row > * { flex: 1; }
+    button {
+      padding: 8px 20px; border-radius: 6px; border: none; font-size: 0.875rem;
+      font-weight: 500; cursor: pointer; white-space: nowrap; transition: background 0.15s;
+    }
+    .btn-primary { background: #6366f1; color: #fff; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-secondary:hover { background: #475569; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 500; margin-left: 8px;
+    }
+    .badge-ok { background: #065f46; color: #6ee7b7; }
+    .badge-err { background: #7f1d1d; color: #fca5a5; }
+    #status { margin-bottom: 16px; font-size: 0.875rem; }
+    pre {
+      background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+      padding: 12px; font-size: 0.8125rem; overflow-x: auto; max-height: 480px;
+      overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+    }
+    .section-title { font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; margin-top: 16px; }
+    .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 0.8125rem; }
+    .info-grid dt { color: #94a3b8; }
+    .info-grid dd { color: #e2e8f0; }
+    .error-text { color: #f87171; }
+    .footer { margin-top: 24px; font-size: 0.75rem; color: #64748b; }
+    .footer a { color: #818cf8; }
+  </style>
+</head>
+<body>
+  <h1>API 连接测试</h1>
+  <p class="subtitle">KeyIP Intelligence — 后端连通性检查（纯 HTML / 无框架）</p>
+
+  <!-- 连接状态 -->
+  <div id="status">检查中…</div>
+
+  <!-- API 信息 -->
+  <div class="card">
+    <div class="section-title">当前配置</div>
+    <dl class="info-grid">
+      <dt>API 模式</dt><dd id="modeDisplay">—</dd>
+      <dt>API 地址</dt><dd id="baseUrlDisplay">—</dd>
+    </dl>
+  </div>
+
+  <!-- 端点健康检查 -->
+  <div class="card">
+    <div class="section-title">健康检查</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      <button class="btn-secondary" onclick="healthCheck('/api/v1/health')">GET /api/v1/health</button>
+      <button class="btn-secondary" onclick="healthCheck('/api/v1/ready')">GET /api/v1/ready</button>
+    </div>
+    <pre id="healthOutput" style="margin-top:8px;">点击按钮发送请求</pre>
+  </div>
+
+  <!-- 分子相似性搜索 -->
+  <div class="card">
+    <div class="section-title">分子相似性搜索</div>
+    <p style="font-size:0.75rem;color:#94a3b8;margin-bottom:10px;">
+      POST /api/v1/molecules/similarity-search
+    </p>
+    <div class="row">
+      <div>
+        <label for="smiles">SMILES</label>
+        <input id="smiles" type="text" value="CCO" placeholder="e.g. CCO, c1ccccc1" />
+      </div>
+      <div>
+        <label for="threshold">相似度阈值</label>
+        <input id="threshold" type="number" step="0.05" min="0" max="1" value="0.6" />
+      </div>
+      <div>
+        <label for="k">返回数量</label>
+        <input id="k" type="number" min="1" max="100" value="10" />
+      </div>
+    </div>
+    <div style="margin-top:10px;">
+      <button class="btn-primary" id="searchBtn" onclick="similaritySearch()">搜索</button>
+      <button class="btn-secondary" onclick="clearOutput()" style="margin-left:8px;">清除</button>
+    </div>
+    <pre id="searchOutput" style="margin-top:10px;">等待输入</pre>
+  </div>
+
+  <!-- 自定义请求 -->
+  <div class="card">
+    <div class="section-title">自定义请求</div>
+    <div class="row">
+      <div>
+        <label for="customMethod">方法</label>
+        <select id="customMethod">
+          <option>GET</option>
+          <option>POST</option>
+          <option>PUT</option>
+          <option>DELETE</option>
+        </select>
+      </div>
+      <div style="flex:3;">
+        <label for="customPath">路径</label>
+        <input id="customPath" type="text" value="/api/v1/health" placeholder="/api/v1/..." />
+      </div>
+    </div>
+    <div style="margin-top:8px;">
+      <label for="customBody">请求体 (JSON, 可选)</label>
+      <input id="customBody" type="text" placeholder='{"key": "value"}' />
+    </div>
+    <div style="margin-top:10px;">
+      <button class="btn-primary" onclick="customRequest()">发送</button>
+    </div>
+    <pre id="customOutput" style="margin-top:10px;">—</pre>
+  </div>
+
+  <div class="footer">
+    提示：在 <strong>mock</strong> 模式下此页面绕过 MSW，直接请求真实后端。
+    使用 <code>VITE_API_MODE=proxy</code> 或 localStorage
+    <code>keyip-api-mode=proxy</code> 切换模式。
+  </div>
+
+  <script>
+    /* ---- 初始化 ---- */
+    const MODE_BASE_URLS = {
+      mock: '/api/v1',
+      proxy: 'http://localhost:8080/api/v1',
+      live: 'https://api.keyip.io/api/v1',
+    };
+
+    function getApiMode() {
+      const stored = localStorage.getItem('keyip-api-mode');
+      if (stored === 'mock' || stored === 'proxy' || stored === 'live') return stored;
+      // 从 URL 查询参数 ?mode=proxy 覆盖
+      const params = new URLSearchParams(window.location.search);
+      const param = params.get('mode');
+      if (param === 'mock' || param === 'proxy' || param === 'live') return param;
+      return 'mock';
+    }
+
+    function getBaseUrl() {
+      const mode = getApiMode();
+      const manual = MODE_BASE_URLS[mode];
+      return manual || '/api/v1';
+    }
+
+    function updateInfo() {
+      const mode = getApiMode();
+      const baseUrl = getBaseUrl();
+      document.getElementById('modeDisplay').textContent = mode;
+      document.getElementById('baseUrlDisplay').textContent = baseUrl;
+    }
+
+    function setStatus(ok, msg) {
+      const el = document.getElementById('status');
+      el.innerHTML = `<span class="badge ${ok ? 'badge-ok' : 'badge-err'}">${ok ? 'OK' : 'ERR'}</span> ${msg}`;
+    }
+
+    /* ---- 网络请求 ---- */
+    async function apiFetch(url, options = {}) {
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+        ...options,
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = text; }
+      return { ok: res.ok, status: res.status, statusText: res.statusText, data };
+    }
+
+    function formatOutput(result) {
+      const parts = [
+        `HTTP ${result.status} ${result.statusText}${result.ok ? '' : '  ⚠️'}`,
+        '',
+        '--- Response ---',
+        JSON.stringify(result.data, null, 2),
+      ];
+      return parts.join('\n');
+    }
+
+    /* ---- 健康检查 ---- */
+    async function healthCheck(path) {
+      const el = document.getElementById('healthOutput');
+      el.textContent = '请求中…';
+      try {
+        const result = await apiFetch(path);
+        el.textContent = formatOutput(result);
+        setStatus(result.ok, `${path} — ${result.status}`);
+      } catch (err) {
+        el.textContent = `错误: ${err.message}`;
+        setStatus(false, `${path} — ${err.message}`);
+      }
+    }
+
+    /* ---- 相似度搜索 ---- */
+    async function similaritySearch() {
+      const smiles = document.getElementById('smiles').value.trim();
+      if (!smiles) { alert('请输入 SMILES'); return; }
+
+      const threshold = parseFloat(document.getElementById('threshold').value) || 0.6;
+      const k = parseInt(document.getElementById('k').value) || 10;
+      const btn = document.getElementById('searchBtn');
+      const el = document.getElementById('searchOutput');
+
+      btn.disabled = true;
+      el.textContent = '搜索中…';
+
+      try {
+        const result = await apiFetch('/api/v1/molecules/similarity-search', {
+          method: 'POST',
+          body: JSON.stringify({
+            smiles,
+            threshold: Math.min(1, Math.max(0, threshold)),
+            k: Math.min(100, Math.max(1, k)),
+          }),
+        });
+        el.textContent = [
+          `请求: POST /api/v1/molecules/similarity-search`,
+          `Body: ${JSON.stringify({ smiles, threshold, k }, null, 2)}`,
+          '',
+          formatOutput(result),
+        ].join('\n');
+        setStatus(result.ok, `相似度搜索 — ${result.status}`);
+      } catch (err) {
+        el.textContent = `错误: ${err.message}`;
+        setStatus(false, `相似度搜索 — ${err.message}`);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /* ---- 自定义请求 ---- */
+    async function customRequest() {
+      const method = document.getElementById('customMethod').value;
+      const path = document.getElementById('customPath').value.trim();
+      const bodyRaw = document.getElementById('customBody').value.trim();
+      const el = document.getElementById('customOutput');
+
+      if (!path) { alert('请输入路径'); return; }
+
+      el.textContent = '请求中…';
+
+      try {
+        const opts = { method };
+        if (bodyRaw && (method === 'POST' || method === 'PUT')) {
+          opts.body = bodyRaw;
+        }
+        const result = await apiFetch(path, opts);
+        el.textContent = [
+          `请求: ${method} ${path}`,
+          bodyRaw ? `Body: ${bodyRaw}` : '',
+          '',
+          formatOutput(result),
+        ].filter(Boolean).join('\n');
+        setStatus(result.ok, `${method} ${path} — ${result.status}`);
+      } catch (err) {
+        el.textContent = `错误: ${err.message}`;
+        setStatus(false, `${method} ${path} — ${err.message}`);
+      }
+    }
+
+    function clearOutput() {
+      document.getElementById('searchOutput').textContent = '等待输入';
+    }
+
+    /* ---- 启动 ---- */
+    updateInfo();
+    setStatus(true, `API 模式: ${getApiMode()}，基础地址: ${getBaseUrl()}`);
+  </script>
+</body>
+</html>
