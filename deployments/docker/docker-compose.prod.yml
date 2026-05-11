@@ -1,0 +1,81 @@
+# =============================================================================
+# KeyIP-Intelligence - Production Deployment
+# =============================================================================
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Environment variables are loaded from the .env file (see .env.example).
+# This file expects infrastructure services (PostgreSQL, Neo4j, Redis, etc.)
+# to be managed externally or referenced via .env hostnames.
+# =============================================================================
+
+version: "3.9"
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ---------------------------------------------------------------------------
+  # API Server - REST API gateway
+  # ---------------------------------------------------------------------------
+  apiserver:
+    image: ghcr.io/turtacn/keyip-apiserver:${IMAGE_TAG:-latest}
+    container_name: keyip-apiserver
+    restart: unless-stopped
+    ports:
+      - "${APISERVER_PORT:-8080}:8080"
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: ${APISERVER_MEM_LIMIT:-512M}
+          cpus: ${APISERVER_CPU_LIMIT:-1.0}
+        reservations:
+          memory: ${APISERVER_MEM_RESERVE:-256M}
+          cpus: ${APISERVER_CPU_RESERVE:-0.25}
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # ---------------------------------------------------------------------------
+  # Worker - Background job processor
+  # ---------------------------------------------------------------------------
+  worker:
+    image: ghcr.io/turtacn/keyip-worker:${IMAGE_TAG:-latest}
+    container_name: keyip-worker
+    restart: unless-stopped
+    env_file: .env
+    healthcheck:
+      test: ["CMD-SHELL", "pidof worker || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: ${WORKER_MEM_LIMIT:-1G}
+          cpus: ${WORKER_CPU_LIMIT:-2.0}
+        reservations:
+          memory: ${WORKER_MEM_RESERVE:-512M}
+          cpus: ${WORKER_CPU_RESERVE:-0.5}
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+# ---------------------------------------------------------------------------
+# Networks - Expects an externally-managed network
+# ---------------------------------------------------------------------------
+networks:
+  keyip-network:
+    name: keyip-network
+    driver: bridge

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 )
 
 // ---------------------------------------------------------------------------
@@ -936,6 +938,140 @@ func BenchmarkSMILESValidation(b *testing.B) {
 		if err := pp.ValidateSMILES(smiles); err != nil {
 			b.Fatalf("ValidateSMILES failed: %v", err)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Cache integration tests
+// ---------------------------------------------------------------------------
+
+func TestPreprocessSMILES_CachesResults(t *testing.T) {
+	pp, _ := NewGNNPreprocessor(DefaultGNNModelConfig())
+	impl := pp.(*gnnPreprocessorImpl)
+
+	// First call should miss
+	graph1, err := pp.PreprocessSMILES(context.Background(), "CCO")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	stats1 := impl.cache.Stats()
+	if stats1.Hits != 0 || stats1.Misses != 1 {
+		t.Errorf("expected 0 hits, 1 miss after first call, got hits=%d misses=%d", stats1.Hits, stats1.Misses)
+	}
+
+	// Second call with same SMILES should hit cache
+	graph2, err := pp.PreprocessSMILES(context.Background(), "CCO")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	stats2 := impl.cache.Stats()
+	if stats2.Hits != 1 {
+		t.Errorf("expected 1 hit after second call, got %d", stats2.Hits)
+	}
+
+	// Both results should point to the same cached graph
+	if graph1 != graph2 {
+		t.Error("expected cached MolecularGraph to be reused (same pointer)")
+	}
+}
+
+func TestPreprocessSMILES_CacheKeyNormalization(t *testing.T) {
+	pp, _ := NewGNNPreprocessor(DefaultGNNModelConfig())
+	impl := pp.(*gnnPreprocessorImpl)
+
+	// First call with a SMILES should cache it
+	graph1, err := pp.PreprocessSMILES(context.Background(), "CCO")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The cache key should be the normalized SMILES
+	normalized := molecule.NormalizeSMILES("CCO")
+	if _, ok := impl.cache.Get(normalized); !ok {
+		t.Error("expected cache entry under normalized SMILES key")
+	}
+
+	// Second call with same SMILES should hit cache
+	graph2, err := pp.PreprocessSMILES(context.Background(), "CCO")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	stats := impl.cache.Stats()
+	if stats.Hits < 1 {
+		t.Errorf("expected at least 1 cache hit, got %d", stats.Hits)
+	}
+
+	if graph1 != graph2 {
+		t.Error("expected same cached graph for identical SMILES input")
+	}
+}
+
+func TestPreprocessBatch_UsesCache(t *testing.T) {
+	pp, _ := NewGNNPreprocessor(DefaultGNNModelConfig())
+	impl := pp.(*gnnPreprocessorImpl)
+
+	inputs := []MolecularInput{
+		{SMILES: "CCO"},
+		{SMILES: "C"},          // different molecule
+		{SMILES: "CCO"},        // duplicate — should hit cache
+		{SMILES: "c1ccccc1"},
+		{SMILES: "CCO"},        // duplicate — should hit cache
+	}
+
+	results, err := pp.PreprocessBatch(context.Background(), inputs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) != 5 {
+		t.Fatalf("expected 5 results, got %d", len(results))
+	}
+
+	stats := impl.cache.Stats()
+	if stats.Hits < 1 {
+		t.Errorf("expected at least 1 cache hit from duplicates in batch, got %d", stats.Hits)
+	}
+
+	// First and third results should be the same graph (same SMILES)
+	if results[0] != results[2] {
+		t.Error("expected results[0] and results[2] to be the same cached graph (CCO)")
+	}
+	if results[0] != results[4] {
+		t.Error("expected results[0] and results[4] to be the same cached graph (CCO)")
+	}
+}
+
+func TestPreprocessSMILES_CacheDifferentSMILES(t *testing.T) {
+	pp, _ := NewGNNPreprocessor(DefaultGNNModelConfig())
+	impl := pp.(*gnnPreprocessorImpl)
+
+	molecules := []string{"CCO", "C", "c1ccccc1", "CC(=O)O", "C=O"}
+	graphs := make([]*MolecularGraph, len(molecules))
+
+	for i, smi := range molecules {
+		g, err := pp.PreprocessSMILES(context.Background(), smi)
+		if err != nil {
+			t.Fatalf("PreprocessSMILES(%q) failed: %v", smi, err)
+		}
+		graphs[i] = g
+	}
+
+	// All different molecules, so cache should have 5 entries
+	if impl.cache.Len() != len(molecules) {
+		t.Errorf("expected %d cached entries, got %d", len(molecules), impl.cache.Len())
+	}
+
+	// Each molecule should have correct metadata
+	if graphs[0].NumAtoms != 3 || graphs[0].SMILES != "CCO" {
+		t.Errorf("CCO: expected 3 atoms, got %d", graphs[0].NumAtoms)
+	}
+	if graphs[1].NumAtoms != 1 || graphs[1].SMILES != "C" {
+		t.Errorf("C: expected 1 atom, got %d", graphs[1].NumAtoms)
+	}
+	if graphs[2].NumAtoms != 6 || graphs[2].SMILES != "c1ccccc1" {
+		t.Errorf("benzene: expected 6 atoms, got %d", graphs[2].NumAtoms)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"unicode"
 
+	"github.com/turtacn/KeyIP-Intelligence/internal/domain/molecule"
 	"github.com/turtacn/KeyIP-Intelligence/pkg/errors"
 )
 
@@ -192,10 +193,14 @@ func balancedBrackets(s string) bool {
 // gnnPreprocessorImpl
 // ---------------------------------------------------------------------------
 
+// DefaultGraphCacheSize is the default maximum number of MolecularGraph entries to cache.
+const DefaultGraphCacheSize = 10000
+
 // gnnPreprocessorImpl is the production implementation of GNNPreprocessor.
 type gnnPreprocessorImpl struct {
 	config *GNNModelConfig
 	mu     sync.RWMutex
+	cache  *molecule.FingerprintCache // caches MolecularGraph results by SMILES
 }
 
 // NewGNNPreprocessor creates a new preprocessor.
@@ -203,7 +208,10 @@ func NewGNNPreprocessor(config *GNNModelConfig) (GNNPreprocessor, error) {
 	if config == nil {
 		return nil, errors.NewInvalidInputError("config is required")
 	}
-	return &gnnPreprocessorImpl{config: config}, nil
+	return &gnnPreprocessorImpl{
+		config: config,
+		cache:  molecule.NewFingerprintCache(DefaultGraphCacheSize),
+	}, nil
 }
 
 // ValidateSMILES performs lightweight structural validation of a SMILES string.
@@ -249,6 +257,12 @@ func (p *gnnPreprocessorImpl) PreprocessSMILES(ctx context.Context, smiles strin
 		return nil, err
 	}
 
+	// Check cache for existing result
+	normalized := molecule.NormalizeSMILES(smiles)
+	if cached, ok := p.cache.Get(normalized); ok {
+		return cached.(*MolecularGraph), nil
+	}
+
 	atoms, bonds, err := parseSMILES(smiles)
 	if err != nil {
 		return nil, fmt.Errorf("SMILES parsing failed: %w", err)
@@ -290,7 +304,7 @@ func (p *gnnPreprocessorImpl) PreprocessSMILES(ctx context.Context, smiles strin
 	// Global features
 	globalFeatures := computeGlobalFeatures(atoms, bonds)
 
-	return &MolecularGraph{
+	graph := &MolecularGraph{
 		NodeFeatures:   nodeFeatures,
 		EdgeIndex:      edgeIndex,
 		EdgeFeatures:   edgeFeatures,
@@ -298,7 +312,11 @@ func (p *gnnPreprocessorImpl) PreprocessSMILES(ctx context.Context, smiles strin
 		NumAtoms:       len(atoms),
 		NumBonds:       len(bonds),
 		SMILES:         smiles,
-	}, nil
+	}
+
+	// Store in cache
+	p.cache.Set(normalized, graph)
+	return graph, nil
 }
 
 // PreprocessMOL converts a MOL block into a MolecularGraph.

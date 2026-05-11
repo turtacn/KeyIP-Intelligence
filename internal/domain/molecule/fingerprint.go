@@ -1,8 +1,12 @@
 package molecule
 
 import (
+	"container/list"
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -283,10 +287,22 @@ type ChemClient interface {
 // RemoteFingerprintCalculator implements FingerprintCalculator using an external chemical service.
 type RemoteFingerprintCalculator struct {
 	client ChemClient
+	cache  *FingerprintCache
 }
 
 func NewRemoteFingerprintCalculator(client ChemClient) *RemoteFingerprintCalculator {
-	return &RemoteFingerprintCalculator{client: client}
+	return &RemoteFingerprintCalculator{
+		client: client,
+		cache:  NewFingerprintCache(DefaultCacheSize),
+	}
+}
+
+// NewRemoteFingerprintCalculatorWithCache creates a new calculator with a custom cache size.
+func NewRemoteFingerprintCalculatorWithCache(client ChemClient, cacheSize int) *RemoteFingerprintCalculator {
+	return &RemoteFingerprintCalculator{
+		client: client,
+		cache:  NewFingerprintCache(cacheSize),
+	}
 }
 
 func (c *RemoteFingerprintCalculator) Calculate(ctx context.Context, smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) (*Fingerprint, error) {
@@ -297,12 +313,25 @@ func (c *RemoteFingerprintCalculator) Calculate(ctx context.Context, smiles stri
 		return nil, err
 	}
 
+	// Check cache first
+	cacheKey := BuildCacheKey(smiles, fpType, opts)
+	if cached, ok := c.cache.Get(cacheKey); ok {
+		return cached.(*Fingerprint), nil
+	}
+
 	bits, err := c.client.CalculateFingerprint(ctx, smiles, fpType, opts.Radius, opts.NumBits)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to calculate fingerprint via external service")
 	}
 
-	return NewBitFingerprint(fpType, bits, opts.NumBits, opts.Radius)
+	fp, err := NewBitFingerprint(fpType, bits, opts.NumBits, opts.Radius)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrCodeInternal, "failed to create bit fingerprint")
+	}
+
+	// Store in cache
+	c.cache.Set(cacheKey, fp)
+	return fp, nil
 }
 
 func (c *RemoteFingerprintCalculator) BatchCalculate(ctx context.Context, smilesSlice []string, fpType FingerprintType, opts *FingerprintCalcOptions) ([]*Fingerprint, error) {
@@ -336,6 +365,150 @@ func (c *RemoteFingerprintCalculator) SupportedTypes() []FingerprintType {
 
 func (c *RemoteFingerprintCalculator) Standardize(ctx context.Context, smiles string) (canonical string, inchi string, inchiKey string, formula string, weight float64, err error) {
 	return c.client.StandardizeSMILES(ctx, smiles)
+}
+
+// ---------------------------------------------------------------------------
+// Fingerprint Cache (thread-safe with LRU eviction)
+// ---------------------------------------------------------------------------
+
+// DefaultCacheSize is the default maximum number of entries in the fingerprint cache.
+const DefaultCacheSize = 10000
+
+// CacheStats tracks cache performance metrics.
+type CacheStats struct {
+	Hits   int64
+	Misses int64
+}
+
+// HitRate returns the cache hit rate as a float between 0 and 1.
+func (s *CacheStats) HitRate() float64 {
+	total := atomic.LoadInt64(&s.Hits) + atomic.LoadInt64(&s.Misses)
+	if total == 0 {
+		return 0
+	}
+	return float64(atomic.LoadInt64(&s.Hits)) / float64(total)
+}
+
+// cacheEntry holds a cached value and its position in the LRU list.
+type cacheEntry struct {
+	value   interface{}
+	element *list.Element
+}
+
+// FingerprintCache is a thread-safe LRU cache for molecular fingerprints.
+// It uses sync.Map for concurrent lookups and a linked list for LRU eviction.
+//
+// When the cache exceeds maxSize, the least recently used entry is evicted.
+// Cache hit/miss statistics are maintained for performance monitoring.
+type FingerprintCache struct {
+	store   sync.Map   // string key -> *cacheEntry
+	lruList *list.List // ordered list for LRU eviction (elements store keys as strings)
+	mu      sync.Mutex // protects lruList and eviction logic
+	maxSize int
+	stats   CacheStats
+}
+
+// NewFingerprintCache creates a new cache with the given maximum size.
+// If maxSize <= 0, DefaultCacheSize is used.
+func NewFingerprintCache(maxSize int) *FingerprintCache {
+	if maxSize <= 0 {
+		maxSize = DefaultCacheSize
+	}
+	return &FingerprintCache{
+		lruList: list.New(),
+		maxSize: maxSize,
+	}
+}
+
+// Get retrieves a value from the cache. Returns (nil, false) if not found.
+// On a cache hit, the entry is promoted to the front of the LRU list.
+func (c *FingerprintCache) Get(key string) (interface{}, bool) {
+	entry, ok := c.store.Load(key)
+	if !ok {
+		atomic.AddInt64(&c.stats.Misses, 1)
+		return nil, false
+	}
+
+	atomic.AddInt64(&c.stats.Hits, 1)
+
+	ce := entry.(*cacheEntry)
+	// Promote to front of LRU list
+	c.mu.Lock()
+	if ce.element != nil {
+		c.lruList.MoveToFront(ce.element)
+	}
+	c.mu.Unlock()
+
+	return ce.value, true
+}
+
+// Set adds a value to the cache. If an entry with the same key already exists,
+// it is updated and promoted to the front. If the cache is full, the least
+// recently used entry is evicted.
+func (c *FingerprintCache) Set(key string, value interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Remove existing entry's list element if present
+	if existing, ok := c.store.Load(key); ok {
+		ce := existing.(*cacheEntry)
+		if ce.element != nil {
+			c.lruList.Remove(ce.element)
+		}
+	}
+
+	// Add new entry
+	ce := &cacheEntry{value: value}
+	ce.element = c.lruList.PushFront(key)
+	c.store.Store(key, ce)
+
+	// Evict LRU entries if over capacity
+	for c.lruList.Len() > c.maxSize {
+		back := c.lruList.Back()
+		if back == nil {
+			break
+		}
+		evictKey := back.Value.(string)
+		c.lruList.Remove(back)
+		c.store.Delete(evictKey)
+	}
+}
+
+// Stats returns a snapshot of the current cache statistics.
+func (c *FingerprintCache) Stats() CacheStats {
+	return CacheStats{
+		Hits:   atomic.LoadInt64(&c.stats.Hits),
+		Misses: atomic.LoadInt64(&c.stats.Misses),
+	}
+}
+
+// Len returns the current number of entries in the cache.
+func (c *FingerprintCache) Len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.lruList.Len()
+}
+
+// NormalizeSMILES produces a canonical form of a SMILES string for use as a cache key.
+// It trims whitespace to ensure that "CCO" and "  CCO  " produce the same key.
+// In production, this would delegate to RDKit for full canonicalization.
+func NormalizeSMILES(smiles string) string {
+	return strings.TrimSpace(smiles)
+}
+
+// BuildCacheKey builds a deterministic cache key for fingerprint lookup.
+// The key incorporates the normalized SMILES, fingerprint type, and calculation options
+// so that different parameter combinations produce distinct cache entries.
+func BuildCacheKey(smiles string, fpType FingerprintType, opts *FingerprintCalcOptions) string {
+	var sb strings.Builder
+	sb.WriteString(NormalizeSMILES(smiles))
+	sb.WriteString("|")
+	sb.WriteString(string(fpType))
+	if opts != nil {
+		sb.WriteString(fmt.Sprintf("|%d|%d|%t|%t",
+			opts.Radius, opts.NumBits, opts.UseChirality, opts.UseFeatures))
+	}
+	return sb.String()
 }
 
 // FingerprintCalcOptions defines configuration for fingerprint calculation.

@@ -62,6 +62,8 @@ type WSHandler struct {
 
 // wsClient represents a single connected WebSocket client.
 type wsClient struct {
+	mu      sync.Mutex
+	closed  bool
 	handler *WSHandler
 	conn    *websocket.Conn
 	send    chan []byte
@@ -126,10 +128,18 @@ func (h *WSHandler) Broadcast(msg WSMessage) {
 		if !ok {
 			return true
 		}
+
+		c.mu.Lock()
+		if c.closed {
+			c.mu.Unlock()
+			return true
+		}
 		select {
 		case c.send <- data:
+			c.mu.Unlock()
 		default:
 			// Client's send buffer is full; drop the slow client.
+			c.mu.Unlock()
 			h.logger.Warn("websocket client send buffer full, dropping client")
 			h.removeClient(c)
 		}
@@ -157,10 +167,16 @@ func (h *WSHandler) clientCount() int {
 }
 
 // removeClient removes a client from the registry and signals the write pump
-// to close the connection by closing the send channel.
+// to close the connection by closing the send channel. It is safe to call
+// concurrently from multiple goroutines.
 func (h *WSHandler) removeClient(c *wsClient) {
 	h.clients.Delete(c)
-	close(c.send)
+	c.mu.Lock()
+	if !c.closed {
+		close(c.send)
+		c.closed = true
+	}
+	c.mu.Unlock()
 }
 
 // readPump reads messages from the WebSocket connection.

@@ -1,7 +1,9 @@
 package molecule
 
 import (
+	"fmt"
 	"math"
+	"sync"
 	"testing"
 )
 
@@ -351,6 +353,302 @@ func BenchmarkWeightedAverageFusion(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Fuse failed: %v", err)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Cache tests
+// ---------------------------------------------------------------------------
+
+func TestNormalizeSMILES(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"CCO", "CCO"},
+		{"  CCO  ", "CCO"},
+		{"\tCCO\n", "CCO"},
+		{"", ""},
+		{"  ", ""},
+		{"c1ccccc1", "c1ccccc1"},
+	}
+	for _, tt := range tests {
+		got := NormalizeSMILES(tt.input)
+		if got != tt.want {
+			t.Errorf("NormalizeSMILES(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestBuildCacheKey(t *testing.T) {
+	t.Parallel()
+	opts := &FingerprintCalcOptions{Radius: 2, NumBits: 2048, UseChirality: false, UseFeatures: false}
+	key := BuildCacheKey("CCO", FingerprintMorgan, opts)
+	if key == "" {
+		t.Fatal("BuildCacheKey returned empty string")
+	}
+	// Same inputs should produce identical keys
+	key2 := BuildCacheKey("CCO", FingerprintMorgan, opts)
+	if key != key2 {
+		t.Errorf("cache key not deterministic: %q vs %q", key, key2)
+	}
+	// Normalized SMILES: different whitespace should produce same key
+	key3 := BuildCacheKey("  CCO  ", FingerprintMorgan, opts)
+	if key != key3 {
+		t.Errorf("cache key should ignore whitespace: %q vs %q", key, key3)
+	}
+	// Different types should produce different keys
+	key4 := BuildCacheKey("CCO", FingerprintMACCS, opts)
+	if key == key4 {
+		t.Error("different fingerprint types should produce different keys")
+	}
+	// Different options should produce different keys
+	opts2 := &FingerprintCalcOptions{Radius: 3, NumBits: 2048}
+	key5 := BuildCacheKey("CCO", FingerprintMorgan, opts2)
+	if key == key5 {
+		t.Error("different options should produce different keys")
+	}
+	// Nil opts is handled gracefully
+	key6 := BuildCacheKey("CCO", FingerprintMorgan, nil)
+	if key6 == "" {
+		t.Error("BuildCacheKey with nil opts returned empty")
+	}
+}
+
+func TestFingerprintCache_GetSet(t *testing.T) {
+	cache := NewFingerprintCache(3)
+
+	// Get on empty cache
+	_, ok := cache.Get("nonexistent")
+	if ok {
+		t.Error("expected miss for nonexistent key")
+	}
+
+	// Set and Get
+	cache.Set("key1", "value1")
+	val, ok := cache.Get("key1")
+	if !ok {
+		t.Fatal("expected hit for key1")
+	}
+	if val.(string) != "value1" {
+		t.Errorf("got %v, want value1", val)
+	}
+
+	// Update existing key
+	cache.Set("key1", "value1_updated")
+	val, ok = cache.Get("key1")
+	if !ok {
+		t.Fatal("expected hit for updated key1")
+	}
+	if val.(string) != "value1_updated" {
+		t.Errorf("got %v, want value1_updated", val)
+	}
+}
+
+func TestFingerprintCache_Len(t *testing.T) {
+	cache := NewFingerprintCache(10)
+	if cache.Len() != 0 {
+		t.Errorf("expected Len 0, got %d", cache.Len())
+	}
+	cache.Set("a", 1)
+	if cache.Len() != 1 {
+		t.Errorf("expected Len 1, got %d", cache.Len())
+	}
+	cache.Set("b", 2)
+	if cache.Len() != 2 {
+		t.Errorf("expected Len 2, got %d", cache.Len())
+	}
+	// Update should not change length
+	cache.Set("a", 10)
+	if cache.Len() != 2 {
+		t.Errorf("expected Len 2 after update, got %d", cache.Len())
+	}
+}
+
+func TestFingerprintCache_LRUEviction(t *testing.T) {
+	cache := NewFingerprintCache(3)
+
+	cache.Set("a", 1)
+	cache.Set("b", 2)
+	cache.Set("c", 3)
+
+	// Cache is full. Access "a" to make it most recently used.
+	cache.Get("a") // promote
+
+	// Add "d" → "b" should be evicted (oldest)
+	cache.Set("d", 4)
+
+	_, ok := cache.Get("a")
+	if !ok {
+		t.Error("expected 'a' to still be in cache (was promoted)")
+	}
+
+	_, ok = cache.Get("b")
+	if ok {
+		t.Error("expected 'b' to be evicted (LRU)")
+	}
+
+	_, ok = cache.Get("c")
+	if !ok {
+		t.Error("expected 'c' to still be in cache")
+	}
+
+	_, ok = cache.Get("d")
+	if !ok {
+		t.Error("expected 'd' to be in cache")
+	}
+}
+
+func TestFingerprintCache_Stats(t *testing.T) {
+	cache := NewFingerprintCache(10)
+
+	stats := cache.Stats()
+	if stats.Hits != 0 || stats.Misses != 0 {
+		t.Errorf("expected zero stats, got hits=%d misses=%d", stats.Hits, stats.Misses)
+	}
+	if stats.HitRate() != 0.0 {
+		t.Errorf("expected hit rate 0, got %f", stats.HitRate())
+	}
+
+	// Miss
+	cache.Get("miss")
+	stats = cache.Stats()
+	_ = stats.HitRate() // no error, just exercise
+	if stats.Misses != 1 {
+		t.Errorf("expected 1 miss, got %d", stats.Misses)
+	}
+	if stats.HitRate() != 0.0 {
+		t.Errorf("expected hit rate 0.0, got %f", stats.HitRate())
+	}
+
+	// Hit
+	cache.Set("hit", 1)
+	cache.Get("hit")
+	stats = cache.Stats()
+	if stats.Hits != 1 {
+		t.Errorf("expected 1 hit, got %d", stats.Hits)
+	}
+	if stats.Misses != 1 {
+		t.Errorf("expected 1 miss, got %d", stats.Misses)
+	}
+
+	// Hit rate: 1 hit / (1 hit + 1 miss) = 0.5
+	expectedRate := 0.5
+	if stats.HitRate() != expectedRate {
+		t.Errorf("expected hit rate %f, got %f", expectedRate, stats.HitRate())
+	}
+}
+
+func TestFingerprintCache_ConcurrentAccess(t *testing.T) {
+	cache := NewFingerprintCache(100)
+	var wg sync.WaitGroup
+
+	// Concurrent writers
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			key := fmt.Sprintf("key_%d", i%10)
+			cache.Set(key, i)
+		}(i)
+	}
+
+	// Concurrent readers
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			key := fmt.Sprintf("key_%d", i%10)
+			cache.Get(key)
+		}(i)
+	}
+
+	wg.Wait()
+	// After concurrent access, cache should still be in a consistent state
+	stats := cache.Stats()
+	_ = stats.HitRate()
+}
+
+func TestFingerprintCache_DefaultSize(t *testing.T) {
+	cache := NewFingerprintCache(0) // should use default
+	// Fill beyond default to verify it's large enough
+	for i := 0; i < 100; i++ {
+		cache.Set(fmt.Sprintf("k%d", i), i)
+	}
+	if cache.Len() != 100 {
+		t.Errorf("expected 100 entries, got %d (default size too small?)", cache.Len())
+	}
+	// Verify oldest entries are still present
+	val, ok := cache.Get("k0")
+	if !ok {
+		t.Error("expected k0 to be in cache after 100 inserts with default 10000 size")
+	}
+	if val.(int) != 0 {
+		t.Errorf("expected 0, got %v", val)
+	}
+
+	cache2 := NewFingerprintCache(-5) // negative should also use default
+	cache2.Set("test", 1)
+	if cache2.Len() != 1 {
+		t.Errorf("expected Len 1, got %d", cache2.Len())
+	}
+}
+
+func TestFingerprintCache_UpdatePreservesOrder(t *testing.T) {
+	cache := NewFingerprintCache(3)
+
+	// Fill cache
+	cache.Set("a", 1)
+	cache.Set("b", 2)
+	cache.Set("c", 3)
+
+	// Update "a" - should move to front
+	cache.Set("a", 10)
+
+	// Add "d" → "b" should be evicted (now LRU)
+	cache.Set("d", 4)
+
+	_, ok := cache.Get("b")
+	if ok {
+		t.Error("expected 'b' to be evicted after update reorder")
+	}
+
+	_, ok = cache.Get("a")
+	if !ok {
+		t.Error("expected 'a' to still be in cache after update")
+	}
+}
+
+func TestRemoteFingerprintCalculator_WithCache(t *testing.T) {
+	// Test that the calculator creates with cache
+	calc := NewRemoteFingerprintCalculator(nil)
+	if calc.cache == nil {
+		t.Error("expected non-nil cache in RemoteFingerprintCalculator")
+	}
+	if calc.cache.Len() != 0 {
+		t.Errorf("expected empty cache, got Len %d", calc.cache.Len())
+	}
+
+	calc2 := NewRemoteFingerprintCalculatorWithCache(nil, 500)
+	if calc2.cache == nil {
+		t.Error("expected non-nil cache in NewRemoteFingerprintCalculatorWithCache")
+	}
+	// Fill cache to verify size
+	for i := 0; i < 500; i++ {
+		calc2.cache.Set(fmt.Sprintf("k%d", i), i)
+	}
+	if calc2.cache.Len() != 500 {
+		t.Errorf("expected 500 entries, got %d", calc2.cache.Len())
+	}
+	// Adding one more should evict oldest
+	calc2.cache.Set("overflow", 999)
+	if calc2.cache.Len() != 500 {
+		t.Errorf("expected 500 entries after overflow, got %d", calc2.cache.Len())
+	}
+	// k0 should be evicted (LRU)
+	if _, ok := calc2.cache.Get("k0"); ok {
+		t.Error("expected k0 to be evicted after overflow")
 	}
 }
 
