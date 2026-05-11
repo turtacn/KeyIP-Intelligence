@@ -6,6 +6,21 @@ import { visualizer } from 'rollup-plugin-visualizer'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
+    // Dev-server startup log: prints resolved API mode
+    {
+      name: 'api-mode-log',
+      configureServer() {
+        const mode = process.env.VITE_API_MODE || 'mock';
+        console.log(`\n  🚀  API mode: ${mode}`);
+        console.log(`  📡  Base URL: ${
+          mode === 'mock'
+            ? '/api/v1 (MSW)'
+            : mode === 'proxy'
+            ? 'http://localhost:8080/api/v1'
+            : 'https://api.keyip.io/api/v1'
+        }\n`);
+      },
+    },
     react(),
     ...(process.env.ANALYZE === 'true'
       ? [

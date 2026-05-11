@@ -181,6 +181,80 @@ search:
     compress_request_body: true
 ```
 
+### OpenSearch 索引初始化
+
+容器启动后，运行初始化脚本自动创建索引 mapping、别名并设置刷新间隔：
+
+```bash
+# 等待 OpenSearch 完全就绪后执行初始化
+./scripts/init-opensearch.sh
+
+# 仅健康检查
+./scripts/init-opensearch.sh --check-only
+
+# 删除现有索引并重建
+./scripts/init-opensearch.sh --recreate
+```
+
+**前置条件**：
+
+- OpenSearch 容器已启动（参考上方 docker 命令）
+- `curl` 和 `jq` 已安装
+- [IK Analysis 插件](https://github.com/medcl/elasticsearch-analysis-ik) 用于中文分词（可选，缺失时回退到 standard 分析器）
+
+**初始化内容**：
+
+| 资源 | 名称 | 说明 |
+|------|------|------|
+| 索引 | `patents-v1` | 专利全文索引（title/abstract/claims CJK 分析） |
+| 索引 | `molecules-v1` | 分子结构索引（SMILES/InChI/名称） |
+| 别名 | `patents -> patents-v1` | 应用层读/写别名 |
+| 别名 | `molecules -> molecules-v1` | 应用层读/写别名 |
+| 刷新间隔 | `30s` | 批量写入后定时刷新 |
+
+**索引 mapping 概览**：
+
+- **专利索引** — `title` / `abstract` 使用 `ik_max_word` + `ik_smart` 分词，支持 BM25 全文检索和 CJK 混合查询。字段包括专利号、标题、摘要、权利要求、申请人、发明人、日期、IPC/CPC 分类、法律状态、引用专利、专利族。
+- **分子索引** — `smiles` / `inchi` / `inchi_key` 使用 keyword 精确匹配，`name` 支持全文检索。字段包括分子式、分子量、精确质量、同义词、来源专利、指纹（binary）。
+
+**环境变量覆写**：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `OPENSEARCH_URL` | `http://localhost:9200` | OpenSearch 地址 |
+| `OPENSEARCH_AUTH` | (空) | Basic Auth 参数（如 `-u admin:admin`） |
+| `PATENT_INDEX` | `patents-v1` | 专利索引名称 |
+| `MOLECULE_INDEX` | `molecules-v1` | 分子索引名称 |
+| `PATENT_ALIAS` | `patents` | 专利别名名称 |
+| `MOLECULE_ALIAS` | `molecules` | 分子别名名称 |
+| `REFRESH_INTERVAL` | `30s` | 索引刷新间隔 |
+
+**验证初始化**：
+
+```bash
+# 查看索引列表
+curl -s http://localhost:9200/_cat/indices?v
+
+# 查看别名映射
+curl -s http://localhost:9200/_alias | jq .
+
+# 测试专利索引写入
+curl -s -X POST http://localhost:9200/patents/_doc \
+  -H 'Content-Type: application/json' \
+  -d '{"patent_number":"TEST001","title":"测试专利","abstract":"一种示例技术方案"}' | jq .
+
+# 测试分子索引写入
+curl -s -X POST http://localhost:9200/molecules/_doc \
+  -H 'Content-Type: application/json' \
+  -d '{"smiles":"CCO","name":"乙醇","molecular_formula":"C2H6O","molecular_weight":46.07}' | jq .
+```
+
+**脚本说明**：
+- 幂等设计，可重复执行不会产生重复资源
+- alias 使用 `is_write_index: true`，确保别名指向唯一写索引
+- mapping 设置 `dynamic: strict`，防止意外字段写入导致 schema 膨胀
+- mapping 定义与 `internal/infrastructure/search/opensearch/indexer.go` 中的 `PatentIndexMapping()` / `MoleculeIndexMapping()` 保持一致
+
 ---
 
 ## 5. Milvus 2.4（独立模式）
