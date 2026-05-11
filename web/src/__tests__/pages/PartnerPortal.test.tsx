@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import PartnerPortal from '@/pages/PartnerPortal';
@@ -85,8 +84,8 @@ describe('PartnerPortal', () => {
 
     // Click on Agency view
     fireEvent.click(screen.getByText('partners.nav.agency'));
-    // Agency view should show its title
-    expect(screen.getByText('partners.agency.title')).toBeInTheDocument();
+    // Agency view should show task title or upload hint
+    expect(screen.getByText('partners.agency.tasks_title')).toBeInTheDocument();
 
     // Click on Counsel view
     fireEvent.click(screen.getByText('partners.nav.counsel'));
@@ -94,7 +93,8 @@ describe('PartnerPortal', () => {
 
     // Click on API Portal view
     fireEvent.click(screen.getByText('partners.nav.api'));
-    expect(screen.getByText('partners.api.title')).toBeInTheDocument();
+    // API Portal shows doc title and intro
+    expect(screen.getByText('partners.api.doc_title')).toBeInTheDocument();
 
     // Click back to Admin — partner data should still render
     fireEvent.click(screen.getByText('partners.nav.admin'));

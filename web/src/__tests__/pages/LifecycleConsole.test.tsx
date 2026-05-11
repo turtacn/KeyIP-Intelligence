@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import LifecycleConsole from '@/pages/LifecycleConsole';
@@ -49,7 +48,7 @@ describe('LifecycleConsole', () => {
     vi.clearAllMocks();
   });
 
-  it('shows loading state initially', () => {
+  it('shows skeleton loading in content area while loading', () => {
     mockUseLifecycle.mockReturnValue({
       data: null,
       loading: true,
@@ -59,11 +58,11 @@ describe('LifecycleConsole', () => {
 
     const { container } = render(<LifecycleConsole />);
 
-    // Should show SkeletonTable (animate-pulse elements with aria-hidden)
+    // Title and tabs ARE rendered even during loading (only tab content shows skeleton)
+    expect(screen.getByText('lifecycle.title')).toBeInTheDocument();
+    expect(screen.getByText('lifecycle.tabs.calendar')).toBeInTheDocument();
+    // Tab content area should show SkeletonTable with animate-pulse
     expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
-    // Should NOT show the title nor tabs when loading
-    expect(screen.queryByText('lifecycle.title')).not.toBeInTheDocument();
-    expect(screen.queryByText('lifecycle.tabs.calendar')).not.toBeInTheDocument();
   });
 
   it('renders lifecycle console with event data', () => {
@@ -76,9 +75,10 @@ describe('LifecycleConsole', () => {
 
     render(<LifecycleConsole />);
 
-    // Title and export button should be visible
+    // Title should be visible
     expect(screen.getByText('lifecycle.title')).toBeInTheDocument();
-    expect(screen.getByText('lifecycle.calendar.export')).toBeInTheDocument();
+    // Export button appears in header (and possibly elsewhere), so use getAllByText
+    expect(screen.getAllByText('lifecycle.calendar.export').length).toBeGreaterThanOrEqual(1);
 
     // Tabs should be rendered
     expect(screen.getByText('lifecycle.tabs.calendar')).toBeInTheDocument();
@@ -91,9 +91,10 @@ describe('LifecycleConsole', () => {
     expect(screen.getByText('pat_005')).toBeInTheDocument();
 
     // Jurisdictions should appear
-    expect(screen.getByText('CN')).toBeInTheDocument();
-    expect(screen.getByText('US')).toBeInTheDocument();
-    expect(screen.getByText('KR')).toBeInTheDocument();
+    // Jurisdictions appear in both filter panel and data table
+    expect(screen.getAllByText('CN').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('US').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('KR').length).toBeGreaterThanOrEqual(1);
   });
 
   it('switches between tabs', () => {
@@ -109,17 +110,21 @@ describe('LifecycleConsole', () => {
     // Click on annuity tab
     fireEvent.click(screen.getByText('lifecycle.tabs.annuity'));
 
-    // Annuity events should be shown (only annuity_due filtered)
-    // The AnnuityManager filters for eventType === 'annuity_due'
-    // Only le_001 is annuity_due
+    // AnnuityManager filters for eventType === 'annuity_due'
+    // Only le_001 is annuity_due, so only pat_001 should appear
     expect(screen.getByText('pat_001')).toBeInTheDocument();
     // Table header for fee amount
     expect(screen.getByText('lifecycle.annuity.fee_amount')).toBeInTheDocument();
 
     // Click on status tab
     fireEvent.click(screen.getByText('lifecycle.tabs.status'));
-    // LegalStatusMonitor should show status-related content
-    expect(screen.getByText('lifecycle.table.patent_id')).toBeInTheDocument();
+    // LegalStatusMonitor renders patent IDs as card headings
+    expect(screen.getByText('pat_001')).toBeInTheDocument();
+    expect(screen.getByText('pat_002')).toBeInTheDocument();
+    // Should show jurisdiction office labels
+    // CNIPA appears in all 3 patent cards, USPTO also appears 3 times
+    expect(screen.getAllByText('CNIPA').length).toBe(3);
+    expect(screen.getAllByText('USPTO').length).toBe(3);
   });
 
   it('shows error state when data fetch fails', () => {
@@ -143,7 +148,7 @@ describe('LifecycleConsole', () => {
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 
-  it('shows empty state when no events match', () => {
+  it('shows empty table when no events match', () => {
     mockUseLifecycle.mockReturnValue({
       data: [],
       loading: false,
@@ -155,21 +160,29 @@ describe('LifecycleConsole', () => {
 
     // Title and tabs should render
     expect(screen.getByText('lifecycle.title')).toBeInTheDocument();
-    // The DeadlineTable should render with no rows, showing only column headers
+    // The DeadlineTable should render with column headers
     expect(screen.getByText('lifecycle.table.patent_id')).toBeInTheDocument();
     expect(screen.getByText('lifecycle.table.jurisdiction')).toBeInTheDocument();
+    // No patent IDs should appear (empty data)
+    expect(screen.queryByText('pat_001')).not.toBeInTheDocument();
   });
 
   it('triggers CSV export when export button is clicked', () => {
-    // Mock createElement and click for CSV download
-    const createElementSpy = vi.spyOn(document, 'createElement');
+    // Use a real anchor element for createElement to avoid appendChild errors
+    const originalCreateElement = document.createElement.bind(document);
     const clickSpy = vi.fn();
-    createElementSpy.mockReturnValue({
-      setAttribute: vi.fn(),
-      click: clickSpy,
-      href: '',
-      download: '',
-    } as unknown as HTMLAnchorElement);
+    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      const el = originalCreateElement(tagName, options);
+      if (tagName === 'a') {
+        // Wrap the click to spy on it
+        const originalClick = el.click.bind(el);
+        el.click = () => {
+          clickSpy();
+          originalClick();
+        };
+      }
+      return el;
+    });
 
     mockUseLifecycle.mockReturnValue({
       data: mockEvents,
@@ -180,10 +193,10 @@ describe('LifecycleConsole', () => {
 
     render(<LifecycleConsole />);
 
-    const exportButton = screen.getByText('lifecycle.calendar.export');
+    const exportButton = screen.getAllByText('lifecycle.calendar.export')[0];
     fireEvent.click(exportButton);
 
-    // Should have created a download link
+    // Should have created a download link and triggered click
     expect(createElementSpy).toHaveBeenCalledWith('a');
     expect(clickSpy).toHaveBeenCalled();
 
