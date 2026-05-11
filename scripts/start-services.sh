@@ -17,16 +17,19 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# ---- 工具函数 ----
+_log()  { echo -e "${GREEN}[INFO]${NC}  $*"; }
+_warn() { echo -e "${YELLOW}[WARN]${NC}  $*"; }
+_fail() { echo -e "${RED}[FAIL]${NC}  $*"; exit 1; }
+
 # ---- docker-machine 检测 ----
 IS_DOCKER_MACHINE=false
 # 检查多种 docker-machine 特征
-if [ -n "${DOCKER_MACHINE_NAME:-}" ] || \
-   [ -n "${DOCKER_HOST:-}" ] && echo "$DOCKER_HOST" | grep -q "192\.168\.99\.\|docker-machine" ; then
+if [ -n "${DOCKER_MACHINE_NAME:-}" ]; then
+  IS_DOCKER_MACHINE=true
+elif [ -n "${DOCKER_HOST:-}" ] && echo "$DOCKER_HOST" | grep -q "192\.168\.99\.\|docker-machine" ; then
   IS_DOCKER_MACHINE=true
 elif docker info 2>/dev/null | grep -qi "docker-machine\|boot2docker"; then
-  IS_DOCKER_MACHINE=true
-elif uname -s | grep -q "Darwin" && ! docker info 2>/dev/null | grep -qi "Docker Desktop"; then
-  # macOS 上用了 docker 但不是 Docker Desktop → 大概率是 docker-machine
   IS_DOCKER_MACHINE=true
 fi
 _log "检测到 IS_DOCKER_MACHINE=$IS_DOCKER_MACHINE"
@@ -50,12 +53,6 @@ else
   OS_MEM="512m"
   MILVUS_MEM="512m"
 fi
-
-_log()  { echo -e "${GREEN}[INFO]${NC}  $*"; }
-_warn() { echo -e "${YELLOW}[WARN]${NC}  $*"; }
-_fail() { echo -e "${RED}[FAIL]${NC}  $*"; exit 1; }
-
-# ---- 创建共享网络 ----
 create_network() {
   if ! docker network inspect "$NETWORK" >/dev/null 2>&1; then
     _log "创建 Docker 网络: $NETWORK"
