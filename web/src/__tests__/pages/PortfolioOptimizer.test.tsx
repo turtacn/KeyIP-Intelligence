@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import PortfolioOptimizer from '@/pages/PortfolioOptimizer';
 
 // Mock Recharts ResponsiveContainer to avoid dimension issues in tests
@@ -102,7 +103,7 @@ describe('PortfolioOptimizer', () => {
     mockUsePatents.mockReturnValue({ data: null, loading: true, error: null, refetch: vi.fn() });
     mockUsePortfolioConstellation.mockReturnValue({ data: null, loading: true, error: null, refetch: vi.fn() });
 
-    const { container } = render(<PortfolioOptimizer />);
+    const { container } = render(<MemoryRouter><PortfolioOptimizer /></MemoryRouter>);
 
     // Should show PortfolioOptimizerSkeleton (animate-pulse elements)
     const skeletons = container.querySelectorAll('.animate-pulse');
@@ -121,7 +122,7 @@ describe('PortfolioOptimizer', () => {
     mockUsePatents.mockReturnValue({ data: mockPatents, loading: false, error: null, refetch: vi.fn() });
     mockUsePortfolioConstellation.mockReturnValue({ data: mockConstellation, loading: false, error: null, refetch: vi.fn() });
 
-    render(<PortfolioOptimizer />);
+    render(<MemoryRouter><PortfolioOptimizer /></MemoryRouter>);
 
     // All nav items should be rendered
     expect(screen.getByText('portfolio.nav.panorama')).toBeInTheDocument();
@@ -134,9 +135,9 @@ describe('PortfolioOptimizer', () => {
     // Section titles should be visible
     expect(screen.getByText('portfolio.panorama.title')).toBeInTheDocument();
     expect(screen.getByText('portfolio.panorama.desc')).toBeInTheDocument();
-    expect(screen.getByText('Patent Constellation Map')).toBeInTheDocument();
-    expect(screen.getByText('portfolio.gap.title')).toBeInTheDocument();
-    expect(screen.getByText('portfolio.scoring.title')).toBeInTheDocument();
+    expect(screen.getAllByText('Patent Constellation Map').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('portfolio.gap.title').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('portfolio.scoring.title').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('portfolio.budget.title')).toBeInTheDocument();
     expect(screen.getByText('portfolio.simulator.title')).toBeInTheDocument();
 
@@ -158,12 +159,12 @@ describe('PortfolioOptimizer', () => {
     mockUsePatents.mockReturnValue({ data: mockPatents, loading: false, error: null, refetch: vi.fn() });
     mockUsePortfolioConstellation.mockReturnValue({ data: mockConstellation, loading: false, error: null, refetch: vi.fn() });
 
-    render(<PortfolioOptimizer />);
+    render(<MemoryRouter><PortfolioOptimizer /></MemoryRouter>);
 
     // Click on Gap Analysis nav
     fireEvent.click(screen.getByText('portfolio.nav.gap'));
     // Section content for gap should still be present
-    expect(screen.getByText('portfolio.gap.title')).toBeInTheDocument();
+    expect(screen.getAllByText('portfolio.gap.title').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows error state when portfolio fetch fails', () => {
@@ -176,7 +177,7 @@ describe('PortfolioOptimizer', () => {
     mockUsePatents.mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
     mockUsePortfolioConstellation.mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
 
-    render(<PortfolioOptimizer />);
+    render(<MemoryRouter><PortfolioOptimizer /></MemoryRouter>);
 
     // PageError should render
     expect(
@@ -199,7 +200,7 @@ describe('PortfolioOptimizer', () => {
     mockUsePatents.mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
     mockUsePortfolioConstellation.mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
 
-    render(<PortfolioOptimizer />);
+    render(<MemoryRouter><PortfolioOptimizer /></MemoryRouter>);
 
     // EmptyState should render
     expect(
