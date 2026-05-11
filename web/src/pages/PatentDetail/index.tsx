@@ -8,7 +8,7 @@ import Badge from '../../components/ui/Badge';
 import StatusBadge from '../../components/ui/StatusBadge';
 import Button from '../../components/ui/Button';
 import PageError from '../../components/ui/PageError';
-import { SkeletonCard, SkeletonLine } from '../../components/ui/Skeleton';
+import PatentDetailSkeleton from './Skeleton';
 import EmptyState from '../../components/ui/EmptyState';
 import FamilyTree from '../../components/visualization/FamilyTree';
 import { ArrowLeft, ExternalLink, FileText } from 'lucide-react';
@@ -66,30 +66,7 @@ const PatentDetail: React.FC = () => {
   }, [id]);
 
   if (loading) {
-    return (
-      <div className="space-y-6 pb-12">
-        {/* Back button skeleton */}
-        <div className="animate-pulse h-4 w-16 bg-slate-200 rounded" />
-
-        {/* Header skeleton */}
-        <div className="animate-pulse space-y-3">
-          <div className="h-8 w-3/4 bg-slate-200 rounded" />
-          <SkeletonLine width="40%" />
-        </div>
-
-        {/* Summary card skeleton */}
-        <SkeletonCard rows={2} className="h-32" />
-
-        {/* Abstract skeleton */}
-        <SkeletonCard rows={4} className="h-40" />
-
-        {/* Two-column skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SkeletonCard rows={3} className="h-32" />
-          <SkeletonCard rows={3} className="h-32" />
-        </div>
-      </div>
-    );
+    return <PatentDetailSkeleton />;
   }
 
   if (error) {

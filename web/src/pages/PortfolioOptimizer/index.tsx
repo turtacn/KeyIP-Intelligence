@@ -12,7 +12,7 @@ import WhatIfSimulator from './WhatIfSimulator';
 import ConstellationMap from '../../components/visualization/ConstellationMap';
 import PageError from '../../components/ui/PageError';
 import EmptyState from '../../components/ui/EmptyState';
-import { SkeletonCard } from '../../components/ui/Skeleton';
+import PortfolioOptimizerSkeleton from './Skeleton';
 import { BarChart3 } from 'lucide-react';
 
 const PortfolioOptimizer: React.FC = () => {
@@ -38,29 +38,7 @@ const PortfolioOptimizer: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-6 pb-12">
-        {/* Sub-nav skeleton */}
-        <div className="bg-white border-b border-slate-200 rounded-lg p-4 animate-pulse">
-          <div className="flex gap-8">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-4 w-20 bg-slate-200 rounded" />
-            ))}
-          </div>
-        </div>
-
-        {/* Section skeletons */}
-        {[1, 2, 3].map((section) => (
-          <div key={section} className="space-y-4">
-            <div className="animate-pulse space-y-2">
-              <div className="h-6 w-48 bg-slate-200 rounded" />
-              <div className="h-4 w-72 bg-slate-200 rounded" />
-            </div>
-            <SkeletonCard rows={4} className="h-64" />
-          </div>
-        ))}
-      </div>
-    );
+    return <PortfolioOptimizerSkeleton />;
   }
 
   if (error) {

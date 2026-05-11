@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -60,6 +61,18 @@ func NewClient(cfg *RedisConfig, log logging.Logger) (*Client, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Auto-detect cluster mode from comma-separated addresses
+	if cfg.Mode == "" {
+		if strings.Contains(cfg.Addr, ",") || len(cfg.ClusterAddrs) > 0 {
+			cfg.Mode = "cluster"
+		} else {
+			cfg.Mode = "standalone"
+		}
+	}
+	if cfg.Mode == "cluster" && len(cfg.ClusterAddrs) == 0 && cfg.Addr != "" {
+		cfg.ClusterAddrs = splitAndTrimAddrs(cfg.Addr)
 	}
 
 	switch cfg.Mode {
@@ -131,7 +144,11 @@ func NewClient(cfg *RedisConfig, log logging.Logger) (*Client, error) {
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to connect to redis")
 	}
 
-	log.Info("Redis client connected", logging.String("mode", cfg.Mode), logging.String("addr", cfg.Addr))
+	addr := cfg.Addr
+	if cfg.Mode == "cluster" {
+		addr = strings.Join(cfg.ClusterAddrs, ",")
+	}
+	log.Info("Redis client connected", logging.String("mode", cfg.Mode), logging.String("addr", addr))
 
 	return &Client{
 		rdb:    rdb,
@@ -165,6 +182,20 @@ func applyDefaults(cfg *RedisConfig) {
 	if cfg.MaxRetryBackoff == 0 {
 		cfg.MaxRetryBackoff = 512 * time.Millisecond
 	}
+}
+
+// splitAndTrimAddrs splits a comma-separated address string
+// and trims whitespace from each address.
+func splitAndTrimAddrs(addr string) []string {
+	parts := strings.Split(addr, ",")
+	addrs := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			addrs = append(addrs, p)
+		}
+	}
+	return addrs
 }
 
 func buildTLSConfig(cfg *RedisConfig) (*tls.Config, error) {
@@ -208,6 +239,21 @@ func (c *Client) Close() error {
 
 func (c *Client) GetUnderlyingClient() redis.UniversalClient {
 	return c.rdb
+}
+
+// RedisClusterClient wraps redis.ClusterClient for cluster-specific operations.
+type RedisClusterClient struct {
+	client *redis.ClusterClient
+}
+
+// Cluster returns a RedisClusterClient if the underlying connection is in cluster
+// mode, or nil otherwise. Callers should check for nil before using.
+func (c *Client) Cluster() *RedisClusterClient {
+	cc, ok := c.rdb.(*redis.ClusterClient)
+	if !ok {
+		return nil
+	}
+	return &RedisClusterClient{client: cc}
 }
 
 func (c *Client) checkClosed() error {
@@ -425,6 +471,55 @@ func (c *Client) ScriptLoad(ctx context.Context, script string) *redis.StringCmd
 		return cmd
 	}
 	return c.rdb.ScriptLoad(ctx, script)
+}
+
+// ---------------------------------------------------------------------------
+// RedisClusterClient delegate methods (cluster-specific operations)
+// ---------------------------------------------------------------------------
+
+// ClusterInfo returns cluster information.
+func (cc *RedisClusterClient) ClusterInfo(ctx context.Context) *redis.StringCmd {
+	return cc.client.ClusterInfo(ctx)
+}
+
+// ClusterNodes returns cluster nodes information.
+func (cc *RedisClusterClient) ClusterNodes(ctx context.Context) *redis.StringCmd {
+	return cc.client.ClusterNodes(ctx)
+}
+
+// ClusterSlots returns the cluster slots mapping.
+func (cc *RedisClusterClient) ClusterSlots(ctx context.Context) *redis.ClusterSlotsCmd {
+	return cc.client.ClusterSlots(ctx)
+}
+
+// ClusterKeySlot returns the hash slot for the given key.
+func (cc *RedisClusterClient) ClusterKeySlot(ctx context.Context, key string) *redis.IntCmd {
+	return cc.client.ClusterKeySlot(ctx, key)
+}
+
+// ClusterCountKeysInSlot returns the number of keys in the given slot.
+func (cc *RedisClusterClient) ClusterCountKeysInSlot(ctx context.Context, slot int) *redis.IntCmd {
+	return cc.client.ClusterCountKeysInSlot(ctx, slot)
+}
+
+// ClusterGetKeysInSlot returns keys in the given slot up to the specified count.
+func (cc *RedisClusterClient) ClusterGetKeysInSlot(ctx context.Context, slot int, count int) *redis.StringSliceCmd {
+	return cc.client.ClusterGetKeysInSlot(ctx, slot, count)
+}
+
+// ForEachMaster calls the given function for each master node in the cluster.
+func (cc *RedisClusterClient) ForEachMaster(ctx context.Context, fn func(ctx context.Context, client *redis.Client) error) error {
+	return cc.client.ForEachMaster(ctx, fn)
+}
+
+// ForEachShard calls the given function for each known node in the cluster.
+func (cc *RedisClusterClient) ForEachShard(ctx context.Context, fn func(ctx context.Context, client *redis.Client) error) error {
+	return cc.client.ForEachShard(ctx, fn)
+}
+
+// PoolStats returns pool statistics for the cluster client.
+func (cc *RedisClusterClient) PoolStats() *redis.PoolStats {
+	return cc.client.PoolStats()
 }
 
 //Personal.AI order the ending

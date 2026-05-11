@@ -374,7 +374,7 @@ install-tools:
 	$(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 	$(GO) install github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION)
 
-## help: Display available targets
+## help: Display this help message
 help:
 	@echo ""
 	@echo "$(BLUE)KeyIP-Intelligence Build System$(NC)"
@@ -383,8 +383,50 @@ help:
 	@echo ""
 	@echo "Usage: make [target]"
 	@echo ""
-	@echo "$(YELLOW)Available targets:$(NC)"
-	@grep -E '^##' $(MAKEFILE_LIST) | sed 's/## //' | awk 'BEGIN {FS=":"} {printf "  $(GREEN)%-28s$(NC) %s\n", $$1, $$2}'
+	@awk 'BEGIN { \
+		group["Build Targets"] = "Build"; \
+		group["Test Targets"] = "Test"; \
+		group["Code Quality Targets"] = "Development"; \
+		group["Code Generation"] = "Development"; \
+		group["Clean Targets"] = "Development"; \
+		group["Database Targets"] = "Deploy"; \
+		group["Docker Targets"] = "Deploy"; \
+		group["Security Targets"] = "Security"; \
+		group["Helper Targets"] = "Tools"; \
+		hcolor["Build"] = "\033[1;34m"; \
+		hcolor["Test"] = "\033[1;32m"; \
+		hcolor["Development"] = "\033[1;33m"; \
+		hcolor["Deploy"] = "\033[1;35m"; \
+		hcolor["Security"] = "\033[1;31m"; \
+		hcolor["Tools"] = "\033[1;36m"; \
+		order["Build"] = 1; \
+		order["Test"] = 2; \
+		order["Development"] = 3; \
+		order["Deploy"] = 4; \
+		order["Security"] = 5; \
+		order["Tools"] = 6; \
+	} \
+	/^# (Build|Test|Code Quality|Security|Database|Docker|Clean|Helper) Targets/ { section = $$0; gsub(/^# +/, "", section); gsub(/ +$$/, "", section); } \
+	/^# Code Generation/ { section = "Code Generation"; } \
+	/^## / { \
+		sub(/^## /, ""); \
+		split($$0, parts, ": "); \
+		t = parts[1]; d = parts[2]; \
+		if (section in group) { \
+			g = group[section]; \
+			items[g] = items[g] sprintf("  \033[36m%-28s\033[0m %s\n", t, d); \
+		} \
+	} \
+	END { \
+		for (i = 1; i <= 6; i++) { \
+			for (g in order) { \
+				if (order[g] == i) { \
+					print hcolor[g] "  + " g "\033[0m"; \
+					print items[g]; \
+				} \
+			} \
+		} \
+	}' $(MAKEFILE_LIST)
 	@echo ""
 
 # //Personal.AI order the ending

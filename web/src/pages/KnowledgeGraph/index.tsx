@@ -4,6 +4,7 @@ import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import KnowledgeGraphSkeleton from './Skeleton';
 import { Search, ZoomIn, ZoomOut, Maximize, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCitationNetwork } from '../../hooks/useKnowledgeGraph';
@@ -44,6 +45,10 @@ const KnowledgeGraph: React.FC = () => {
   const { data: citationData, loading: citationLoading, error: citationError } = useCitationNetwork(
     mode === 'realtime' && patentId ? patentId : undefined
   );
+
+  if (mode === 'realtime' && citationLoading) {
+    return <KnowledgeGraphSkeleton />;
+  }
 
   const generateMockElements = (): GraphElements => ({
     nodes: [

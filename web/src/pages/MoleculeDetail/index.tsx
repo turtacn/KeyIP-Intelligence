@@ -7,7 +7,7 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import MoleculeViewer from '../../components/ui/MoleculeViewer';
 import PageError from '../../components/ui/PageError';
-import { SkeletonCard, SkeletonLine } from '../../components/ui/Skeleton';
+import MoleculeDetailSkeleton from './Skeleton';
 import EmptyState from '../../components/ui/EmptyState';
 import PropertyComparison from '../../components/visualization/PropertyComparison';
 import { ArrowLeft, Beaker } from 'lucide-react';
@@ -101,24 +101,7 @@ const MoleculeDetail: React.FC = () => {
   }, [id]);
 
   if (loading) {
-    return (
-      <div className="space-y-6 pb-12">
-        {/* Back button skeleton */}
-        <div className="animate-pulse h-4 w-16 bg-slate-200 rounded" />
-
-        {/* Header skeleton */}
-        <div className="animate-pulse space-y-3">
-          <div className="h-8 w-1/2 bg-slate-200 rounded" />
-          <SkeletonLine width="30%" />
-        </div>
-
-        {/* Two-column skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <SkeletonCard rows={3} className="h-80 lg:col-span-1" />
-          <SkeletonCard rows={5} className="h-80 lg:col-span-2" />
-        </div>
-      </div>
-    );
+    return <MoleculeDetailSkeleton />;
   }
 
   if (error) {
