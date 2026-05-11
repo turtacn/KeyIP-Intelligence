@@ -1,0 +1,81 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-05-11T00:00:00Z",
+  "description": "OLED 专利组合测试数据 — Host Materials / Blue Emitters / TADF 三个组合",
+  "portfolios": [
+    {
+      "id": "oled-por-0001-4000-a000-000000000001",
+      "name": "OLED Host Materials Portfolio",
+      "description": "涵盖咔唑类、三嗪类及螺环类 OLED 主体材料核心专利组合，覆盖 CN/US/EP/KR 四局，包含双极性主体、磷光主体和 TADF 主体技术路径",
+      "owner_id": "oled-usr-0001-4000-b000-000000000001",
+      "status": "active",
+      "tech_domains": [
+        "C07D209/86",
+        "C07D251/24",
+        "C07D403/14",
+        "C09K11/06",
+        "H10K85/60"
+      ],
+      "target_jurisdictions": ["CN", "US", "EP", "KR"],
+      "metadata": {
+        "strategy": "defensive",
+        "total_patents": 4,
+        "active_patents": 4,
+        "health_score": 85.0,
+        "filing_year_range": "2020-2022"
+      },
+      "patent_count": 4,
+      "created_at": "2023-06-15T08:00:00Z",
+      "updated_at": "2026-04-10T14:30:00Z"
+    },
+    {
+      "id": "oled-por-0002-4000-a000-000000000002",
+      "name": "Blue Emitters Portfolio",
+      "description": "蓝色发光材料核心专利组合，涵盖铱配合物磷光蓝色发光体与 TADF 蓝色发光体，含 DMAC-TRZ、Flrpic 系材料，面向高端显示应用",
+      "owner_id": "oled-usr-0002-4000-b000-000000000002",
+      "status": "active",
+      "tech_domains": [
+        "C07F15/00",
+        "C09K11/06",
+        "H10K85/30",
+        "H10K50/12"
+      ],
+      "target_jurisdictions": ["US", "JP", "KR", "CN"],
+      "metadata": {
+        "strategy": "offensive",
+        "total_patents": 3,
+        "active_patents": 3,
+        "health_score": 82.0,
+        "filing_year_range": "2020-2022"
+      },
+      "patent_count": 3,
+      "created_at": "2023-08-20T10:00:00Z",
+      "updated_at": "2026-03-15T09:00:00Z"
+    },
+    {
+      "id": "oled-por-0003-4000-a000-000000000003",
+      "name": "TADF Technology Portfolio",
+      "description": "热活化延迟荧光(TADF)技术组合，涵盖 DMAC-TRZ、4CzIPN 类 TADF 材料的分子设计、器件结构及制备方法专利，面向新一代高效 OLED 显示与照明",
+      "owner_id": "oled-usr-0001-4000-b000-000000000001",
+      "status": "active",
+      "tech_domains": [
+        "C09K11/06",
+        "C07D219/10",
+        "C07D401/14",
+        "H10K85/60",
+        "H10K50/12"
+      ],
+      "target_jurisdictions": ["JP", "CN", "US", "EP", "KR"],
+      "metadata": {
+        "strategy": "balanced",
+        "total_patents": 3,
+        "active_patents": 2,
+        "health_score": 76.0,
+        "filing_year_range": "2021-2022"
+      },
+      "patent_count": 3,
+      "created_at": "2024-01-10T08:30:00Z",
+      "updated_at": "2026-05-01T11:00:00Z"
+    }
+  ]
+}

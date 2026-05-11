@@ -1,0 +1,10 @@
+[
+  {"id":"dl-001","patent_number":"CN115000001A","jurisdiction":"CN","deadline_type":"annuity","deadline_date":"2025-06-15","priority":"high","description":"第3年年费缴纳截止日","fee_amount":900,"fee_currency":"CNY","status":"pending"},
+  {"id":"dl-002","patent_number":"US20230100001A1","jurisdiction":"US","deadline_type":"response","deadline_date":"2025-03-20","priority":"critical","description":"Office Action response deadline (non-final rejection)","status":"pending"},
+  {"id":"dl-003","patent_number":"EP4200001A1","jurisdiction":"EP","deadline_type":"examination","deadline_date":"2025-08-01","priority":"medium","description":"Request for examination due","status":"pending"},
+  {"id":"dl-004","patent_number":"JP2024012345A","jurisdiction":"JP","deadline_type":"annuity","deadline_date":"2025-04-10","priority":"low","description":"第2年年費","fee_amount":200,"fee_currency":"JPY","status":"pending"},
+  {"id":"dl-005","patent_number":"KR102500001B1","jurisdiction":"KR","deadline_type":"annuity","deadline_date":"2025-03-20","priority":"high","description":"第3년 연차료 납부","fee_amount":120000,"fee_currency":"KRW","status":"paid"},
+  {"id":"dl-006","patent_number":"US11234567B2","jurisdiction":"US","deadline_type":"issue_fee","deadline_date":"2024-08-15","priority":"critical","description":"Issue fee payment deadline","status":"paid"},
+  {"id":"dl-007","patent_number":"CN118000001A","jurisdiction":"CN","deadline_type":"substantive_examination","deadline_date":"2027-01-05","priority":"medium","description":"实审请求截止日","status":"pending"},
+  {"id":"dl-008","patent_number":"KR20230056789A","jurisdiction":"KR","deadline_type":"response","deadline_date":"2025-02-28","priority":"high","description":"의견제출통지서 대응 마감일","status":"overdue"}
+]

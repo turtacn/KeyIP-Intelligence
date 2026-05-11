@@ -79,7 +79,7 @@ NC     := \033[0m # No Color
 
 # Phony targets declaration
 .PHONY: all build build-apiserver build-worker build-keyip \
-        test test-unit test-integration test-e2e test-coverage test-race \
+        test test-unit test-integration test-e2e test-e2e-report test-coverage test-race \
         lint fmt vet check \
         security-scan security-scan-go security-scan-code security-scan-frontend \
         install-security-tools \
@@ -151,12 +151,17 @@ test-e2e:
 	bash scripts/test.sh --level e2e --race
 	@echo "$(GREEN)>> E2E tests passed.$(NC)"
 
+## test-e2e-report: Run E2E tests and generate a detailed summary report
+test-e2e-report:
+	@echo "$(BLUE)>> Running E2E tests and generating report...$(NC)"
+	bash scripts/generate-test-report.sh
+	@echo "$(GREEN)>> E2E test report generated.$(NC)"
+
 ## test-coverage: Generate and open HTML coverage report
 test-coverage:
 	@echo "$(BLUE)>> Generating coverage report...$(NC)"
-	bash scripts/test.sh --level unit --coverage
-	@which open > /dev/null 2>&1 && open $(COVERAGE_HTML) || true
-	@which xdg-open > /dev/null 2>&1 && xdg-open $(COVERAGE_HTML) || true
+	bash scripts/test-coverage.sh
+	@echo "$(GREEN)>> Coverage report generated: $(COVERAGE_HTML)$(NC)"
 
 ## test-race: Run tests with race detection
 test-race:

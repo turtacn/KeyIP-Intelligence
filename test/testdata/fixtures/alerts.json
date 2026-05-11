@@ -1,0 +1,7 @@
+[
+  {"id":"alert-001","type":"patent_match","severity":"high","patent_number":"CN118000001A","matched_molecule":"Ir(ppy)2(acac)","similarity_score":0.87,"message":"新公开专利 CN118000001A 中发现了与您的 Ir(ppy)2(acac) 分子高度相似的化合物，建议进行 FTO 分析","timestamp":"2025-01-10T09:00:00Z","read":false},
+  {"id":"alert-002","type":"deadline_alert","severity":"critical","patent_number":"US20230100001A1","deadline_date":"2025-03-20","days_remaining":65,"message":"OA 答复期限仅剩 65 天，请尽快准备答复材料","timestamp":"2025-01-14T08:00:00Z","read":false},
+  {"id":"alert-003","type":"infringement_warning","severity":"medium","patent_number":"CN115000001A","target_molecule":"CBP","risk_score":0.45,"message":"CBP 与 CN115000001A 权利要求存在部分重叠，建议进行等同原则分析","timestamp":"2025-01-08T14:30:00Z","read":true},
+  {"id":"alert-004","type":"patent_match","severity":"high","patent_number":"KR20230056789A","matched_molecule":"TADF-Blue-01","similarity_score":0.92,"message":"三星显示新公开的 B-N 多环 TADF 材料与您的蓝色 TADF 分子骨架高度相似","timestamp":"2025-01-05T10:00:00Z","read":false},
+  {"id":"alert-005","type":"system_notification","severity":"low","patent_number":null,"message":"专利数据更新完成，新增 2024年Q4 公开的 2,847 条 OLED 相关专利","timestamp":"2025-01-01T00:00:00Z","read":true}
+]
