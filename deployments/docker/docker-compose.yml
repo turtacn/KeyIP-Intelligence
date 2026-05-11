@@ -25,6 +25,8 @@ services:
     image: postgres:16-alpine
     container_name: keyip-postgres
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "5432:5432"
     environment:
@@ -49,6 +51,8 @@ services:
     image: neo4j:5-community
     container_name: keyip-neo4j
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "7687:7687"   # Bolt
       - "7474:7474"   # HTTP browser
@@ -77,6 +81,8 @@ services:
     image: redis:7-alpine
     container_name: keyip-redis
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "6379:6379"
     command: redis-server --loglevel warning --save "" --appendonly no
@@ -96,6 +102,8 @@ services:
     image: opensearchproject/opensearch:2.14.0
     container_name: keyip-opensearch
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "9200:9200"   # REST API
       - "9600:9600"   # Performance Analyzer
@@ -122,6 +130,8 @@ services:
     image: opensearchproject/opensearch-dashboards:2.14.0
     container_name: keyip-os-dashboards
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "5601:5601"
     environment:
@@ -141,6 +151,8 @@ services:
     image: quay.io/coreos/etcd:v3.5.14
     container_name: keyip-milvus-etcd
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     environment:
       ETCD_AUTO_COMPACTION_MODE: revision
       ETCD_AUTO_COMPACTION_RETENTION: "1000"
@@ -162,6 +174,8 @@ services:
     image: minio/minio:RELEASE.2024-08-17T01-24-54Z
     container_name: keyip-milvus-minio
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "9000:9000"    # S3-compatible API
       - "9001:9001"    # Console
@@ -184,6 +198,8 @@ services:
     image: milvusdb/milvus:v2.4.6
     container_name: keyip-milvus
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "19530:19530"  # gRPC
     environment:
@@ -217,6 +233,8 @@ services:
     image: minio/minio:RELEASE.2024-08-17T01-24-54Z
     container_name: keyip-minio
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "9002:9000"     # avoid conflict with milvus-minio on port 9000
       - "9003:9001"     # Console
@@ -240,6 +258,8 @@ services:
     image: minio/mc:latest
     container_name: keyip-minio-init
     restart: "no"
+    security_opt:
+      - seccomp:unconfined
     depends_on:
       minio:
         condition: service_healthy
@@ -259,6 +279,8 @@ services:
     image: confluentinc/cp-kafka:7.6.1
     container_name: keyip-kafka
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "9092:9092"
     environment:
@@ -294,6 +316,8 @@ services:
     image: mailhog/mailhog:v1.0.1
     container_name: keyip-mailhog
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "1025:1025"   # SMTP
       - "8025:8025"   # Web UI
