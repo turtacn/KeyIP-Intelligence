@@ -282,4 +282,86 @@ func TestClient_Pipeline(t *testing.T) {
 	assert.Equal(t, "2", val)
 }
 
+// ---------------------------------------------------------------------------
+// Cluster mode & auto-detect tests
+// ---------------------------------------------------------------------------
+
+func TestSplitAndTrimAddrs(t *testing.T) {
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		{"host1:6379,host2:6380,host3:6381", []string{"host1:6379", "host2:6380", "host3:6381"}},
+		{" host1:6379 , host2:6380 ", []string{"host1:6379", "host2:6380"}},
+		{"host1:6379", []string{"host1:6379"}},
+		{"", []string{}},
+	}
+	for _, tt := range tests {
+		got := splitAndTrimAddrs(tt.input)
+		assert.Equal(t, tt.want, got, "splitAndTrimAddrs(%q)", tt.input)
+	}
+}
+
+func TestNewClient_AutoDetectClusterFromCommaAddr(t *testing.T) {
+	// Empty Mode + comma-separated Addr -> auto-detect cluster
+	cfg := &RedisConfig{
+		Addr: "host1:6379,host2:6380,host3:6381",
+	}
+	client, err := NewClient(cfg, logging.NewNopLogger())
+	assert.Error(t, err) // No real cluster available
+	assert.Nil(t, client)
+	assert.Equal(t, "cluster", cfg.Mode)
+	assert.Equal(t, []string{"host1:6379", "host2:6380", "host3:6381"}, cfg.ClusterAddrs)
+}
+
+func TestNewClient_AutoDetectClusterFromClusterAddrs(t *testing.T) {
+	// Empty Mode + populated ClusterAddrs -> auto-detect cluster
+	cfg := &RedisConfig{
+		ClusterAddrs: []string{"host1:6379", "host2:6380"},
+	}
+	client, err := NewClient(cfg, logging.NewNopLogger())
+	assert.Error(t, err)
+	assert.Nil(t, client)
+	assert.Equal(t, "cluster", cfg.Mode)
+}
+
+func TestNewClient_AutoDetectStandalone(t *testing.T) {
+	// Empty Mode + single Addr (no comma) -> auto-detect standalone
+	// Will fail because no redis server, but mode should be set
+	cfg := &RedisConfig{
+		Addr: "localhost:6379",
+	}
+	client, err := NewClient(cfg, logging.NewNopLogger())
+	assert.Error(t, err)
+	assert.Nil(t, client)
+	assert.Equal(t, "standalone", cfg.Mode)
+}
+
+func TestNewClient_ExplicitClusterWithCommaAddr(t *testing.T) {
+	// Explicit Mode=cluster + comma-separated Addr
+	cfg := &RedisConfig{
+		Mode: "cluster",
+		Addr: "node1:6379,node2:6379,node3:6379",
+	}
+	client, err := NewClient(cfg, logging.NewNopLogger())
+	assert.Error(t, err)
+	assert.Nil(t, client)
+	assert.Equal(t, "cluster", cfg.Mode)
+	assert.Equal(t, []string{"node1:6379", "node2:6379", "node3:6379"}, cfg.ClusterAddrs)
+}
+
+func TestClient_Cluster_ReturnsNilForStandalone(t *testing.T) {
+	_, client := setupClientTest(t)
+	cc := client.Cluster()
+	assert.Nil(t, cc, "Cluster() should return nil for standalone mode")
+}
+
+func TestClient_Cluster_ClusterMethodsPanicOnNil(t *testing.T) {
+	// Verify that calling methods on nil *RedisClusterClient panics
+	// (expected Go behavior for nil pointer receiver)
+	_, client := setupClientTest(t)
+	cc := client.Cluster()
+	assert.Nil(t, cc)
+}
+
 //Personal.AI order the ending
