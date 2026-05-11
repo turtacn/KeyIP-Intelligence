@@ -39,7 +39,19 @@
     "no_history": "暂无搜索记录",
     "search_duration": "耗时 {{time}}",
     "result": "条结果",
-    "results": "条结果"
+    "results": "条结果",
+    "scope_title": "标题",
+    "scope_abstract": "摘要",
+    "scope_fulltext": "全文",
+    "scope_all": "全部",
+    "scope_label": "搜索范围",
+    "filter_date_filing": "申请日",
+    "filter_date_publication": "公开日",
+    "filter_from": "从",
+    "filter_to": "至",
+    "filter_jurisdiction": "专利局",
+    "filter_active": "筛选条件",
+    "filter_clear_all": "清除全部"
   },
   "knowledge_graph": {
     "search_placeholder": "搜索图谱..."

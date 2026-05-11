@@ -9,7 +9,7 @@ import Button from '../../components/ui/Button';
 import { Search as SearchIcon, FileText, Beaker, AlertCircle, Clock, X } from 'lucide-react';
 import { patentService } from '../../services/patent.service';
 import { moleculeService } from '../../services/molecule.service';
-import { Patent, Molecule } from '../../types/domain';
+import { Patent, Molecule, Jurisdiction } from '../../types/domain';
 
 // ─── Search History Helpers ──────────────────────────────────────────────────
 const SEARCH_HISTORY_KEY = 'keyip_search_history';
@@ -67,6 +67,8 @@ function highlightText(text: string, query: string): React.ReactNode {
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+type SearchScope = 'title' | 'abstract' | 'fulltext' | 'all';
+
 interface PatentResult {
   type: 'patent';
   id: string;
@@ -105,10 +107,23 @@ const Search: React.FC = () => {
   // Track the query used for the last search (used for result highlighting)
   const [searchQuery, setSearchQuery] = useState('');
 
+  // ── Filter state ──
+  const [searchScope, setSearchScope] = useState<SearchScope>('all');
+  const [filingDateFrom, setFilingDateFrom] = useState('');
+  const [filingDateTo, setFilingDateTo] = useState('');
+  const [pubDateFrom, setPubDateFrom] = useState('');
+  const [pubDateTo, setPubDateTo] = useState('');
+  const [selectedJurisdictions, setSelectedJurisdictions] = useState<Jurisdiction[]>([]);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>();
   const lastSearchedQuery = useRef('');
+  const lastSearchKey = useRef('');
+
+  // Keep filter values accessible in stable callbacks without re-creating them
+  const filtersRef = useRef({ searchScope: 'all' as SearchScope, filingDateFrom: '', filingDateTo: '', pubDateFrom: '', pubDateTo: '', jurisdictions: [] as Jurisdiction[] });
+  filtersRef.current = { searchScope, filingDateFrom, filingDateTo, pubDateFrom, pubDateTo, jurisdictions: selectedJurisdictions };
 
   // ── Tabs ──
   const tabs = useMemo(
@@ -126,7 +141,9 @@ const Search: React.FC = () => {
       const trimmed = searchTerm.trim();
       if (!trimmed) return;
 
+      const f = filtersRef.current;
       lastSearchedQuery.current = trimmed;
+      lastSearchKey.current = JSON.stringify({ query: trimmed, scope: f.searchScope, filingDateFrom: f.filingDateFrom, filingDateTo: f.filingDateTo, pubDateFrom: f.pubDateFrom, pubDateTo: f.pubDateTo, jurisdictions: f.jurisdictions });
       setLoading(true);
       setError(null);
       setSearched(true);
@@ -137,7 +154,14 @@ const Search: React.FC = () => {
 
       try {
         const [patentResp, moleculeResp] = await Promise.all([
-          patentService.getPatents(1, 20, trimmed),
+          patentService.getPatents(1, 20, trimmed, {
+            scope: f.searchScope,
+            filingDateFrom: f.filingDateFrom,
+            filingDateTo: f.filingDateTo,
+            publicationDateFrom: f.pubDateFrom,
+            publicationDateTo: f.pubDateTo,
+            jurisdictions: f.jurisdictions,
+          }),
           moleculeService.getMolecules(1, 20),
         ]);
 
@@ -188,15 +212,15 @@ const Search: React.FC = () => {
     [t],
   );
 
-  // ── Debounced auto-search ──
-  // Triggers 300ms after the user stops typing, but skips if this
-  // query was already submitted manually (via Enter or suggestion click).
+  // ── Consolidated debounced auto-search (query + filter changes) ──
+  // Triggers 300ms after the user stops typing or changes a filter,
+  // but skips if this exact combination was already searched.
   useEffect(() => {
     const trimmed = query.trim();
     if (!trimmed) return;
 
-    // Already searched for this exact query — don't auto-search again.
-    if (query === lastSearchedQuery.current) return;
+    const key = JSON.stringify({ query: trimmed, searchScope, filingDateFrom, filingDateTo, pubDateFrom, pubDateTo, jurisdictions: selectedJurisdictions });
+    if (key === lastSearchKey.current) return;
 
     debounceTimer.current = setTimeout(() => {
       performSearch(query);
@@ -207,7 +231,7 @@ const Search: React.FC = () => {
         clearTimeout(debounceTimer.current);
       }
     };
-  }, [query, performSearch]);
+  }, [query, searchScope, filingDateFrom, filingDateTo, pubDateFrom, pubDateTo, selectedJurisdictions, performSearch]);
 
   // ── Form submit handler (Enter key) ──
   const handleSearch = useCallback(
@@ -229,6 +253,68 @@ const Search: React.FC = () => {
       setShowSuggestions(true);
     }
   }, []);
+
+  // ── Clear all filters ──
+  const clearAllFilters = useCallback(() => {
+    setSearchScope('all');
+    setFilingDateFrom('');
+    setFilingDateTo('');
+    setPubDateFrom('');
+    setPubDateTo('');
+    setSelectedJurisdictions([]);
+  }, []);
+
+  // ── Toggle jurisdiction selection ──
+  const toggleJurisdiction = useCallback((j: Jurisdiction) => {
+    setSelectedJurisdictions(prev =>
+      prev.includes(j) ? prev.filter(x => x !== j) : [...prev, j],
+    );
+  }, []);
+
+  // ── Active filter chips ──
+  const activeFilters = useMemo(() => {
+    const chips: { id: string; label: string; onRemove: () => void }[] = [];
+
+    if (searchScope !== 'all') {
+      const scopeLabels: Record<SearchScope, string> = {
+        title: t('search.scope_title'),
+        abstract: t('search.scope_abstract'),
+        fulltext: t('search.scope_fulltext'),
+        all: t('search.scope_all'),
+      };
+      chips.push({
+        id: 'scope',
+        label: scopeLabels[searchScope],
+        onRemove: () => setSearchScope('all'),
+      });
+    }
+
+    if (filingDateFrom || filingDateTo) {
+      chips.push({
+        id: 'filingDate',
+        label: `${t('search.filter_date_filing')}: ${filingDateFrom || '...'} ~ ${filingDateTo || '...'}`,
+        onRemove: () => { setFilingDateFrom(''); setFilingDateTo(''); },
+      });
+    }
+
+    if (pubDateFrom || pubDateTo) {
+      chips.push({
+        id: 'pubDate',
+        label: `${t('search.filter_date_publication')}: ${pubDateFrom || '...'} ~ ${pubDateTo || '...'}`,
+        onRemove: () => { setPubDateFrom(''); setPubDateTo(''); },
+      });
+    }
+
+    selectedJurisdictions.forEach((j) => {
+      chips.push({
+        id: `jurisdiction-${j}`,
+        label: j,
+        onRemove: () => setSelectedJurisdictions(prev => prev.filter(x => x !== j)),
+      });
+    });
+
+    return chips;
+  }, [searchScope, filingDateFrom, filingDateTo, pubDateFrom, pubDateTo, selectedJurisdictions, t]);
 
   // ── Suggestion click ──
   const handleSuggestionClick = useCallback(
@@ -517,27 +603,41 @@ const Search: React.FC = () => {
           </span>
         </div>
 
-        {/* ── Search Input ── */}
+        {/* ── Search Input with Scope ── */}
         <form onSubmit={handleSearch}>
-          <div className="relative" ref={suggestionsRef}>
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={handleInputChange}
-              onFocus={() => setShowSuggestions(searchHistory.length > 0)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' && query) {
-                  handleClear();
-                }
-              }}
-              placeholder={t('search.placeholder')}
-              className="w-full pl-10 pr-10 py-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
-            />
-            <SearchIcon
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none"
-              aria-hidden="true"
-            />
+          <div className="flex items-stretch">
+            {/* Search scope dropdown */}
+            <select
+              value={searchScope}
+              onChange={(e) => setSearchScope(e.target.value as SearchScope)}
+              className="px-3 py-3 border border-r-0 border-slate-300 rounded-l-lg bg-white text-sm text-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:z-10 relative"
+              aria-label={t('search.scope_label')}
+            >
+              <option value="all">{t('search.scope_all')}</option>
+              <option value="title">{t('search.scope_title')}</option>
+              <option value="abstract">{t('search.scope_abstract')}</option>
+              <option value="fulltext">{t('search.scope_fulltext')}</option>
+            </select>
+
+            <div className="relative flex-1" ref={suggestionsRef}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={handleInputChange}
+                onFocus={() => setShowSuggestions(searchHistory.length > 0)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && query) {
+                    handleClear();
+                  }
+                }}
+                placeholder={t('search.placeholder')}
+                className="w-full pl-10 pr-10 py-3 border border-slate-300 rounded-none rounded-r-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+              />
+              <SearchIcon
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none"
+                aria-hidden="true"
+              />
 
             {/* Clear button */}
             {query && (
@@ -594,7 +694,111 @@ const Search: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
         </form>
+
+        {/* ── Filters bar ── */}
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2.5">
+          {/* Date range filters */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            {/* Filing date */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-slate-500 whitespace-nowrap uppercase tracking-wider">
+                {t('search.filter_date_filing')}
+              </label>
+              <input
+                type="date"
+                value={filingDateFrom}
+                onChange={(e) => setFilingDateFrom(e.target.value)}
+                className="px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                aria-label={t('search.filter_from')}
+              />
+              <span className="text-slate-400 text-xs">~</span>
+              <input
+                type="date"
+                value={filingDateTo}
+                onChange={(e) => setFilingDateTo(e.target.value)}
+                className="px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                aria-label={t('search.filter_to')}
+              />
+            </div>
+
+            {/* Publication date */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-slate-500 whitespace-nowrap uppercase tracking-wider">
+                {t('search.filter_date_publication')}
+              </label>
+              <input
+                type="date"
+                value={pubDateFrom}
+                onChange={(e) => setPubDateFrom(e.target.value)}
+                className="px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                aria-label={t('search.filter_from')}
+              />
+              <span className="text-slate-400 text-xs">~</span>
+              <input
+                type="date"
+                value={pubDateTo}
+                onChange={(e) => setPubDateTo(e.target.value)}
+                className="px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                aria-label={t('search.filter_to')}
+              />
+            </div>
+          </div>
+
+          {/* Jurisdiction filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+              {t('search.filter_jurisdiction')}
+            </span>
+            <div className="flex gap-1">
+              {(['CN', 'US', 'EP', 'JP', 'KR'] as Jurisdiction[]).map((j) => (
+                <button
+                  key={j}
+                  type="button"
+                  onClick={() => toggleJurisdiction(j)}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+                    selectedJurisdictions.includes(j)
+                      ? 'bg-blue-100 border-blue-300 text-blue-700'
+                      : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  {j}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Active filter chips ── */}
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-slate-400 mr-0.5">{t('search.filter_active')}:</span>
+            {activeFilters.map((chip) => (
+              <span
+                key={chip.id}
+                className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-200"
+              >
+                {chip.label}
+                <button
+                  type="button"
+                  onClick={chip.onRemove}
+                  className="text-blue-400 hover:text-blue-600 transition-colors"
+                  aria-label={`Remove ${chip.label}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors ml-1"
+            >
+              {t('search.filter_clear_all')}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Search info bar (duration + count) ── */}

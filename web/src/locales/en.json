@@ -39,7 +39,19 @@
     "no_history": "No recent searches",
     "search_duration": "Found in {{time}}",
     "result": "result",
-    "results": "results"
+    "results": "results",
+    "scope_title": "Title",
+    "scope_abstract": "Abstract",
+    "scope_fulltext": "Full Text",
+    "scope_all": "All",
+    "scope_label": "Search scope",
+    "filter_date_filing": "Filing Date",
+    "filter_date_publication": "Pub. Date",
+    "filter_from": "From",
+    "filter_to": "To",
+    "filter_jurisdiction": "Patent Office",
+    "filter_active": "Filters",
+    "filter_clear_all": "Clear All"
   },
   "knowledge_graph": {
     "search_placeholder": "Search graph..."
