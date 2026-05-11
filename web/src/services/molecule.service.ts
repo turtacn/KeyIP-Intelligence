@@ -9,5 +9,9 @@ export const moleculeService = {
 
   async getMoleculeById(id: string): Promise<ApiResponse<Molecule>> {
     return api.get<ApiResponse<Molecule>>(`/molecules/${id}`);
+  },
+
+  async searchMolecules(query: string): Promise<ApiResponse<Molecule[]>> {
+    return api.get<ApiResponse<Molecule[]>>('/molecules', { query, pageSize: 20 });
   }
 };

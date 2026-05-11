@@ -4,6 +4,7 @@ import { Bell, Search, Globe, Settings, LogIn, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { type ApiMode, getApiMode, setApiMode, isMockMode } from '../../utils/apiMode';
 import { useAuth } from '../../utils/auth';
+import { useAlerts } from '../../hooks/useAlerts';
 
 const MODE_LABELS: Record<ApiMode, string> = {
   mock: 'Mock',
@@ -174,6 +175,106 @@ const AuthButton: React.FC = () => {
   );
 };
 
+const AlertBell: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { alerts, unreadCount, loading } = useAlerts();
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  // Only show in non-mock mode
+  if (isMockMode()) return null;
+
+  const recentAlerts = alerts.slice(0, 5);
+
+  const severityDot: Record<string, string> = {
+    high: 'bg-red-500',
+    medium: 'bg-amber-500',
+    low: 'bg-blue-500',
+  };
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors relative"
+        title="Notifications"
+      >
+        <Bell className="w-5 h-5" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1 border-2 border-white">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+          <div className="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+            Notifications
+          </div>
+
+          {loading ? (
+            <div className="px-4 py-8 text-center text-sm text-slate-400">
+              <div className="animate-pulse">Loading...</div>
+            </div>
+          ) : recentAlerts.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-slate-400">
+              No new notifications
+            </div>
+          ) : (
+            recentAlerts.map((alert) => (
+              <div
+                key={alert.id}
+                className={`px-4 py-3 border-b border-slate-50 last:border-b-0 hover:bg-slate-50 transition-colors cursor-pointer ${
+                  !alert.read ? 'bg-blue-50/40' : ''
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
+                      severityDot[alert.severity] ?? 'bg-slate-400'
+                    }`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`text-sm ${
+                        !alert.read
+                          ? 'font-semibold text-slate-800'
+                          : 'text-slate-600'
+                      }`}
+                    >
+                      {alert.title}
+                    </p>
+                    {alert.message && (
+                      <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">
+                        {alert.message}
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-400 mt-1">
+                      {new Date(alert.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TopBar: React.FC = () => {
   const { i18n, t } = useTranslation();
   const navigate = useNavigate();
@@ -230,10 +331,7 @@ const TopBar: React.FC = () => {
             </select>
           </div>
 
-          <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-          </button>
+          <AlertBell />
 
           <div className="h-8 w-px bg-slate-200 mx-2"></div>
 

@@ -1,7 +1,7 @@
 // Phase 11 - 接口层: HTTP Middleware - 速率限制中间件
 // 序号: 278
 // 文件: internal/interfaces/http/middleware/ratelimit.go
-// 功能定位: 实现 HTTP 请求速率限制中间件，支持基于 IP、API Key、Tenant 的多维度限流
+// 功能定位: 实现 HTTP 请求速率限制中间件，支持基于 IP、API Key、Tenant、User Tier 的多维度限流
 // 核心实现:
 //   - 定义 RateLimitConfig 结构体: RequestsPerSecond, BurstSize, KeyFunc, SkipPaths, ExceededHandler
 //   - 定义 RateLimiter 接口: Allow(key string) (bool, RateLimitInfo)
@@ -12,6 +12,8 @@
 //   - 响应头设置: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
 //   - 超限时返回 429 Too Many Requests + Retry-After 头
 //   - 支持过期清理，防止内存泄漏
+//   - TenantRateLimiter: 租户级独立配额（跨所有用户聚合计数）
+//   - 租户限流键格式: "tenant:<id>"，在用户/层级限流之前检查
 //
 // 依赖关系:
 //   - 依赖: internal/infrastructure/monitoring/logging
@@ -71,6 +73,12 @@ type RateLimitConfig struct {
 	// TierLimits maps user tiers to their specific rate limits.
 	// If nil or empty, per-tier limits are not enforced and RequestsPerSecond/BurstSize are used.
 	TierLimits map[UserTier]TierLimits
+	// TenantRequestsPerSecond is the per-tenant sustained request rate across all users in that tenant.
+	// A value of 0 or less disables tenant-level rate limiting.
+	TenantRequestsPerSecond float64
+	// TenantBurstSize is the maximum burst for tenant-level rate limiting.
+	// Ignored when TenantRequestsPerSecond <= 0.
+	TenantBurstSize int
 	// ExpensivePaths are request paths that consume extra tokens per request
 	// (e.g., similarity search, report generation).
 	ExpensivePaths []string
@@ -609,6 +617,55 @@ func IsExpensivePath(path string, expensivePaths []string) bool {
 	return false
 }
 
+// --- Tenant Rate Limiter ---
+
+// TenantRateLimiter enforces per-tenant aggregate rate limits across all users.
+// It provides an additional rate limiting dimension beyond user/tier/IP-level limits.
+// Each tenant gets a separate token bucket keyed by "tenant:<tenantID>".
+type TenantRateLimiter struct {
+	limiter *TokenBucketLimiter
+	enabled bool
+	rate    float64
+	burst   int
+}
+
+// NewTenantRateLimiter creates a new TenantRateLimiter.
+// Tenant-level rate limiting is disabled when rate <= 0 or burst <= 0.
+func NewTenantRateLimiter(rate float64, burstSize int, cleanupInterval time.Duration) *TenantRateLimiter {
+	enabled := rate > 0 && burstSize > 0
+	var limiter *TokenBucketLimiter
+	if enabled {
+		limiter = NewTokenBucketLimiter(rate, burstSize, cleanupInterval)
+	}
+	return &TenantRateLimiter{
+		limiter: limiter,
+		enabled: enabled,
+		rate:    rate,
+		burst:   burstSize,
+	}
+}
+
+// Allow checks if a request for the given tenant ID is within the tenant's aggregate quota.
+// Returns (true, empty RateLimitInfo) when tenant limiting is disabled or tenantID is empty.
+func (l *TenantRateLimiter) Allow(tenantID string) (bool, RateLimitInfo) {
+	if !l.enabled || tenantID == "" {
+		return true, RateLimitInfo{}
+	}
+	return l.limiter.Allow("tenant:" + tenantID)
+}
+
+// Stop stops the underlying limiter's cleanup goroutine.
+func (l *TenantRateLimiter) Stop() {
+	if l.limiter != nil {
+		l.limiter.Stop()
+	}
+}
+
+// IsEnabled returns whether tenant-level rate limiting is enabled.
+func (l *TenantRateLimiter) IsEnabled() bool {
+	return l.enabled
+}
+
 // --- Redis Rate Limiter ---
 
 // redisTokenBucketScript is a Lua script implementing the token bucket algorithm in Redis.
@@ -863,6 +920,13 @@ func NewTieredRateLimitMiddleware(config RateLimitConfig) *RateLimitMiddleware {
 	expensivePaths := config.ExpensivePaths
 	expensiveCost := config.ExpensiveCost
 
+	// Create tenant-level rate limiter for per-tenant aggregate quotas
+	tenantLimiter := NewTenantRateLimiter(
+		config.TenantRequestsPerSecond,
+		config.TenantBurstSize,
+		config.CleanupInterval,
+	)
+
 	return &RateLimitMiddleware{
 		handler: func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -870,6 +934,25 @@ func NewTieredRateLimitMiddleware(config RateLimitConfig) *RateLimitMiddleware {
 				if skipSet[r.URL.Path] {
 					next.ServeHTTP(w, r)
 					return
+				}
+
+				// --- Tenant-level rate limit check (applies before user/tier check) ---
+				// Tenant quota is shared across all users in the same tenant.
+				// This ensures a single tenant cannot overwhelm the system through
+				// many concurrent users, even if each user is within their personal limit.
+				tenantID := ContextGetTenantID(r.Context())
+				if tenantLimiter.IsEnabled() && tenantID != "" {
+					tenantAllowed, tenantInfo := tenantLimiter.Allow(tenantID)
+					if !tenantAllowed {
+						w.Header().Set("X-RateLimit-Tenant-Limit", strconv.Itoa(tenantInfo.Limit))
+						w.Header().Set("X-RateLimit-Tenant-Remaining", "0")
+						w.Header().Set("X-RateLimit-Tenant-Reset", strconv.FormatInt(tenantInfo.ResetAt.Unix(), 10))
+						writeRateLimitExceeded(w, config, tenantInfo)
+						return
+					}
+					w.Header().Set("X-RateLimit-Tenant-Limit", strconv.Itoa(tenantInfo.Limit))
+					w.Header().Set("X-RateLimit-Tenant-Remaining", strconv.Itoa(tenantInfo.Remaining))
+					w.Header().Set("X-RateLimit-Tenant-Reset", strconv.FormatInt(tenantInfo.ResetAt.Unix(), 10))
 				}
 
 				// Determine key: use expensive key for expensive paths

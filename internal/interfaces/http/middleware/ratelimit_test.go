@@ -917,4 +917,320 @@ func TestDefaultRateLimitConfigCompile(t *testing.T) {
 	assert.Equal(t, 1000, cfg.Server.RateLimit.EnterpriseBurstSize)
 }
 
+// --- TenantRateLimiter Tests ---
+
+func TestTenantRateLimiter_Enabled_RespectsQuota(t *testing.T) {
+	limiter := NewTenantRateLimiter(100, 3, 0)
+	defer limiter.Stop()
+
+	assert.True(t, limiter.IsEnabled())
+
+	for i := 0; i < 3; i++ {
+		allowed, info := limiter.Allow("tenant-alpha")
+		assert.True(t, allowed, "request %d should be allowed", i)
+		assert.True(t, info.Remaining >= 0)
+		assert.Equal(t, 3, info.Limit)
+	}
+
+	// 4th request should be rejected
+	allowed, info := limiter.Allow("tenant-alpha")
+	assert.False(t, allowed)
+	assert.Equal(t, 0, info.Remaining)
+}
+
+func TestTenantRateLimiter_Disabled_AlwaysAllows(t *testing.T) {
+	limiter := NewTenantRateLimiter(0, 0, 0) // disabled
+	assert.False(t, limiter.IsEnabled())
+
+	// Even with many requests, should all pass since disabled
+	for i := 0; i < 100; i++ {
+		allowed, _ := limiter.Allow("tenant-any")
+		assert.True(t, allowed, "disabled limiter request %d should always pass", i)
+	}
+}
+
+func TestTenantRateLimiter_DisabledByZeroRate(t *testing.T) {
+	limiter := NewTenantRateLimiter(0, 100, 0)
+	assert.False(t, limiter.IsEnabled())
+
+	for i := 0; i < 100; i++ {
+		allowed, _ := limiter.Allow("tenant-zero")
+		assert.True(t, allowed)
+	}
+}
+
+func TestTenantRateLimiter_EmptyTenantID_AlwaysAllowed(t *testing.T) {
+	limiter := NewTenantRateLimiter(1, 1, 0)
+	defer limiter.Stop()
+	assert.True(t, limiter.IsEnabled())
+
+	// Empty tenant ID: always allowed (no tenant context)
+	for i := 0; i < 100; i++ {
+		allowed, _ := limiter.Allow("")
+		assert.True(t, allowed, "empty tenantID request %d should always be allowed", i)
+	}
+}
+
+func TestTenantRateLimiter_TenantsAreIndependent(t *testing.T) {
+	limiter := NewTenantRateLimiter(100, 2, 0)
+	defer limiter.Stop()
+	assert.True(t, limiter.IsEnabled())
+
+	// Exhaust tenant-alpha
+	limiter.Allow("tenant-alpha")
+	limiter.Allow("tenant-alpha")
+
+	// 3rd for alpha should fail
+	allowed, _ := limiter.Allow("tenant-alpha")
+	assert.False(t, allowed)
+
+	// tenant-beta should still have its own quota
+	for i := 0; i < 2; i++ {
+		allowed, _ := limiter.Allow("tenant-beta")
+		assert.True(t, allowed, "independent tenant request %d", i)
+	}
+
+	// 3rd for beta should fail
+	allowed, _ = limiter.Allow("tenant-beta")
+	assert.False(t, allowed)
+}
+
+func TestTenantRateLimiter_KeyFormat(t *testing.T) {
+	// Verify the internal key format uses "tenant:<id>"
+	inner := NewTokenBucketLimiter(100, 100, 0)
+	defer inner.Stop()
+
+	inner.Allow("tenant:test-org")
+	count := inner.BucketCount()
+	assert.Equal(t, 1, count)
+}
+
+// --- Middleware Tenant Rate Limit Integration Tests ---
+
+func TestNewTieredRateLimitMiddleware_TenantLimitExceeded(t *testing.T) {
+	config := DefaultRateLimitConfig()
+	config.TierLimits = map[UserTier]TierLimits{
+		TierFree: {RequestsPerSecond: 100, BurstSize: 100},
+	}
+	config.TenantRequestsPerSecond = 100
+	config.TenantBurstSize = 2
+
+	mw := NewTieredRateLimitMiddleware(config)
+
+	claims := &Claims{UserID: "user-1", TenantID: "tenant-strict", Roles: []string{"viewer"}}
+	ctx := context.WithValue(context.Background(), claimsContextKey, claims)
+
+	handler := mw.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// First two requests should pass (tenant burst = 2)
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/api/v1/patents", nil).WithContext(ctx)
+		handler.ServeHTTP(w, r)
+		assert.Equal(t, http.StatusOK, w.Code, "request %d should pass tenant limit", i)
+	}
+
+	// Third request should be rate limited by tenant quota
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/v1/patents", nil).WithContext(ctx)
+	handler.ServeHTTP(w, r)
+	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+}
+
+func TestNewTieredRateLimitMiddleware_TenantLimitDisabled(t *testing.T) {
+	config := DefaultRateLimitConfig()
+	config.TierLimits = map[UserTier]TierLimits{
+		TierFree: {RequestsPerSecond: 100, BurstSize: 10},
+	}
+	config.TenantRequestsPerSecond = 0
+	config.TenantBurstSize = 0
+
+	mw := NewTieredRateLimitMiddleware(config)
+
+	claims := &Claims{UserID: "user-1", TenantID: "tenant-disabled", Roles: []string{"viewer"}}
+	ctx := context.WithValue(context.Background(), claimsContextKey, claims)
+
+	handler := mw.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// More requests than tenant burst would allow, but since disabled, user limit applies
+	for i := 0; i < 10; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/api/v1/patents", nil).WithContext(ctx)
+		handler.ServeHTTP(w, r)
+		assert.Equal(t, http.StatusOK, w.Code, "request %d should pass with tenant disabled", i)
+	}
+}
+
+func TestNewTieredRateLimitMiddleware_TenantHeaders(t *testing.T) {
+	config := DefaultRateLimitConfig()
+	config.TierLimits = map[UserTier]TierLimits{
+		TierFree: {RequestsPerSecond: 100, BurstSize: 100},
+	}
+	config.TenantRequestsPerSecond = 100
+	config.TenantBurstSize = 50
+
+	mw := NewTieredRateLimitMiddleware(config)
+
+	claims := &Claims{UserID: "user-header", TenantID: "tenant-headers", Roles: []string{"viewer"}}
+	ctx := context.WithValue(context.Background(), claimsContextKey, claims)
+
+	handler := mw.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/v1/patents", nil).WithContext(ctx)
+	handler.ServeHTTP(w, r)
+
+	// Check tenant-specific headers are present
+	tenantLimit := w.Header().Get("X-RateLimit-Tenant-Limit")
+	tenantRemaining := w.Header().Get("X-RateLimit-Tenant-Remaining")
+	tenantReset := w.Header().Get("X-RateLimit-Tenant-Reset")
+
+	assert.Equal(t, "50", tenantLimit)
+	assert.NotEmpty(t, tenantRemaining)
+	assert.NotEmpty(t, tenantReset)
+
+	// Standard user-level headers should still be present
+	assert.Equal(t, "100", w.Header().Get("X-RateLimit-Limit"))
+	assert.NotEmpty(t, w.Header().Get("X-RateLimit-Remaining"))
+	assert.NotEmpty(t, w.Header().Get("X-RateLimit-Reset"))
+}
+
+func TestNewTieredRateLimitMiddleware_TenantOverUserLimit(t *testing.T) {
+	// When tenant limit is hit, the user should be rejected
+	// even if the user's personal limit is not exhausted
+	config := DefaultRateLimitConfig()
+	config.TierLimits = map[UserTier]TierLimits{
+		TierFree: {RequestsPerSecond: 1000, BurstSize: 1000},
+	}
+	config.TenantRequestsPerSecond = 1
+	config.TenantBurstSize = 1
+
+	mw := NewTieredRateLimitMiddleware(config)
+
+	claims := &Claims{UserID: "user-over", TenantID: "tenant-over", Roles: []string{"viewer"}}
+	ctx := context.WithValue(context.Background(), claimsContextKey, claims)
+
+	handler := mw.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// First request: passes (user OK, tenant OK)
+	w1 := httptest.NewRecorder()
+	r1 := httptest.NewRequest("GET", "/api/v1/patents", nil).WithContext(ctx)
+	handler.ServeHTTP(w1, r1)
+	assert.Equal(t, http.StatusOK, w1.Code)
+
+	// Second request: tenant limit exceeded, even though user limit is generous
+	w2 := httptest.NewRecorder()
+	r2 := httptest.NewRequest("GET", "/api/v1/patents", nil).WithContext(ctx)
+	handler.ServeHTTP(w2, r2)
+	assert.Equal(t, http.StatusTooManyRequests, w2.Code)
+}
+
+func TestNewTieredRateLimitMiddleware_TenantAcrossMultipleUsers(t *testing.T) {
+	// Multiple users in the same tenant share the tenant quota
+	config := DefaultRateLimitConfig()
+	config.TierLimits = map[UserTier]TierLimits{
+		TierFree: {RequestsPerSecond: 1000, BurstSize: 1000},
+	}
+	config.TenantRequestsPerSecond = 100
+	config.TenantBurstSize = 3
+
+	mw := NewTieredRateLimitMiddleware(config)
+
+	handler := mw.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	user1Claims := &Claims{UserID: "user-a", TenantID: "shared-tenant", Roles: []string{"viewer"}}
+	user2Claims := &Claims{UserID: "user-b", TenantID: "shared-tenant", Roles: []string{"viewer"}}
+
+	ctx1 := context.WithValue(context.Background(), claimsContextKey, user1Claims)
+	ctx2 := context.WithValue(context.Background(), claimsContextKey, user2Claims)
+
+	// User A makes 2 requests (tenant has 3 burst)
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/api/v1/patents", nil).WithContext(ctx1)
+		handler.ServeHTTP(w, r)
+		assert.Equal(t, http.StatusOK, w.Code, "user A request %d", i)
+	}
+
+	// User B makes 2 requests (only 1 should pass, since tenant burst=3)
+	w1 := httptest.NewRecorder()
+	r1 := httptest.NewRequest("GET", "/api/v1/patents", nil).WithContext(ctx2)
+	handler.ServeHTTP(w1, r1)
+	assert.Equal(t, http.StatusOK, w1.Code, "user B first request should pass")
+
+	w2 := httptest.NewRecorder()
+	r2 := httptest.NewRequest("GET", "/api/v1/patents", nil).WithContext(ctx2)
+	handler.ServeHTTP(w2, r2)
+	assert.Equal(t, http.StatusTooManyRequests, w2.Code,
+		"user B second request should be blocked by shared tenant quota")
+}
+
+func TestNewTieredRateLimitMiddleware_NoTenantContext(t *testing.T) {
+	// When no tenant context exists, tenant limiting is bypassed
+	config := DefaultRateLimitConfig()
+	config.RequestsPerSecond = 100
+	config.BurstSize = 100
+	config.TenantRequestsPerSecond = 1
+	config.TenantBurstSize = 1
+
+	mw := NewTieredRateLimitMiddleware(config)
+
+	handler := mw.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// No claims = no tenant context = tenant limiting bypassed
+	for i := 0; i < 50; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/api/v1/patents", nil)
+		r.RemoteAddr = "10.0.0.1:1234"
+		handler.ServeHTTP(w, r)
+		assert.Equal(t, http.StatusOK, w.Code, "request %d without tenant should pass", i)
+	}
+}
+
+func TestNewTieredRateLimitMiddleware_TenantLimitWithExpensivePath(t *testing.T) {
+	config := DefaultRateLimitConfig()
+	config.TierLimits = map[UserTier]TierLimits{
+		TierFree: {RequestsPerSecond: 100, BurstSize: 100},
+	}
+	config.TenantRequestsPerSecond = 100
+	config.TenantBurstSize = 2
+	config.ExpensivePaths = []string{"/api/v1/similarity"}
+	config.ExpensiveCost = 1
+
+	mw := NewTieredRateLimitMiddleware(config)
+
+	claims := &Claims{UserID: "exp-user", TenantID: "tenant-exp", Roles: []string{"viewer"}}
+	ctx := context.WithValue(context.Background(), claimsContextKey, claims)
+
+	handler := mw.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Two expensive requests should pass (tenant burst = 2)
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/api/v1/similarity/search", nil).WithContext(ctx)
+		handler.ServeHTTP(w, r)
+		assert.Equal(t, http.StatusOK, w.Code, "expensive request %d", i)
+	}
+
+	// Third expensive request should be blocked by tenant limit
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/v1/similarity/search", nil).WithContext(ctx)
+	handler.ServeHTTP(w, r)
+	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+}
+
 //Personal.AI order the ending

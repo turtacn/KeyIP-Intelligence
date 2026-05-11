@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { moleculeService } from '../../services/molecule.service';
@@ -9,7 +9,11 @@ import MoleculeViewer from '../../components/ui/MoleculeViewer';
 import PageError from '../../components/ui/PageError';
 import { SkeletonCard, SkeletonLine } from '../../components/ui/Skeleton';
 import EmptyState from '../../components/ui/EmptyState';
+import PropertyComparison from '../../components/visualization/PropertyComparison';
 import { ArrowLeft, Beaker } from 'lucide-react';
+
+// Maximum number of molecules allowed in comparison
+const MAX_COMPARE = 10;
 
 const MoleculeDetail: React.FC = () => {
   const { t } = useTranslation();
@@ -19,6 +23,11 @@ const MoleculeDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Property comparison state ──
+  const [compareMolecules, setCompareMolecules] = useState<Molecule[]>([]);
+  const [addingMolecule, setAddingMolecule] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
   const fetchMolecule = async () => {
     if (!id) return;
     setLoading(true);
@@ -26,12 +35,58 @@ const MoleculeDetail: React.FC = () => {
     try {
       const response = await moleculeService.getMoleculeById(id);
       setMolecule(response.data);
+      // Start comparison with the current molecule
+      setCompareMolecules([response.data]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load molecule');
     } finally {
       setLoading(false);
     }
   };
+
+  // ── Comparison handlers ──
+  const handleAddMolecule = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+    if (compareMolecules.length >= MAX_COMPARE) {
+      setAddError(`Maximum ${MAX_COMPARE} molecules allowed.`);
+      return;
+    }
+    if (compareMolecules.some((m) => m.id === query || m.smiles === query)) {
+      setAddError('This molecule is already in the comparison.');
+      return;
+    }
+    setAddingMolecule(true);
+    setAddError(null);
+    try {
+      // Try fetching by ID first
+      const response = await moleculeService.getMoleculeById(query.trim());
+      setCompareMolecules((prev) => [...prev, response.data]);
+    } catch {
+      // Fallback: try searching by query
+      try {
+        const searchResult = await moleculeService.searchMolecules(query.trim());
+        if (searchResult.data.length > 0) {
+          const found = searchResult.data[0];
+          // Avoid duplicates
+          if (!compareMolecules.some((m) => m.id === found.id)) {
+            setCompareMolecules((prev) => [...prev, found]);
+          } else {
+            setAddError('This molecule is already in the comparison.');
+          }
+        } else {
+          setAddError('Molecule not found. Please check the ID or SMILES.');
+        }
+      } catch {
+        setAddError('Failed to find molecule. Please check the ID or SMILES.');
+      }
+    } finally {
+      setAddingMolecule(false);
+    }
+  }, [compareMolecules]);
+
+  const handleRemoveMolecule = useCallback((removeId: string) => {
+    setCompareMolecules((prev) => prev.filter((m) => m.id !== removeId));
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -193,6 +248,17 @@ const MoleculeDetail: React.FC = () => {
             </table>
           </div>
         </Card>
+      )}
+
+      {/* ── Property Comparison ── */}
+      {molecule && (
+        <PropertyComparison
+          molecules={compareMolecules}
+          onRemoveMolecule={handleRemoveMolecule}
+          onAddMolecule={handleAddMolecule}
+          addError={addError}
+          adding={addingMolecule}
+        />
       )}
     </div>
   );

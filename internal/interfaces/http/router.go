@@ -54,6 +54,7 @@ type RouterConfig struct {
 	RuntimeHandler    *handlers.RuntimeHandler
 	DocsHandler       *handlers.DocsHandler
 	CSPReportHandler  *handlers.CSPReportHandler
+	WSHandler         *handlers.WSHandler
 
 	// Infrastructure
 	Logger           logging.Logger
@@ -138,6 +139,14 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	// --- CSP Report Endpoint (no auth required, accepts POST from browsers) ---
 	if cfg.CSPReportHandler != nil {
 		cfg.CSPReportHandler.RegisterRoutes(mux)
+	}
+
+	// --- WebSocket Events Endpoint ---
+	// Real-time event push for patent matches, deadline alerts, infringement warnings,
+	// and system notifications. Upgraded from HTTP to WebSocket; auth/tenant middlewares
+	// are applied via the conditional middleware chain below.
+	if cfg.WSHandler != nil {
+		cfg.WSHandler.RegisterRoutes(mux)
 	}
 
 	// --- API v1 Routes ---
