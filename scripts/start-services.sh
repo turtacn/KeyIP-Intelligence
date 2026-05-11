@@ -240,14 +240,14 @@ start_mailhog() {
 
 start_keycloak() {
   if $IS_DOCKER_MACHINE; then
-    _warn "docker-machine: 跳过 Keycloak 24（UBI9 捆绑 JDK 不兼容，认证功能不可用）"
-    _warn "  已在 docker-machine 下检查的方案:"
-    _warn "  - 降级到 Keycloak 23/22/21（仍使用 UBI9 + JDK 17，同 24，无改善）"
-    _warn "  - Keycloak 'quarkus 精简版'（不存在独立版本，start-dev 已是最轻量）"
-    _warn "  - redhat/ubi9-openjdk-17 基础镜像（即 Keycloak 24 当前使用的基础镜像）"
-    _warn "  如仍需 Keycloak，可尝试以下外部方案："
-    _warn "  1. quay.io/keycloak/keycloak:20.0（UBI8 + JDK 11，兼容性可能更好）"
-    _warn "  2. bitnami/keycloak:24.0（Debian 12 基础镜像，非 UBI 系列）"
+    _warn "docker-machine: 使用 bitnami/keycloak:24（Debian 12 基础镜像，兼容性更好）"
+    docker run -d --name keyip-keycloak \
+      $RESTART $LOGGING --network "$NETWORK" \
+      -p 8180:8080 \
+      -e KEYCLOAK_ADMIN=admin \
+      -e KEYCLOAK_ADMIN_PASSWORD=admin \
+      -e KEYCLOAK_HTTP_PORT=8080 \
+      bitnami/keycloak:24
     return 0
   fi
   _log "启动 Keycloak 24 (8180)"
