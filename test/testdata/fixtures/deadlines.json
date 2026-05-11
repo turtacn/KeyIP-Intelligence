@@ -1,10 +1,259 @@
-[
-  {"id":"dl-001","patent_number":"CN115000001A","jurisdiction":"CN","deadline_type":"annuity","deadline_date":"2025-06-15","priority":"high","description":"第3年年费缴纳截止日","fee_amount":900,"fee_currency":"CNY","status":"pending"},
-  {"id":"dl-002","patent_number":"US20230100001A1","jurisdiction":"US","deadline_type":"response","deadline_date":"2025-03-20","priority":"critical","description":"Office Action response deadline (non-final rejection)","status":"pending"},
-  {"id":"dl-003","patent_number":"EP4200001A1","jurisdiction":"EP","deadline_type":"examination","deadline_date":"2025-08-01","priority":"medium","description":"Request for examination due","status":"pending"},
-  {"id":"dl-004","patent_number":"JP2024012345A","jurisdiction":"JP","deadline_type":"annuity","deadline_date":"2025-04-10","priority":"low","description":"第2年年費","fee_amount":200,"fee_currency":"JPY","status":"pending"},
-  {"id":"dl-005","patent_number":"KR102500001B1","jurisdiction":"KR","deadline_type":"annuity","deadline_date":"2025-03-20","priority":"high","description":"第3년 연차료 납부","fee_amount":120000,"fee_currency":"KRW","status":"paid"},
-  {"id":"dl-006","patent_number":"US11234567B2","jurisdiction":"US","deadline_type":"issue_fee","deadline_date":"2024-08-15","priority":"critical","description":"Issue fee payment deadline","status":"paid"},
-  {"id":"dl-007","patent_number":"CN118000001A","jurisdiction":"CN","deadline_type":"substantive_examination","deadline_date":"2027-01-05","priority":"medium","description":"实审请求截止日","status":"pending"},
-  {"id":"dl-008","patent_number":"KR20230056789A","jurisdiction":"KR","deadline_type":"response","deadline_date":"2025-02-28","priority":"high","description":"의견제출통지서 대응 마감일","status":"overdue"}
-]
+{
+  "version": "1.0.0",
+  "generated_at": "2026-05-11T00:00:00Z",
+  "description": "OLED 专利生命周期期限测试数据 — 年费/OA答复/PCT进入国家阶段/优先权/授权费 八种期限",
+  "deadlines": [
+    {
+      "id": "oled-dln-0001-4000-c000-000000000001",
+      "patent_id": "oled-pat-0001-4000-a000-000000000001",
+      "deadline_type": "annuity_payment",
+      "title": "CN115650927B 第5年年费缴纳",
+      "description": "中国发明专利第5年度维持费，含附加费期限。专利权人：京东方科技集团股份有限公司",
+      "due_date": "2026-09-10T00:00:00Z",
+      "original_due_date": "2026-09-10T00:00:00Z",
+      "status": "active",
+      "priority": "high",
+      "assignee_id": "oled-usr-0004-4000-b000-000000000004",
+      "completed_at": null,
+      "completed_by": null,
+      "extension_count": 0,
+      "extension_history": [],
+      "reminder_config": {
+        "first_reminder": -60,
+        "second_reminder": -30,
+        "final_reminder": -7,
+        "channels": ["email", "system"]
+      },
+      "last_reminder_at": "2026-07-12T00:00:00Z",
+      "metadata": {
+        "annuity_year": 5,
+        "fee_amount": 2000.00,
+        "currency": "CNY",
+        "patent_number": "CN115650927B",
+        "jurisdiction": "CN"
+      },
+      "created_at": "2026-01-10T08:00:00Z",
+      "updated_at": "2026-05-11T00:00:00Z"
+    },
+    {
+      "id": "oled-dln-0002-4000-c000-000000000002",
+      "patent_id": "oled-pat-0002-4000-a000-000000000002",
+      "deadline_type": "annuity_payment",
+      "title": "US11678901B2 第4-5.5年维护费",
+      "description": "美国发明专利第4-5.5年维护费缴纳，USPTO维护费窗口期。专利权人：Universal Display Corporation",
+      "due_date": "2027-08-22T00:00:00Z",
+      "original_due_date": "2027-08-22T00:00:00Z",
+      "status": "active",
+      "priority": "high",
+      "assignee_id": "oled-usr-0004-4000-b000-000000000004",
+      "completed_at": null,
+      "completed_by": null,
+      "extension_count": 0,
+      "extension_history": [],
+      "reminder_config": {
+        "first_reminder": -90,
+        "second_reminder": -30,
+        "channels": ["email"]
+      },
+      "last_reminder_at": null,
+      "metadata": {
+        "annuity_year": 4,
+        "fee_amount": 3800.00,
+        "currency": "USD",
+        "patent_number": "US11678901B2",
+        "jurisdiction": "US",
+        "maintenance_period": "3.5-7.5 years"
+      },
+      "created_at": "2026-01-10T08:00:00Z",
+      "updated_at": "2026-05-11T00:00:00Z"
+    },
+    {
+      "id": "oled-dln-0003-4000-c000-000000000003",
+      "patent_id": "oled-pat-0003-4000-a000-000000000003",
+      "deadline_type": "oa_response",
+      "title": "EP3988567B1 异议期答复",
+      "description": "欧洲专利授权后9个月内异议期，任何第三方可提出异议。专利权人：Merck Patent GmbH",
+      "due_date": "2026-10-10T00:00:00Z",
+      "original_due_date": "2026-10-10T00:00:00Z",
+      "status": "active",
+      "priority": "critical",
+      "assignee_id": "oled-usr-0004-4000-b000-000000000004",
+      "completed_at": null,
+      "completed_by": null,
+      "extension_count": 0,
+      "extension_history": [],
+      "reminder_config": {
+        "first_reminder": -60,
+        "second_reminder": -30,
+        "final_reminder": -14,
+        "channels": ["email", "slack"]
+      },
+      "last_reminder_at": "2026-08-11T00:00:00Z",
+      "metadata": {
+        "ep_opposition_period": true,
+        "patent_number": "EP3988567B1",
+        "jurisdiction": "EP",
+        "deadline_type_detail": "opposition"
+      },
+      "created_at": "2026-01-15T09:00:00Z",
+      "updated_at": "2026-05-11T00:00:00Z"
+    },
+    {
+      "id": "oled-dln-0004-4000-c000-000000000004",
+      "patent_id": "oled-pat-0004-4000-a000-000000000004",
+      "deadline_type": "oa_response",
+      "title": "JP2023501234A 拒絶理由通知応答",
+      "description": "日本特許庁からの拒絶理由通知に対する応答期限（意見書・補正書提出）。出願人：Kyulux Inc.",
+      "due_date": "2026-08-15T00:00:00Z",
+      "original_due_date": "2026-08-15T00:00:00Z",
+      "status": "active",
+      "priority": "high",
+      "assignee_id": "oled-usr-0004-4000-b000-000000000004",
+      "completed_at": null,
+      "completed_by": null,
+      "extension_count": 1,
+      "extension_history": [
+        {
+          "date": "2026-01-20T00:00:00Z",
+          "reason": "审查意见复杂，需要补充实验数据",
+          "to": "2026-08-15T00:00:00Z"
+        }
+      ],
+      "reminder_config": {
+        "first_reminder": -45,
+        "second_reminder": -14,
+        "channels": ["email", "system"]
+      },
+      "last_reminder_at": "2026-07-01T00:00:00Z",
+      "metadata": {
+        "patent_number": "JP2023501234A",
+        "jurisdiction": "JP",
+        "office_action_count": 2,
+        "extension_reason": "data_complement"
+      },
+      "created_at": "2025-10-15T08:00:00Z",
+      "updated_at": "2026-05-11T00:00:00Z"
+    },
+    {
+      "id": "oled-dln-0005-4000-c000-000000000005",
+      "patent_id": "oled-pat-0009-4000-a000-000000000009",
+      "deadline_type": "pct_national_phase",
+      "title": "JP2023512345A PCT进入国家阶段",
+      "description": "PCT国际申请进入日本国家阶段的30个月期限。需提交日文译文、缴纳申请费及实审请求。出愿人：出光興産株式会社",
+      "due_date": "2026-09-10T00:00:00Z",
+      "original_due_date": "2026-09-10T00:00:00Z",
+      "status": "active",
+      "priority": "critical",
+      "assignee_id": "oled-usr-0004-4000-b000-000000000004",
+      "completed_at": null,
+      "completed_by": null,
+      "extension_count": 0,
+      "extension_history": [],
+      "reminder_config": {
+        "first_reminder": -90,
+        "second_reminder": -60,
+        "final_reminder": -14,
+        "channels": ["email", "slack", "system"]
+      },
+      "last_reminder_at": "2026-06-12T00:00:00Z",
+      "metadata": {
+        "patent_number": "JP2023512345A",
+        "jurisdiction": "JP",
+        "pct_app_number": "PCT/JP2021/045678",
+        "national_deadline_months": 30,
+        "filing_date": "2022-03-10"
+      },
+      "created_at": "2026-01-10T08:00:00Z",
+      "updated_at": "2026-05-11T00:00:00Z"
+    },
+    {
+      "id": "oled-dln-0006-4000-c000-000000000006",
+      "patent_id": "oled-pat-0005-4000-a000-000000000005",
+      "deadline_type": "annuity_payment",
+      "title": "KR1020230078901B1 第4-5年年金納付",
+      "description": "大韓民国特許第4-5年年金(特許維持費)納付。特許権者：삼성SDI 주식회사",
+      "due_date": "2026-08-20T00:00:00Z",
+      "original_due_date": "2026-08-20T00:00:00Z",
+      "status": "active",
+      "priority": "normal",
+      "assignee_id": "oled-usr-0004-4000-b000-000000000004",
+      "completed_at": null,
+      "completed_by": null,
+      "extension_count": 0,
+      "extension_history": [],
+      "reminder_config": {
+        "first_reminder": -30,
+        "channels": ["email"]
+      },
+      "last_reminder_at": null,
+      "metadata": {
+        "annuity_year": 4,
+        "fee_amount": 60000.00,
+        "currency": "KRW",
+        "patent_number": "KR1020230078901B1",
+        "jurisdiction": "KR"
+      },
+      "created_at": "2026-01-10T08:00:00Z",
+      "updated_at": "2026-05-11T00:00:00Z"
+    },
+    {
+      "id": "oled-dln-0007-4000-c000-000000000007",
+      "patent_id": "oled-pat-0008-4000-a000-000000000008",
+      "deadline_type": "examination_request",
+      "title": "EP4125678A1 实审请求提交",
+      "description": "欧洲专利申请实质审查请求提交期限（优先权日起31个月内）。申请人：Samsung Display Co., Ltd.",
+      "due_date": "2026-07-01T00:00:00Z",
+      "original_due_date": "2026-07-01T00:00:00Z",
+      "status": "active",
+      "priority": "high",
+      "assignee_id": "oled-usr-0004-4000-b000-000000000004",
+      "completed_at": null,
+      "completed_by": null,
+      "extension_count": 0,
+      "extension_history": [],
+      "reminder_config": {
+        "first_reminder": -90,
+        "second_reminder": -30,
+        "channels": ["email", "system"]
+      },
+      "last_reminder_at": "2026-04-01T00:00:00Z",
+      "metadata": {
+        "patent_number": "EP4125678A1",
+        "jurisdiction": "EP",
+        "priority_date": "2021-06-01",
+        "deadline_type_detail": "examination_request"
+      },
+      "created_at": "2026-01-10T08:00:00Z",
+      "updated_at": "2026-05-11T00:00:00Z"
+    },
+    {
+      "id": "oled-dln-0008-4000-c000-000000000008",
+      "patent_id": "oled-pat-0010-4000-a000-000000000010",
+      "deadline_type": "priority_claim",
+      "title": "KR1020240056789A 优先权文件提交",
+      "description": "要求优先权的优先权证明文件及韩文译文提交期限（优先权日起16个月内）。申请人：롯데케미칼 주식회사",
+      "due_date": "2026-09-15T00:00:00Z",
+      "original_due_date": "2026-09-15T00:00:00Z",
+      "status": "active",
+      "priority": "normal",
+      "assignee_id": null,
+      "completed_at": null,
+      "completed_by": null,
+      "extension_count": 0,
+      "extension_history": [],
+      "reminder_config": {
+        "first_reminder": -30,
+        "channels": ["email"]
+      },
+      "last_reminder_at": null,
+      "metadata": {
+        "patent_number": "KR1020240056789A",
+        "jurisdiction": "KR",
+        "priority_date": "2022-05-15",
+        "deadline_type_detail": "priority_document"
+      },
+      "created_at": "2026-01-10T08:00:00Z",
+      "updated_at": "2026-05-11T00:00:00Z"
+    }
+  ]
+}
