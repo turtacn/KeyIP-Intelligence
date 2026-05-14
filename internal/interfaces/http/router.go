@@ -37,6 +37,7 @@ type RouterConfig struct {
 	CollaborationHandler *handlers.CollaborationHandler
 	ReportHandler        *handlers.ReportHandler
 	HealthHandler        *handlers.HealthHandler
+	AIHandler            *handlers.AIHandler
 
 	// Middleware
 	AuthMiddleware               *middleware.AuthMiddleware
@@ -140,6 +141,10 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	// --- CSP Report Endpoint (no auth required, accepts POST from browsers) ---
 	if cfg.CSPReportHandler != nil {
 		cfg.CSPReportHandler.RegisterRoutes(mux)
+	}
+
+	if cfg.AIHandler != nil {
+		cfg.AIHandler.RegisterRoutes(mux)
 	}
 
 	// --- WebSocket Events Endpoint ---

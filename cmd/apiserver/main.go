@@ -21,6 +21,7 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/neo4j"
+	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres"
 	pg_repos "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres/repositories"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/redis"
@@ -246,6 +247,9 @@ func main() {
 
 	authHandler := h.NewAuthHandler(authSvc, logger)
 
+	aiBackend := common.NewOpenAIBackend(nil)
+	aiHandler := h.NewAIHandler(aiBackend, logger)
+
 	// --- CORS Middleware (permissive for docker-machine dev) ---
 	corsMw := httpmw.NewCORSMiddleware(httpmw.CORSConfig{
 		AllowedOrigins:   []string{"*"},
@@ -263,6 +267,7 @@ func main() {
 		PortfolioHandler:    portfolioHandler,
 		LifecycleHandler:    lifecycleHandler,
 		AuthHandler:         authHandler,
+		AIHandler:           aiHandler,
 		HealthHandler:       healthHandler,
 		CORSMiddleware:      corsMw,
 		Logger:              logger,
