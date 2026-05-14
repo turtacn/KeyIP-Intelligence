@@ -1,0 +1,197 @@
+# KeyIP-Intelligence Platform — Local Development Configuration
+# ============================================================
+# This file is for LOCAL DEVELOPMENT ONLY.
+# Do not commit real production secrets to this file.
+# ============================================================
+
+server:
+  http:
+    host: "0.0.0.0"
+    port: 8080
+    read_timeout: 30s
+    write_timeout: 30s
+    max_header_bytes: 1048576
+
+  grpc:
+    host: "0.0.0.0"
+    port: 9090
+    max_recv_msg_size: 52428800
+    max_send_msg_size: 52428800
+
+database:
+  postgres:
+    host: "keyip-postgres"
+    port: 5432
+    user: "keyip"
+    password: "keyip_dev"
+    dbname: "keyip_dev"
+    sslmode: "disable"
+    max_open_conns: 25
+    max_idle_conns: 10
+    conn_max_lifetime: 5m
+
+  neo4j:
+    uri: "bolt://keyip-neo4j:7687"
+    user: "neo4j"
+    password: "neo4j_dev"
+    max_connection_pool_size: 50
+    connection_acquisition_timeout: 60s
+
+cache:
+  redis:
+    addr: "keyip-redis:6379"
+    password: ""
+    db: 0
+    pool_size: 20
+    min_idle_conns: 5
+    dial_timeout: 5s
+    read_timeout: 3s
+    write_timeout: 3s
+
+search:
+  opensearch:
+    addresses:
+      - "http://keyip-opensearch:9200"
+    username: "admin"
+    password: "admin"
+    max_retries: 3
+    retry_on_status: [502, 503, 504]
+    compress_request_body: true
+
+  milvus:
+    address: "keyip-milvus"
+    port: 19530
+    username: ""
+    password: ""
+    connect_timeout: 10s
+    read_timeout: 10s
+
+messaging:
+  kafka:
+    brokers:
+      - "keyip-kafka:29092"
+    consumer_group: "keyip-dev-group"
+    auto_offset_reset: "earliest"
+    max_bytes: 10485760
+    session_timeout: 30s
+    heartbeat_interval: 3s
+    rebalance_timeout: 60s
+
+storage:
+  # Standalone MinIO (shared with Milvus internal MinIO but on different port)
+  minio:
+    endpoint: "keyip-minio:9000"
+    access_key: "minioadmin"
+    secret_key: "minioadmin"
+    use_ssl: false
+    bucket_name: "keyip-documents"
+    region: "us-east-1"
+    part_size: 67108864
+
+auth:
+  keycloak:
+    base_url: "http://localhost:8180"
+    realm: "keyip"
+    client_id: "keyip-api"
+    client_secret: "dev-secret"
+    admin_user: "admin"
+    admin_password: "admin"
+    token_endpoint: "/realms/keyip/protocol/openid-connect/token"
+    userinfo_endpoint: "/realms/keyip/protocol/openid-connect/userinfo"
+
+  jwt:
+    secret: "dev-jwt-secret-do-not-use-in-prod"
+    issuer: "keyip-api"
+    expiry: 24h
+    refresh_expiry: 168h
+    signing_method: "HS256"
+
+intelligence:
+  models_dir: "./models"
+
+  molpatent_gnn:
+    model_path: "molpatent_gnn_dev.pt"
+    batch_size: 32
+    timeout: 30s
+    device: "cpu"
+    num_workers: 4
+
+  claim_bert:
+    model_path: "claim_bert_dev"
+    max_seq_length: 512
+    timeout: 30s
+    device: "cpu"
+    vocab_path: "vocab.txt"
+
+  strategy_gpt:
+    endpoint: "https://api.deepseek.com/v1"
+    api_key: "${DEEPSEEK_API_KEY}"
+    model_name: "deepseek-chat"
+    max_tokens: 65536
+    temperature: 0.7
+    top_p: 0.9
+    timeout: 120s
+    retry_count: 3
+    retry_delay: 2s
+
+  chem_extractor:
+    ocr_endpoint: "http://localhost:8081/ocr"
+    ner_model_path: "chem_ner_dev"
+    image_preprocessing: true
+    supported_formats: ["png", "jpg", "pdf"]
+    timeout: 60s
+
+  infringe_net:
+    model_path: "infringe_net_dev.pt"
+    threshold: 0.85
+    batch_size: 16
+    timeout: 30s
+    similarity_metric: "cosine"
+
+monitoring:
+  prometheus:
+    enabled: true
+    port: 9091
+    path: "/metrics"
+    namespace: "keyip"
+
+  logging:
+    level: "debug"
+    format: "json"
+    output: "stdout"
+    file_path: ""
+    max_size: 100
+    max_backups: 3
+    max_age: 28
+    compress: false
+
+  tracing:
+    enabled: false
+    endpoint: "http://localhost:4317"
+    sample_rate: 1.0
+    service_name: "keyip-intelligence-dev"
+    environment: "development"
+
+  pprof:
+    enabled: false
+    # Enable pprof profiling endpoints at /debug/pprof/...
+    # WARNING: Do NOT enable in production. Can expose sensitive runtime information.
+
+notification:
+  email:
+    smtp_host: "keyip-mailhog"
+    smtp_port: 1025
+    username: ""
+    password: ""
+    from: "dev@keyip.com"
+    use_tls: false
+    timeout: 10s
+
+  wechat_work:
+    corp_id: "dev-corp"
+    agent_id: "1000002"
+    secret: "dev-secret"
+    token: "dev-token"
+    encoding_aes_key: "dev-aes-key"
+
+# //Personal.AI order the ending

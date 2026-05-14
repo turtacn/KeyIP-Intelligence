@@ -7,6 +7,6 @@ export const infringementService = {
     const params: Record<string, any> = { page, pageSize };
     if (riskLevel) params.riskLevel = riskLevel;
 
-    return api.get<ApiResponse<InfringementAlert[]>>('/alerts', params);
+    return api.get<ApiResponse<InfringementAlert[]>>('/infringement/alerts', params);
   }
 };

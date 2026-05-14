@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../utils/auth';
 import {
   LayoutDashboard,
   Search,
@@ -15,6 +16,7 @@ import {
 
 const Sidebar: React.FC = () => {
   const { t } = useTranslation();
+  const { user, isAuthenticated } = useAuth();
 
   const navItems = [
     { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
@@ -74,11 +76,24 @@ const Sidebar: React.FC = () => {
       <div className="p-4 border-t border-slate-800">
         <div className="flex items-center">
           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">
-            JD
+            {isAuthenticated && user
+              ? (user.name || user.preferred_username || 'U')
+                  .split(' ')
+                  .map(s => s[0])
+                  .join('')
+                  .toUpperCase()
+                  .slice(0, 2)
+              : 'JD'}
           </div>
           <div className="ml-3">
-            <p className="text-sm font-medium">John Doe</p>
-            <p className="text-xs text-slate-500">{t('app.role')}</p>
+            <p className="text-sm font-medium">
+              {isAuthenticated && user
+                ? user.name || user.preferred_username
+                : 'John Doe'}
+            </p>
+            <p className="text-xs text-slate-500">
+              {isAuthenticated && user?.email ? user.email : t('app.role')}
+            </p>
           </div>
         </div>
       </div>

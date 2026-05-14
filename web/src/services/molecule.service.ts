@@ -8,7 +8,9 @@ export const moleculeService = {
   },
 
   async getMoleculeById(id: string): Promise<ApiResponse<Molecule>> {
-    return api.get<ApiResponse<Molecule>>(`/molecules/${id}`);
+    // URL-encode to handle special chars like parentheses in molecule names
+    const safeId = encodeURIComponent(id);
+    return api.get<ApiResponse<Molecule>>(`/molecules/${safeId}`);
   },
 
   async searchMolecules(query: string): Promise<ApiResponse<Molecule[]>> {

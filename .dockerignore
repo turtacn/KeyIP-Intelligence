@@ -1,0 +1,21 @@
+.git
+web/node_modules
+# web/dist  -- needed for web Dockerfile.bin (pre-built locally)
+.claude
+.claw
+.codex
+.sandbox-home
+.sandbox-tmp
+.semantic_snapshot_cache
+Playwright
+*.exe
+*.dll
+*.so
+*.dylib
+apiserver
+apiserver-*
+worker
+worker-*
+keyip
+/tmp
+/logs

@@ -28,8 +28,8 @@ const AlertList: React.FC<AlertListProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredAlerts = alerts.filter(alert =>
-    alert.targetPatentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    alert.triggerMoleculeId.toLowerCase().includes(searchTerm.toLowerCase())
+    alert?.targetPatentId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    alert?.triggerMoleculeId?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (

@@ -28,6 +28,7 @@ Thumbs.db
 
 # Config and sensitive files
 configs/config.yaml
+configs/local.yaml
 .env
 .env.*
 *.pem
@@ -37,6 +38,12 @@ configs/config.yaml
 # Build and deployment artifacts
 dist/
 build/
+apiserver
+apiserver-darwin*
+apiserver-static
+keyip
+worker
+worker-static
 coverage.out
 coverage.html
 *.prof
@@ -62,6 +69,29 @@ tmp/
 # Test artifacts
 test/testdata/generated/
 .testcache/
+Playwright/artifacts/
+
+# Sandbox & AI assistant caches
+.sandbox-home/
+.sandbox-tmp/
+.semantic_snapshot_cache/
+.gocache/
+.claude/
+.claw/
+.clawd-todos.json
+.codex/
+
+# AI assistant scripts & personal dev tools
+bd.sh
+commit.sh
+dev-server.py
+mkdirtouchfile.sh
+mod.sh
+deepseek.rc
+config-docker-net.yaml
+
+# Debug scripts
+Playwright/debug_*.py
 
 # //Personal.AI order the ending
 node_modules/

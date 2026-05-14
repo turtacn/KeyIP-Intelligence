@@ -262,7 +262,7 @@ type PrometheusConfig struct {
 
 type LoggingConfig struct {
 	Level      string `mapstructure:"level" validate:"oneof=debug info warn error"`
-	Format     string `mapstructure:"format" validate:"oneof=json text"`
+	Format     string `mapstructure:"format" validate:"oneof=json text console"`
 	Output     string `mapstructure:"output" validate:"oneof=stdout file"`
 	FilePath   string `mapstructure:"file_path"`
 	MaxSize    int    `mapstructure:"max_size"`

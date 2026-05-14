@@ -1,5 +1,5 @@
 import React from 'react';
-import { Skeleton, SkeletonLine, SkeletonCard } from '../../components/ui/Skeleton';
+import Skeleton, { SkeletonLine, SkeletonCard } from '../../components/ui/Skeleton';
 
 /** Specialized skeleton matching the MoleculeDetail page layout */
 const MoleculeDetailSkeleton: React.FC = () => {

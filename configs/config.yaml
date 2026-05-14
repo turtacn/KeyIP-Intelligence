@@ -157,7 +157,7 @@ monitoring:
 
   logging:
     level: "debug"
-    format: "text"
+    format: "json"
     output: "stdout"
     file_path: ""
     max_size: 100

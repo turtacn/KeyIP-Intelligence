@@ -99,7 +99,7 @@ type LogConfig struct {
 
 // Validate checks if the LogConfig is valid.
 func (c LogConfig) Validate() error {
-	if c.Format != "json" && c.Format != "console" && c.Format != "" {
+	if c.Format != "json" && c.Format != "console" && c.Format != "text" && c.Format != "" {
 		return fmt.Errorf("invalid log format: %s", c.Format)
 	}
 	if len(c.OutputPaths) == 0 {

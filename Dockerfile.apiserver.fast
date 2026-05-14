@@ -1,0 +1,20 @@
+# Fast build: uses pre-populated Go module cache from .gocache
+FROM golang:1.22-alpine AS builder
+WORKDIR /build
+# Copy the pre-downloaded module cache
+COPY .gocache /go/pkg/mod
+# Copy source and build directly (skip go mod download)
+COPY go.mod go.sum ./
+COPY . .
+ENV GOMODCACHE=/go/pkg/mod
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOSUMDB=off
+ENV GOFLAGS=-mod=mod
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o apiserver-docker ./cmd/apiserver/
+
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates tzdata
+COPY --from=builder /build/apiserver-docker /usr/local/bin/apiserver
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/apiserver"]
+CMD ["-config", "/app/configs/docker-net.yaml"]

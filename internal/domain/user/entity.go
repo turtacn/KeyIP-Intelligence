@@ -14,11 +14,11 @@ type User struct {
 	DisplayName      string         `json:"display_name"`
 	PasswordHash     string         `json:"-"`
 	Status           string         `json:"status"`
-	AvatarURL        string         `json:"avatar_url,omitempty"`
+	AvatarURL        *string        `json:"avatar_url,omitempty"`
 	Locale           string         `json:"locale"`
 	Timezone         string         `json:"timezone"`
 	LastLoginAt      *time.Time     `json:"last_login_at,omitempty"`
-	LastLoginIP      string         `json:"last_login_ip,omitempty"`
+	LastLoginIP      *string        `json:"last_login_ip,omitempty"`
 	LoginCount       int            `json:"login_count"`
 	FailedLoginCount int            `json:"failed_login_count"`
 	LockedUntil      *time.Time     `json:"locked_until,omitempty"`

@@ -1,0 +1,6 @@
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates tzdata
+COPY apiserver-docker /usr/local/bin/apiserver
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/apiserver"]
+CMD ["-config", "/app/config-docker.yaml"]

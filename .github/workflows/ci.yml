@@ -2,7 +2,7 @@
 # KeyIP-Intelligence CI Pipeline
 # =============================================================================
 # Runs on pushes to main and pull requests targeting main.
-# Jobs: lint, test, build, security
+# Jobs: lint, test, build, security, e2e-test
 # =============================================================================
 
 name: CI
@@ -145,3 +145,46 @@ jobs:
         run: |
           bun install --frozen-lockfile
           npm audit --audit-level=high
+
+  # ---------------------------------------------------------------------------
+  # E2E Test: start infrastructure services, build, and run end-to-end tests
+  # ---------------------------------------------------------------------------
+  e2e-test:
+    name: E2E Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Start Infrastructure Services
+        run: docker compose -f deployments/docker/docker-compose.yml up -d --wait
+
+      - name: Install migrate tool
+        run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+      - name: Run Database Migrations
+        run: make migrate-up
+
+      - name: Build Binaries
+        run: make build
+
+      - name: Start API Server
+        run: |
+          bin/apiserver &
+          sleep 3
+
+      - name: Run E2E Tests
+        run: go test -tags=e2e -v -count=1 -timeout=10m ./test/e2e/...
+        env:
+          KEYIP_E2E_BASE_URL: http://localhost:8080
+          KEYIP_E2E_DB_DSN: postgres://keyip:keyip_dev@localhost:5432/keyip_dev?sslmode=disable
+
+      - name: Cleanup Infrastructure
+        if: always()
+        run: docker compose -f deployments/docker/docker-compose.yml down --remove-orphans

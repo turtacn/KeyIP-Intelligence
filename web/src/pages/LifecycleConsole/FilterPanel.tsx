@@ -82,7 +82,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filters, onFilterChange, onRe
           >
             {eventTypes.map((type) => (
               <option key={type} value={type}>
-                {type === 'All' ? 'All Event Types' : type.replace(/_/g, ' ')}
+                {type === 'All' ? 'All Event Types' : (type || '').replace(/_/g, ' ')}
               </option>
             ))}
           </select>

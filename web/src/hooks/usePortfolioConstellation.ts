@@ -20,7 +20,7 @@ export function usePortfolioConstellation(portfolioId?: string): UseConstellatio
     setError(null);
     try {
       const response = await portfolioService.getConstellation(pid);
-      setData(response);
+      setData((response as any).data || response);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {

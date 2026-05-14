@@ -414,17 +414,18 @@ func initWorkerInfrastructure(cfg *config.Config, logger logging.Logger) (*worke
 	infra.opensearch = osCli
 
 	// Convert app config to milvus infrastructure config
+		// Fix: include port in address, and make milvus optional
 	milvusCfg := milvusclient.ClientConfig{
-		Address:  cfg.Search.Milvus.Address,
+		Address:  fmt.Sprintf("%s:%d", cfg.Search.Milvus.Address, cfg.Search.Milvus.Port),
 		Username: cfg.Search.Milvus.Username,
 		Password: cfg.Search.Milvus.Password,
 	}
 	milvusCli, err := milvusclient.NewClient(milvusCfg, logger)
 	if err != nil {
-		infra.Close()
-		return nil, fmt.Errorf("milvus: %w", err)
+		logger.Warn("milvus connection failed (non-fatal)", logging.Err(err))
+	} else {
+		infra.milvus = milvusCli
 	}
-	infra.milvus = milvusCli
 
 	logger.Info("worker infrastructure initialized")
 	return infra, nil

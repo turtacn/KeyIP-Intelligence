@@ -9,7 +9,7 @@
 # points to all these services on their default ports.
 # =============================================================================
 
-version: "3.9"
+version: "3.7"
 
 x-logging: &default-logging
   driver: json-file
@@ -22,7 +22,7 @@ services:
   # PostgreSQL - Primary relational database
   # ---------------------------------------------------------------------------
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: keyip-postgres
     restart: unless-stopped
     security_opt:
@@ -138,8 +138,7 @@ services:
       OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
       DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
     depends_on:
-      opensearch:
-        condition: service_healthy
+      - opensearch
     logging: *default-logging
     networks:
       - keyip-network
@@ -211,10 +210,8 @@ services:
     volumes:
       - milvus-data:/var/lib/milvus:delegated
     depends_on:
-      milvus-etcd:
-        condition: service_healthy
-      milvus-minio:
-        condition: service_healthy
+      - milvus-etcd
+      - milvus-minio
     command: ["milvus", "run", "standalone"]
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:9091/health"]
@@ -261,8 +258,7 @@ services:
     security_opt:
       - seccomp:unconfined
     depends_on:
-      minio:
-        condition: service_healthy
+      - minio
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
@@ -321,6 +317,64 @@ services:
     ports:
       - "1025:1025"   # SMTP
       - "8025:8025"   # Web UI
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # ---------------------------------------------------------------------------
+  # API Server - REST API gateway (Go binary)
+  # ---------------------------------------------------------------------------
+  apiserver:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.apiserver.fast
+    image: keyip-apiserver:local
+    container_name: keyip-apiserver
+    restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
+    ports:
+      - "8080:8080"    # HTTP API
+      - "9090:9090"    # gRPC
+      - "9091:9091"    # Prometheus metrics
+    environment:
+      CONFIG_FILE: /app/configs/docker-net.yaml
+    volumes:
+      - ../../configs/docker-net.yaml:/app/configs/docker-net.yaml:ro
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging: *default-logging
+    networks:
+      - keyip-network
+
+  # ---------------------------------------------------------------------------
+  # Web Frontend - React SPA served by nginx
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: ../..
+      dockerfile: web/Dockerfile.bin
+    container_name: keyip-web
+    restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
+    ports:
+      - "80:80"
+    depends_on:
+      - apiserver
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     logging: *default-logging
     networks:
       - keyip-network

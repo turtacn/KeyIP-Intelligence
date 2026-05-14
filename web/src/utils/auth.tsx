@@ -137,6 +137,54 @@ function isKeycloakConfigured(): boolean {
 }
 
 // ── Public API ────────────────────────────────────────────────
+
+/** Check if we can use local email+password sign-in (backend auth, no Keycloak). */
+export function isLocalAuthAvailable(): boolean {
+  return !isMockMode();
+}
+
+/**
+ * Sign in via the backend's local auth endpoint (email + password → JWT).
+ * Does NOT redirect — returns a result object with success/error.
+ */
+export async function localSignIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Use same-origin /api/v1/auth/signin (nginx proxies to apiserver)
+    const resp = await fetch('/api/v1/auth/signin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => null);
+      const msg = body?.error?.message || body?.message || `HTTP ${resp.status}`;
+      return { success: false, error: msg };
+    }
+
+    const body = await resp.json();
+    // API returns flat { access_token, token_type, expires_in } (not wrapped in data)
+    const token = body.access_token;
+    if (!token) {
+      return { success: false, error: 'No access_token in response' };
+    }
+
+    // Store locally (same format as Keycloak flow)
+    storeTokens(token, body.refresh_token || '');
+    sessionStorage.setItem(STORAGE_KEYS.tokenExpiry, String(Math.floor(Date.now() / 1000) + (body.expires_in || 86400)));
+
+    // Decode user info from JWT
+    const userInfo = extractUserInfo(token);
+    if (userInfo) {
+      sessionStorage.setItem(STORAGE_KEYS.userInfo, JSON.stringify(userInfo));
+    }
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function login(redirectTo?: string): Promise<void> {
   if (!isKeycloakConfigured()) {
     console.warn('[Auth] Keycloak is not configured. Set VITE_KEYCLOAK_URL env var.');
@@ -263,17 +311,23 @@ export async function refreshAccessToken(): Promise<string | null> {
  * Returns null if no valid token is available or auth is not applicable.
  */
 export async function getAccessToken(): Promise<string | null> {
-  // Auth is only enabled in non-mock mode
   if (isMockMode()) return null;
-  if (!isKeycloakConfigured()) return null;
 
   const token = getStoredAccessToken();
   if (!token) return null;
 
-  if (isTokenExpired(token)) {
-    return await refreshAccessToken();
+  if (isKeycloakConfigured()) {
+    if (isTokenExpired(token)) {
+      return await refreshAccessToken();
+    }
+    return token;
   }
 
+  // Local auth: just check expiry
+  if (isTokenExpired(token)) {
+    clearTokens();
+    return null;
+  }
   return token;
 }
 

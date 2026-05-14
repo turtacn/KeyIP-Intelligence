@@ -15,7 +15,7 @@ const STORAGE_KEY = 'keyip-api-mode';
 
 const MODE_BASE_URLS: Record<ApiMode, string> = {
   mock: '/api/v1',
-  proxy: 'http://localhost:8080/api/v1',
+  proxy: '/api/v1',
   live: 'https://api.keyip.io/api/v1',
 };
 
@@ -33,7 +33,7 @@ export function getApiMode(): ApiMode {
     return env;
   }
 
-  return 'mock';
+  return 'proxy';
 }
 
 /** Switch API mode at runtime. Triggers a full page reload so MSW lifecycle is clean. */

@@ -57,7 +57,7 @@ const AlertDetail: React.FC<AlertDetailProps> = ({ alert }) => {
         <div className="flex flex-col items-end gap-2">
           <StatusBadge status={patent.legalStatus === 'granted' ? 'active' : 'pending'} label={patent.legalStatus} />
           <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
-            {patent.ipcCodes[0]}
+            {patent.ipcCodes?.[0] || 'N/A'}
           </span>
         </div>
       </div>

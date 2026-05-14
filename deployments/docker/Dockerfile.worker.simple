@@ -1,0 +1,5 @@
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates tzdata
+COPY worker-static /usr/local/bin/worker
+WORKDIR /app
+ENTRYPOINT ["worker"]

@@ -121,7 +121,7 @@ const PatentDetail: React.FC = () => {
             {patent.publicationNumber}
           </p>
         </div>
-        <StatusBadge status={patent.legalStatus.toLowerCase() as any} label={patent.legalStatus} />
+        <StatusBadge status={(patent.legalStatus || 'unknown').toLowerCase() as any} label={patent.legalStatus || 'Unknown'} />
       </div>
 
       {/* Summary Card */}

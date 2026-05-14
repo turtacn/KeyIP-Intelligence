@@ -48,10 +48,6 @@ type Client struct {
 
 // NewClient creates a new OpenSearch client.
 func NewClient(cfg ClientConfig, logger logging.Logger) (*Client, error) {
-	if err := ValidateConfig(cfg); err != nil {
-		return nil, err
-	}
-
 	// Fill defaults
 	if cfg.MaxRetries == 0 {
 		cfg.MaxRetries = 3
@@ -61,6 +57,10 @@ func NewClient(cfg ClientConfig, logger logging.Logger) (*Client, error) {
 	}
 	if cfg.RequestTimeout == 0 {
 		cfg.RequestTimeout = 30 * time.Second
+	}
+
+	if err := ValidateConfig(cfg); err != nil {
+		return nil, err
 	}
 	if cfg.MaxIdleConnsPerHost == 0 {
 		cfg.MaxIdleConnsPerHost = 10

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Skeleton, SkeletonLine, SkeletonCard } from '../../components/ui/Skeleton';
+import { SkeletonLine, SkeletonCard } from '../../components/ui/Skeleton';
 
 /** Specialized skeleton matching the PatentDetail page layout */
 const PatentDetailSkeleton: React.FC = () => {

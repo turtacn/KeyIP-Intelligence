@@ -12,10 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	appauth "github.com/turtacn/KeyIP-Intelligence/internal/application/auth"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/collaboration"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/lifecycle"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/molecule"
-	// "github.com/turtacn/KeyIP-Intelligence/internal/application/patent"
+	app_patent "github.com/turtacn/KeyIP-Intelligence/internal/application/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
@@ -32,7 +33,8 @@ import (
 	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/grpc/services"
 	csgrpc "github.com/turtacn/KeyIP-Intelligence/internal/interfaces/grpc"
 	httpserver "github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http"
-	"github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/handlers"
+	h "github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/handlers"
+	httpmw "github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/middleware"
 	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
 )
 
@@ -206,36 +208,65 @@ func main() {
 
 	// --- Repositories ---
 	moleculeRepo := pg_repos.NewPostgresMoleculeRepo(pgConn, logger)
+	userRepo := pg_repos.NewPostgresUserRepo(pgConn, logger)
 
 	// --- Application Services ---
-	// Real services for the molecule vertical slice
 	moleculeSvc := molecule.NewService(moleculeRepo, logger)
+	patentSvc := app_patent.NewStubService()
+	lifecycleSvc := lifecycle.NewStubTrackingService()
+	portfolioSvc := portfolio.NewStubService()
+
+	// Auth service (local JWT-based, no Keycloak required)
+	jwtSecret := os.Getenv("KEYIP_JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = appauth.GenerateRandomSecret()
+		logger.Warn("KEYIP_JWT_SECRET not set, using random secret (tokens invalid on restart)")
+	}
+	authSvc := appauth.NewService(appauth.ServiceConfig{
+		JWTSecret: jwtSecret,
+		JWTTTL:    24 * time.Hour,
+	}, userRepo, logger)
 
 	// Minimal Similarity Search implementation
-	similaritySvcDeps := patent_mining.SimilaritySearchDeps{
-		// Logger interface mismatch means we should leave it nil for now
-		// Or we can create an inline wrapper struct.
-	}
+	similaritySvcDeps := patent_mining.SimilaritySearchDeps{}
 	similaritySvc := patent_mining.NewSimilaritySearchService(similaritySvcDeps)
 
 	// --- Handlers ---
-	moleculeHandler := handlers.NewMoleculeHandler(moleculeSvc, logger)
+	moleculeHandler := h.NewMoleculeHandler(moleculeSvc, logger)
+	patentHandler := h.NewPatentHandler(patentSvc, nil, logger)
+	lifecycleHandler := h.NewLifecycleHandler(lifecycleSvc, logger)
+	portfolioHandler := h.NewPortfolioHandler(portfolioSvc, logger)
 
-	healthHandler := handlers.NewHealthHandler(
+	healthHandler := h.NewHealthHandler(
 		config.Version,
-		// Adapters to satisfy HealthChecker interface
 		&postgresHealthAdapter{pgConn},
 		&redisHealthAdapter{redisClient},
 	)
 
+	authHandler := h.NewAuthHandler(authSvc, logger)
+
+	// --- CORS Middleware (permissive for docker-machine dev) ---
+	corsMw := httpmw.NewCORSMiddleware(httpmw.CORSConfig{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization", "Accept-Version", "X-Request-ID"},
+		AllowCredentials: false,
+		MaxAge:           86400,
+	})
+
 	// --- Router ---
 	pprofEnabled := cfg.Monitoring.Pprof.Enabled || os.Getenv("DEBUG") == "true"
 	routerCfg := httpserver.RouterConfig{
-		MoleculeHandler:  moleculeHandler,
-		HealthHandler:    healthHandler,
-		Logger:           logger,
-		MetricsCollector: metrics,
-		PprofEnabled:     pprofEnabled,
+		MoleculeHandler:     moleculeHandler,
+		PatentHandler:       patentHandler,
+		PortfolioHandler:    portfolioHandler,
+		LifecycleHandler:    lifecycleHandler,
+		AuthHandler:         authHandler,
+		HealthHandler:       healthHandler,
+		CORSMiddleware:      corsMw,
+		Logger:              logger,
+		MetricsCollector:    metrics,
+		PprofEnabled:        pprofEnabled,
 	}
 	httpRouter := httpserver.NewRouter(routerCfg)
 

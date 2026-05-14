@@ -77,7 +77,7 @@ const PortfolioOptimizer: React.FC = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Sticky Sub-nav */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 mb-6">
+      <div className="bg-white border-b border-slate-200 sticky top-16 z-10 mb-6">
         <nav className="flex space-x-8 px-1 overflow-x-auto" aria-label="Portfolio Sections">
           {[
             { id: 'panorama', label: t('portfolio.nav.panorama') },

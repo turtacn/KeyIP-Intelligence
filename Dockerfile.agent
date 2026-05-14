@@ -1,0 +1,100 @@
+# ---------------------------------------------------------
+# KeyIP-Intelligence 全栈 Agent 工作区镜像
+# 包含: Go 1.22 + Node 22 + Git + Make + Ripgrep + Claude Code
+# ---------------------------------------------------------
+FROM golang:1.22-bookworm
+
+LABEL maintainer="KeyIP-Intelligence" \
+      description="Fullstack Agent Workspace: Go 1.22 + Node 22 + Claude Code"
+
+# ---- 基础环境 ----
+ENV DEBIAN_FRONTEND=noninteractive \
+    TERM=xterm-256color \
+    CLICOLOR=1 \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# ---- 系统层：用清华镜像装基础工具，避开代理与 GPG 问题 ----
+# 策略：先 HTTP 拉 ca-certificates，再切回 HTTPS
+RUN set -eux; \
+    sed -i 's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; \
+            s|http://deb.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g' \
+            /etc/apt/sources.list.d/debian.sources; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        wget \
+        git \
+        make \
+        xz-utils \
+        jq \
+        vim \
+        less \
+        procps \
+        ripgrep \
+        tini; \
+    sed -i 's|http://mirrors.tuna|https://mirrors.tuna|g' /etc/apt/sources.list.d/debian.sources; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*
+
+# ---- Node.js 22 LTS（从清华镜像直接拉官方二进制，彻底绕过代理） ----
+ARG NODE_VERSION=22.11.0
+RUN set -eux; \
+    ARCH=$(dpkg --print-architecture); \
+    case "${ARCH}" in \
+        amd64)  NODE_ARCH="x64"    ;; \
+        arm64)  NODE_ARCH="arm64"  ;; \
+        armhf)  NODE_ARCH="armv7l" ;; \
+        *) echo "Unsupported arch: ${ARCH}"; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz" \
+        -o /tmp/node.tar.xz; \
+    tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner; \
+    rm -f /tmp/node.tar.xz; \
+    ln -sf /usr/local/bin/node /usr/local/bin/nodejs
+
+# ---- npm 配置：国内镜像 + 重试策略（env 方式，任意 npm 版本一致生效） ----
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com/ \
+    NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=300000
+
+# ---- Go 模块代理 ----
+ENV GOPROXY=https://goproxy.cn,direct \
+    GOSUMDB=sum.golang.google.cn \
+    GO111MODULE=on
+
+ARG ANTHROPIC_AUTH_TOKEN=sf-xxxx
+
+# ---- 业务环境变量（严禁硬编码 ANTHROPIC_AUTH_TOKEN，运行时注入） ----
+ENV ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic \
+    ANTHROPIC_MODEL="deepseek-v4-pro[1m]" \
+    ANTHROPIC_DEFAULT_OPUS_MODEL="deepseek-v4-pro[1m]" \
+    ANTHROPIC_DEFAULT_SONNET_MODEL="deepseek-v4-pro[1m]" \
+    ANTHROPIC_DEFAULT_HAIKU_MODEL=deepseek-v4-flash \
+    CLAUDE_CODE_SUBAGENT_MODEL=deepseek-v4-flash \
+    CLAUDE_CODE_EFFORT_LEVEL=max
+
+# ---- 升级 npm 并全局安装 Claude Code ----
+RUN set -eux; \
+    npm install -g npm@latest; \
+    npm install -g @anthropic-ai/claude-code --unsafe-perm; \
+    npm cache clean --force
+
+# ---- 工具链验证（任何一项失败立即中断构建，免得装了半拉子镜像） ----
+RUN set -eux; \
+    go version; \
+    node -v; \
+    npm -v; \
+    git --version; \
+    make --version | head -n1; \
+    rg --version | head -n1; \
+    claude --version
+
+# ---- 工作目录 ----
+WORKDIR /workspace
+
+# ---- 入口点：表现为原生 claude 命令 ----
+ENTRYPOINT ["claude"]

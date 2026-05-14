@@ -1,12 +1,12 @@
 import React from 'react';
-import { Skeleton, SkeletonLine, SkeletonCard, SkeletonKPICard } from '../../components/ui/Skeleton';
+import { SkeletonCard, SkeletonKPICard } from '../../components/ui/Skeleton';
 
 /** Specialized skeleton matching the PortfolioOptimizer page layout */
 const PortfolioOptimizerSkeleton: React.FC = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]" aria-hidden="true">
       {/* Sticky sub-nav skeleton: 6 nav items */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 mb-6">
+      <div className="bg-white border-b border-slate-200 sticky top-16 z-10 mb-6">
         <div className="flex space-x-8 px-1 animate-pulse">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="h-4 w-20 bg-slate-200 rounded py-4" />

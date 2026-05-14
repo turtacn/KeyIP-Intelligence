@@ -123,7 +123,7 @@ const LifecycleConsole: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white border-b border-slate-200 mb-6 sticky top-0 z-10">
+        <div className="bg-white border-b border-slate-200 mb-6 sticky top-16 z-10">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             {[
               { id: 'calendar', name: t('lifecycle.tabs.calendar') },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Skeleton, SkeletonLine } from '../../components/ui/Skeleton';
+import { SkeletonLine } from '../../components/ui/Skeleton';
 import { Search, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 
 /** Specialized skeleton matching the KnowledgeGraph page layout */

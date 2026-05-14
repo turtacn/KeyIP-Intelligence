@@ -65,9 +65,9 @@ func NewHealthHandler(version string, checkers ...HealthChecker) *HealthHandler 
 
 // RegisterRoutes registers health check routes.
 func (h *HealthHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /healthz", h.Liveness)
-	mux.HandleFunc("GET /readyz", h.Readiness)
-	mux.HandleFunc("GET /healthz/detail", h.Detailed)
+	mux.HandleFunc("GET /api/v1/healthz", h.Liveness)
+	mux.HandleFunc("GET /api/v1/readyz", h.Readiness)
+	mux.HandleFunc("GET /api/v1/healthz/detail", h.Detailed)
 }
 
 // LivenessResponse is the response for liveness probe.

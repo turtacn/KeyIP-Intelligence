@@ -21,7 +21,9 @@ const MoleculeComparison: React.FC<MoleculeComparisonProps> = ({ triggerMolecule
       setLoading(true);
       try {
         const response = await moleculeService.getMoleculeById(triggerMoleculeId);
-        setTriggerMolecule(response.data);
+        // Handle both wrapped ApiResponse {code,message,data} and flat molecule object
+        const mol = (response as any)?.data ?? response;
+        setTriggerMolecule(mol);
       } catch (err) {
         console.error('Failed to fetch molecule', err);
       } finally {

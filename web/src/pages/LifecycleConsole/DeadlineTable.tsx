@@ -90,7 +90,7 @@ const DeadlineTable: React.FC<DeadlineTableProps> = ({ events, loading, onMarkHa
       },
       {
         header: t('lifecycle.table.event_type'),
-        accessor: (row) => row.eventType.replace(/_/g, ' '),
+        accessor: (row) => (row.eventType || '').replace(/_/g, ' '),
         sortable: true,
         sortKey: 'eventType',
       },

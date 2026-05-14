@@ -64,8 +64,8 @@ describe('DataTable', () => {
         pagination={{ currentPage: 1, totalPages: 5, onPageChange }}
       />
     );
-    // Shows current page and total pages
-    expect(screen.getByText(/pagination.showing/)).toBeInTheDocument();
+    // Shows current page and total pages (t() fallback to 'Page 1 of 5')
+    expect(screen.getByText(/^Page/)).toBeInTheDocument();
     // Both Next buttons exist (mobile + desktop views)
     const nextButtons = screen.getAllByText('Next');
     expect(nextButtons.length).toBeGreaterThanOrEqual(1);

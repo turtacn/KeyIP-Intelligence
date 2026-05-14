@@ -1,0 +1,7 @@
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates tzdata
+COPY apiserver-static /usr/local/bin/apiserver
+COPY configs /app/configs
+WORKDIR /app
+EXPOSE 8080
+ENTRYPOINT ["apiserver"]

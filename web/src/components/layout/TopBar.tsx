@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, Search, Globe, Settings, LogIn, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { type ApiMode, getApiMode, setApiMode, isMockMode } from '../../utils/apiMode';
-import { useAuth } from '../../utils/auth';
+import { useAuth, isLocalAuthAvailable } from '../../utils/auth';
 import { useAlerts } from '../../hooks/useAlerts';
 
 const MODE_LABELS: Record<ApiMode, string> = {
@@ -61,7 +61,7 @@ const ApiModeSwitcher: React.FC = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+        <div className="absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-[100]">
           <div className="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
             API Mode
           </div>
@@ -103,6 +103,7 @@ const AuthButton: React.FC = () => {
   const { isAuthenticated: authed, user, login, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Do not show auth UI in mock mode
   if (isMockMode()) {
@@ -122,6 +123,19 @@ const AuthButton: React.FC = () => {
   }, [menuOpen]);
 
   if (!authed || !user) {
+    // When Keycloak is not configured, navigate to /login page instead of OIDC redirect
+    if (isLocalAuthAvailable()) {
+      return (
+        <button
+          onClick={() => navigate('/login')}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+          title="Sign in with email and password"
+        >
+          <LogIn className="w-4 h-4" />
+          <span>Sign In</span>
+        </button>
+      );
+    }
     return (
       <button
         onClick={() => login()}
@@ -296,7 +310,7 @@ const TopBar: React.FC = () => {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-10 transition-all duration-300">
+    <header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-20 transition-all duration-300">
       <div className="container mx-auto px-6 h-full flex items-center justify-between">
         <div className="flex items-center">
           <div className="relative">

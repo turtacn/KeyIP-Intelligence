@@ -85,10 +85,12 @@ describe('ExecutiveDashboard', () => {
       refetch: vi.fn(),
     });
 
-    render(<ExecutiveDashboard />);
+    const { container } = render(<ExecutiveDashboard />);
 
-    // Should show loading spinner
-    expect(screen.getByLabelText('Loading')).toBeInTheDocument();
+    // Should show skeleton loading (not the actual dashboard title)
+    expect(screen.queryByText('dashboard.title')).not.toBeInTheDocument();
+    // Skeleton elements are rendered with aria-hidden="true" and animate-pulse
+    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
   });
 
   it('renders dashboard with mock data', () => {
@@ -144,10 +146,11 @@ describe('ExecutiveDashboard', () => {
 
     render(<ExecutiveDashboard />);
 
+    // PageError renders the error string literally and the title via t() fallback
     expect(
-      screen.getByText(/error loading dashboard data/i)
+      screen.getByText('Failed to load dashboard')
     ).toBeInTheDocument();
-    expect(screen.getByText(/Network error/)).toBeInTheDocument();
+    expect(screen.getByText('Network error')).toBeInTheDocument();
   });
 
   it('generates report when export button is clicked', () => {

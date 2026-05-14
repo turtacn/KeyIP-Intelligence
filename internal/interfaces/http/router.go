@@ -33,6 +33,7 @@ type RouterConfig struct {
 	PatentHandler        *handlers.PatentHandler
 	PortfolioHandler     *handlers.PortfolioHandler
 	LifecycleHandler     *handlers.LifecycleHandler
+	AuthHandler          *handlers.AuthHandler
 	CollaborationHandler *handlers.CollaborationHandler
 	ReportHandler        *handlers.ReportHandler
 	HealthHandler        *handlers.HealthHandler
@@ -165,6 +166,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	}
 	if cfg.LifecycleHandler != nil {
 		cfg.LifecycleHandler.RegisterRoutes(mux)
+	}
+	if cfg.AuthHandler != nil {
+		cfg.AuthHandler.RegisterRoutes(mux)
 	}
 	if cfg.CollaborationHandler != nil {
 		cfg.CollaborationHandler.RegisterRoutes(mux)
