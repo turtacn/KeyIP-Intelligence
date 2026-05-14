@@ -209,10 +209,11 @@ func main() {
 	// --- Repositories ---
 	moleculeRepo := pg_repos.NewPostgresMoleculeRepo(pgConn, logger)
 	userRepo := pg_repos.NewPostgresUserRepo(pgConn, logger)
+	patentRepo := pg_repos.NewPostgresPatentRepo(pgConn, logger)
 
 	// --- Application Services ---
 	moleculeSvc := molecule.NewService(moleculeRepo, logger)
-	patentSvc := app_patent.NewStubService()
+	patentSvc := app_patent.NewService(patentRepo, logger)
 	lifecycleSvc := lifecycle.NewStubTrackingService()
 	portfolioSvc := portfolio.NewStubService()
 
