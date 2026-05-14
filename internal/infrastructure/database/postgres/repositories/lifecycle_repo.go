@@ -777,9 +777,21 @@ func (r *postgresLifecycleRepo) QueryPayments(ctx context.Context, query *lifecy
 
 // Legal Status
 
-func (r *postgresLifecycleRepo) GetByPatentID(ctx context.Context, patentID string) (*lifecycle.LegalStatusEntity, error) {
-	// Stub implementation
-	return &lifecycle.LegalStatusEntity{}, nil
+func (r *postgresLifecycleRepo) GetByPatentID(ctx context.Context, idOrNumber string) (*lifecycle.LegalStatusEntity, error) {
+	var resolvedID, jurisdiction string
+	if _, err := uuid.Parse(idOrNumber); err == nil {
+		resolvedID = idOrNumber
+	} else {
+		err := r.executor().QueryRowContext(ctx,
+			`SELECT id, jurisdiction FROM patents WHERE patent_number=$1 AND deleted_at IS NULL`, idOrNumber).Scan(&resolvedID, &jurisdiction)
+		if err != nil {
+			return &lifecycle.LegalStatusEntity{PatentID: idOrNumber}, nil
+		}
+	}
+	var status string
+	r.executor().QueryRowContext(ctx,
+		`SELECT COALESCE(event_type::text,'filing') FROM patent_lifecycle_events WHERE patent_id=$1 ORDER BY event_date DESC LIMIT 1`, resolvedID).Scan(&status)
+	return &lifecycle.LegalStatusEntity{PatentID: resolvedID, Jurisdiction: jurisdiction, Status: status}, nil
 }
 
 func (r *postgresLifecycleRepo) UpdateStatus(ctx context.Context, patentID string, status string, effectiveDate time.Time) error {

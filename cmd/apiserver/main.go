@@ -215,7 +215,8 @@ func main() {
 	// --- Application Services ---
 	moleculeSvc := molecule.NewService(moleculeRepo, logger)
 	patentSvc := app_patent.NewService(patentRepo, logger)
-	lifecycleSvc := lifecycle.NewStubTrackingService()
+	lifecycleRepo := pg_repos.NewPostgresLifecycleRepo(pgConn, logger)
+	lifecycleSvc := lifecycle.NewRealTrackingService(lifecycleRepo, logger)
 	portfolioSvc := portfolio.NewStubService()
 
 	// Auth service (local JWT-based, no Keycloak required)
