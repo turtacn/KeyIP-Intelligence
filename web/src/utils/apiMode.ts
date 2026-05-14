@@ -16,7 +16,9 @@ const STORAGE_KEY = 'keyip-api-mode';
 const MODE_BASE_URLS: Record<ApiMode, string> = {
   mock: '/api/v1',
   proxy: '/api/v1',
-  live: 'https://api.keyip.io/api/v1',
+  // live: 默认走 nginx proxy（docker-machine 环境），
+  // 生产部署时设置环境变量 VITE_LIVE_API_URL=https://api.keyip.io/api/v1
+  live: '/api/v1',
 };
 
 /** Return the currently active API mode. */
@@ -51,6 +53,11 @@ export function getBaseUrl(): string {
   // VITE_API_BASE_URL, if set, always wins (manual override)
   const manualUrl = import.meta.env.VITE_API_BASE_URL;
   if (manualUrl) return manualUrl;
+
+  // live 模式优先使用 VITE_LIVE_API_URL（生产部署时注入）
+  if (mode === 'live' && import.meta.env.VITE_LIVE_API_URL) {
+    return import.meta.env.VITE_LIVE_API_URL;
+  }
 
   return MODE_BASE_URLS[mode];
 }
