@@ -1,0 +1,165 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-05-11T00:00:00Z",
+  "description": "OLED 领域用户测试数据 — admin/researcher/ip_manager/executive/partner_agent 五种角色",
+  "users": [
+    {
+      "id": "oled-usr-0001-4000-b000-000000000001",
+      "email": "zhang.wei@oledmaterial.cn",
+      "username": "zhangwei",
+      "display_name": "张伟",
+      "status": "active",
+      "avatar_url": "https://avatar.oledmaterial.cn/zhangwei.png",
+      "locale": "zh-CN",
+      "timezone": "Asia/Shanghai",
+      "last_login_at": "2026-05-10T08:30:00Z",
+      "last_login_ip": "192.168.1.100",
+      "login_count": 342,
+      "failed_login_count": 0,
+      "email_verified_at": "2023-01-15T10:00:00Z",
+      "mfa_enabled": true,
+      "preferences": {
+        "theme": "dark",
+        "notification": "email+slack",
+        "dashboard_layout": "analyst",
+        "default_search_filter": "OLED"
+      },
+      "metadata": {
+        "department": "IP Management",
+        "title": "IP Manager",
+        "organization": "OLED材料科技有限公司",
+        "role": "admin",
+        "permission_group": "super_admin"
+      },
+      "created_at": "2023-01-01T00:00:00Z",
+      "updated_at": "2026-05-10T08:30:00Z"
+    },
+    {
+      "id": "oled-usr-0002-4000-b000-000000000002",
+      "email": "li.jing@research.oled.cn",
+      "username": "lijing",
+      "display_name": "李静",
+      "status": "active",
+      "avatar_url": "",
+      "locale": "zh-CN",
+      "timezone": "Asia/Shanghai",
+      "last_login_at": "2026-05-09T14:20:00Z",
+      "last_login_ip": "10.0.1.50",
+      "login_count": 189,
+      "failed_login_count": 1,
+      "email_verified_at": "2023-03-20T09:00:00Z",
+      "mfa_enabled": false,
+      "preferences": {
+        "theme": "light",
+        "notification": "email",
+        "dashboard_layout": "researcher",
+        "default_search_filter": "molecule"
+      },
+      "metadata": {
+        "department": "R&D",
+        "title": "Senior Research Scientist",
+        "organization": "OLED材料科技有限公司",
+        "role": "researcher",
+        "specialization": "TADF materials design",
+        "permission_group": "researcher"
+      },
+      "created_at": "2023-03-01T00:00:00Z",
+      "updated_at": "2026-05-09T14:20:00Z"
+    },
+    {
+      "id": "oled-usr-0003-4000-b000-000000000003",
+      "email": "chen.yu@oledmaterial.cn",
+      "username": "chenyu",
+      "display_name": "陈宇",
+      "status": "active",
+      "avatar_url": "https://avatar.oledmaterial.cn/chenyu.png",
+      "locale": "zh-CN",
+      "timezone": "Asia/Shanghai",
+      "last_login_at": "2026-05-11T07:45:00Z",
+      "last_login_ip": "192.168.1.200",
+      "login_count": 521,
+      "failed_login_count": 0,
+      "email_verified_at": "2022-11-01T08:00:00Z",
+      "mfa_enabled": true,
+      "preferences": {
+        "theme": "dark",
+        "notification": "email+slack+wechat",
+        "dashboard_layout": "executive",
+        "default_search_filter": "portfolio"
+      },
+      "metadata": {
+        "department": "Executive",
+        "title": "VP of IP Strategy",
+        "organization": "OLED材料科技有限公司",
+        "role": "executive",
+        "permission_group": "executive"
+      },
+      "created_at": "2022-11-01T00:00:00Z",
+      "updated_at": "2026-05-11T07:45:00Z"
+    },
+    {
+      "id": "oled-usr-0004-4000-b000-000000000004",
+      "email": "wang.fang@ip-agency.cn",
+      "username": "wangfang",
+      "display_name": "王芳",
+      "status": "active",
+      "avatar_url": "",
+      "locale": "zh-CN",
+      "timezone": "Asia/Shanghai",
+      "last_login_at": "2026-05-10T16:00:00Z",
+      "last_login_ip": "203.0.113.45",
+      "login_count": 87,
+      "failed_login_count": 2,
+      "email_verified_at": "2024-02-01T10:00:00Z",
+      "mfa_enabled": true,
+      "preferences": {
+        "theme": "light",
+        "notification": "email",
+        "dashboard_layout": "ip_manager",
+        "default_search_filter": "deadline"
+      },
+      "metadata": {
+        "department": "Patent Agency",
+        "title": "Patent Agent",
+        "organization": "国际知识产权代理有限公司",
+        "role": "ip_manager",
+        "specialization": "OLED patent prosecution",
+        "permission_group": "ip_manager"
+      },
+      "created_at": "2024-02-01T00:00:00Z",
+      "updated_at": "2026-05-10T16:00:00Z"
+    },
+    {
+      "id": "oled-usr-0005-4000-b000-000000000005",
+      "email": "partner@samsung-display.co.kr",
+      "username": "partner_kim",
+      "display_name": "Kim Min-Soo",
+      "status": "active",
+      "avatar_url": "",
+      "locale": "ko-KR",
+      "timezone": "Asia/Seoul",
+      "last_login_at": "2026-05-08T09:15:00Z",
+      "last_login_ip": "123.45.67.89",
+      "login_count": 34,
+      "failed_login_count": 0,
+      "email_verified_at": "2025-06-01T08:00:00Z",
+      "mfa_enabled": true,
+      "preferences": {
+        "theme": "dark",
+        "notification": "email",
+        "dashboard_layout": "partner",
+        "default_search_filter": "patent"
+      },
+      "metadata": {
+        "department": "Partnership",
+        "title": "External Collaborator",
+        "organization": "Samsung Display Co., Ltd.",
+        "role": "partner_agent",
+        "permission_group": "limited_partner",
+        "access_scope": "portfolio_share_only"
+      },
+      "created_at": "2025-06-01T00:00:00Z",
+      "updated_at": "2026-05-08T09:15:00Z"
+    }
+  ]
+}

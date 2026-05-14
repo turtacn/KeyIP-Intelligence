@@ -1,0 +1,1343 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2024-01-15T00:00:00Z",
+  "description": "Portfolio, lifecycle, and collaboration test fixtures for PatentHub platform. All patent_id references align with patent_fixtures.json. Reference date for days_remaining calculations: 2024-01-15.",
+  "portfolios": [
+    {
+      "id": "a1b2c3d4-1111-4000-a000-000000000001",
+      "name": "Blue Emitter Core Portfolio",
+      "description": "Core defensive portfolio covering blue OLED emitter host materials based on carbazole and spirofluorene scaffolds",
+      "owner_id": "user-00000000-0000-4000-b000-000000000001",
+      "patent_ids": [
+        "pat-00000000-0000-4000-a000-000000000001",
+        "pat-00000000-0000-4000-a000-000000000002",
+        "pat-00000000-0000-4000-a000-000000000003",
+        "pat-00000000-0000-4000-a000-000000000004",
+        "pat-00000000-0000-4000-a000-000000000005"
+      ],
+      "tech_domains": [
+        "C09K-011/06",
+        "H10K-050/00",
+        "H10K-085/60",
+        "C07D-209/86"
+      ],
+      "strategy": "defensive",
+      "health_score": {
+        "coverage": 88,
+        "concentration": 72,
+        "aging": 15,
+        "overall": 85
+      },
+      "statistics": {
+        "total_patents": 5,
+        "active_patents": 5,
+        "expired_patents": 0,
+        "jurisdictions": {
+          "US": 2,
+          "CN": 1,
+          "EP": 1,
+          "KR": 1
+        },
+        "filing_year_distribution": {
+          "2019": 1,
+          "2020": 2,
+          "2021": 1,
+          "2022": 1
+        }
+      },
+      "created_at": "2023-03-10T08:30:00Z",
+      "updated_at": "2024-01-10T14:22:00Z"
+    },
+    {
+      "id": "a1b2c3d4-1111-4000-a000-000000000002",
+      "name": "Hole Transport Material Portfolio",
+      "description": "Balanced portfolio for hole transport layer materials including triarylamine and spiro-OMeTAD derivatives",
+      "owner_id": "user-00000000-0000-4000-b000-000000000001",
+      "patent_ids": [
+        "pat-00000000-0000-4000-a000-000000000006",
+        "pat-00000000-0000-4000-a000-000000000007",
+        "pat-00000000-0000-4000-a000-000000000008",
+        "pat-00000000-0000-4000-a000-000000000009"
+      ],
+      "tech_domains": [
+        "H10K-050/15",
+        "H10K-085/00",
+        "C07C-211/61"
+      ],
+      "strategy": "balanced",
+      "health_score": {
+        "coverage": 65,
+        "concentration": 58,
+        "aging": 40,
+        "overall": 62
+      },
+      "statistics": {
+        "total_patents": 4,
+        "active_patents": 3,
+        "expired_patents": 1,
+        "jurisdictions": {
+          "US": 2,
+          "CN": 1,
+          "JP": 1
+        },
+        "filing_year_distribution": {
+          "2016": 1,
+          "2018": 1,
+          "2020": 1,
+          "2021": 1
+        }
+      },
+      "created_at": "2023-05-20T10:00:00Z",
+      "updated_at": "2024-01-08T09:15:00Z"
+    },
+    {
+      "id": "a1b2c3d4-1111-4000-a000-000000000003",
+      "name": "Licensing Revenue Portfolio",
+      "description": "High-value patents selected for out-licensing to panel manufacturers, covering key TADF emitter and device architecture innovations",
+      "owner_id": "user-00000000-0000-4000-b000-000000000002",
+      "patent_ids": [
+        "pat-00000000-0000-4000-a000-000000000010",
+        "pat-00000000-0000-4000-a000-000000000011",
+        "pat-00000000-0000-4000-a000-000000000012"
+      ],
+      "tech_domains": [
+        "H10K-050/11",
+        "H10K-050/12",
+        "C09K-011/02"
+      ],
+      "strategy": "licensing",
+      "health_score": {
+        "coverage": 45,
+        "concentration": 90,
+        "aging": 20,
+        "overall": 70
+      },
+      "statistics": {
+        "total_patents": 3,
+        "active_patents": 3,
+        "expired_patents": 0,
+        "jurisdictions": {
+          "US": 1,
+          "CN": 1,
+          "EP": 1
+        },
+        "filing_year_distribution": {
+          "2020": 1,
+          "2021": 2
+        }
+      },
+      "created_at": "2023-08-01T13:45:00Z",
+      "updated_at": "2024-01-12T16:30:00Z"
+    },
+    {
+      "id": "a1b2c3d4-1111-4000-a000-000000000004",
+      "name": "Legacy Phosphorescent Portfolio",
+      "description": "Aging portfolio of early-generation phosphorescent OLED materials, most patents approaching expiration",
+      "owner_id": "user-00000000-0000-4000-b000-000000000001",
+      "patent_ids": [
+        "pat-00000000-0000-4000-a000-000000000013",
+        "pat-00000000-0000-4000-a000-000000000014",
+        "pat-00000000-0000-4000-a000-000000000015"
+      ],
+      "tech_domains": [
+        "C09K-011/06",
+        "H10K-050/11",
+        "C07F-015/00"
+      ],
+      "strategy": "defensive",
+      "health_score": {
+        "coverage": 30,
+        "concentration": 85,
+        "aging": 92,
+        "overall": 28
+      },
+      "statistics": {
+        "total_patents": 3,
+        "active_patents": 1,
+        "expired_patents": 2,
+        "jurisdictions": {
+          "US": 1,
+          "JP": 1,
+          "KR": 1
+        },
+        "filing_year_distribution": {
+          "2005": 1,
+          "2007": 1,
+          "2008": 1
+        }
+      },
+      "created_at": "2022-01-15T09:00:00Z",
+      "updated_at": "2023-12-20T11:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-1111-4000-a000-000000000005",
+      "name": "Empty Evaluation Portfolio",
+      "description": "Empty portfolio created for boundary condition and edge case testing",
+      "owner_id": "user-00000000-0000-4000-b000-000000000003",
+      "patent_ids": [],
+      "tech_domains": [],
+      "strategy": "balanced",
+      "health_score": {
+        "coverage": 0,
+        "concentration": 0,
+        "aging": 0,
+        "overall": 0
+      },
+      "statistics": {
+        "total_patents": 0,
+        "active_patents": 0,
+        "expired_patents": 0,
+        "jurisdictions": {},
+        "filing_year_distribution": {}
+      },
+      "created_at": "2024-01-14T18:00:00Z",
+      "updated_at": "2024-01-14T18:00:00Z"
+    },
+    {
+      "id": "a1b2c3d4-1111-4000-a000-000000000006",
+      "name": "Offensive Encapsulation Portfolio",
+      "description": "Offensive portfolio targeting thin-film encapsulation and barrier layer technologies for flexible OLED displays",
+      "owner_id": "user-00000000-0000-4000-b000-000000000002",
+      "patent_ids": [
+        "pat-00000000-0000-4000-a000-000000000016",
+        "pat-00000000-0000-4000-a000-000000000017"
+      ],
+      "tech_domains": [
+        "H10K-050/84",
+        "H10K-077/10",
+        "B32B-007/02"
+      ],
+      "strategy": "offensive",
+      "health_score": {
+        "coverage": 55,
+        "concentration": 78,
+        "aging": 10,
+        "overall": 68
+      },
+      "statistics": {
+        "total_patents": 2,
+        "active_patents": 2,
+        "expired_patents": 0,
+        "jurisdictions": {
+          "US": 1,
+          "CN": 1
+        },
+        "filing_year_distribution": {
+          "2022": 1,
+          "2023": 1
+        }
+      },
+      "created_at": "2023-11-01T07:20:00Z",
+      "updated_at": "2024-01-13T10:45:00Z"
+    }
+  ],
+  "lifecycle_records": [
+    {
+      "id": "lc-00000000-0000-4000-c000-000000000001",
+      "patent_id": "pat-00000000-0000-4000-a000-000000000003",
+      "jurisdiction": "CN",
+      "deadlines": [
+        {
+          "type": "annuity_payment",
+          "due_date": "2024-06-15T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": true,
+          "days_remaining": 152
+        },
+        {
+          "type": "oa_response",
+          "due_date": "2024-03-20T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": false,
+          "days_remaining": 65
+        }
+      ],
+      "annuities": [
+        {
+          "year": 1,
+          "amount": 900.00,
+          "currency": "CNY",
+          "due_date": "2021-09-10T00:00:00Z",
+          "paid_date": "2021-08-25T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 2,
+          "amount": 1200.00,
+          "currency": "CNY",
+          "due_date": "2022-09-10T00:00:00Z",
+          "paid_date": "2022-09-01T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 3,
+          "amount": 1200.00,
+          "currency": "CNY",
+          "due_date": "2023-09-10T00:00:00Z",
+          "paid_date": "2023-08-28T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 4,
+          "amount": 2000.00,
+          "currency": "CNY",
+          "due_date": "2024-09-10T00:00:00Z",
+          "paid_date": null,
+          "status": "pending"
+        }
+      ],
+      "legal_status_history": [
+        {
+          "status": "filed",
+          "effective_date": "2020-09-10T00:00:00Z",
+          "source": "CNIPA"
+        },
+        {
+          "status": "published",
+          "effective_date": "2021-03-12T00:00:00Z",
+          "source": "CNIPA"
+        },
+        {
+          "status": "substantive_examination",
+          "effective_date": "2021-09-15T00:00:00Z",
+          "source": "CNIPA"
+        },
+        {
+          "status": "granted",
+          "effective_date": "2023-02-14T00:00:00Z",
+          "source": "CNIPA"
+        }
+      ],
+      "documents": [
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000001",
+          "type": "application",
+          "filename": "CN202010950123_application.pdf",
+          "uploaded_at": "2020-09-12T10:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000002",
+          "type": "oa_notice",
+          "filename": "CN202010950123_OA1.pdf",
+          "uploaded_at": "2022-06-20T08:30:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000003",
+          "type": "oa_response",
+          "filename": "CN202010950123_OA1_response.pdf",
+          "uploaded_at": "2022-10-15T14:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000004",
+          "type": "grant_certificate",
+          "filename": "CN202010950123_grant.pdf",
+          "uploaded_at": "2023-02-20T09:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "lc-00000000-0000-4000-c000-000000000002",
+      "patent_id": "pat-00000000-0000-4000-a000-000000000001",
+      "jurisdiction": "US",
+      "deadlines": [
+        {
+          "type": "annuity_payment",
+          "due_date": "2023-12-18T00:00:00Z",
+          "status": "overdue",
+          "reminder_sent": true,
+          "days_remaining": -28
+        }
+      ],
+      "annuities": [
+        {
+          "year": 1,
+          "amount": 1600.00,
+          "currency": "USD",
+          "due_date": "2022-06-18T00:00:00Z",
+          "paid_date": "2022-06-10T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 2,
+          "amount": 1600.00,
+          "currency": "USD",
+          "due_date": "2023-06-18T00:00:00Z",
+          "paid_date": "2023-06-15T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 3,
+          "amount": 1600.00,
+          "currency": "USD",
+          "due_date": "2023-12-18T00:00:00Z",
+          "paid_date": null,
+          "status": "grace_period"
+        }
+      ],
+      "legal_status_history": [
+        {
+          "status": "filed",
+          "effective_date": "2019-11-05T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "published",
+          "effective_date": "2020-05-07T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "non_final_rejection",
+          "effective_date": "2021-02-10T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "granted",
+          "effective_date": "2021-12-18T00:00:00Z",
+          "source": "USPTO"
+        }
+      ],
+      "documents": [
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000010",
+          "type": "application",
+          "filename": "US17123456_application.pdf",
+          "uploaded_at": "2019-11-06T09:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000011",
+          "type": "oa_notice",
+          "filename": "US17123456_NFOA.pdf",
+          "uploaded_at": "2021-02-12T10:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000012",
+          "type": "oa_response",
+          "filename": "US17123456_NFOA_response.pdf",
+          "uploaded_at": "2021-08-10T15:30:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000013",
+          "type": "grant_certificate",
+          "filename": "US17123456_grant.pdf",
+          "uploaded_at": "2021-12-20T08:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "lc-00000000-0000-4000-c000-000000000003",
+      "patent_id": "pat-00000000-0000-4000-a000-000000000004",
+      "jurisdiction": "EP",
+      "deadlines": [
+        {
+          "type": "oa_response",
+          "due_date": "2024-02-14T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": true,
+          "days_remaining": 30
+        },
+        {
+          "type": "annuity_payment",
+          "due_date": "2024-04-30T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": false,
+          "days_remaining": 106
+        }
+      ],
+      "annuities": [
+        {
+          "year": 3,
+          "amount": 495.00,
+          "currency": "EUR",
+          "due_date": "2023-04-30T00:00:00Z",
+          "paid_date": "2023-04-20T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 4,
+          "amount": 555.00,
+          "currency": "EUR",
+          "due_date": "2024-04-30T00:00:00Z",
+          "paid_date": null,
+          "status": "pending"
+        }
+      ],
+      "legal_status_history": [
+        {
+          "status": "filed",
+          "effective_date": "2020-04-30T00:00:00Z",
+          "source": "EPO"
+        },
+        {
+          "status": "published",
+          "effective_date": "2020-11-04T00:00:00Z",
+          "source": "EPO"
+        },
+        {
+          "status": "examination_requested",
+          "effective_date": "2022-10-28T00:00:00Z",
+          "source": "EPO"
+        },
+        {
+          "status": "examination_in_progress",
+          "effective_date": "2023-09-15T00:00:00Z",
+          "source": "EPO"
+        }
+      ],
+      "documents": [
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000020",
+          "type": "application",
+          "filename": "EP20172345_application.pdf",
+          "uploaded_at": "2020-05-02T08:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000021",
+          "type": "oa_notice",
+          "filename": "EP20172345_communication.pdf",
+          "uploaded_at": "2023-10-14T11:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "lc-00000000-0000-4000-c000-000000000004",
+      "patent_id": "pat-00000000-0000-4000-a000-000000000007",
+      "jurisdiction": "JP",
+      "deadlines": [
+        {
+          "type": "pct_national_phase",
+          "due_date": "2024-03-01T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": true,
+          "days_remaining": 46
+        }
+      ],
+      "annuities": [],
+      "legal_status_history": [
+        {
+          "status": "pct_filed",
+          "effective_date": "2022-03-01T00:00:00Z",
+          "source": "WIPO"
+        },
+        {
+          "status": "pct_published",
+          "effective_date": "2022-09-08T00:00:00Z",
+          "source": "WIPO"
+        },
+        {
+          "status": "national_phase_pending",
+          "effective_date": "2023-09-01T00:00:00Z",
+          "source": "JPO"
+        }
+      ],
+      "documents": [
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000030",
+          "type": "application",
+          "filename": "PCT_JP2022_008765_application.pdf",
+          "uploaded_at": "2022-03-02T07:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "lc-00000000-0000-4000-c000-000000000005",
+      "patent_id": "pat-00000000-0000-4000-a000-000000000009",
+      "jurisdiction": "KR",
+      "deadlines": [
+        {
+          "type": "priority_claim",
+          "due_date": "2024-02-28T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": true,
+          "days_remaining": 44
+        },
+        {
+          "type": "annuity_payment",
+          "due_date": "2024-08-15T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": false,
+          "days_remaining": 213
+        }
+      ],
+      "annuities": [
+        {
+          "year": 1,
+          "amount": 45000,
+          "currency": "KRW",
+          "due_date": "2024-08-15T00:00:00Z",
+          "paid_date": null,
+          "status": "pending"
+        }
+      ],
+      "legal_status_history": [
+        {
+          "status": "filed",
+          "effective_date": "2023-02-28T00:00:00Z",
+          "source": "KIPO"
+        },
+        {
+          "status": "published",
+          "effective_date": "2023-09-05T00:00:00Z",
+          "source": "KIPO"
+        }
+      ],
+      "documents": [
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000040",
+          "type": "application",
+          "filename": "KR1020230025678_application.pdf",
+          "uploaded_at": "2023-03-01T06:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "lc-00000000-0000-4000-c000-000000000006",
+      "patent_id": "pat-00000000-0000-4000-a000-000000000013",
+      "jurisdiction": "US",
+      "deadlines": [],
+      "annuities": [
+        {
+          "year": 1,
+          "amount": 980.00,
+          "currency": "USD",
+          "due_date": "2009-03-20T00:00:00Z",
+          "paid_date": "2009-03-15T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 2,
+          "amount": 980.00,
+          "currency": "USD",
+          "due_date": "2010-03-20T00:00:00Z",
+          "paid_date": "2010-03-18T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 3,
+          "amount": 2480.00,
+          "currency": "USD",
+          "due_date": "2012-09-20T00:00:00Z",
+          "paid_date": "2012-09-10T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 4,
+          "amount": 2480.00,
+          "currency": "USD",
+          "due_date": "2016-09-20T00:00:00Z",
+          "paid_date": null,
+          "status": "overdue"
+        }
+      ],
+      "legal_status_history": [
+        {
+          "status": "filed",
+          "effective_date": "2005-06-10T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "published",
+          "effective_date": "2005-12-15T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "granted",
+          "effective_date": "2008-09-20T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "maintenance_fee_lapsed",
+          "effective_date": "2017-03-20T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "expired",
+          "effective_date": "2017-03-20T00:00:00Z",
+          "source": "USPTO"
+        }
+      ],
+      "documents": [
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000050",
+          "type": "application",
+          "filename": "US11234567_application.pdf",
+          "uploaded_at": "2005-06-12T09:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000051",
+          "type": "grant_certificate",
+          "filename": "US11234567_grant.pdf",
+          "uploaded_at": "2008-09-22T10:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "lc-00000000-0000-4000-c000-000000000007",
+      "patent_id": "pat-00000000-0000-4000-a000-000000000010",
+      "jurisdiction": "US",
+      "deadlines": [
+        {
+          "type": "annuity_payment",
+          "due_date": "2024-09-05T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": false,
+          "days_remaining": 234
+        },
+        {
+          "type": "oa_response",
+          "due_date": "2024-04-10T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": true,
+          "days_remaining": 86
+        },
+        {
+          "type": "grant_fee",
+          "due_date": "2024-05-30T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": false,
+          "days_remaining": 136
+        }
+      ],
+      "annuities": [
+        {
+          "year": 1,
+          "amount": 1600.00,
+          "currency": "USD",
+          "due_date": "2023-09-05T00:00:00Z",
+          "paid_date": "2023-08-30T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 2,
+          "amount": 1600.00,
+          "currency": "USD",
+          "due_date": "2024-09-05T00:00:00Z",
+          "paid_date": null,
+          "status": "pending"
+        }
+      ],
+      "legal_status_history": [
+        {
+          "status": "filed",
+          "effective_date": "2020-11-05T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "published",
+          "effective_date": "2021-05-13T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "non_final_rejection",
+          "effective_date": "2022-08-20T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "granted",
+          "effective_date": "2023-03-05T00:00:00Z",
+          "source": "USPTO"
+        }
+      ],
+      "documents": [
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000060",
+          "type": "application",
+          "filename": "US17345678_application.pdf",
+          "uploaded_at": "2020-11-06T08:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000061",
+          "type": "oa_notice",
+          "filename": "US17345678_NFOA.pdf",
+          "uploaded_at": "2022-08-22T09:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000062",
+          "type": "oa_response",
+          "filename": "US17345678_NFOA_response.pdf",
+          "uploaded_at": "2023-01-15T14:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000063",
+          "type": "grant_certificate",
+          "filename": "US17345678_grant.pdf",
+          "uploaded_at": "2023-03-07T10:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000064",
+          "type": "assignment",
+          "filename": "US17345678_assignment.pdf",
+          "uploaded_at": "2023-06-01T11:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "lc-00000000-0000-4000-c000-000000000008",
+      "patent_id": "pat-00000000-0000-4000-a000-000000000011",
+      "jurisdiction": "CN",
+      "deadlines": [
+        {
+          "type": "annuity_payment",
+          "due_date": "2024-05-20T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": false,
+          "days_remaining": 126
+        }
+      ],
+      "annuities": [
+        {
+          "year": 1,
+          "amount": 900.00,
+          "currency": "CNY",
+          "due_date": "2022-05-20T00:00:00Z",
+          "paid_date": "2022-05-10T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 2,
+          "amount": 1200.00,
+          "currency": "CNY",
+          "due_date": "2023-05-20T00:00:00Z",
+          "paid_date": "2023-05-15T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 3,
+          "amount": 1200.00,
+          "currency": "CNY",
+          "due_date": "2024-05-20T00:00:00Z",
+          "paid_date": null,
+          "status": "pending"
+        }
+      ],
+      "legal_status_history": [
+        {
+          "status": "filed",
+          "effective_date": "2021-05-20T00:00:00Z",
+          "source": "CNIPA"
+        },
+        {
+          "status": "published",
+          "effective_date": "2021-11-26T00:00:00Z",
+          "source": "CNIPA"
+        },
+        {
+          "status": "substantive_examination",
+          "effective_date": "2022-05-20T00:00:00Z",
+          "source": "CNIPA"
+        },
+        {
+          "status": "granted",
+          "effective_date": "2023-08-15T00:00:00Z",
+          "source": "CNIPA"
+        }
+      ],
+      "documents": [
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000070",
+          "type": "application",
+          "filename": "CN202110556789_application.pdf",
+          "uploaded_at": "2021-05-22T08:00:00Z"
+        },
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000071",
+          "type": "grant_certificate",
+          "filename": "CN202110556789_grant.pdf",
+          "uploaded_at": "2023-08-18T09:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "lc-00000000-0000-4000-c000-000000000009",
+      "patent_id": "pat-00000000-0000-4000-a000-000000000012",
+      "jurisdiction": "EP",
+      "deadlines": [
+        {
+          "type": "renewal",
+          "due_date": "2024-07-31T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": false,
+          "days_remaining": 198
+        }
+      ],
+      "annuities": [
+        {
+          "year": 3,
+          "amount": 495.00,
+          "currency": "EUR",
+          "due_date": "2023-07-31T00:00:00Z",
+          "paid_date": "2023-07-20T00:00:00Z",
+          "status": "paid"
+        },
+        {
+          "year": 4,
+          "amount": 555.00,
+          "currency": "EUR",
+          "due_date": "2024-07-31T00:00:00Z",
+          "paid_date": null,
+          "status": "pending"
+        }
+      ],
+      "legal_status_history": [
+        {
+          "status": "filed",
+          "effective_date": "2021-07-31T00:00:00Z",
+          "source": "EPO"
+        },
+        {
+          "status": "published",
+          "effective_date": "2022-02-02T00:00:00Z",
+          "source": "EPO"
+        },
+        {
+          "status": "examination_requested",
+          "effective_date": "2023-07-30T00:00:00Z",
+          "source": "EPO"
+        }
+      ],
+      "documents": [
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000080",
+          "type": "application",
+          "filename": "EP21187654_application.pdf",
+          "uploaded_at": "2021-08-02T07:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "lc-00000000-0000-4000-c000-000000000010",
+      "patent_id": "pat-00000000-0000-4000-a000-000000000016",
+      "jurisdiction": "US",
+      "deadlines": [
+        {
+          "type": "oa_response",
+          "due_date": "2024-06-01T00:00:00Z",
+          "status": "upcoming",
+          "reminder_sent": false,
+          "days_remaining": 138
+        }
+      ],
+      "annuities": [],
+      "legal_status_history": [
+        {
+          "status": "filed",
+          "effective_date": "2022-08-10T00:00:00Z",
+          "source": "USPTO"
+        },
+        {
+          "status": "published",
+          "effective_date": "2023-02-16T00:00:00Z",
+          "source": "USPTO"
+        }
+      ],
+      "documents": [
+        {
+          "id": "doc-00000000-0000-4000-d000-000000000090",
+          "type": "application",
+          "filename": "US18456789_application.pdf",
+          "uploaded_at": "2022-08-12T09:00:00Z"
+        }
+      ]
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "ws-00000000-0000-4000-e000-000000000001",
+      "name": "OLED R&D Internal Team",
+      "type": "internal",
+      "owner_id": "user-00000000-0000-4000-b000-000000000001",
+      "members": [
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000001",
+          "role": "owner",
+          "joined_at": "2023-01-10T08:00:00Z"
+        },
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000002",
+          "role": "admin",
+          "joined_at": "2023-01-10T08:30:00Z"
+        },
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000003",
+          "role": "editor",
+          "joined_at": "2023-02-01T09:00:00Z"
+        },
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000004",
+          "role": "editor",
+          "joined_at": "2023-03-15T10:00:00Z"
+        },
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000005",
+          "role": "viewer",
+          "joined_at": "2023-06-20T14:00:00Z"
+        }
+      ],
+      "permissions": {
+        "allow_download": true,
+        "allow_share": true,
+        "watermark_enabled": false,
+        "expiry_date": null
+      },
+      "shared_patent_ids": [
+        "pat-00000000-0000-4000-a000-000000000001",
+        "pat-00000000-0000-4000-a000-000000000002",
+        "pat-00000000-0000-4000-a000-000000000003",
+        "pat-00000000-0000-4000-a000-000000000004",
+        "pat-00000000-0000-4000-a000-000000000005",
+        "pat-00000000-0000-4000-a000-000000000006",
+        "pat-00000000-0000-4000-a000-000000000010",
+        "pat-00000000-0000-4000-a000-000000000011"
+      ],
+      "shared_portfolio_ids": [
+        "a1b2c3d4-1111-4000-a000-000000000001",
+        "a1b2c3d4-1111-4000-a000-000000000002",
+        "a1b2c3d4-1111-4000-a000-000000000003"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "ws-00000000-0000-4000-e000-000000000002",
+      "name": "Patent Agency Collaboration",
+      "type": "partner",
+      "owner_id": "user-00000000-0000-4000-b000-000000000001",
+      "members": [
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000001",
+          "role": "owner",
+          "joined_at": "2023-04-01T08:00:00Z"
+        },
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000006",
+          "role": "editor",
+          "joined_at": "2023-04-02T09:00:00Z"
+        },
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000007",
+          "role": "editor",
+          "joined_at": "2023-04-02T09:30:00Z"
+        }
+      ],
+      "permissions": {
+        "allow_download": false,
+        "allow_share": false,
+        "watermark_enabled": true,
+        "expiry_date": "2024-12-31T23:59:59Z"
+      },
+      "shared_patent_ids": [
+        "pat-00000000-0000-4000-a000-000000000003",
+        "pat-00000000-0000-4000-a000-000000000004",
+        "pat-00000000-0000-4000-a000-000000000007"
+      ],
+      "shared_portfolio_ids": [
+        "a1b2c3d4-1111-4000-a000-000000000002"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "ws-00000000-0000-4000-e000-000000000003",
+      "name": "External Counsel FTO Review",
+      "type": "external_counsel",
+      "owner_id": "user-00000000-0000-4000-b000-000000000002",
+      "members": [
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000002",
+          "role": "owner",
+          "joined_at": "2023-09-01T08:00:00Z"
+        },
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000008",
+          "role": "viewer",
+          "joined_at": "2023-09-05T10:00:00Z"
+        },
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000009",
+          "role": "viewer",
+          "joined_at": "2023-09-05T10:30:00Z"
+        }
+      ],
+      "permissions": {
+        "allow_download": false,
+        "allow_share": false,
+        "watermark_enabled": true,
+        "expiry_date": "2024-03-31T23:59:59Z"
+      },
+      "shared_patent_ids": [
+        "pat-00000000-0000-4000-a000-000000000010",
+        "pat-00000000-0000-4000-a000-000000000011",
+        "pat-00000000-0000-4000-a000-000000000012"
+      ],
+      "shared_portfolio_ids": [
+        "a1b2c3d4-1111-4000-a000-000000000003"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "ws-00000000-0000-4000-e000-000000000004",
+      "name": "Archived Phosphorescent Review",
+      "type": "internal",
+      "owner_id": "user-00000000-0000-4000-b000-000000000001",
+      "members": [
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000001",
+          "role": "owner",
+          "joined_at": "2022-03-01T08:00:00Z"
+        },
+        {
+          "user_id": "user-00000000-0000-4000-b000-000000000003",
+          "role": "editor",
+          "joined_at": "2022-03-02T09:00:00Z"
+        }
+      ],
+      "permissions": {
+        "allow_download": true,
+        "allow_share": false,
+        "watermark_enabled": false,
+        "expiry_date": null
+      },
+      "shared_patent_ids": [
+        "pat-00000000-0000-4000-a000-000000000013",
+        "pat-00000000-0000-4000-a000-000000000014",
+        "pat-00000000-0000-4000-a000-000000000015"
+      ],
+      "shared_portfolio_ids": [
+        "a1b2c3d4-1111-4000-a000-000000000004"
+      ],
+      "status": "archived"
+    }
+  ],
+  "valuation_benchmarks": [
+    {
+      "patent_id": "pat-00000000-0000-4000-a000-000000000001",
+      "technical_score": 92,
+      "legal_score": 88,
+      "commercial_score": 95,
+      "strategic_score": 93,
+      "overall_score": 92.3,
+      "tier": "S",
+      "assessment_date": "2024-01-10T00:00:00Z"
+    },
+    {
+      "patent_id": "pat-00000000-0000-4000-a000-000000000010",
+      "technical_score": 85,
+      "legal_score": 82,
+      "commercial_score": 88,
+      "strategic_score": 80,
+      "overall_score": 83.8,
+      "tier": "A",
+      "assessment_date": "2024-01-10T00:00:00Z"
+    },
+    {
+      "patent_id": "pat-00000000-0000-4000-a000-000000000006",
+      "technical_score": 70,
+      "legal_score": 75,
+      "commercial_score": 60,
+      "strategic_score": 65,
+      "overall_score": 66.5,
+      "tier": "B",
+      "assessment_date": "2024-01-10T00:00:00Z"
+    },
+    {
+      "patent_id": "pat-00000000-0000-4000-a000-000000000008",
+      "technical_score": 55,
+      "legal_score": 60,
+      "commercial_score": 50,
+      "strategic_score": 48,
+      "overall_score": 52.4,
+      "tier": "C",
+      "assessment_date": "2024-01-10T00:00:00Z"
+    },
+    {
+      "patent_id": "pat-00000000-0000-4000-a000-000000000013",
+      "technical_score": 40,
+      "legal_score": 30,
+      "commercial_score": 25,
+      "strategic_score": 20,
+      "overall_score": 27.5,
+      "tier": "D",
+      "assessment_date": "2024-01-10T00:00:00Z"
+    },
+    {
+      "patent_id": "pat-00000000-0000-4000-a000-000000000003",
+      "technical_score": 88,
+      "legal_score": 90,
+      "commercial_score": 92,
+      "strategic_score": 91,
+      "overall_score": 90.7,
+      "tier": "S",
+      "assessment_date": "2024-01-10T00:00:00Z"
+    },
+    {
+      "patent_id": "pat-00000000-0000-4000-a000-000000000016",
+      "technical_score": 78,
+      "legal_score": 72,
+      "commercial_score": 80,
+      "strategic_score": 85,
+      "overall_score": 79.5,
+      "tier": "B",
+      "assessment_date": "2024-01-10T00:00:00Z"
+    },
+    {
+      "patent_id": "pat-00000000-0000-4000-a000-000000000014",
+      "technical_score": 45,
+      "legal_score": 35,
+      "commercial_score": 40,
+      "strategic_score": 38,
+      "overall_score": 39.4,
+      "tier": "D",
+      "assessment_date": "2024-01-10T00:00:00Z"
+    }
+  ],
+  "invalid_records": [
+    {
+      "id": "invalid-001",
+      "description": "Portfolio referencing non-existent patent ID",
+      "expected_error": "PATENT_NOT_FOUND",
+      "data": {
+        "type": "portfolio",
+        "id": "a1b2c3d4-9999-4000-a000-000000000099",
+        "name": "Invalid Reference Portfolio",
+        "owner_id": "user-00000000-0000-4000-b000-000000000001",
+        "patent_ids": [
+          "pat-00000000-0000-4000-a000-FFFFFFFFFFFF",
+          "pat-NONEXISTENT-0000-0000-000000000000"
+        ],
+        "strategy": "balanced"
+      }
+    },
+    {
+      "id": "invalid-002",
+      "description": "Annuity with negative amount",
+      "expected_error": "INVALID_AMOUNT",
+      "data": {
+        "type": "annuity",
+        "patent_id": "pat-00000000-0000-4000-a000-000000000001",
+        "year": 2,
+        "amount": -500.00,
+        "currency": "USD",
+        "due_date": "2024-06-18T00:00:00Z",
+        "status": "pending"
+      }
+    },
+    {
+      "id": "invalid-003",
+      "description": "Annuity with invalid currency code",
+      "expected_error": "INVALID_CURRENCY",
+      "data": {
+        "type": "annuity",
+        "patent_id": "pat-00000000-0000-4000-a000-000000000003",
+        "year": 5,
+        "amount": 2000.00,
+        "currency": "XYZ",
+        "due_date": "2025-09-10T00:00:00Z",
+        "status": "pending"
+      }
+    },
+    {
+      "id": "invalid-004",
+      "description": "Deadline with due_date earlier than patent filing date",
+      "expected_error": "INVALID_DATE_SEQUENCE",
+      "data": {
+        "type": "deadline",
+        "patent_id": "pat-00000000-0000-4000-a000-000000000001",
+        "deadline_type": "annuity_payment",
+        "due_date": "2018-01-01T00:00:00Z",
+        "status": "upcoming"
+      }
+    },
+    {
+      "id": "invalid-005",
+      "description": "Workspace member with invalid role enum",
+      "expected_error": "INVALID_ROLE",
+      "data": {
+        "type": "workspace_member",
+        "workspace_id": "ws-00000000-0000-4000-e000-000000000001",
+        "user_id": "user-00000000-0000-4000-b000-000000000099",
+        "role": "superadmin",
+        "joined_at": "2024-01-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "invalid-006",
+      "description": "Portfolio with invalid strategy enum",
+      "expected_error": "INVALID_STRATEGY",
+      "data": {
+        "type": "portfolio",
+        "id": "a1b2c3d4-9999-4000-a000-000000000098",
+        "name": "Bad Strategy Portfolio",
+        "owner_id": "user-00000000-0000-4000-b000-000000000001",
+        "patent_ids": [],
+        "strategy": "aggressive"
+      }
+    },
+    {
+      "id": "invalid-007",
+      "description": "Lifecycle record with duplicate annuity years",
+      "expected_error": "DUPLICATE_ANNUITY_YEAR",
+      "data": {
+        "type": "lifecycle",
+        "patent_id": "pat-00000000-0000-4000-a000-000000000003",
+        "jurisdiction": "CN",
+        "annuities": [
+          {
+            "year": 2,
+            "amount": 1200.00,
+            "currency": "CNY",
+            "due_date": "2022-09-10T00:00:00Z",
+            "status": "paid"
+          },
+          {
+            "year": 2,
+            "amount": 1200.00,
+            "currency": "CNY",
+            "due_date": "2022-09-10T00:00:00Z",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid-008",
+      "description": "Valuation benchmark with scores exceeding 100",
+      "expected_error": "SCORE_OUT_OF_RANGE",
+      "data": {
+        "type": "valuation",
+        "patent_id": "pat-00000000-0000-4000-a000-000000000001",
+        "technical_score": 105,
+        "legal_score": 88,
+        "commercial_score": -10,
+        "strategic_score": 93,
+        "overall_score": 69.0,
+        "tier": "B"
+      }
+    },
+    {
+      "id": "invalid-009",
+      "description": "Workspace sharing non-existent portfolio ID",
+      "expected_error": "PORTFOLIO_NOT_FOUND",
+      "data": {
+        "type": "workspace",
+        "id": "ws-00000000-0000-4000-e000-000000000099",
+        "name": "Bad Share Workspace",
+        "type_ws": "internal",
+        "owner_id": "user-00000000-0000-4000-b000-000000000001",
+        "shared_portfolio_ids": [
+          "a1b2c3d4-FFFF-4000-a000-FFFFFFFFFFFF"
+        ],
+        "status": "active"
+      }
+    },
+    {
+      "id": "invalid-010",
+      "description": "Deadline with invalid status enum value",
+      "expected_error": "INVALID_STATUS",
+      "data": {
+        "type": "deadline",
+        "patent_id": "pat-00000000-0000-4000-a000-000000000004",
+        "deadline_type": "oa_response",
+        "due_date": "2024-02-14T00:00:00Z",
+        "status": "cancelled"
+      }
+    }
+  ]
+}
+

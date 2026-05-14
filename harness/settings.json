@@ -1,0 +1,31 @@
+{
+  "env": {
+    "KEYIP_ENV": "development",
+    "KEYIP_CONFIG": "configs/config.yaml"
+  },
+  "permissions": {
+    "Bash": {
+      "go (build|test|fmt|vet|lint|run|mod|get|install) .*": "allow",
+      "make (build|test|lint|fmt|vet|check|clean|all|generate|proto|migrate.*|seed|docker.*|security.*|help)": "allow",
+      "npm (install|test|run|ci|audit) .*": "allow",
+      "npx (.*)": "allow",
+      "docker compose .*": "allow",
+      "docker (build|push|tag|logs|ps|images|network) .*": "allow",
+      "gh (pr|issue|repo|auth|api|search) .*": "allow",
+      "golangci-lint .*": "allow",
+      "gosec .*": "allow",
+      "git (status|diff|log|add|commit|fetch|pull|push|branch|checkout|stash|restore|show) .*": "allow"
+    },
+    "Read": {
+      ".*": "allow"
+    },
+    "Edit": {
+      ".*": "allow"
+    },
+    "Write": {
+      "/workspace/.*": "allow"
+    },
+    "WebSearch": "allow",
+    "WebFetch": "allow"
+  }
+}

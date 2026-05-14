@@ -1,0 +1,2296 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2024-01-15T00:00:00Z",
+  "description": "Patent domain test fixtures for PatentScope Intelligence Platform. Covers multi-jurisdiction (CN/US/EP/JP/KR), multi-legal-status, multi-claim-type scenarios for unit, integration, and e2e tests.",
+  "patents": [
+    {
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "patent_number": "CN115650927B",
+      "title": "一种有机发光器件用蓝光主体材料及其制备方法与应用",
+      "abstract": "本发明公开了一种有机发光器件用蓝光主体材料，所述材料具有通式(I)所示结构，其中核心骨架为咔唑-三嗪双极性结构，通过在咔唑氮原子上引入螺芴基团提高材料的形态稳定性和三线态能级。所述材料的三线态能级T1≥2.8eV，玻璃化转变温度Tg≥150℃，适用于蓝色磷光和TADF有机发光器件的主体材料。本发明还公开了包含所述材料的有机发光器件，该器件在1000cd/m²亮度下外量子效率≥22%，CIE色坐标y值≤0.15，器件寿命LT95≥500小时。",
+      "filing_date": "2022-03-18",
+      "publication_date": "2023-08-29",
+      "grant_date": "2024-01-05",
+      "legal_status": "granted",
+      "jurisdiction": "CN",
+      "assignees": [
+        {
+          "name": "深圳光韵达材料科技有限公司",
+          "country": "CN",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "张明辉", "country": "CN" },
+        { "name": "李晓燕", "country": "CN" },
+        { "name": "王建国", "country": "CN" }
+      ],
+      "ipc_codes": [
+        "C07D209/86",
+        "C07D403/14",
+        "C09K11/06",
+        "H10K85/60",
+        "H10K50/11"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种有机化合物，具有通式(I)所示结构：其中，Ar1选自苯基、萘基、联苯基、菲基中的一种；Ar2选自吡啶基、嘧啶基、三嗪基中的一种；R1至R4各自独立地选自氢、C1-C6烷基、C6-C18芳基、C3-C15杂芳基中的一种；L选自单键、亚苯基、亚联苯基中的一种；所述通式(I)的核心骨架为9,9'-螺二芴与咔唑通过所述L连接的结构。",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "通式(I)所示结构的有机化合物", "is_novel": true },
+            { "id": "E1-2", "description": "Ar1选自苯基、萘基、联苯基、菲基", "is_novel": false },
+            { "id": "E1-3", "description": "Ar2选自吡啶基、嘧啶基、三嗪基", "is_novel": true },
+            { "id": "E1-4", "description": "R1至R4各自独立地选自氢、C1-C6烷基、C6-C18芳基、C3-C15杂芳基", "is_novel": false },
+            { "id": "E1-5", "description": "L选自单键、亚苯基、亚联苯基", "is_novel": false },
+            { "id": "E1-6", "description": "核心骨架为9,9'-螺二芴与咔唑通过L连接", "is_novel": true }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的有机化合物，其中Ar1为萘基，Ar2为三嗪基。",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "Ar1限定为萘基", "is_novel": false },
+            { "id": "E2-2", "description": "Ar2限定为三嗪基", "is_novel": true }
+          ]
+        },
+        {
+          "number": 3,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的有机化合物，其中R1和R2各自独立地选自氢或甲基，R3和R4各自独立地选自苯基或萘基。",
+          "category": "product",
+          "elements": [
+            { "id": "E3-1", "description": "R1和R2限定为氢或甲基", "is_novel": false },
+            { "id": "E3-2", "description": "R3和R4限定为苯基或萘基", "is_novel": false }
+          ]
+        },
+        {
+          "number": 4,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的有机化合物，其中L为亚苯基。",
+          "category": "product",
+          "elements": [
+            { "id": "E4-1", "description": "L限定为亚苯基", "is_novel": false }
+          ]
+        },
+        {
+          "number": 5,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种有机发光器件，包括：阳极；空穴注入层，设置在所述阳极上；空穴传输层，设置在所述空穴注入层上；发光层，设置在所述空穴传输层上，所述发光层包含权利要求1至4任一项所述的有机化合物作为主体材料和磷光掺杂剂或TADF掺杂剂；电子传输层，设置在所述发光层上；阴极，设置在所述电子传输层上。",
+          "category": "product",
+          "elements": [
+            { "id": "E5-1", "description": "阳极", "is_novel": false },
+            { "id": "E5-2", "description": "空穴注入层设置在阳极上", "is_novel": false },
+            { "id": "E5-3", "description": "空穴传输层设置在空穴注入层上", "is_novel": false },
+            { "id": "E5-4", "description": "发光层包含权利要求1-4的化合物作为主体材料", "is_novel": true },
+            { "id": "E5-5", "description": "发光层包含磷光掺杂剂或TADF掺杂剂", "is_novel": false },
+            { "id": "E5-6", "description": "电子传输层设置在发光层上", "is_novel": false },
+            { "id": "E5-7", "description": "阴极设置在电子传输层上", "is_novel": false }
+          ]
+        },
+        {
+          "number": 6,
+          "type": "dependent",
+          "depends_on": 5,
+          "text": "根据权利要求5所述的有机发光器件，其中所述发光层的厚度为20nm至40nm，所述掺杂剂的掺杂浓度为5wt%至20wt%。",
+          "category": "product",
+          "elements": [
+            { "id": "E6-1", "description": "发光层厚度20-40nm", "is_novel": false },
+            { "id": "E6-2", "description": "掺杂浓度5-20wt%", "is_novel": false }
+          ]
+        },
+        {
+          "number": 7,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种制备有机发光器件的方法，包括以下步骤：(a)在基板上形成阳极；(b)在所述阳极上通过真空蒸镀形成空穴注入层；(c)在所述空穴注入层上通过真空蒸镀形成空穴传输层；(d)在所述空穴传输层上通过共蒸镀形成发光层，其中共蒸镀使用权利要求1至4任一项所述的有机化合物和掺杂剂，蒸镀温度为200℃至350℃，蒸镀速率为0.5Å/s至2.0Å/s；(e)在所述发光层上通过真空蒸镀形成电子传输层；(f)在所述电子传输层上形成阴极。",
+          "category": "method",
+          "elements": [
+            { "id": "E7-1", "description": "在基板上形成阳极", "is_novel": false },
+            { "id": "E7-2", "description": "真空蒸镀形成空穴注入层", "is_novel": false },
+            { "id": "E7-3", "description": "真空蒸镀形成空穴传输层", "is_novel": false },
+            { "id": "E7-4", "description": "共蒸镀形成发光层，使用权利要求1-4的化合物和掺杂剂", "is_novel": true },
+            { "id": "E7-5", "description": "蒸镀温度200-350℃", "is_novel": false },
+            { "id": "E7-6", "description": "蒸镀速率0.5-2.0Å/s", "is_novel": false },
+            { "id": "E7-7", "description": "真空蒸镀形成电子传输层", "is_novel": false },
+            { "id": "E7-8", "description": "形成阴极", "is_novel": false }
+          ]
+        },
+        {
+          "number": 8,
+          "type": "dependent",
+          "depends_on": 7,
+          "text": "根据权利要求7所述的方法，其中步骤(d)中蒸镀温度为250℃至300℃，所述发光层的厚度为25nm至35nm。",
+          "category": "method",
+          "elements": [
+            { "id": "E8-1", "description": "蒸镀温度限定为250-300℃", "is_novel": false },
+            { "id": "E8-2", "description": "发光层厚度限定为25-35nm", "is_novel": false }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-cbz-spiro-001", "location": "实施例1, 表1, 化合物1", "role": "core_compound" },
+        { "molecule_id": "mol-cbz-spiro-002", "location": "实施例2, 表1, 化合物2", "role": "example" },
+        { "molecule_id": "mol-cbz-spiro-003", "location": "实施例3, 表1, 化合物3", "role": "example" },
+        { "molecule_id": "mol-cbz-ref-001", "location": "对比例1, 表2", "role": "comparative" },
+        { "molecule_id": "mol-cbz-mksh-001", "location": "权利要求1, 通式(I)实例", "role": "markush_instance" }
+      ],
+      "markush_structures": [
+        {
+          "id": "mksh-cn-001",
+          "core_smarts": "[#6]1([#6]2[#6][#6][#6]([#6]3[#7][#6]4[#6][#6][#6][#6][#6]4[#6]4[#6][#6][#6][#6][#6]34)[#6][#6]2)([#6]2[#6][#6][#6][#6][#6]2[#6]2[#6][#6][#6][#6][#6]2)[#6][#6][#6][#6]1",
+          "variable_groups": [
+            {
+              "position": "Ar1",
+              "options": [
+                "c1ccccc1",
+                "c1ccc2ccccc2c1",
+                "c1ccc(-c2ccccc2)cc1",
+                "c1ccc2c(c1)ccc1ccccc12"
+              ]
+            },
+            {
+              "position": "Ar2",
+              "options": [
+                "c1ccncc1",
+                "c1ccnc(n1)",
+                "c1nc(nc(n1))"
+              ]
+            },
+            {
+              "position": "R1",
+              "options": ["[H]", "C", "CC", "CCC", "c1ccccc1", "c1ccc2ccccc2c1"]
+            },
+            {
+              "position": "R2",
+              "options": ["[H]", "C", "CC", "CCC", "c1ccccc1", "c1ccc2ccccc2c1"]
+            },
+            {
+              "position": "R3",
+              "options": ["[H]", "C", "c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1"]
+            },
+            {
+              "position": "R4",
+              "options": ["[H]", "C", "c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1"]
+            },
+            {
+              "position": "L",
+              "options": ["", "c1ccc(cc1)", "c1ccc(-c2ccc(cc2))cc1"]
+            }
+          ],
+          "estimated_coverage": 37800,
+          "related_claim_numbers": [1, 2, 3, 4]
+        }
+      ],
+      "family_id": "FAM-2022-OLED-001",
+      "priority_date": "2022-03-18",
+      "metadata": {
+        "data_source": "CNIPA",
+        "technology_field": "OLED_blue_host",
+        "commercial_relevance": "high"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "patent_number": "CN116354946A",
+      "title": "一种有机发光器件用空穴传输材料及其应用",
+      "abstract": "本发明涉及一种有机发光器件用空穴传输材料，所述材料基于三苯胺-咔唑杂化骨架，通过分子工程调控HOMO能级至-5.2eV至-5.5eV范围，实现与蓝光发光层的高效空穴注入。所述材料具有高空穴迁移率（≥1×10⁻³ cm²/Vs）和优异的热稳定性（Tg≥130℃），适用于高效蓝色OLED器件。",
+      "filing_date": "2023-01-10",
+      "publication_date": "2023-07-28",
+      "grant_date": null,
+      "legal_status": "examination",
+      "jurisdiction": "CN",
+      "assignees": [
+        {
+          "name": "深圳光韵达材料科技有限公司",
+          "country": "CN",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "李晓燕", "country": "CN" },
+        { "name": "陈伟", "country": "CN" }
+      ],
+      "ipc_codes": [
+        "C07D209/86",
+        "C07D403/04",
+        "H10K85/60",
+        "H10K50/15"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种空穴传输材料，具有通式(II)所示结构，其中核心骨架为三苯胺与咔唑通过亚苯基连接的结构，R1至R3各自独立地选自氢、甲基、叔丁基、苯基中的一种。",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "通式(II)所示结构的空穴传输材料", "is_novel": true },
+            { "id": "E1-2", "description": "核心骨架为三苯胺与咔唑通过亚苯基连接", "is_novel": true },
+            { "id": "E1-3", "description": "R1至R3选自氢、甲基、叔丁基、苯基", "is_novel": false }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的空穴传输材料，其中R1为甲基，R2和R3为氢。",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "R1限定为甲基", "is_novel": false },
+            { "id": "E2-2", "description": "R2和R3限定为氢", "is_novel": false }
+          ]
+        },
+        {
+          "number": 3,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种有机发光器件，包含阳极、空穴注入层、空穴传输层、发光层、电子传输层和阴极，其中所述空穴传输层包含权利要求1或2所述的空穴传输材料。",
+          "category": "product",
+          "elements": [
+            { "id": "E3-1", "description": "有机发光器件层叠结构", "is_novel": false },
+            { "id": "E3-2", "description": "空穴传输层包含权利要求1或2的材料", "is_novel": true }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-tpa-cbz-001", "location": "实施例1", "role": "core_compound" },
+        { "molecule_id": "mol-tpa-cbz-002", "location": "实施例2", "role": "example" }
+      ],
+      "markush_structures": [],
+      "family_id": "FAM-2023-HTL-001",
+      "priority_date": "2023-01-10",
+      "metadata": {
+        "data_source": "CNIPA",
+        "technology_field": "OLED_HTL",
+        "commercial_relevance": "medium"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "patent_number": "US11,832,456B2",
+      "title": "Phosphorescent Organometallic Compound for Organic Light-Emitting Device",
+      "abstract": "Disclosed is a phosphorescent organometallic compound comprising an iridium center coordinated with cyclometalated ligands bearing fluorinated phenylpyridine moieties and an ancillary beta-diketonate ligand. The compound exhibits emission in the blue-green region with CIE coordinates of (0.16, 0.32), photoluminescence quantum yield exceeding 85%, and triplet lifetime of 1.2 microseconds in doped thin film. An organic light-emitting device employing the compound as a phosphorescent dopant in a host matrix achieves external quantum efficiency of 24.5% and operational lifetime LT95 of 800 hours at initial luminance of 1000 cd/m².",
+      "filing_date": "2021-06-15",
+      "publication_date": "2022-11-28",
+      "grant_date": "2023-11-28",
+      "legal_status": "granted",
+      "jurisdiction": "US",
+      "assignees": [
+        {
+          "name": "Luminara Materials Inc.",
+          "country": "US",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "Takeshi Yamamoto", "country": "JP" },
+        { "name": "Sarah Chen", "country": "US" },
+        { "name": "Min-Jae Park", "country": "KR" }
+      ],
+      "ipc_codes": [
+        "C07F15/00",
+        "C09K11/06",
+        "H10K85/30",
+        "H10K50/11"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "An organometallic compound having the formula Ir(L1)₂(L2), wherein L1 is a cyclometalated ligand selected from 2-phenylpyridinato derivatives having at least one fluorine substituent on the phenyl ring, and L2 is an ancillary ligand selected from acetylacetonate, picolinate, and tetrakis(1-pyrazolyl)borate.",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "Organometallic compound with formula Ir(L1)₂(L2)", "is_novel": true },
+            { "id": "E1-2", "description": "L1 is cyclometalated 2-phenylpyridinato derivative", "is_novel": false },
+            { "id": "E1-3", "description": "L1 has at least one fluorine on phenyl ring", "is_novel": true },
+            { "id": "E1-4", "description": "L2 selected from acac, pic, and Tp", "is_novel": false }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "The organometallic compound of claim 1, wherein L1 is 2-(2,4-difluorophenyl)pyridinato.",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "L1 specified as 2-(2,4-difluorophenyl)pyridinato", "is_novel": true }
+          ]
+        },
+        {
+          "number": 3,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "The organometallic compound of claim 1, wherein L2 is acetylacetonate.",
+          "category": "product",
+          "elements": [
+            { "id": "E3-1", "description": "L2 specified as acetylacetonate", "is_novel": false }
+          ]
+        },
+        {
+          "number": 4,
+          "type": "independent",
+          "depends_on": null,
+          "text": "An organic light-emitting device comprising: an anode; a hole injection layer disposed on the anode; a hole transport layer disposed on the hole injection layer; an emissive layer disposed on the hole transport layer, the emissive layer comprising a host material and the organometallic compound of claim 1 as a phosphorescent dopant at a concentration of 2 wt% to 15 wt%; an electron transport layer disposed on the emissive layer; and a cathode disposed on the electron transport layer.",
+          "category": "product",
+          "elements": [
+            { "id": "E4-1", "description": "Anode", "is_novel": false },
+            { "id": "E4-2", "description": "Hole injection layer on anode", "is_novel": false },
+            { "id": "E4-3", "description": "Hole transport layer on HIL", "is_novel": false },
+            { "id": "E4-4", "description": "Emissive layer with host and claim 1 compound as phosphorescent dopant", "is_novel": true },
+            { "id": "E4-5", "description": "Dopant concentration 2-15 wt%", "is_novel": false },
+            { "id": "E4-6", "description": "Electron transport layer on emissive layer", "is_novel": false },
+            { "id": "E4-7", "description": "Cathode on ETL", "is_novel": false }
+          ]
+        },
+        {
+          "number": 5,
+          "type": "dependent",
+          "depends_on": 4,
+          "text": "The organic light-emitting device of claim 4, wherein the host material is selected from the group consisting of CBP, mCBP, and DPEPO.",
+          "category": "product",
+          "elements": [
+            { "id": "E5-1", "description": "Host material specified as CBP, mCBP, or DPEPO", "is_novel": false }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-ir-dfppy-001", "location": "Example 1, Table 1, Compound A", "role": "core_compound" },
+        { "molecule_id": "mol-ir-dfppy-002", "location": "Example 2, Table 1, Compound B", "role": "example" },
+        { "molecule_id": "mol-ir-ppy-ref", "location": "Comparative Example 1", "role": "comparative" }
+      ],
+      "markush_structures": [
+        {
+          "id": "mksh-us-001",
+          "core_smarts": "[Ir]([#6]1[#6][#6][#6]([F])[#6][#6]1[#6]1[#7][#6][#6][#6][#6]1)([#6]1[#6][#6][#6]([F])[#6][#6]1[#6]1[#7][#6][#6][#6][#6]1)",
+          "variable_groups": [
+            {
+              "position": "L2",
+              "options": [
+                "CC(=O)/C=C(\\C)[O-]",
+                "OC(=O)c1ccccn1",
+                "[#7]1[#6]=[#6][#7]([BH2-])([#7]2[#6]=[#6][#7]2)[#7]2[#6]=[#6][#7]12"
+              ]
+            },
+            {
+              "position": "F_position",
+              "options": ["2-F", "4-F", "2,4-diF", "2,6-diF", "2,4,6-triF"]
+            }
+          ],
+          "estimated_coverage": 15,
+          "related_claim_numbers": [1, 2, 3]
+        }
+      ],
+      "family_id": "FAM-2021-PHO-001",
+      "priority_date": "2020-12-22",
+      "metadata": {
+        "data_source": "USPTO",
+        "technology_field": "OLED_phosphorescent_emitter",
+        "commercial_relevance": "high",
+        "priority_country": "KR"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "patent_number": "US2023/0389421A1",
+      "title": "Thermally Activated Delayed Fluorescence Material for Blue Organic Light-Emitting Device",
+      "abstract": "A thermally activated delayed fluorescence (TADF) material based on a donor-acceptor architecture, wherein the donor moiety comprises a modified acridine unit and the acceptor moiety comprises a diphenyl sulfone unit. The material exhibits a small singlet-triplet energy gap (ΔEST) of less than 0.1 eV, enabling efficient reverse intersystem crossing. Blue emission with CIE coordinates of (0.15, 0.10) and photoluminescence quantum yield of 78% are achieved. An OLED device using this TADF material as an emitter demonstrates external quantum efficiency of 20.3% without any heavy metal dopant.",
+      "filing_date": "2022-08-20",
+      "publication_date": "2023-11-30",
+      "grant_date": null,
+      "legal_status": "pending",
+      "jurisdiction": "US",
+      "assignees": [
+        {
+          "name": "Luminara Materials Inc.",
+          "country": "US",
+          "type": "corporation"
+        },
+        {
+          "name": "Korea Advanced Institute of Science and Technology",
+          "country": "KR",
+          "type": "university"
+        }
+      ],
+      "inventors": [
+        { "name": "Min-Jae Park", "country": "KR" },
+        { "name": "Yuki Tanaka", "country": "JP" }
+      ],
+      "ipc_codes": [
+        "C07D265/38",
+        "C07C317/14",
+        "C09K11/06",
+        "H10K85/60",
+        "H10K50/11"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "A thermally activated delayed fluorescence compound comprising a donor moiety and an acceptor moiety connected via a spiro or ortho linkage, wherein the donor moiety is selected from acridine, phenoxazine, and phenothiazine derivatives, and the acceptor moiety is selected from diphenyl sulfone, triazine, and benzonitrile derivatives, and wherein the singlet-triplet energy gap ΔEST of the compound is less than 0.15 eV.",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "TADF compound with donor-acceptor architecture", "is_novel": true },
+            { "id": "E1-2", "description": "Donor and acceptor connected via spiro or ortho linkage", "is_novel": true },
+            { "id": "E1-3", "description": "Donor selected from acridine, phenoxazine, phenothiazine derivatives", "is_novel": false },
+            { "id": "E1-4", "description": "Acceptor selected from diphenyl sulfone, triazine, benzonitrile derivatives", "is_novel": false },
+            { "id": "E1-5", "description": "ΔEST less than 0.15 eV", "is_novel": true }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "The compound of claim 1, wherein the donor moiety is a 9,9-dimethylacridine derivative and the acceptor moiety is a diphenyl sulfone derivative.",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "Donor specified as 9,9-dimethylacridine derivative", "is_novel": false },
+            { "id": "E2-2", "description": "Acceptor specified as diphenyl sulfone derivative", "is_novel": false }
+          ]
+        },
+        {
+          "number": 3,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "The compound of claim 1, wherein the compound has a photoluminescence quantum yield of at least 70% and an emission peak wavelength between 440 nm and 475 nm.",
+          "category": "product",
+          "elements": [
+            { "id": "E3-1", "description": "PLQY at least 70%", "is_novel": false },
+            { "id": "E3-2", "description": "Emission peak 440-475 nm", "is_novel": false }
+          ]
+        },
+        {
+          "number": 4,
+          "type": "independent",
+          "depends_on": null,
+          "text": "An organic light-emitting device comprising an emissive layer containing the compound of claim 1 as a non-doped emitter or as a dopant in a host matrix at a concentration of 10 wt% to 50 wt%.",
+          "category": "product",
+          "elements": [
+            { "id": "E4-1", "description": "OLED with emissive layer containing claim 1 compound", "is_novel": true },
+            { "id": "E4-2", "description": "Used as non-doped emitter or dopant at 10-50 wt%", "is_novel": true }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-tadf-acr-001", "location": "Example 1, Compound TADF-1", "role": "core_compound" },
+        { "molecule_id": "mol-tadf-acr-002", "location": "Example 2, Compound TADF-2", "role": "example" }
+      ],
+      "markush_structures": [
+        {
+          "id": "mksh-us-002",
+          "core_smarts": "[#6]1(~[#6]~[#6]~[#7]~[#6]~[#6]1)~[#6]1~[#6]~[#6](~[S](=O)(=O)~[#6]2~[#6]~[#6]~[#6]~[#6]~[#6]2)~[#6]~[#6]~[#6]1",
+          "variable_groups": [
+            {
+              "position": "donor",
+              "options": [
+                "C1(C)(C)c2ccccc2Nc2ccccc21",
+                "c1ccc2c(c1)Oc1ccccc1N2",
+                "c1ccc2c(c1)Sc1ccccc1N2"
+              ]
+            },
+            {
+              "position": "acceptor",
+              "options": [
+                "c1ccc(cc1)S(=O)(=O)c1ccccc1",
+                "c1nc(nc(n1))",
+                "c1ccc(cc1)C#N"
+              ]
+            },
+            {
+              "position": "linkage",
+              "options": ["spiro", "ortho-twist"]
+            }
+          ],
+          "estimated_coverage": 18,
+          "related_claim_numbers": [1, 2]
+        }
+      ],
+      "family_id": "FAM-2022-TADF-001",
+      "priority_date": "2022-02-15",
+      "metadata": {
+        "data_source": "USPTO",
+        "technology_field": "OLED_TADF_emitter",
+        "commercial_relevance": "high",
+        "priority_country": "KR"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "patent_number": "EP3,985,742A1",
+      "title": "Electron Transport Material for Organic Light-Emitting Device and Device Thereof",
+      "abstract": "The present invention relates to an electron transport material based on a phosphine oxide-modified triazine scaffold. The material exhibits electron mobility exceeding 5×10⁻⁴ cm²/Vs, LUMO energy level of -2.8 eV, and excellent thermal stability with decomposition temperature above 400°C. An organic light-emitting device incorporating the material as an electron transport layer demonstrates reduced driving voltage by 0.8V compared to conventional BPhen-based devices while maintaining equivalent external quantum efficiency of 21%.",
+      "filing_date": "2021-09-03",
+      "publication_date": "2022-04-20",
+      "grant_date": "2023-08-16",
+      "legal_status": "granted",
+      "jurisdiction": "EP",
+      "assignees": [
+        {
+          "name": "European Organic Electronics GmbH",
+          "country": "DE",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "Klaus Weber", "country": "DE" },
+        { "name": "Marie Dupont", "country": "FR" }
+      ],
+      "ipc_codes": [
+        "C07F9/53",
+        "C07D251/24",
+        "H10K85/60",
+        "H10K50/17"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "An electron transport compound having a triazine core substituted with at least one phosphine oxide group, wherein the triazine core is 1,3,5-triazine and the phosphine oxide group has the formula -P(=O)(Ar3)(Ar4) where Ar3 and Ar4 are each independently selected from phenyl, naphthyl, and biphenyl.",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "Electron transport compound with triazine core", "is_novel": true },
+            { "id": "E1-2", "description": "At least one phosphine oxide substituent on triazine", "is_novel": true },
+            { "id": "E1-3", "description": "Triazine core is 1,3,5-triazine", "is_novel": false },
+            { "id": "E1-4", "description": "Phosphine oxide formula -P(=O)(Ar3)(Ar4)", "is_novel": false },
+            { "id": "E1-5", "description": "Ar3 and Ar4 selected from phenyl, naphthyl, biphenyl", "is_novel": false }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "The compound of claim 1, wherein the triazine core is further substituted with one or two pyridyl groups.",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "Triazine further substituted with pyridyl groups", "is_novel": false }
+          ]
+        },
+        {
+          "number": 3,
+          "type": "independent",
+          "depends_on": null,
+          "text": "An organic light-emitting device comprising an electron transport layer containing the compound of claim 1, wherein the electron transport layer has a thickness of 20 nm to 60 nm.",
+          "category": "product",
+          "elements": [
+            { "id": "E3-1", "description": "OLED with ETL containing claim 1 compound", "is_novel": true },
+            { "id": "E3-2", "description": "ETL thickness 20-60 nm", "is_novel": false }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-etl-trz-001", "location": "Example 1, Compound ETL-1", "role": "core_compound" },
+        { "molecule_id": "mol-etl-trz-002", "location": "Example 2, Compound ETL-2", "role": "example" }
+      ],
+      "markush_structures": [],
+      "family_id": "FAM-2021-ETL-001",
+      "priority_date": "2021-03-10",
+      "metadata": {
+        "data_source": "EPO",
+        "technology_field": "OLED_ETL",
+        "commercial_relevance": "medium"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "patent_number": "JP7,234,567B2",
+      "title": "有機発光素子およびその製造方法",
+      "abstract": "本発明は、タンデム構造を有する有機発光素子に関する。当該素子は、第一発光ユニットと第二発光ユニットとの間に電荷発生層を備え、前記電荷発生層はn型金属酸化物層とp型有機半導体層との積層構造を有する。本発明の素子は、単一ユニット素子と比較して2倍以上の電流効率を達成し、初期輝度5000cd/m²における素子寿命LT95が1500時間以上である。",
+      "filing_date": "2021-04-22",
+      "publication_date": "2022-10-15",
+      "grant_date": "2023-03-01",
+      "legal_status": "granted",
+      "jurisdiction": "JP",
+      "assignees": [
+        {
+          "name": "東京有機エレクトロニクス株式会社",
+          "country": "JP",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "山本健", "country": "JP" },
+        { "name": "佐藤美咲", "country": "JP" }
+      ],
+      "ipc_codes": [
+        "H10K50/19",
+        "H10K50/11",
+        "H10K71/00",
+        "H10K59/10"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "基板上に順に積層された、第一電極と、第一発光ユニットと、電荷発生層と、第二発光ユニットと、第二電極とを備える有機発光素子であって、前記電荷発生層は、膜厚5nm〜20nmのn型金属酸化物層と、膜厚5nm〜15nmのp型有機半導体層との積層構造を有することを特徴とする有機発光素子。",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "タンデム構造の有機発光素子", "is_novel": true },
+            { "id": "E1-2", "description": "電荷発生層がn型金属酸化物層とp型有機半導体層の積層", "is_novel": true },
+            { "id": "E1-3", "description": "n型金属酸化物層の膜厚5-20nm", "is_novel": false },
+            { "id": "E1-4", "description": "p型有機半導体層の膜厚5-15nm", "is_novel": false }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "前記n型金属酸化物層がMoO₃、V₂O₅、またはWO₃からなる、請求項1に記載の有機発光素子。",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "n型金属酸化物がMoO₃、V₂O₅、またはWO₃", "is_novel": false }
+          ]
+        },
+        {
+          "number": 3,
+          "type": "independent",
+          "depends_on": null,
+          "text": "有機発光素子の製造方法であって、(a)基板上に第一電極を形成する工程と、(b)前記第一電極上に第一発光ユニットを真空蒸着により形成する工程と、(c)前記第一発光ユニット上にn型金属酸化物層を蒸着温度100℃〜300℃で形成し、続いてp型有機半導体層を蒸着温度150℃〜350℃で形成して電荷発生層を形成する工程と、(d)前記電荷発生層上に第二発光ユニットを形成する工程と、(e)前記第二発光ユニット上に第二電極を形成する工程とを含む方法。",
+          "category": "method",
+          "elements": [
+            { "id": "E3-1", "description": "基板上に第一電極を形成", "is_novel": false },
+            { "id": "E3-2", "description": "第一発光ユニットを真空蒸着で形成", "is_novel": false },
+            { "id": "E3-3", "description": "n型金属酸化物層を100-300℃で蒸着", "is_novel": false },
+            { "id": "E3-4", "description": "p型有機半導体層を150-350℃で蒸着して電荷発生層形成", "is_novel": true },
+            { "id": "E3-5", "description": "第二発光ユニットを形成", "is_novel": false },
+            { "id": "E3-6", "description": "第二電極を形成", "is_novel": false }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-cgl-hat-001", "location": "実施例1, 表1", "role": "core_compound" }
+      ],
+      "markush_structures": [],
+      "family_id": "FAM-2021-TANDEM-001",
+      "priority_date": "2020-10-30",
+      "metadata": {
+        "data_source": "JPO",
+        "technology_field": "OLED_device_structure",
+        "commercial_relevance": "high",
+        "priority_country": "JP"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+      "patent_number": "KR10-2023-0145678A",
+      "title": "유기 발광 소자용 봉지 재료 및 이를 포함하는 유기 발광 표시 장치",
+      "abstract": "본 발명은 유기 발광 소자의 수분 및 산소 차단을 위한 봉지 재료에 관한 것으로, 무기층과 유기층이 교대로 적층된 다층 박막 봉지 구조를 개시한다. 상기 무기층은 Al₂O₃ 또는 SiNx로 이루어지고, 상기 유기층은 아크릴레이트계 고분자로 이루어진다. 본 발명의 봉지 구조는 수분 투과율(WVTR)이 1×10⁻⁶ g/m²/day 이하이며, 85℃/85%RH 조건에서 1000시간 이상의 내구성을 나타낸다.",
+      "filing_date": "2023-04-05",
+      "publication_date": "2023-10-20",
+      "grant_date": null,
+      "legal_status": "pending",
+      "jurisdiction": "KR",
+      "assignees": [
+        {
+          "name": "삼성디스플레이 주식회사",
+          "country": "KR",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "김지훈", "country": "KR" },
+        { "name": "이수연", "country": "KR" }
+      ],
+      "ipc_codes": [
+        "H10K50/84",
+        "H10K59/80",
+        "C23C16/40",
+        "B32B7/02"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "유기 발광 소자 상에 형성된 박막 봉지 구조로서, 상기 박막 봉지 구조는 적어도 2개의 무기층과 적어도 1개의 유기층이 교대로 적층된 구조를 포함하고, 상기 무기층은 Al₂O₃, SiNx, SiO₂, 및 TiO₂로 이루어진 군에서 선택되는 하나 이상의 재료로 이루어지며, 각 무기층의 두께는 10nm 내지 100nm이고, 상기 유기층은 아크릴레이트계 고분자로 이루어지며, 각 유기층의 두께는 1μm 내지 10μm인 것을 특징으로 하는 박막 봉지 구조.",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "무기층과 유기층이 교대 적층된 박막 봉지 구조", "is_novel": true },
+            { "id": "E1-2", "description": "무기층은 Al₂O₃, SiNx, SiO₂, TiO₂ 중 선택", "is_novel": false },
+            { "id": "E1-3", "description": "무기층 두께 10-100nm", "is_novel": false },
+            { "id": "E1-4", "description": "유기층은 아크릴레이트계 고분자", "is_novel": false },
+            { "id": "E1-5", "description": "유기층 두께 1-10μm", "is_novel": false }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "제1항에 있어서, 상기 박막 봉지 구조의 수분 투과율(WVTR)이 1×10⁻⁶ g/m²/day 이하인 것을 특징으로 하는 박막 봉지 구조.",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "WVTR ≤ 1×10⁻⁶ g/m²/day", "is_novel": true }
+          ]
+        }
+      ],
+      "molecules": [],
+      "markush_structures": [],
+      "family_id": "FAM-2023-ENCAP-001",
+      "priority_date": "2023-04-05",
+      "metadata": {
+        "data_source": "KIPO",
+        "technology_field": "OLED_encapsulation",
+        "commercial_relevance": "medium"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "patent_number": "CN108864095B",
+      "title": "一种有机电致发光器件用空穴注入材料",
+      "abstract": "本发明公开了一种基于酞菁铜衍生物的空穴注入材料，该材料通过在酞菁铜外围引入氟代苯基取代基，提高了材料的功函数和空气稳定性。所述材料的HOMO能级为-5.4eV，适用于ITO阳极的空穴注入。本发明的有机发光器件在10mA/cm²电流密度下的驱动电压仅为3.2V。",
+      "filing_date": "2017-05-12",
+      "publication_date": "2018-11-23",
+      "grant_date": "2020-02-14",
+      "legal_status": "expired",
+      "jurisdiction": "CN",
+      "assignees": [
+        {
+          "name": "北京有机光电研究所",
+          "country": "CN",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "刘强", "country": "CN" }
+      ],
+      "ipc_codes": [
+        "C07D487/22",
+        "H10K85/30",
+        "H10K50/17"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种空穴注入材料，其特征在于，所述材料为酞菁铜衍生物，其外围苯环上具有1至8个氟代苯基取代基。",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "酞菁铜衍生物空穴注入材料", "is_novel": true },
+            { "id": "E1-2", "description": "外围苯环上1-8个氟代苯基取代基", "is_novel": true }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的空穴注入材料，其中所述氟代苯基为全氟苯基。",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "氟代苯基限定为全氟苯基", "is_novel": false }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-cupc-f-001", "location": "实施例1", "role": "core_compound" }
+      ],
+      "markush_structures": [],
+      "family_id": "FAM-2017-HIL-001",
+      "priority_date": "2017-05-12",
+      "metadata": {
+        "data_source": "CNIPA",
+        "technology_field": "OLED_HIL",
+        "commercial_relevance": "low",
+        "expiry_reason": "failure_to_pay_annuity"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "patent_number": "EP3,412,156B1",
+      "title": "Host Material for Phosphorescent Organic Light-Emitting Device",
+      "abstract": "A bipolar host material based on carbazole-benzimidazole hybrid structure for use in phosphorescent OLEDs. The material demonstrates balanced charge transport properties with hole mobility of 2×10⁻⁴ cm²/Vs and electron mobility of 8×10⁻⁵ cm²/Vs. A green phosphorescent OLED using this host achieves EQE of 26% and power efficiency of 85 lm/W.",
+      "filing_date": "2018-02-08",
+      "publication_date": "2018-12-12",
+      "grant_date": "2020-06-10",
+      "legal_status": "revoked",
+      "jurisdiction": "EP",
+      "assignees": [
+        {
+          "name": "European Organic Electronics GmbH",
+          "country": "DE",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "Klaus Weber", "country": "DE" },
+        { "name": "Anna Schmidt", "country": "DE" }
+      ],
+      "ipc_codes": [
+        "C07D235/18",
+        "C07D209/86",
+        "H10K85/60",
+        "H10K50/11"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "A bipolar host compound comprising a carbazole donor moiety and a benzimidazole acceptor moiety connected through a phenylene linker, wherein the carbazole nitrogen is substituted with a C1-C4 alkyl group or a phenyl group.",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "Bipolar host with carbazole-benzimidazole structure", "is_novel": true },
+            { "id": "E1-2", "description": "Connected through phenylene linker", "is_novel": false },
+            { "id": "E1-3", "description": "Carbazole N-substituted with C1-C4 alkyl or phenyl", "is_novel": false }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "The compound of claim 1, wherein the carbazole nitrogen is substituted with a phenyl group and the benzimidazole is 1-phenyl-1H-benzimidazole.",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "Carbazole N-phenyl, benzimidazole is 1-phenyl-1H-benzimidazole", "is_novel": false }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-cbz-bim-001", "location": "Example 1", "role": "core_compound" }
+      ],
+      "markush_structures": [],
+      "family_id": "FAM-2018-HOST-001",
+      "priority_date": "2017-08-15",
+      "metadata": {
+        "data_source": "EPO",
+        "technology_field": "OLED_host",
+        "commercial_relevance": "none",
+        "revocation_reason": "opposition_prior_art",
+        "revocation_date": "2022-09-20"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "patent_number": "CN116003389B",
+      "title": "一种螺芴-三嗪双极性蓝光主体材料及有机发光器件",
+      "abstract": "本发明公开了一种基于螺芴-三嗪骨架的双极性蓝光主体材料，通过在螺芴的2位和7位分别引入给体基团（咔唑或吖啶）和受体基团（三嗪或嘧啶），实现了分子内电荷转移态的精确调控。所述材料的三线态能级T1≥2.85eV，HOMO/LUMO能级分别为-5.6eV/-2.5eV，玻璃化转变温度Tg≥165℃。采用该材料作为主体的蓝色TADF器件外量子效率达到23.8%，CIE色坐标为(0.14, 0.12)，在1000cd/m²初始亮度下LT95寿命超过600小时。",
+      "filing_date": "2022-06-20",
+      "publication_date": "2023-05-02",
+      "grant_date": "2023-12-15",
+      "legal_status": "granted",
+      "jurisdiction": "CN",
+      "assignees": [
+        {
+          "name": "深圳光韵达材料科技有限公司",
+          "country": "CN",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "张明辉", "country": "CN" },
+        { "name": "王建国", "country": "CN" },
+        { "name": "赵丽华", "country": "CN" }
+      ],
+      "ipc_codes": [
+        "C07D209/86",
+        "C07D251/24",
+        "C07D405/14",
+        "C09K11/06",
+        "H10K85/60"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种有机化合物，具有通式(III)所示结构，其中核心骨架为9,9'-螺二芴，所述螺二芴的一个芴单元的2位连接给体基团D，7位连接受体基团A；D选自咔唑基、吖啶基、吩噁嗪基中的一种；A选自1,3,5-三嗪基、嘧啶基中的一种；D和A各自通过单键或亚苯基与螺二芴连接；D上任选地具有1至3个选自C1-C4烷基和苯基的取代基；A上任选地具有1至2个选自苯基、萘基和联苯基的取代基。",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "通式(III)所示结构的有机化合物", "is_novel": true },
+            { "id": "E1-2", "description": "核心骨架为9,9'-螺二芴", "is_novel": false },
+            { "id": "E1-3", "description": "芴2位连接给体D，7位连接受体A", "is_novel": true },
+            { "id": "E1-4", "description": "D选自咔唑基、吖啶基、吩噁嗪基", "is_novel": false },
+            { "id": "E1-5", "description": "A选自1,3,5-三嗪基、嘧啶基", "is_novel": false },
+            { "id": "E1-6", "description": "D和A通过单键或亚苯基连接", "is_novel": false },
+            { "id": "E1-7", "description": "D上任选1-3个C1-C4烷基或苯基取代基", "is_novel": false },
+            { "id": "E1-8", "description": "A上任选1-2个苯基、萘基或联苯基取代基", "is_novel": false }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的有机化合物，其中D为咔唑基，A为1,3,5-三嗪基。",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "D限定为咔唑基", "is_novel": false },
+            { "id": "E2-2", "description": "A限定为1,3,5-三嗪基", "is_novel": false }
+          ]
+        },
+        {
+          "number": 3,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的有机化合物，其中D通过亚苯基与螺二芴连接，A通过单键与螺二芴连接。",
+          "category": "product",
+          "elements": [
+            { "id": "E3-1", "description": "D通过亚苯基连接", "is_novel": false },
+            { "id": "E3-2", "description": "A通过单键连接", "is_novel": false }
+          ]
+        },
+        {
+          "number": 4,
+          "type": "dependent",
+          "depends_on": 2,
+          "text": "根据权利要求2所述的有机化合物，其中所述咔唑基的氮原子上具有苯基取代基，所述三嗪基上具有两个苯基取代基。",
+          "category": "product",
+          "elements": [
+            { "id": "E4-1", "description": "咔唑N上苯基取代", "is_novel": false },
+            { "id": "E4-2", "description": "三嗪上两个苯基取代", "is_novel": false }
+          ]
+        },
+        {
+          "number": 5,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种有机发光器件，包括阳极、空穴注入层、空穴传输层、发光层、电子传输层和阴极，其中所述发光层包含权利要求1至4任一项所述的有机化合物作为主体材料，以及TADF发光材料或磷光发光材料作为掺杂剂。",
+          "category": "product",
+          "elements": [
+            { "id": "E5-1", "description": "有机发光器件层叠结构", "is_novel": false },
+            { "id": "E5-2", "description": "发光层含权利要求1-4化合物作为主体", "is_novel": true },
+            { "id": "E5-3", "description": "掺杂剂为TADF或磷光材料", "is_novel": false }
+          ]
+        },
+        {
+          "number": 6,
+          "type": "dependent",
+          "depends_on": 5,
+          "text": "根据权利要求5所述的有机发光器件，其中所述发光层的厚度为20nm至40nm，所述掺杂剂的掺杂浓度为8wt%至25wt%。",
+          "category": "product",
+          "elements": [
+            { "id": "E6-1", "description": "发光层厚度20-40nm", "is_novel": false },
+            { "id": "E6-2", "description": "掺杂浓度8-25wt%", "is_novel": false }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-spiro-cbz-trz-001", "location": "实施例1, 表1, 化合物SBH-1", "role": "core_compound" },
+        { "molecule_id": "mol-spiro-cbz-trz-002", "location": "实施例2, 表1, 化合物SBH-2", "role": "example" },
+        { "molecule_id": "mol-spiro-acr-trz-001", "location": "实施例3, 表1, 化合物SBH-3", "role": "example" },
+        { "molecule_id": "mol-spiro-ref-001", "location": "对比例1, 表2", "role": "comparative" },
+        { "molecule_id": "mol-spiro-mksh-001", "location": "权利要求1, 通式(III)实例", "role": "markush_instance" },
+        { "molecule_id": "mol-spiro-mksh-002", "location": "权利要求1, 通式(III)实例", "role": "markush_instance" }
+      ],
+      "markush_structures": [
+        {
+          "id": "mksh-cn-002",
+          "core_smarts": "[#6]12([#6]3[#6][#6][#6][#6][#6]3[#6]3[#6][#6][#6][#6][#6]31)[#6]1[#6][#6]([*:1])[#6][#6]([*:2])[#6]1[#6][#6]2",
+          "variable_groups": [
+            {
+              "position": "D (donor at C2)",
+              "options": [
+                "c1ccc2c(c1)[nH]c1ccccc12",
+                "C1(C)(C)c2ccccc2Nc2ccccc21",
+                "c1ccc2c(c1)Oc1ccccc1N2"
+              ]
+            },
+            {
+              "position": "A (acceptor at C7)",
+              "options": [
+                "c1nc(nc(n1))",
+                "c1ccnc(n1)"
+              ]
+            },
+            {
+              "position": "L_D (linker for D)",
+              "options": ["", "c1ccc(cc1)"]
+            },
+            {
+              "position": "L_A (linker for A)",
+              "options": ["", "c1ccc(cc1)"]
+            },
+            {
+              "position": "D_sub (substituents on D)",
+              "options": ["[H]", "C", "CC", "C(C)C", "CCCC", "c1ccccc1"]
+            },
+            {
+              "position": "A_sub1 (substituent 1 on A)",
+              "options": ["c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1"]
+            },
+            {
+              "position": "A_sub2 (substituent 2 on A)",
+              "options": ["[H]", "c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1"]
+            }
+          ],
+          "estimated_coverage": 15552,
+          "related_claim_numbers": [1, 2, 3, 4]
+        }
+      ],
+      "family_id": "FAM-2022-OLED-001",
+      "priority_date": "2022-03-18",
+      "metadata": {
+        "data_source": "CNIPA",
+        "technology_field": "OLED_blue_host_bipolar",
+        "commercial_relevance": "high",
+        "is_divisional": false,
+        "parent_application": "CN115650927B"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "patent_number": "US11,456,789B2",
+      "title": "Spirofluorene-Triazine Bipolar Host Material for Blue Organic Light-Emitting Device",
+      "abstract": "A bipolar host material based on spirofluorene-triazine architecture for blue OLED applications. The compound features a 9,9'-spirobifluorene core with a carbazole donor at the 2-position and a triazine acceptor at the 7-position. The material exhibits triplet energy T1 of 2.86 eV, balanced HOMO/LUMO levels of -5.58 eV/-2.52 eV, and glass transition temperature of 168°C. Blue TADF-OLED devices using this host achieve EQE of 23.5% with CIE coordinates of (0.14, 0.13) and LT95 lifetime exceeding 580 hours at 1000 cd/m² initial luminance.",
+      "filing_date": "2022-09-15",
+      "publication_date": "2023-06-20",
+      "grant_date": "2023-10-03",
+      "legal_status": "granted",
+      "jurisdiction": "US",
+      "assignees": [
+        {
+          "name": "Luminara Materials Inc.",
+          "country": "US",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "Ming-Hui Zhang", "country": "CN" },
+        { "name": "Sarah Chen", "country": "US" },
+        { "name": "Jian-Guo Wang", "country": "CN" }
+      ],
+      "ipc_codes": [
+        "C07D209/86",
+        "C07D251/24",
+        "C07D405/14",
+        "C09K11/06",
+        "H10K85/60"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "A compound having a 9,9'-spirobifluorene core, wherein a first fluorene unit of the spirobifluorene is substituted at the 2-position with a donor group D and at the 7-position with an acceptor group A, wherein D is selected from carbazolyl, acridinyl, and phenoxazinyl, and A is selected from 1,3,5-triazinyl and pyrimidinyl, and wherein D and A are each independently connected to the spirobifluorene core via a direct bond or a phenylene linker.",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "Compound with 9,9'-spirobifluorene core", "is_novel": false },
+            { "id": "E1-2", "description": "2-position substituted with donor D, 7-position with acceptor A", "is_novel": true },
+            { "id": "E1-3", "description": "D selected from carbazolyl, acridinyl, phenoxazinyl", "is_novel": false },
+            { "id": "E1-4", "description": "A selected from 1,3,5-triazinyl, pyrimidinyl", "is_novel": false },
+            { "id": "E1-5", "description": "Connected via direct bond or phenylene linker", "is_novel": false }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "The compound of claim 1, wherein D is carbazolyl and A is 1,3,5-triazinyl.",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "D is carbazolyl, A is triazinyl", "is_novel": false }
+          ]
+        },
+        {
+          "number": 3,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "The compound of claim 1, wherein D is connected to the spirobifluorene core via a phenylene linker and A is connected via a direct bond.",
+          "category": "product",
+          "elements": [
+            { "id": "E3-1", "description": "D via phenylene, A via direct bond", "is_novel": false }
+          ]
+        },
+        {
+          "number": 4,
+          "type": "independent",
+          "depends_on": null,
+          "text": "An organic light-emitting device comprising an emissive layer containing the compound of any one of claims 1 to 3 as a host material and a TADF or phosphorescent dopant.",
+          "category": "product",
+          "elements": [
+            { "id": "E4-1", "description": "OLED with emissive layer containing claims 1-3 compound as host", "is_novel": true },
+            { "id": "E4-2", "description": "TADF or phosphorescent dopant", "is_novel": false }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-spiro-cbz-trz-001", "location": "Example 1, Table 1, Compound SBH-1", "role": "core_compound" },
+        { "molecule_id": "mol-spiro-cbz-trz-002", "location": "Example 2, Table 1, Compound SBH-2", "role": "example" }
+      ],
+      "markush_structures": [],
+      "family_id": "FAM-2022-OLED-001",
+      "priority_date": "2022-03-18",
+      "metadata": {
+        "data_source": "USPTO",
+        "technology_field": "OLED_blue_host_bipolar",
+        "commercial_relevance": "high",
+        "priority_country": "CN"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "patent_number": "EP4,123,456A1",
+      "title": "Spirofluorene-Triazine Compound for Organic Electroluminescent Device",
+      "abstract": "The invention relates to a spirofluorene-triazine compound for use as a host material in organic electroluminescent devices. The compound features a donor-acceptor architecture on a spirobifluorene scaffold, providing bipolar charge transport capability and high triplet energy suitable for blue phosphorescent and TADF emitters. Devices incorporating the compound demonstrate external quantum efficiency above 22% and operational stability exceeding 500 hours at 1000 cd/m².",
+      "filing_date": "2022-10-08",
+      "publication_date": "2023-07-12",
+      "grant_date": null,
+      "legal_status": "examination",
+      "jurisdiction": "EP",
+      "assignees": [
+        {
+          "name": "Luminara Materials Inc.",
+          "country": "US",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "Ming-Hui Zhang", "country": "CN" },
+        { "name": "Klaus Weber", "country": "DE" }
+      ],
+      "ipc_codes": [
+        "C07D209/86",
+        "C07D251/24",
+        "H10K85/60"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "A compound having a 9,9'-spirobifluorene core substituted with a carbazole-based donor group and a triazine-based acceptor group, wherein the donor and acceptor are positioned on the same fluorene unit of the spirobifluorene.",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "Spirobifluorene core with carbazole donor and triazine acceptor", "is_novel": true },
+            { "id": "E1-2", "description": "Donor and acceptor on same fluorene unit", "is_novel": true }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "independent",
+          "depends_on": null,
+          "text": "An organic electroluminescent device comprising an emissive layer containing the compound of claim 1 as a host material.",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "OLED with claim 1 compound as host in emissive layer", "is_novel": true }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-spiro-cbz-trz-001", "location": "Example 1", "role": "core_compound" }
+      ],
+      "markush_structures": [],
+      "family_id": "FAM-2022-OLED-001",
+      "priority_date": "2022-03-18",
+      "metadata": {
+        "data_source": "EPO",
+        "technology_field": "OLED_blue_host_bipolar",
+        "commercial_relevance": "high",
+        "priority_country": "CN"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "patent_number": "CN116425750A",
+      "title": "一种含多重可变基团的有机发光材料及其Markush通式表示",
+      "abstract": "本发明公开了一种有机发光材料，采用Markush通式表示，其核心骨架为二苯并呋喃或二苯并噻吩与三嗪的杂化结构。通过在核心骨架的多个位点引入可变取代基（R1-R8），实现了对材料光电性能的系统调控。所述通式覆盖的化合物总数超过50000种，其中优选化合物的三线态能级T1≥2.7eV，适用于蓝色和绿色OLED器件的主体材料。本发明还公开了从所述通式中筛选高性能化合物的计算化学方法。",
+      "filing_date": "2023-03-01",
+      "publication_date": "2023-09-15",
+      "grant_date": null,
+      "legal_status": "examination",
+      "jurisdiction": "CN",
+      "assignees": [
+        {
+          "name": "深圳光韵达材料科技有限公司",
+          "country": "CN",
+          "type": "corporation"
+        },
+        {
+          "name": "清华大学",
+          "country": "CN",
+          "type": "university"
+        }
+      ],
+      "inventors": [
+        { "name": "张明辉", "country": "CN" },
+        { "name": "陈伟", "country": "CN" },
+        { "name": "林教授", "country": "CN" }
+      ],
+      "ipc_codes": [
+        "C07D307/91",
+        "C07D333/76",
+        "C07D251/24",
+        "C09K11/06",
+        "H10K85/60"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种有机化合物，具有通式(IV)所示结构，其中X选自O和S；Y选自N和CH；Ar1至Ar3各自独立地选自苯基、萘基、联苯基、菲基、芴基中的一种；R1至R8各自独立地选自氢、C1-C12烷基、C6-C30芳基、C3-C30杂芳基、C6-C30芳氨基中的一种；L1和L2各自独立地选自单键、亚苯基、亚萘基、亚联苯基中的一种；n为1至3的整数。",
+          "category": "product",
+          "elements": [
+            { "id": "E1-1", "description": "通式(IV)所示结构的有机化合物", "is_novel": true },
+            { "id": "E1-2", "description": "X选自O和S（二苯并呋喃或二苯并噻吩）", "is_novel": false },
+            { "id": "E1-3", "description": "Y选自N和CH", "is_novel": false },
+            { "id": "E1-4", "description": "Ar1-Ar3各自独立选自5种芳基", "is_novel": false },
+            { "id": "E1-5", "description": "R1-R8各自独立选自5类取代基", "is_novel": false },
+            { "id": "E1-6", "description": "L1和L2各自独立选自4种连接基", "is_novel": false },
+            { "id": "E1-7", "description": "n为1至3的整数", "is_novel": false }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的有机化合物，其中X为O，Y为N。",
+          "category": "product",
+          "elements": [
+            { "id": "E2-1", "description": "X限定为O（二苯并呋喃）", "is_novel": false },
+            { "id": "E2-2", "description": "Y限定为N", "is_novel": false }
+          ]
+        },
+        {
+          "number": 3,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的有机化合物，其中R1至R4各自独立地选自氢、甲基、苯基中的一种，R5至R8各自独立地选自氢、C6-C18芳基中的一种。",
+          "category": "product",
+          "elements": [
+            { "id": "E3-1", "description": "R1-R4限缩为氢、甲基、苯基", "is_novel": false },
+            { "id": "E3-2", "description": "R5-R8限缩为氢或C6-C18芳基", "is_novel": false }
+          ]
+        },
+        {
+          "number": 4,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的有机化合物，其中n为1，L1为亚苯基，L2为单键。",
+          "category": "product",
+          "elements": [
+            { "id": "E4-1", "description": "n限定为1", "is_novel": false },
+            { "id": "E4-2", "description": "L1为亚苯基，L2为单键", "is_novel": false }
+          ]
+        },
+        {
+          "number": 5,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种有机发光器件，其发光层包含权利要求1至4任一项所述的有机化合物作为主体材料。",
+          "category": "product",
+          "elements": [
+            { "id": "E5-1", "description": "OLED发光层含权利要求1-4化合物作为主体", "is_novel": true }
+          ]
+        },
+        {
+          "number": 6,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种筛选有机发光材料的方法，包括：(a)根据权利要求1所述的通式(IV)，利用计算化学方法计算候选化合物的三线态能级T1、HOMO能级和LUMO能级；(b)筛选T1≥2.7eV且HOMO能级在-5.2eV至-6.0eV范围内的化合物；(c)对筛选出的化合物进行分子动力学模拟，评估其薄膜形态稳定性；(d)选择玻璃化转变温度Tg≥120℃的化合物作为候选主体材料。",
+          "category": "method",
+          "elements": [
+            { "id": "E6-1", "description": "利用计算化学计算T1、HOMO、LUMO", "is_novel": false },
+            { "id": "E6-2", "description": "筛选T1≥2.7eV且HOMO在-5.2至-6.0eV", "is_novel": true },
+            { "id": "E6-3", "description": "分子动力学模拟评估薄膜形态稳定性", "is_novel": true },
+            { "id": "E6-4", "description": "选择Tg≥120℃的化合物", "is_novel": false }
+          ]
+        }
+      ],
+      "molecules": [
+        { "molecule_id": "mol-dbf-trz-001", "location": "实施例1, 化合物MK-1", "role": "core_compound" },
+        { "molecule_id": "mol-dbt-trz-001", "location": "实施例2, 化合物MK-2", "role": "example" },
+        { "molecule_id": "mol-dbf-trz-002", "location": "实施例3, 化合物MK-3", "role": "example" },
+        { "molecule_id": "mol-dbf-mksh-001", "location": "权利要求1, 通式(IV)实例A", "role": "markush_instance" },
+        { "molecule_id": "mol-dbf-mksh-002", "location": "权利要求1, 通式(IV)实例B", "role": "markush_instance" },
+        { "molecule_id": "mol-dbf-mksh-003", "location": "权利要求1, 通式(IV)实例C", "role": "markush_instance" }
+      ],
+      "markush_structures": [
+        {
+          "id": "mksh-cn-003",
+          "core_smarts": "[#8,#16]1[#6]2[#6][#6][#6][#6][#6]2[#6]2[#6][#6][#6][#6][#6]12",
+          "variable_groups": [
+            {
+              "position": "X (heteroatom)",
+              "options": ["O", "S"]
+            },
+            {
+              "position": "Y",
+              "options": ["N", "C"]
+            },
+            {
+              "position": "Ar1",
+              "options": ["c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1", "c1ccc2c(c1)ccc1ccccc12", "C1(c2ccccc2)c2ccccc2-1"]
+            },
+            {
+              "position": "Ar2",
+              "options": ["c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1", "c1ccc2c(c1)ccc1ccccc12", "C1(c2ccccc2)c2ccccc2-1"]
+            },
+            {
+              "position": "Ar3",
+              "options": ["c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1", "c1ccc2c(c1)ccc1ccccc12", "C1(c2ccccc2)c2ccccc2-1"]
+            },
+            {
+              "position": "R1",
+              "options": ["[H]", "C", "CC", "CCC", "CCCC", "c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1"]
+            },
+            {
+              "position": "R2",
+              "options": ["[H]", "C", "CC", "CCC", "CCCC", "c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1"]
+            },
+            {
+              "position": "R3",
+              "options": ["[H]", "C", "CC", "c1ccccc1"]
+            },
+            {
+              "position": "R4",
+              "options": ["[H]", "C", "CC", "c1ccccc1"]
+            },
+            {
+              "position": "R5",
+              "options": ["[H]", "c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1"]
+            },
+            {
+              "position": "R6",
+              "options": ["[H]", "c1ccccc1", "c1ccc2ccccc2c1", "c1ccc(-c2ccccc2)cc1"]
+            },
+            {
+              "position": "R7",
+              "options": ["[H]", "c1ccccc1", "c1ccc2ccccc2c1"]
+            },
+            {
+              "position": "R8",
+              "options": ["[H]", "c1ccccc1", "c1ccc2ccccc2c1"]
+            },
+            {
+              "position": "L1",
+              "options": ["", "c1ccc(cc1)", "c1ccc2ccc(cc2)c1", "c1ccc(-c2ccc(cc2))cc1"]
+            },
+            {
+              "position": "L2",
+              "options": ["", "c1ccc(cc1)", "c1ccc2ccc(cc2)c1", "c1ccc(-c2ccc(cc2))cc1"]
+            },
+            {
+              "position": "n (repeat unit)",
+              "options": ["1", "2", "3"]
+            }
+          ],
+          "estimated_coverage": 56623104,
+          "related_claim_numbers": [1, 2, 3, 4]
+        }
+      ],
+      "family_id": "FAM-2023-MARKUSH-001",
+      "priority_date": "2023-03-01",
+      "metadata": {
+        "data_source": "CNIPA",
+        "technology_field": "OLED_host_markush",
+        "commercial_relevance": "high",
+        "markush_complexity": "very_high"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    },
+    {
+      "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "patent_number": "CN115894555B",
+      "title": "一种有机发光器件的制备方法",
+      "abstract": "本发明公开了一种有机发光器件的制备方法，包括采用溶液加工法制备空穴注入层和空穴传输层，以及采用真空蒸镀法制备发光层、电子传输层和阴极的混合工艺。所述方法通过优化溶液加工层与蒸镀层之间的界面处理工艺，包括在溶液加工层表面进行紫外臭氧处理和退火处理，有效消除了界面缺陷。采用该方法制备的器件在保持与全蒸镀器件相当的发光效率（EQE≥20%）的同时，将制造成本降低了40%。",
+      "filing_date": "2022-01-15",
+      "publication_date": "2023-04-04",
+      "grant_date": "2023-09-22",
+      "legal_status": "granted",
+      "jurisdiction": "CN",
+      "assignees": [
+        {
+          "name": "深圳光韵达材料科技有限公司",
+          "country": "CN",
+          "type": "corporation"
+        }
+      ],
+      "inventors": [
+        { "name": "王建国", "country": "CN" },
+        { "name": "赵丽华", "country": "CN" }
+      ],
+      "ipc_codes": [
+        "H10K71/10",
+        "H10K71/12",
+        "H10K71/16",
+        "H10K50/11"
+      ],
+      "claims": [
+        {
+          "number": 1,
+          "type": "independent",
+          "depends_on": null,
+          "text": "一种有机发光器件的制备方法，包括以下步骤：(a)在基板上形成阳极；(b)在所述阳极上通过旋涂法涂覆空穴注入材料溶液，在120℃至180℃下退火10分钟至30分钟，形成厚度为20nm至50nm的空穴注入层；(c)在所述空穴注入层上通过旋涂法涂覆空穴传输材料溶液，在150℃至200℃下退火15分钟至45分钟，形成厚度为30nm至60nm的空穴传输层；(d)对所述空穴传输层表面进行紫外臭氧处理，处理时间为1分钟至10分钟；(e)在经处理的空穴传输层上通过真空蒸镀形成发光层；(f)在所述发光层上通过真空蒸镀形成电子传输层；(g)在所述电子传输层上形成阴极。",
+          "category": "method",
+          "elements": [
+            { "id": "E1-1", "description": "在基板上形成阳极", "is_novel": false },
+            { "id": "E1-2", "description": "旋涂法形成空穴注入层，120-180℃退火10-30min，厚度20-50nm", "is_novel": false },
+            { "id": "E1-3", "description": "旋涂法形成空穴传输层，150-200℃退火15-45min，厚度30-60nm", "is_novel": false },
+            { "id": "E1-4", "description": "空穴传输层表面紫外臭氧处理1-10min", "is_novel": true },
+            { "id": "E1-5", "description": "真空蒸镀形成发光层", "is_novel": false },
+            { "id": "E1-6", "description": "真空蒸镀形成电子传输层", "is_novel": false },
+            { "id": "E1-7", "description": "形成阴极", "is_novel": false }
+          ]
+        },
+        {
+          "number": 2,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的方法，其中步骤(b)中所述空穴注入材料溶液的溶剂为DMSO或DMF，浓度为5mg/mL至20mg/mL。",
+          "category": "method",
+          "elements": [
+            { "id": "E2-1", "description": "HIL溶剂为DMSO或DMF", "is_novel": false },
+            { "id": "E2-2", "description": "浓度5-20mg/mL", "is_novel": false }
+          ]
+        },
+        {
+          "number": 3,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的方法，其中步骤(d)中紫外臭氧处理的紫外光波长为185nm和254nm，功率密度为10mW/cm²至50mW/cm²。",
+          "category": "method",
+          "elements": [
+            { "id": "E3-1", "description": "UV波长185nm和254nm", "is_novel": false },
+            { "id": "E3-2", "description": "功率密度10-50mW/cm²", "is_novel": false }
+          ]
+        },
+        {
+          "number": 4,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的方法，其中步骤(d)之后还包括在氮气氛围下对所述空穴传输层进行二次退火处理，退火温度为100℃至150℃，退火时间为5分钟至15分钟。",
+          "category": "method",
+          "elements": [
+            { "id": "E4-1", "description": "氮气氛围下二次退火", "is_novel": true },
+            { "id": "E4-2", "description": "退火温度100-150℃，时间5-15min", "is_novel": false }
+          ]
+        },
+        {
+          "number": 5,
+          "type": "dependent",
+          "depends_on": 1,
+          "text": "根据权利要求1所述的方法，其中步骤(e)中所述发光层包含蓝光主体材料和TADF掺杂剂，蒸镀温度为200℃至300℃，发光层厚度为25nm至35nm。",
+          "category": "method",
+          "elements": [
+            { "id": "E5-1", "description": "发光层含蓝光主体和TADF掺杂剂", "is_novel": false },
+            { "id": "E5-2", "description": "蒸镀温度200-300℃，厚度25-35nm", "is_novel": false }
+          ]
+        }
+      ],
+      "molecules": [],
+      "markush_structures": [],
+      "family_id": "FAM-2022-METHOD-001",
+      "priority_date": "2022-01-15",
+      "metadata": {
+        "data_source": "CNIPA",
+        "technology_field": "OLED_fabrication_method",
+        "commercial_relevance": "medium"
+      },
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2024-01-15T00:00:00Z"
+    }
+  ],
+  "citation_network": [
+    {
+      "citing_patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "cited_patent_id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "citation_type": "applicant_cited",
+      "citation_date": "2022-03-18"
+    },
+    {
+      "citing_patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "cited_patent_id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "citation_type": "examiner_cited",
+      "citation_date": "2023-02-10"
+    },
+    {
+      "citing_patent_id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "cited_patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "citation_type": "applicant_cited",
+      "citation_date": "2022-06-20"
+    },
+    {
+      "citing_patent_id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "cited_patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "citation_type": "applicant_cited",
+      "citation_date": "2022-09-15"
+    },
+    {
+      "citing_patent_id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "cited_patent_id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "citation_type": "examiner_cited",
+      "citation_date": "2023-04-05"
+    },
+    {
+      "citing_patent_id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "cited_patent_id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "citation_type": "examiner_cited",
+      "citation_date": "2023-04-05"
+    },
+    {
+      "citing_patent_id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "cited_patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "citation_type": "applicant_cited",
+      "citation_date": "2022-10-08"
+    },
+    {
+      "citing_patent_id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "cited_patent_id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "citation_type": "examiner_cited",
+      "citation_date": "2023-03-20"
+    },
+    {
+      "citing_patent_id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "cited_patent_id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "citation_type": "applicant_cited",
+      "citation_date": "2022-08-20"
+    },
+    {
+      "citing_patent_id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "cited_patent_id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "citation_type": "examiner_cited",
+      "citation_date": "2023-05-15"
+    },
+    {
+      "citing_patent_id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "cited_patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "citation_type": "applicant_cited",
+      "citation_date": "2023-01-10"
+    },
+    {
+      "citing_patent_id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "cited_patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "citation_type": "applicant_cited",
+      "citation_date": "2023-03-01"
+    },
+    {
+      "citing_patent_id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "cited_patent_id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "citation_type": "applicant_cited",
+      "citation_date": "2023-03-01"
+    },
+    {
+      "citing_patent_id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "cited_patent_id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "citation_type": "examiner_cited",
+      "citation_date": "2022-11-20"
+    },
+    {
+      "citing_patent_id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "cited_patent_id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "citation_type": "third_party_cited",
+      "citation_date": "2023-01-30"
+    },
+    {
+      "citing_patent_id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+      "cited_patent_id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "citation_type": "applicant_cited",
+      "citation_date": "2023-04-05"
+    },
+    {
+      "citing_patent_id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "cited_patent_id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "citation_type": "examiner_cited",
+      "citation_date": "2023-01-15"
+    }
+  ],
+  "claim_analysis_cases": [
+    {
+      "case_id": "CA-001",
+      "patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "claim_number": 1,
+      "target_molecule_id": "mol-cbz-spiro-001",
+      "expected_literal_match": true,
+      "expected_equivalents_match": true,
+      "expected_risk_level": "high",
+      "reasoning": "Target molecule mol-cbz-spiro-001 is the core compound disclosed in Example 1 of CN115650927B. It falls squarely within the Markush formula (I) of claim 1: the spirofluorene-carbazole core matches the claimed scaffold, Ar1 is naphthyl (within the claimed options), Ar2 is triazinyl (within the claimed options), and all R groups are within the specified ranges. This constitutes literal infringement."
+    },
+    {
+      "case_id": "CA-002",
+      "patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "claim_number": 1,
+      "target_molecule_id": "mol-spiro-cbz-trz-001",
+      "expected_literal_match": true,
+      "expected_equivalents_match": true,
+      "expected_risk_level": "high",
+      "reasoning": "mol-spiro-cbz-trz-001 is a spirobifluorene-carbazole-triazine compound that falls within the Markush formula (I) of claim 1. The core scaffold matches (spirofluorene-carbazole), the Ar groups are within claimed selections, and the linker L is phenylene which is explicitly listed. Literal match confirmed."
+    },
+    {
+      "case_id": "CA-003",
+      "patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "claim_number": 1,
+      "target_molecule_id": "mol-etl-trz-001",
+      "expected_literal_match": false,
+      "expected_equivalents_match": false,
+      "expected_risk_level": "none",
+      "reasoning": "mol-etl-trz-001 is a phosphine oxide-triazine electron transport material. Its core scaffold is triazine-phosphine oxide, which is fundamentally different from the spirofluorene-carbazole core required by claim 1. No structural overlap exists with the Markush formula (I). Neither literal nor equivalents infringement applies."
+    },
+    {
+      "case_id": "CA-004",
+      "patent_id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "claim_number": 1,
+      "target_molecule_id": "mol-cbz-spiro-001",
+      "expected_literal_match": false,
+      "expected_equivalents_match": true,
+      "expected_risk_level": "medium",
+      "reasoning": "mol-cbz-spiro-001 has a carbazole-spirofluorene structure. The revoked EP patent claim 1 requires carbazole-benzimidazole connected through phenylene. While the carbazole donor moiety is present, the acceptor is triazine rather than benzimidazole. However, under the doctrine of equivalents, triazine and benzimidazole serve substantially the same function (electron acceptance) in substantially the same way (n-type transport via nitrogen heterocycle) to achieve substantially the same result (bipolar host behavior). Medium risk due to equivalents theory, but note the patent is revoked."
+    },
+    {
+      "case_id": "CA-005",
+      "patent_id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "claim_number": 1,
+      "target_molecule_id": "mol-spiro-cbz-trz-002",
+      "expected_literal_match": true,
+      "expected_equivalents_match": true,
+      "expected_risk_level": "high",
+      "reasoning": "mol-spiro-cbz-trz-002 is a spirobifluorene compound with carbazole donor at 2-position and triazine acceptor at 7-position. CN116003389B claim 1 defines exactly this architecture with formula (III). The donor D is carbazolyl (within claimed options), acceptor A is triazinyl (within claimed options), and the connection mode matches. Literal infringement confirmed."
+    },
+    {
+      "case_id": "CA-006",
+      "patent_id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "claim_number": 1,
+      "target_molecule_id": "mol-dbf-trz-001",
+      "expected_literal_match": true,
+      "expected_equivalents_match": true,
+      "expected_risk_level": "high",
+      "reasoning": "mol-dbf-trz-001 is a dibenzofuran-triazine compound disclosed as Example 1 (MK-1) in CN116425750A. It is a specific instance of the Markush formula (IV) with X=O, and falls within the enormous coverage space (>50 million compounds) of claim 1. All variable groups match the claimed selections. Literal infringement within Markush scope."
+    },
+    {
+      "case_id": "CA-007",
+      "patent_id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "claim_number": 1,
+      "target_molecule_id": "mol-ir-dfppy-001",
+      "expected_literal_match": false,
+      "expected_equivalents_match": false,
+      "expected_risk_level": "none",
+      "reasoning": "mol-ir-dfppy-001 is an iridium-based phosphorescent complex, which is a completely different class of compound from the carbazole-benzimidazole host material claimed in EP3,412,156B1 claim 1. The iridium complex is an organometallic compound while the claim covers purely organic compounds. No infringement under any theory."
+    },
+    {
+      "case_id": "CA-008",
+      "patent_id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "claim_number": 1,
+      "target_molecule_id": "mol-tpa-cbz-001",
+      "expected_literal_match": false,
+      "expected_equivalents_match": false,
+      "expected_risk_level": "low",
+      "reasoning": "CN115894555B claim 1 is a method claim for fabricating OLEDs using a hybrid solution/vacuum process. mol-tpa-cbz-001 is a hole transport material compound, not a method. However, if mol-tpa-cbz-001 were used as the hole transport material in a process following the claimed method steps (spin-coating HTL, UV-ozone treatment, vacuum deposition of EML), there could be indirect infringement risk. The risk is low because the claim is directed to the method, not the material itself, and the material could be used in non-infringing processes."
+    },
+    {
+      "case_id": "CA-009",
+      "patent_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "claim_number": 2,
+      "target_molecule_id": "mol-cbz-spiro-002",
+      "expected_literal_match": false,
+      "expected_equivalents_match": true,
+      "expected_risk_level": "medium",
+      "reasoning": "Claim 2 narrows claim 1 by requiring Ar1=naphthyl and Ar2=triazinyl. mol-cbz-spiro-002 has Ar1=biphenyl (not naphthyl) and Ar2=triazinyl. The Ar2 requirement is met, but Ar1 does not literally match. Under equivalents analysis, biphenyl and naphthyl are structurally similar fused/extended aromatic systems that serve the same function of extending conjugation. Medium risk under doctrine of equivalents."
+    },
+    {
+      "case_id": "CA-010",
+      "patent_id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "claim_number": 1,
+      "target_molecule_id": "mol-spiro-acr-trz-001",
+      "expected_literal_match": true,
+      "expected_equivalents_match": true,
+      "expected_risk_level": "high",
+      "reasoning": "US11,456,789B2 claim 1 covers spirobifluorene compounds with donor D (carbazolyl, acridinyl, phenoxazinyl) and acceptor A (triazinyl, pyrimidinyl). mol-spiro-acr-trz-001 has acridinyl donor and triazinyl acceptor on a spirobifluorene core, which falls within the literal scope of claim 1. All structural requirements are met."
+    }
+  ],
+  "invalid_patents": [
+    {
+      "id": "inv-001",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "patent_number": "",
+        "title": "Empty Patent Number Test",
+        "abstract": "Test patent with empty patent number.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [],
+        "inventors": [],
+        "ipc_codes": [],
+        "claims": [],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "patent_number",
+      "expected_error_message": "patent_number is required and cannot be empty"
+    },
+    {
+      "id": "inv-002",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000002",
+        "patent_number": "XX999999A",
+        "title": "Invalid Jurisdiction Test",
+        "abstract": "Test patent with invalid jurisdiction code.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "XX",
+        "assignees": [{ "name": "Test Corp", "country": "XX", "type": "corporation" }],
+        "inventors": [{ "name": "Test Inventor", "country": "XX" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "jurisdiction",
+      "expected_error_message": "jurisdiction must be one of: CN, US, EP, JP, KR"
+    },
+    {
+      "id": "inv-003",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000003",
+        "patent_number": "CN116000000A",
+        "title": "Invalid Date Order Test",
+        "abstract": "Test patent with publication_date before filing_date.",
+        "filing_date": "2023-06-01",
+        "publication_date": "2023-01-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [
+          {
+            "number": 1,
+            "type": "independent",
+            "depends_on": null,
+            "text": "一种测试化合物。",
+            "category": "product",
+            "elements": [{ "id": "E1-1", "description": "测试要素", "is_novel": true }]
+          }
+        ],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-06-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "publication_date",
+      "expected_error_message": "publication_date must be on or after filing_date"
+    },
+    {
+      "id": "inv-004",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000004",
+        "patent_number": "CN116000001A",
+        "title": "Invalid Grant Date Order Test",
+        "abstract": "Test patent with grant_date before publication_date.",
+        "filing_date": "2022-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": "2023-01-01",
+        "legal_status": "granted",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [
+          {
+            "number": 1,
+            "type": "independent",
+            "depends_on": null,
+            "text": "一种测试化合物。",
+            "category": "product",
+            "elements": [{ "id": "E1-1", "description": "测试要素", "is_novel": true }]
+          }
+        ],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2022-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "grant_date",
+      "expected_error_message": "grant_date must be on or after publication_date"
+    },
+    {
+      "id": "inv-005",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000005",
+        "patent_number": "CN116000002A",
+        "title": "Invalid Date Format Test",
+        "abstract": "Test patent with malformed date string.",
+        "filing_date": "2023/01/01",
+        "publication_date": "01-06-2023",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023/01/01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "filing_date",
+      "expected_error_message": "dates must be in ISO 8601 format (YYYY-MM-DD)"
+    },
+    {
+      "id": "inv-006",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000006",
+        "patent_number": "CN116000003A",
+        "title": "Non-Sequential Claim Numbers Test",
+        "abstract": "Test patent with non-sequential claim numbering.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [
+          {
+            "number": 1,
+            "type": "independent",
+            "depends_on": null,
+            "text": "一种测试化合物A。",
+            "category": "product",
+            "elements": [{ "id": "E1-1", "description": "测试要素A", "is_novel": true }]
+          },
+          {
+            "number": 3,
+            "type": "dependent",
+            "depends_on": 1,
+            "text": "根据权利要求1所述的化合物A，其中包含取代基R。",
+            "category": "product",
+            "elements": [{ "id": "E3-1", "description": "取代基R", "is_novel": false }]
+          },
+          {
+            "number": 5,
+            "type": "independent",
+            "depends_on": null,
+            "text": "一种包含权利要求1化合物的器件。",
+            "category": "product",
+            "elements": [{ "id": "E5-1", "description": "包含化合物A的器件", "is_novel": true }]
+          }
+        ],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "claims",
+      "expected_error_message": "claim numbers must be sequential starting from 1 (expected 2, got 3)"
+    },
+    {
+      "id": "inv-007",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000007",
+        "patent_number": "CN116000004A",
+        "title": "Invalid Dependent Claim Reference Test",
+        "abstract": "Test patent with dependent claim referencing non-existent independent claim.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [
+          {
+            "number": 1,
+            "type": "independent",
+            "depends_on": null,
+            "text": "一种测试化合物B。",
+            "category": "product",
+            "elements": [{ "id": "E1-1", "description": "测试要素B", "is_novel": true }]
+          },
+          {
+            "number": 2,
+            "type": "dependent",
+            "depends_on": 5,
+            "text": "根据权利要求5所述的化合物，其中包含取代基X。",
+            "category": "product",
+            "elements": [{ "id": "E2-1", "description": "取代基X", "is_novel": false }]
+          }
+        ],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "claims[1].depends_on",
+      "expected_error_message": "dependent claim 2 references non-existent claim 5"
+    },
+    {
+      "id": "inv-008",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000008",
+        "patent_number": "CN116000005A",
+        "title": "Dependent Claim References Higher Number Test",
+        "abstract": "Test patent with dependent claim referencing a claim with higher number.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [
+          {
+            "number": 1,
+            "type": "dependent",
+            "depends_on": 2,
+            "text": "根据权利要求2所述的化合物，其中包含取代基Y。",
+            "category": "product",
+            "elements": [{ "id": "E1-1", "description": "取代基Y", "is_novel": false }]
+          },
+          {
+            "number": 2,
+            "type": "independent",
+            "depends_on": null,
+            "text": "一种测试化合物C。",
+            "category": "product",
+            "elements": [{ "id": "E2-1", "description": "测试要素C", "is_novel": true }]
+          }
+        ],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "claims[0].depends_on",
+      "expected_error_message": "dependent claim 1 must reference a claim with smaller number (references claim 2)"
+    },
+    {
+      "id": "inv-009",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000009",
+        "patent_number": "CN116000006A",
+        "title": "Invalid Legal Status Test",
+        "abstract": "Test patent with invalid legal_status enum value.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "unknown_status",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "legal_status",
+      "expected_error_message": "legal_status must be one of: pending, examination, granted, expired, abandoned, revoked"
+    },
+    {
+      "id": "inv-010",
+      "data": {
+        "id": "not-a-valid-uuid",
+        "patent_number": "CN116000007A",
+        "title": "Invalid UUID Format Test",
+        "abstract": "Test patent with invalid UUID format for id field.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "id",
+      "expected_error_message": "id must be a valid UUID v4 format"
+    },
+    {
+      "id": "inv-011",
+      "data": {
+        "id": "00000000-0000-0000-0000-00000000000b",
+        "patent_number": "CN116000008A",
+        "title": "Missing Required Fields Test",
+        "abstract": null,
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [],
+        "inventors": [],
+        "ipc_codes": [],
+        "claims": [],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": null
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "abstract",
+      "expected_error_message": "abstract is required and cannot be null"
+    },
+    {
+      "id": "inv-012",
+      "data": {
+        "id": "00000000-0000-0000-0000-00000000000c",
+        "patent_number": "CN116000009A",
+        "title": "Invalid Molecule Reference Test",
+        "abstract": "Test patent referencing non-existent molecule_id.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [
+          {
+            "number": 1,
+            "type": "independent",
+            "depends_on": null,
+            "text": "一种测试化合物D。",
+            "category": "product",
+            "elements": [{ "id": "E1-1", "description": "测试要素D", "is_novel": true }]
+          }
+        ],
+        "molecules": [
+          { "molecule_id": "mol-nonexistent-999", "location": "实施例1", "role": "core_compound" }
+        ],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "referential_integrity_error",
+      "expected_error_field": "molecules[0].molecule_id",
+      "expected_error_message": "molecule_id 'mol-nonexistent-999' does not exist in molecule_fixtures.json"
+    },
+    {
+      "id": "inv-013",
+      "data": {
+        "id": "00000000-0000-0000-0000-00000000000d",
+        "patent_number": "CN116000010A",
+        "title": "Invalid Assignee Type Test",
+        "abstract": "Test patent with invalid assignee type enum.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "government" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "assignees[0].type",
+      "expected_error_message": "assignee type must be one of: corporation, individual, university"
+    },
+    {
+      "id": "inv-014",
+      "data": {
+        "id": "00000000-0000-0000-0000-00000000000e",
+        "patent_number": "CN116000011A",
+        "title": "Invalid Molecule Role Test",
+        "abstract": "Test patent with invalid molecule role enum.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [
+          {
+            "number": 1,
+            "type": "independent",
+            "depends_on": null,
+            "text": "一种测试化合物E。",
+            "category": "product",
+            "elements": [{ "id": "E1-1", "description": "测试要素E", "is_novel": true }]
+          }
+        ],
+        "molecules": [
+          { "molecule_id": "mol-cbz-spiro-001", "location": "实施例1", "role": "byproduct" }
+        ],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "molecules[0].role",
+      "expected_error_message": "molecule role must be one of: core_compound, example, comparative, markush_instance"
+    },
+    {
+      "id": "inv-015",
+      "data": {
+        "id": "00000000-0000-0000-0000-00000000000f",
+        "patent_number": "CN116000012A",
+        "title": "Invalid Claim Category Test",
+        "abstract": "Test patent with invalid claim category enum.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "CN",
+        "assignees": [{ "name": "测试公司", "country": "CN", "type": "corporation" }],
+        "inventors": [{ "name": "测试发明人", "country": "CN" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [
+          {
+            "number": 1,
+            "type": "independent",
+            "depends_on": null,
+            "text": "一种测试用途。",
+            "category": "use",
+            "elements": [{ "id": "E1-1", "description": "测试用途要素", "is_novel": true }]
+          }
+        ],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "claims[0].category",
+      "expected_error_message": "claim category must be one of: product, method"
+    },
+    {
+      "id": "inv-016",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000010",
+        "patent_number": "US2023/9999999A1",
+        "title": "Dependent Claim With Non-Null Depends On For Independent Type",
+        "abstract": "Test patent where an independent claim has a non-null depends_on value.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "US",
+        "assignees": [{ "name": "Test Corp", "country": "US", "type": "corporation" }],
+        "inventors": [{ "name": "Test Inventor", "country": "US" }],
+        "ipc_codes": ["H10K85/60"],
+        "claims": [
+          {
+            "number": 1,
+            "type": "independent",
+            "depends_on": 3,
+            "text": "A test compound.",
+            "category": "product",
+            "elements": [{ "id": "E1-1", "description": "Test element", "is_novel": true }]
+          },
+          {
+            "number": 2,
+            "type": "dependent",
+            "depends_on": 1,
+            "text": "The compound of claim 1, further comprising substituent Z.",
+            "category": "product",
+            "elements": [{ "id": "E2-1", "description": "Substituent Z", "is_novel": false }]
+          }
+        ],
+        "molecules": [],
+        "markush_structures": [],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "validation_error",
+      "expected_error_field": "claims[0].depends_on",
+      "expected_error_message": "independent claim must have depends_on set to null"
+    },
+    {
+      "id": "inv-017",
+      "data": {
+        "id": "00000000-0000-0000-0000-000000000011",
+        "patent_number": "EP1,234,567A1",
+        "title": "Markush Structure With Invalid Related Claims",
+        "abstract": "Test patent with markush_structure referencing non-existent claim numbers.",
+        "filing_date": "2023-01-01",
+        "publication_date": "2023-06-01",
+        "grant_date": null,
+        "legal_status": "pending",
+        "jurisdiction": "EP",
+        "assignees": [{ "name": "Test GmbH", "country": "DE", "type": "corporation" }],
+        "inventors": [{ "name": "Test Erfinder", "country": "DE" }],
+        "ipc_codes": ["C07D209/86"],
+        "claims": [
+          {
+            "number": 1,
+            "type": "independent",
+            "depends_on": null,
+            "text": "A test compound having formula (X).",
+            "category": "product",
+            "elements": [{ "id": "E1-1", "description": "Formula X compound", "is_novel": true }]
+          }
+        ],
+        "molecules": [],
+        "markush_structures": [
+          {
+            "id": "mksh-inv-001",
+            "core_smarts": "[#6]1[#6][#6][#6][#6][#6]1",
+            "variable_groups": [
+              { "position": "R1", "options": ["C", "CC"] }
+            ],
+            "estimated_coverage": 2,
+            "related_claim_numbers": [1, 5, 10]
+          }
+        ],
+        "family_id": null,
+        "priority_date": "2023-01-01"
+      },
+      "expected_error_type": "referential_integrity_error",
+      "expected_error_field": "markush_structures[0].related_claim_numbers",
+      "expected_error_message": "related_claim_numbers [5, 10] reference non-existent claims in this patent"
+    }
+  ]
+}

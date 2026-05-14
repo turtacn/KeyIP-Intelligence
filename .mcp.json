@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "description": "GitHub MCP - PR 管理、Issue 跟踪、代码搜索、仓库操作"
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@anthropic/mcp-playwright"],
+      "description": "Playwright MCP - 浏览器自动化 E2E 测试（本地需 Playwright 已安装）",
+      "disabled": true
+    }
+  },
+  "notes": {
+    "github": "需要设置 GITHUB_PERSONAL_ACCESS_TOKEN 环境变量: export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx",
+    "playwright": "需要先安装 Playwright: cd Playwright/e2e && npm install && npx playwright install chromium",
+    "postgres_future": "项目重度使用 PostgreSQL + pgvector，建议后续添加 Postgres MCP server 以支持数据库检查与查询调试"
+  }
+}

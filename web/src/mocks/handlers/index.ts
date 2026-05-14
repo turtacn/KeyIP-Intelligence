@@ -5,6 +5,7 @@ import { portfolioHandlers } from './portfolio';
 import { lifecycleHandlers } from './lifecycle';
 import { partnerHandlers } from './partners';
 import { dashboardHandlers } from './dashboard';
+import { authHandlers } from './auth';
 
 export const handlers = [
   ...patentHandlers,
@@ -14,4 +15,5 @@ export const handlers = [
   ...lifecycleHandlers,
   ...partnerHandlers,
   ...dashboardHandlers,
+  ...authHandlers,
 ];

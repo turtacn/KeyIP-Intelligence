@@ -1,0 +1,116 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-05-14T19:53:45Z",
+  "project": "KeyIP-Intelligence",
+  "environment": "docker-machine",
+  "contents": {
+    "postgres": {
+      "molecules": 15,
+      "patents": 5,
+      "seed_sql": "63953 bytes",
+      "migrations": 8
+    },
+    "files": [
+    {
+        "path": "postgres/infringement_alerts.json",
+        "size": 1122
+    },
+    {
+        "path": "postgres/migrations/005_create_users.sql",
+        "size": 7032
+    },
+    {
+        "path": "postgres/migrations/002_create_molecules.sql",
+        "size": 3786
+    },
+    {
+        "path": "postgres/migrations/003_create_portfolios.sql",
+        "size": 6338
+    },
+    {
+        "path": "postgres/migrations/006_create_workspaces.sql",
+        "size": 7993
+    },
+    {
+        "path": "postgres/migrations/008_seed_data.sql",
+        "size": 63953
+    },
+    {
+        "path": "postgres/migrations/004_create_lifecycle.sql",
+        "size": 5521
+    },
+    {
+        "path": "postgres/migrations/007_fix_molecule_status_enum.sql",
+        "size": 1023
+    },
+    {
+        "path": "postgres/migrations/001_create_patents.sql",
+        "size": 3922
+    },
+    {
+        "path": "postgres/patents.json",
+        "size": 1808
+    },
+    {
+        "path": "postgres/seed_data.sql",
+        "size": 63953
+    },
+    {
+        "path": "postgres/fto_search.json",
+        "size": 451
+    },
+    {
+        "path": "postgres/dashboard_metrics.json",
+        "size": 817
+    },
+    {
+        "path": "postgres/molecules.json",
+        "size": 3243
+    },
+    {
+        "path": "postgres/portfolios.json",
+        "size": 500
+    },
+    {
+        "path": "manifest.json",
+        "size": 0
+    },
+    {
+        "path": "fixtures/deadlines.json",
+        "size": 9611
+    },
+    {
+        "path": "fixtures/patents.json",
+        "size": 20019
+    },
+    {
+        "path": "fixtures/alerts.json",
+        "size": 7273
+    },
+    {
+        "path": "fixtures/patent_fixtures.json",
+        "size": 108286
+    },
+    {
+        "path": "fixtures/molecule_fixtures.json",
+        "size": 35638
+    },
+    {
+        "path": "fixtures/users.json",
+        "size": 5426
+    },
+    {
+        "path": "fixtures/molecules.json",
+        "size": 28946
+    },
+    {
+        "path": "fixtures/portfolios.json",
+        "size": 2831
+    },
+    {
+        "path": "fixtures/portfolio_fixtures.json",
+        "size": 39092
+    }
+]
+  }
+}

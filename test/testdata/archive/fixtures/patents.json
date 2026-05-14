@@ -1,0 +1,499 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-05-11T00:00:00Z",
+  "description": "OLED 领域专利测试数据 — 涵盖 CN/US/EP/JP/KR 五局,含咔唑、三嗪、芴、螺环、铱配合物各类材料",
+  "patents": [
+    {
+      "id": "oled-pat-0001-4000-a000-000000000001",
+      "patent_number": "CN115650927B",
+      "title": "一种咔唑-三嗪双极性主体材料及其有机发光器件",
+      "title_en": "Carbazole-triazine bipolar host material and organic light-emitting device thereof",
+      "abstract": "本发明公开了一种咔唑-三嗪双极性主体材料,其具有通式(I)所示结构,包含咔唑供电子单元和三嗪受电子单元,通过芳基桥连基团连接。该材料具有高三线态能级(T1≥2.8eV)、高玻璃化转变温度(Tg≥150℃),适合作为蓝色磷光和TADF器件的主体材料。包含该材料的OLED器件在1000cd/m²亮度下EQE≥22%,LT95≥500h。",
+      "abstract_en": "The present invention discloses a carbazole-triazine bipolar host material having a structure represented by general formula (I), comprising a carbazole electron-donating unit and a triazine electron-accepting unit connected via an aryl bridging group.",
+      "patent_type": "invention",
+      "status": 5,
+      "office": "CNIPA",
+      "dates": {
+        "filing_date": "2021-09-10T00:00:00Z",
+        "publication_date": "2022-12-20T00:00:00Z",
+        "grant_date": "2024-03-15T00:00:00Z",
+        "expiry_date": "2041-09-10T00:00:00Z",
+        "priority_date": "2021-03-10T00:00:00Z"
+      },
+      "assignee_name": "京东方科技集团股份有限公司",
+      "jurisdiction": "CN",
+      "application_number": "CN202111056789.0",
+      "family_id": "FAM-OLED-2021-001",
+      "ipc_codes": [
+        "C07D251/24",
+        "C07D209/86",
+        "C09K11/06",
+        "H10K85/60",
+        "H10K50/11"
+      ],
+      "cpc_codes": [
+        "C07D251/24",
+        "C09K11/06",
+        "H10K85/60"
+      ],
+      "keyip_tech_codes": [
+        "OLED-HOST-CARBAZOLE",
+        "OLED-BIPOLAR"
+      ],
+      "source": "CNIPA",
+      "inventors": [
+        { "name": "张明辉", "country": "CN", "affiliation": "京东方", "sequence": 1 },
+        { "name": "李晓燕", "country": "CN", "affiliation": "京东方", "sequence": 2 },
+        { "name": "王建国", "country": "CN", "affiliation": "京东方", "sequence": 3 }
+      ],
+      "metadata": {
+        "value_score": 92.0,
+        "family_members": ["US20220123456A1", "EP3987654A1", "JP2023501234A"]
+      },
+      "created_at": "2021-09-10T08:00:00Z",
+      "updated_at": "2024-03-15T10:00:00Z",
+      "version": 5
+    },
+    {
+      "id": "oled-pat-0002-4000-a000-000000000002",
+      "patent_number": "US11678901B2",
+      "title": "Organic electroluminescent device comprising iridium complex and novel iridium complex compound",
+      "title_en": "Organic electroluminescent device comprising iridium complex and novel iridium complex compound",
+      "abstract": "The present invention provides a novel iridium complex compound represented by formula (II) and an organic electroluminescent device comprising the same. The iridium complex has a main ligand of 2-phenylpyridine derivative and an auxiliary ligand of acetylacetonate derivative. The compound exhibits high phosphorescent quantum yield (Φ≥85%) and short excited state lifetime (τ≤1.5μs).",
+      "abstract_en": "",
+      "patent_type": "invention",
+      "status": 5,
+      "office": "USPTO",
+      "dates": {
+        "filing_date": "2020-11-05T00:00:00Z",
+        "publication_date": "2021-05-13T00:00:00Z",
+        "grant_date": "2023-08-22T00:00:00Z",
+        "expiry_date": "2040-11-05T00:00:00Z",
+        "priority_date": "2019-11-05T00:00:00Z"
+      },
+      "assignee_name": "Universal Display Corporation",
+      "jurisdiction": "US",
+      "application_number": "US17/098,765",
+      "family_id": "FAM-OLED-2020-002",
+      "ipc_codes": [
+        "C07F15/00",
+        "C09K11/06",
+        "H10K85/30",
+        "H10K50/12"
+      ],
+      "cpc_codes": [
+        "C07F15/0033",
+        "C09K11/06",
+        "H10K85/30"
+      ],
+      "keyip_tech_codes": [
+        "OLED-EMITTER-IRIDIUM",
+        "OLED-PHOSPHORESCENT"
+      ],
+      "source": "USPTO",
+      "inventors": [
+        { "name": "Robert C. Kwong", "country": "US", "affiliation": "UDC", "sequence": 1 },
+        { "name": "Chin-Yang Shen", "country": "US", "affiliation": "UDC", "sequence": 2 },
+        { "name": "Min-Hao J. Kim", "country": "US", "affiliation": "UDC", "sequence": 3 }
+      ],
+      "metadata": {
+        "value_score": 88.0,
+        "cited_by": ["US11712345B2", "US11890123B2", "CN115650927B"]
+      },
+      "created_at": "2020-11-05T09:00:00Z",
+      "updated_at": "2023-08-22T14:00:00Z",
+      "version": 4
+    },
+    {
+      "id": "oled-pat-0003-4000-a000-000000000003",
+      "patent_number": "EP3988567B1",
+      "title": "Spirobifluorene compound and organic light-emitting diode using the same",
+      "title_en": "Spirobifluorene compound and organic light-emitting diode using the same",
+      "abstract": "The present invention relates to a spirobifluorene compound having an amine substituent at the 2,2'-position, represented by formula (III). The spirobifluorene core structure provides high thermal stability (Td≥400°C) and high triplet energy (T1≥2.9eV). A hole transport layer comprising the compound shows high hole mobility (≥1×10⁻⁴ cm²/Vs).",
+      "abstract_en": "",
+      "patent_type": "invention",
+      "status": 5,
+      "office": "EPO",
+      "dates": {
+        "filing_date": "2020-04-30T00:00:00Z",
+        "publication_date": "2020-11-04T00:00:00Z",
+        "grant_date": "2024-01-10T00:00:00Z",
+        "expiry_date": "2040-04-30T00:00:00Z",
+        "priority_date": "2019-04-30T00:00:00Z"
+      },
+      "assignee_name": "Merck Patent GmbH",
+      "jurisdiction": "EP",
+      "application_number": "EP20172345.6",
+      "family_id": "FAM-OLED-2020-003",
+      "ipc_codes": [
+        "C07C211/58",
+        "C07C211/61",
+        "C09K11/06",
+        "H10K85/60",
+        "H10K50/15"
+      ],
+      "cpc_codes": [
+        "C07C211/58",
+        "H10K85/60",
+        "C07C2603/18"
+      ],
+      "keyip_tech_codes": [
+        "OLED-HTL-SPIRO",
+        "OLED-HOLE-TRANSPORT"
+      ],
+      "source": "EPO",
+      "inventors": [
+        { "name": "Heinrich Becker", "country": "DE", "affiliation": "Merck", "sequence": 1 },
+        { "name": "Holger Heil", "country": "DE", "affiliation": "Merck", "sequence": 2 }
+      ],
+      "metadata": {
+        "value_score": 85.0,
+        "designated_states": ["DE", "FR", "GB", "NL", "IT", "ES"]
+      },
+      "created_at": "2020-04-30T08:30:00Z",
+      "updated_at": "2024-01-10T11:00:00Z",
+      "version": 5
+    },
+    {
+      "id": "oled-pat-0004-4000-a000-000000000004",
+      "patent_number": "JP2023501234A",
+      "title": "遅延蛍光材料及びそれを用いた有機発光素子",
+      "title_en": "Delayed fluorescent material and organic light-emitting device using the same",
+      "abstract": "本発明は、新しい遅延蛍光(TADF)材料を提供する。該材料は電子供与性のアクリジン骨格と電子受容性のトリアジンまたはベンゾニトリル骨格を有し、一重項-三重項エネルギー差(ΔEST)が0.1eV以下である。",
+      "abstract_en": "The present invention provides a novel delayed fluorescent (TADF) material. The material has an electron-donating acridine skeleton and an electron-accepting triazine or benzonitrile skeleton.",
+      "patent_type": "invention",
+      "status": 3,
+      "office": "JPO",
+      "dates": {
+        "filing_date": "2021-06-15T00:00:00Z",
+        "publication_date": "2023-01-20T00:00:00Z",
+        "priority_date": "2020-06-15T00:00:00Z"
+      },
+      "assignee_name": "Kyulux Inc.",
+      "jurisdiction": "JP",
+      "application_number": "JP2021-098765",
+      "family_id": "FAM-OLED-2021-004",
+      "ipc_codes": [
+        "C09K11/06",
+        "C07D219/10",
+        "C07D251/24",
+        "H10K85/60",
+        "H10K50/12"
+      ],
+      "cpc_codes": [
+        "C09K11/06",
+        "H10K85/60",
+        "C09K2211/1011"
+      ],
+      "keyip_tech_codes": [
+        "OLED-EMITTER-TADF",
+        "OLED-DEEP-BLUE"
+      ],
+      "source": "JPO",
+      "inventors": [
+        { "name": "中野谷一", "country": "JP", "affiliation": "Kyulux", "sequence": 1 },
+        { "name": "安達千波矢", "country": "JP", "affiliation": "九州大学", "sequence": 2 }
+      ],
+      "metadata": {
+        "value_score": 90.0,
+        "ΔEST": 0.08
+      },
+      "created_at": "2021-06-15T09:00:00Z",
+      "updated_at": "2023-01-20T10:00:00Z",
+      "version": 3
+    },
+    {
+      "id": "oled-pat-0005-4000-a000-000000000005",
+      "patent_number": "KR1020230078901B1",
+      "title": "아민계 정공수송 재료 및 이를 포함하는 유기전계발광 소자",
+      "title_en": "Amine-based hole transport material and organic electroluminescent device comprising the same",
+      "abstract": "본 발명은 신규한 아민계 화합물 및 이를 포함하는 유기전계발광 소자에 관한 것이다. 상기 화합물은 카바졸 또는 플루오렌 골격에 아릴아민 치환기를 갖는 구조로서, 높은 정공 이동도(≥5×10⁻⁴cm²/Vs) 및 적절한 HOMO 에너지 준위(-5.2~-5.4eV)를 나타낸다.",
+      "abstract_en": "",
+      "patent_type": "invention",
+      "status": 5,
+      "office": "KIPO",
+      "dates": {
+        "filing_date": "2021-08-20T00:00:00Z",
+        "publication_date": "2022-05-10T00:00:00Z",
+        "grant_date": "2024-02-28T00:00:00Z",
+        "expiry_date": "2041-08-20T00:00:00Z",
+        "priority_date": "2021-02-20T00:00:00Z"
+      },
+      "assignee_name": "삼성SDI 주식회사",
+      "jurisdiction": "KR",
+      "application_number": "KR1020210112345",
+      "family_id": "FAM-OLED-2021-005",
+      "ipc_codes": [
+        "C07C211/61",
+        "C07D209/86",
+        "C09K11/06",
+        "H10K85/60",
+        "H10K50/15"
+      ],
+      "cpc_codes": [
+        "C07C211/61",
+        "H10K85/60"
+      ],
+      "keyip_tech_codes": [
+        "OLED-HTL-AMINE",
+        "OLED-HOLE-TRANSPORT"
+      ],
+      "source": "KIPO",
+      "inventors": [
+        { "name": "김태형", "country": "KR", "affiliation": "삼성SDI", "sequence": 1 },
+        { "name": "이준호", "country": "KR", "affiliation": "삼성SDI", "sequence": 2 },
+        { "name": "박상현", "country": "KR", "affiliation": "삼성SDI", "sequence": 3 }
+      ],
+      "metadata": {
+        "value_score": 80.0,
+        "family_members": ["US20220012345A1", "CN114567890A"]
+      },
+      "created_at": "2021-08-20T08:00:00Z",
+      "updated_at": "2024-02-28T09:00:00Z",
+      "version": 4
+    },
+    {
+      "id": "oled-pat-0006-4000-a000-000000000006",
+      "patent_number": "CN114456183B",
+      "title": "一种含有萘啶骨架的电子传输材料及OLED器件",
+      "title_en": "Electron transport material containing naphthyridine skeleton and OLED device",
+      "abstract": "本发明公开了一种含有萘啶并咪唑骨架的电子传输材料,具有通式(IV)所示结构。该材料具有高电子迁移率(≥1×10⁻³cm²/Vs)和深LUMO能级(-2.8~-3.2eV),能够有效降低电子注入势垒。",
+      "abstract_en": "",
+      "patent_type": "invention",
+      "status": 5,
+      "office": "CNIPA",
+      "dates": {
+        "filing_date": "2022-01-05T00:00:00Z",
+        "publication_date": "2022-10-18T00:00:00Z",
+        "grant_date": "2024-06-20T00:00:00Z",
+        "expiry_date": "2042-01-05T00:00:00Z",
+        "priority_date": "2021-07-05T00:00:00Z"
+      },
+      "assignee_name": "TCL科技集团股份有限公司",
+      "jurisdiction": "CN",
+      "application_number": "CN202210012345.6",
+      "family_id": "FAM-OLED-2022-006",
+      "ipc_codes": [
+        "C07D471/14",
+        "C07D519/00",
+        "C09K11/06",
+        "H10K85/60",
+        "H10K50/16"
+      ],
+      "cpc_codes": [
+        "C07D471/14",
+        "H10K85/60"
+      ],
+      "keyip_tech_codes": [
+        "OLED-ETL-NAPTHYRIDINE",
+        "OLED-ELECTRON-TRANSPORT"
+      ],
+      "source": "CNIPA",
+      "inventors": [
+        { "name": "陈志强", "country": "CN", "affiliation": "TCL", "sequence": 1 },
+        { "name": "刘芳", "country": "CN", "affiliation": "TCL", "sequence": 2 }
+      ],
+      "metadata": {
+        "value_score": 76.0,
+        "electron_mobility": "1.5e-3 cm²/Vs"
+      },
+      "created_at": "2022-01-05T08:00:00Z",
+      "updated_at": "2024-06-20T10:00:00Z",
+      "version": 4
+    },
+    {
+      "id": "oled-pat-0007-4000-a000-000000000007",
+      "patent_number": "US11765432B2",
+      "title": "Organic light-emitting device having a composite charge generation layer and tandem structure",
+      "title_en": "",
+      "abstract": "The present disclosure relates to an organic light-emitting device having a tandem structure comprising a first emission unit, a second emission unit, and a charge generation layer (CGL) disposed between the first and second emission units. The CGL comprises an N-type charge generation layer and a P-type charge generation layer.",
+      "abstract_en": "",
+      "patent_type": "invention",
+      "status": 5,
+      "office": "USPTO",
+      "dates": {
+        "filing_date": "2021-03-20T00:00:00Z",
+        "publication_date": "2021-09-23T00:00:00Z",
+        "grant_date": "2024-05-15T00:00:00Z",
+        "expiry_date": "2041-03-20T00:00:00Z",
+        "priority_date": "2020-03-20T00:00:00Z"
+      },
+      "assignee_name": "LG Display Co., Ltd.",
+      "jurisdiction": "US",
+      "application_number": "US17/207,654",
+      "family_id": "FAM-OLED-2021-007",
+      "ipc_codes": [
+        "H10K50/17",
+        "H10K50/80",
+        "H10K50/11",
+        "H10K50/13",
+        "H10K59/30"
+      ],
+      "cpc_codes": [
+        "H10K50/17",
+        "H10K50/80",
+        "H10K2102/302"
+      ],
+      "keyip_tech_codes": [
+        "OLED-TANDEM",
+        "OLED-DEVICE-ARCHITECTURE"
+      ],
+      "source": "USPTO",
+      "inventors": [
+        { "name": "Sung-Hoon Kim", "country": "KR", "affiliation": "LG Display", "sequence": 1 },
+        { "name": "Jae-Hong Lee", "country": "KR", "affiliation": "LG Display", "sequence": 2 }
+      ],
+      "metadata": {
+        "value_score": 82.0,
+        "current_efficiency": 150
+      },
+      "created_at": "2021-03-20T09:00:00Z",
+      "updated_at": "2024-05-15T11:00:00Z",
+      "version": 4
+    },
+    {
+      "id": "oled-pat-0008-4000-a000-000000000008",
+      "patent_number": "EP4125678A1",
+      "title": "Thin-film encapsulation structure for flexible OLED display with improved barrier properties",
+      "title_en": "",
+      "abstract": "The present invention provides a thin-film encapsulation (TFE) structure for a flexible OLED display, comprising alternating inorganic barrier layers and organic buffer layers. The inorganic barrier layer comprises Al₂O₃ deposited by ALD at a thickness of 10-50nm, achieving WVTR ≤1×10⁻⁵ g/m²/day.",
+      "abstract_en": "",
+      "patent_type": "invention",
+      "status": 3,
+      "office": "EPO",
+      "dates": {
+        "filing_date": "2022-06-01T00:00:00Z",
+        "publication_date": "2023-04-15T00:00:00Z",
+        "priority_date": "2021-06-01T00:00:00Z"
+      },
+      "assignee_name": "Samsung Display Co., Ltd.",
+      "jurisdiction": "EP",
+      "application_number": "EP22176543.2",
+      "family_id": "FAM-OLED-2022-008",
+      "ipc_codes": [
+        "H10K50/84",
+        "H10K77/10",
+        "H10K59/12",
+        "B32B7/02",
+        "B32B9/00"
+      ],
+      "cpc_codes": [
+        "H10K50/84",
+        "H10K77/10",
+        "H01L2251/5338"
+      ],
+      "keyip_tech_codes": [
+        "OLED-ENCAPSULATION",
+        "OLED-FLEXIBLE"
+      ],
+      "source": "EPO",
+      "inventors": [
+        { "name": "Kang-Min Park", "country": "KR", "affiliation": "三星显示", "sequence": 1 },
+        { "name": "Hyun-Suk Kim", "country": "KR", "affiliation": "三星显示", "sequence": 2 }
+      ],
+      "metadata": {
+        "value_score": 78.0,
+        "WVTR": "1e-5 g/m²/day"
+      },
+      "created_at": "2022-06-01T08:00:00Z",
+      "updated_at": "2023-04-15T10:00:00Z",
+      "version": 3
+    },
+    {
+      "id": "oled-pat-0009-4000-a000-000000000009",
+      "patent_number": "JP2023512345A",
+      "title": "熱活性化遅延蛍光材料、それを含む組成物及び有機発光素子",
+      "title_en": "Thermally activated delayed fluorescent material, composition comprising the same and organic light-emitting device",
+      "abstract": "本発明は、新規な熱活性化遅延蛍光(TADF)材料として、ベンゾニトリルをアクセプター骨格とし、ジメチルアクリジンをドナー骨格とする化合物を提供する。該化合物は一重項-三重項エネルギー差(ΔEST)が0.05eV以下であり、室温での遅延蛍光成分比率が90%以上である。",
+      "abstract_en": "",
+      "patent_type": "invention",
+      "status": 3,
+      "office": "JPO",
+      "dates": {
+        "filing_date": "2022-03-10T00:00:00Z",
+        "publication_date": "2023-09-28T00:00:00Z",
+        "priority_date": "2021-03-10T00:00:00Z"
+      },
+      "assignee_name": "出光興産株式会社",
+      "jurisdiction": "JP",
+      "application_number": "JP2022-045678",
+      "family_id": "FAM-OLED-2022-009",
+      "ipc_codes": [
+        "C09K11/06",
+        "C07D219/10",
+        "C07D401/14",
+        "H10K85/60",
+        "H10K50/12"
+      ],
+      "cpc_codes": [
+        "C09K11/06",
+        "H10K85/60",
+        "C09K2211/1022"
+      ],
+      "keyip_tech_codes": [
+        "OLED-EMITTER-TADF",
+        "OLED-GREEN"
+      ],
+      "source": "JPO",
+      "inventors": [
+        { "name": "佐藤祐輔", "country": "JP", "affiliation": "出光興産", "sequence": 1 },
+        { "name": "田中信宏", "country": "JP", "affiliation": "出光興産", "sequence": 2 }
+      ],
+      "metadata": {
+        "value_score": 84.0,
+        "ΔEST": 0.05
+      },
+      "created_at": "2022-03-10T09:00:00Z",
+      "updated_at": "2023-09-28T10:00:00Z",
+      "version": 3
+    },
+    {
+      "id": "oled-pat-0010-4000-a000-000000000010",
+      "patent_number": "KR1020240056789A",
+      "title": "중성 이리듐 착물을 포함하는 인광 호스트 재료 및 유기 발광 소자",
+      "title_en": "Phosphorescent host material comprising neutral iridium complex and organic light-emitting device",
+      "abstract": "본 발명은 카바졸 및 트리아진 모이어티를 포함하는 신규한 인광 호스트 재료에 관한 것이다. 상기 호스트 재료는 카바졸-트리아진-카바졸 구조를 가지며, 3중항 에너지(T1)가 2.7eV 이상이다.",
+      "abstract_en": "",
+      "patent_type": "invention",
+      "status": 3,
+      "office": "KIPO",
+      "dates": {
+        "filing_date": "2022-11-15T00:00:00Z",
+        "publication_date": "2024-02-20T00:00:00Z",
+        "priority_date": "2022-05-15T00:00:00Z"
+      },
+      "assignee_name": "롯데케미칼 주식회사",
+      "jurisdiction": "KR",
+      "application_number": "KR1020240056789",
+      "family_id": "FAM-OLED-2022-010",
+      "ipc_codes": [
+        "C07D209/86",
+        "C07D251/24",
+        "C07D403/14",
+        "C09K11/06",
+        "H10K85/60"
+      ],
+      "cpc_codes": [
+        "C07D403/14",
+        "C09K11/06",
+        "H10K85/60"
+      ],
+      "keyip_tech_codes": [
+        "OLED-HOST-CARBAZOLE-TRIAZINE",
+        "OLED-PHOSPHORESCENT-HOST"
+      ],
+      "source": "KIPO",
+      "inventors": [
+        { "name": "최영준", "country": "KR", "affiliation": "롯데케미칼", "sequence": 1 },
+        { "name": "송민호", "country": "KR", "affiliation": "롯데케미칼", "sequence": 2 }
+      ],
+      "metadata": {
+        "value_score": 79.0,
+        "T1": 2.75
+      },
+      "created_at": "2022-11-15T08:00:00Z",
+      "updated_at": "2024-02-20T10:00:00Z",
+      "version": 3
+    }
+  ]
+}
