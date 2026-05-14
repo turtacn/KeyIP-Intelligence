@@ -6,6 +6,8 @@ import en from './en.json';
 import zhCN from './zh-CN.json';
 import ja from './ja.json';
 import ko from './ko.json';
+import de from './de.json';
+import fr from './fr.json';
 
 i18n
   .use(LanguageDetector)
@@ -16,11 +18,14 @@ i18n
       'zh-CN': { translation: zhCN },
       ja: { translation: ja },
       ko: { translation: ko },
+      de: { translation: de },
+      fr: { translation: fr },
     },
-    lng: 'zh-CN', // Default language
+    lng: 'zh-CN',
     fallbackLng: 'en',
+    supportedLngs: ['zh-CN', 'en', 'ja', 'ko', 'de', 'fr'],
     interpolation: {
-      escapeValue: false, // React already escapes by default
+      escapeValue: false,
     },
   });
 
