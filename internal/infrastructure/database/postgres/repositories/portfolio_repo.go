@@ -104,12 +104,20 @@ func (r *postgresPortfolioRepo) List(ctx context.Context, ownerID string, opts .
 	// Apply options
 	options := portfolio.ApplyPortfolioOptions(opts...)
 
-	baseQuery := `FROM portfolios WHERE owner_id = $1 AND deleted_at IS NULL`
-	args := []interface{}{ownerID}
+	baseQuery := `FROM portfolios WHERE deleted_at IS NULL`
+	var args []interface{}
+	argIdx := 1
+
+	if ownerID != "" {
+		baseQuery += fmt.Sprintf(` AND owner_id = $%d`, argIdx)
+		args = append(args, ownerID)
+		argIdx++
+	}
 
 	if options.Status != nil {
-		baseQuery += ` AND status = $2`
+		baseQuery += fmt.Sprintf(` AND status = $%d`, argIdx)
 		args = append(args, *options.Status)
+		argIdx++
 	}
 
 	var total int64
@@ -118,7 +126,7 @@ func (r *postgresPortfolioRepo) List(ctx context.Context, ownerID string, opts .
 		return nil, 0, err
 	}
 
-	dataQuery := fmt.Sprintf("SELECT * %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d", baseQuery, len(args)+1, len(args)+2)
+	dataQuery := fmt.Sprintf("SELECT * %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d", baseQuery, argIdx, argIdx+1)
 	args = append(args, options.Limit, options.Offset)
 
 	rows, err := r.executor().QueryContext(ctx, dataQuery, args...)

@@ -217,7 +217,8 @@ func main() {
 	patentSvc := app_patent.NewService(patentRepo, logger)
 	lifecycleRepo := pg_repos.NewPostgresLifecycleRepo(pgConn, logger)
 	lifecycleSvc := lifecycle.NewRealTrackingService(lifecycleRepo, logger)
-	portfolioSvc := portfolio.NewStubService()
+	portfolioRepo := pg_repos.NewPostgresPortfolioRepo(pgConn, logger)
+	portfolioSvc := portfolio.NewService(portfolioRepo, logger)
 
 	// Auth service (local JWT-based, no Keycloak required)
 	jwtSecret := os.Getenv("KEYIP_JWT_SECRET")
