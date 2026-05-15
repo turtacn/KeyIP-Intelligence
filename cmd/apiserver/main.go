@@ -250,6 +250,9 @@ func main() {
 	)
 
 	authHandler := h.NewAuthHandler(authSvc, logger)
+	collaborationWorkspaceSvc := collaboration.NewMinimalWorkspaceService(logger)
+	collaborationSharingSvc := collaboration.NewMinimalSharingService(logger)
+	collaborationHandler := h.NewCollaborationHandler(collaborationWorkspaceSvc, collaborationSharingSvc, logger)
 
 	aiBackend := common.NewOpenAIBackend(nil)
 	aiHandler := h.NewAIHandler(aiBackend, logger)
@@ -266,13 +269,14 @@ func main() {
 	// --- Router ---
 	pprofEnabled := cfg.Monitoring.Pprof.Enabled || os.Getenv("DEBUG") == "true"
 	routerCfg := httpserver.RouterConfig{
-		MoleculeHandler:     moleculeHandler,
-		PatentHandler:       patentHandler,
-		PortfolioHandler:    portfolioHandler,
-		LifecycleHandler:    lifecycleHandler,
-		AuthHandler:         authHandler,
-		AIHandler:           aiHandler,
-		HealthHandler:       healthHandler,
+		MoleculeHandler:       moleculeHandler,
+		PatentHandler:         patentHandler,
+		PortfolioHandler:      portfolioHandler,
+		LifecycleHandler:      lifecycleHandler,
+		AuthHandler:           authHandler,
+		AIHandler:             aiHandler,
+		CollaborationHandler:  collaborationHandler,
+		HealthHandler:         healthHandler,
 		CORSMiddleware:      corsMw,
 		Logger:              logger,
 		MetricsCollector:    metrics,
@@ -384,7 +388,6 @@ func loadConfig(path string) (*config.Config, error) {
 // Placeholder types to allow compilation where imports are missing/incomplete in this snippet context
 // In a real scenario, these would be proper imports
 // Ensuring unused imports are handled if placeholders are nil
-var _ = collaboration.Service(nil)
 var _ = lifecycle.Service(nil)
 var _ = portfolio.Service(nil)
 
