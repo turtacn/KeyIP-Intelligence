@@ -14,6 +14,7 @@ import (
 
 	appauth "github.com/turtacn/KeyIP-Intelligence/internal/application/auth"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/collaboration"
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/infringement"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/lifecycle"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/molecule"
 	app_patent "github.com/turtacn/KeyIP-Intelligence/internal/application/patent"
@@ -237,7 +238,8 @@ func main() {
 
 	// --- Handlers ---
 	moleculeHandler := h.NewMoleculeHandler(moleculeSvc, logger)
-	patentHandler := h.NewPatentHandler(patentSvc, nil, logger)
+	infringementSvc := infringement.NewMinimalRiskService(patentRepo, logger)
+	patentHandler := h.NewPatentHandler(patentSvc, infringementSvc, logger)
 	lifecycleHandler := h.NewLifecycleHandler(lifecycleSvc, logger)
 	portfolioHandler := h.NewPortfolioHandler(portfolioSvc, logger)
 
