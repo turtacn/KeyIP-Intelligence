@@ -971,11 +971,14 @@ func scanDeadline(row scanner) (*lifecycle.Deadline, error) {
 func scanEvent(row scanner) (*lifecycle.LifecycleEvent, error) {
 	e := &lifecycle.LifecycleEvent{}
 	var before, after, attach, meta []byte
+	var actorName, description sql.NullString
 	err := row.Scan(
-		&e.ID, &e.PatentID, &e.EventType, &e.EventDate, &e.Title, &e.Description,
-		&e.ActorID, &e.ActorName, &e.RelatedDeadlineID, &e.RelatedAnnuityID,
+		&e.ID, &e.PatentID, &e.EventType, &e.EventDate, &e.Title, &description,
+		&e.ActorID, &actorName, &e.RelatedDeadlineID, &e.RelatedAnnuityID,
 		&before, &after, &attach, &e.Source, &meta, &e.CreatedAt,
 	)
+	e.ActorName = actorName.String
+	e.Description = description.String
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.New(errors.ErrCodeNotFound, "event not found")
