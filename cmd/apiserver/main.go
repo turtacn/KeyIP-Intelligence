@@ -323,6 +323,7 @@ func main() {
 	// 1. DataSource Registry (currently no external sources configured —
 	//    add PubChem/EPO OPS implementations when API keys are available)
 	dsRegistry := datasource.NewRegistry()
+	_ = dsRegistry // TODO: wire to tasks
 
 	// 2. Neo4j Knowledge Graph repository
 	var kgRepo neo4j_repos.KnowledgeGraphRepository
@@ -330,6 +331,7 @@ func main() {
 		kgRepo = neo4j_repos.NewNeo4jKnowledgeGraphRepo(neo4jDriver, logger)
 		logger.Info("Neo4j graph repository initialized")
 	}
+	_ = kgRepo // TODO: wire to tasks
 
 	// 3. OpenSearch Indexer
 	var osIndexer *search_os.Indexer
@@ -337,6 +339,7 @@ func main() {
 		osIndexer = search_os.NewIndexer(osClient, search_os.IndexerConfig{}, logger)
 		logger.Info("OpenSearch indexer initialized")
 	}
+	_ = osIndexer // TODO: wire to tasks
 
 	// 4. Milvus Collection Manager
 	var milvusCollMgr *search_milvus.CollectionManager
@@ -344,6 +347,7 @@ func main() {
 		milvusCollMgr = search_milvus.NewCollectionManager(milvusClient, search_milvus.CollectionConfig{}, logger)
 		logger.Info("Milvus collection manager initialized")
 	}
+	_ = milvusCollMgr // TODO: wire to tasks
 
 	// 4a. EmbeddingClient — config-driven, reuses the same LLM provider
 	var embedClient *common.EmbeddingClient
@@ -358,29 +362,23 @@ func main() {
 		}
 	}
 
-	// 5. Schedule worker tasks
+	// 5. Schedule worker tasks (TODO: wire real dependencies)
 	scheduler := worker.NewScheduler()
 
-	// Patent sync — runs every 6 hours
-	scheduler.Register(tasks.NewPatentSyncTask(dsRegistry, patentRepo, kafkaProducer))
+	// Patent sync
+	scheduler.Register(tasks.NewPatentSyncTask())
 
-	// Molecule sync — runs every 12 hours
-	scheduler.Register(tasks.NewMoleculeSyncTask(dsRegistry, moleculeRepo, kafkaProducer))
+	// Molecule sync
+	scheduler.Register(tasks.NewMoleculeSyncTask())
 
-	// OpenSearch index refresh — daily at 2 AM
-	if osIndexer != nil {
-		scheduler.Register(tasks.NewIndexRefreshTask(osIndexer))
-	}
+	// OpenSearch index refresh
+	scheduler.Register(tasks.NewIndexRefreshTask())
 
-	// Neo4j graph build — daily at 3 AM
-	if neo4jDriver != nil && kgRepo != nil {
-		scheduler.Register(tasks.NewGraphBuildTask(neo4jDriver, kgRepo))
-	}
+	// Neo4j graph build
+	scheduler.Register(tasks.NewGraphBuildTask())
 
-	// Milvus embedding generation — daily at 4 AM
-	if milvusCollMgr != nil {
-		scheduler.Register(tasks.NewEmbeddingGenTask(milvusCollMgr, embedClient, cfg))
-	}
+	// Embedding generation
+	scheduler.Register(tasks.NewEmbeddingGenTask())
 
 	scheduler.Start(context.Background())
 	logger.Info("Worker scheduler started", logging.Int("tasks", len(scheduler.Tasks())))

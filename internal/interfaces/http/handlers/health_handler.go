@@ -68,6 +68,8 @@ func (h *HealthHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/healthz", h.Liveness)
 	mux.HandleFunc("GET /api/v1/readyz", h.Readiness)
 	mux.HandleFunc("GET /api/v1/healthz/detail", h.Detailed)
+	// Docker health check uses bare /healthz (no /api/v1 prefix)
+	mux.HandleFunc("GET /healthz", h.Liveness)
 }
 
 // LivenessResponse is the response for liveness probe.

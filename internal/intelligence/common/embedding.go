@@ -172,18 +172,12 @@ func (c *EmbeddingClient) embedPromptBased(ctx context.Context, text string) ([]
 		return nil, fmt.Errorf("embedding: no backend available for prompt-based embedding")
 	}
 
-	systemPrompt := `You are a chemical patent vectorizer. Given a molecule or patent description, output ONLY a single line of comma-separated numeric descriptors representing: molecular weight, logP, TPSA, atom count, ring count, aromatic ring count, H-bond donors, H-bond acceptors, rotatable bonds, and 5 structural fingerprint bits. Format: 0.1,0.5,0.3,... (all values 0.0-1.0 normalized).`
-
-	prompt := fmt.Sprintf("Vectorize this: %s\n\nOutput ONLY the comma-separated numbers, nothing else.", text)
+	prompt := fmt.Sprintf("Vectorize this chemical entity: %s", text)
 
 	req := &PredictRequest{
-		ModelName: c.modelName,
-		Messages: []Message{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: prompt},
-		},
-		MaxTokens:   256,
-		Temperature: 0.0,
+		ModelName:   c.modelName,
+		InputData:   []byte(prompt),
+		InputFormat: FormatText,
 	}
 
 	resp, err := c.backend.Predict(ctx, req)
@@ -191,8 +185,11 @@ func (c *EmbeddingClient) embedPromptBased(ctx context.Context, text string) ([]
 		return nil, fmt.Errorf("embedding: predict: %w", err)
 	}
 
-	// Parse the response as comma-separated floats
-	raw := strings.TrimSpace(resp.Content)
+	// Extract text output from PredictResponse.Outputs
+	var raw string
+	if data, ok := resp.Outputs["text"]; ok {
+		raw = strings.TrimSpace(string(data))
+	}
 	parts := strings.Split(raw, ",")
 	baseVec := make([]float32, 0, len(parts))
 	for _, p := range parts {

@@ -338,10 +338,16 @@ func (r *postgresPatentRepo) Search(ctx context.Context, c patent.PatentSearchCr
 
 func (r *postgresPatentRepo) FindByID(ctx context.Context, id string) (*patent.Patent, error) {
 	uid, err := uuid.Parse(id)
-	if err != nil {
-		return nil, errors.NewInvalidInputError("invalid patent ID")
+	if err == nil {
+		return r.GetByID(ctx, uid)
 	}
-	return r.GetByID(ctx, uid)
+	// Fallback: lookup by patent_number (e.g. "CN115650927B") 
+	// when frontend passes a human-readable patent number instead of UUID
+	p, patentErr := r.GetByPatentNumber(ctx, id)
+	if patentErr == nil {
+		return p, nil
+	}
+	return nil, errors.NewInvalidInputError("invalid patent ID")
 }
 
 func (r *postgresPatentRepo) FindCitedBy(ctx context.Context, patentNumber string) ([]*patent.Patent, error) {
