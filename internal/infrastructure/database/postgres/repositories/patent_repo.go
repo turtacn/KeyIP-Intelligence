@@ -1054,17 +1054,19 @@ func scanPatent(row scanner) (*patent.Patent, error) {
 	p := &patent.Patent{}
 	var statusStr string
 	var raw, meta []byte
-	var titleEn, abstractEn, familyID, appNum, fullTextHash sql.NullString
+	var titleEn, abstractEn, abstractStr, assigneeName, familyID, appNum, fullTextHash sql.NullString
 
 	err := row.Scan(
-		&p.ID, &p.PatentNumber, &p.Title, &titleEn, &p.Abstract, &abstractEn, &p.Type, &statusStr,
+		&p.ID, &p.PatentNumber, &p.Title, &titleEn, &abstractStr, &abstractEn, &p.Type, &statusStr,
 		&p.FilingDate, &p.PublicationDate, &p.GrantDate, &p.ExpiryDate, &p.PriorityDate,
-		&p.AssigneeID, &p.AssigneeName, &p.Jurisdiction, pq.Array(&p.IPCCodes), pq.Array(&p.CPCCodes), pq.Array(&p.KeyIPTechCodes),
+		&p.AssigneeID, &assigneeName, &p.Jurisdiction, pq.Array(&p.IPCCodes), pq.Array(&p.CPCCodes), pq.Array(&p.KeyIPTechCodes),
 		&familyID, &appNum, &fullTextHash, &p.Source, &raw, &meta,
 		&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 	)
 	p.TitleEn = titleEn.String
+	p.Abstract = abstractStr.String
 	p.AbstractEn = abstractEn.String
+	p.AssigneeName = assigneeName.String
 	p.FamilyID = familyID.String
 	p.ApplicationNumber = appNum.String
 	p.FullTextHash = fullTextHash.String

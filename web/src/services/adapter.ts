@@ -1,4 +1,4 @@
-import { getBaseUrl, isMockMode } from '../utils/apiMode';
+import { getBaseUrl } from '../utils/apiMode';
 import { getAccessToken } from '../utils/auth';
 
 /** Retry policy for API requests */
@@ -70,15 +70,13 @@ class FetchAdapter implements ApiAdapter {
   private async request<T>(path: string, options: RequestInit, silent = false): Promise<T> {
     const fullUrl = `${this.baseUrl}${path}`;
 
-    // Attach Bearer token for authenticated requests in non-mock mode
-    if (!isMockMode()) {
-      const token = await getAccessToken();
-      if (token) {
-        options.headers = {
-          ...(options.headers as Record<string, string>),
-          Authorization: `Bearer ${token}`,
-        };
-      }
+    // Attach Bearer token for authenticated requests
+    const token = await getAccessToken();
+    if (token) {
+      options.headers = {
+        ...(options.headers as Record<string, string>),
+        Authorization: `Bearer ${token}`,
+      };
     }
 
     console.log(`[API] Requesting: ${fullUrl}`, options);
@@ -100,8 +98,45 @@ class FetchAdapter implements ApiAdapter {
       }
 
       const result = await response.json();
-      // Return the full response object, assuming T is ApiResponse<D>
-      return result;
+
+      // If the response already has ApiResponse shape ({code, data}), return as-is.
+      // If it's a raw API response (e.g. {"patents":[...]}), wrap it in ApiResponse.
+      if (result && typeof result === 'object' && 'code' in result) {
+        return result;
+      }
+
+      // Real API returns unwrapped data — wrap it for frontend compatibility.
+      // Example: {"patents":[...]} → {code:0, message:"ok", data:[...]}
+      // Example: {"portfolios":[...]} → {code:0, message:"ok", data:[...]}
+      // Example: {"molecules":[...]} → {code:0, message:"ok", data:[...]}
+      let innerData: unknown = result;
+      let pagination: unknown = undefined;
+
+      if (result && typeof result === 'object' && !Array.isArray(result)) {
+        const keys = Object.keys(result);
+        // Look for the primary array key (exclude pagination-like keys)
+        const paginationKeys = ['pagination', 'page', 'page_size', 'total', 'total_pages', 'pageSize'];
+        const dataKeys = keys.filter(k => !paginationKeys.includes(k));
+        if (dataKeys.length === 1 && Array.isArray(result[dataKeys[0]])) {
+          innerData = result[dataKeys[0]];
+          // Extract pagination from either nested object or flat keys
+          if (result.pagination) {
+            pagination = result.pagination;
+          } else if ('page' in result || 'total' in result) {
+            pagination = {
+              page: result.page || 1,
+              pageSize: result.page_size || result.pageSize || result.data?.length || 20,
+              total: result.total || 0,
+            };
+          }
+        }
+      }
+
+      const wrapped: any = { code: 0, message: 'ok', data: innerData };
+      if (pagination) {
+        wrapped.pagination = pagination;
+      }
+      return wrapped;
     } catch (error) {
       if (!silent) {
         console.error(`[API] Fetch failed for ${fullUrl}:`, error);

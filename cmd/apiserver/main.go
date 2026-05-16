@@ -20,9 +20,13 @@ import (
 	app_patent "github.com/turtacn/KeyIP-Intelligence/internal/application/patent"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/patent_mining"
 	"github.com/turtacn/KeyIP-Intelligence/internal/application/portfolio"
+	"github.com/turtacn/KeyIP-Intelligence/internal/application/reporting"
 	"github.com/turtacn/KeyIP-Intelligence/internal/config"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/neo4j"
+	neo4j_repos "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/neo4j/repositories"
+	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/datasource"
 	"github.com/turtacn/KeyIP-Intelligence/internal/intelligence/common"
+	strategy_gpt "github.com/turtacn/KeyIP-Intelligence/internal/intelligence/strategy_gpt"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres"
 	pg_repos "github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/postgres/repositories"
 	"github.com/turtacn/KeyIP-Intelligence/internal/infrastructure/database/redis"
@@ -37,6 +41,8 @@ import (
 	httpserver "github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http"
 	h "github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/handlers"
 	httpmw "github.com/turtacn/KeyIP-Intelligence/internal/interfaces/http/middleware"
+	"github.com/turtacn/KeyIP-Intelligence/internal/worker"
+	"github.com/turtacn/KeyIP-Intelligence/internal/worker/tasks"
 	pb "github.com/turtacn/KeyIP-Intelligence/api/proto/v1"
 )
 
@@ -254,8 +260,133 @@ func main() {
 	collaborationSharingSvc := collaboration.NewMinimalSharingService(logger)
 	collaborationHandler := h.NewCollaborationHandler(collaborationWorkspaceSvc, collaborationSharingSvc, logger)
 
-	aiBackend := common.NewOpenAIBackend(nil)
-	aiHandler := h.NewAIHandler(aiBackend, logger)
+	// --- LLM Backend (config-driven: primary=Anthropic, fallback=DeepSeek) ---
+	aiBackend, llmErr := common.NewLLMBackend(cfg)
+	if llmErr != nil {
+		logger.Warn("LLM backend init failed, AI features disabled", logging.Err(llmErr))
+		aiBackend = nil
+	}
+	var aiHandler *h.AIHandler
+	if aiBackend != nil {
+		aiHandler = h.NewAIHandler(aiBackend, logger)
+		logger.Info("LLM backend initialized", logging.String("provider", cfg.LLM.Primary.Provider))
+	}
+
+	// --- StrategyGPT Reporting Services ---
+	// Create the StrategyGPT ReportGenerator with RAG enabled.
+	// Uses the same aiBackend for LLM inference; RAG config defaults
+	// to enabled with a similarity threshold of 0.70.
+	strategyCfg := strategy_gpt.NewStrategyGPTConfig()
+	promptMgr, _ := strategy_gpt.NewPromptManager(nil) // nil config → defaults
+	// RAG engine requires VectorStore + Embedder + Chunker;
+	// for minimal deployment we pass nil RAGEngine (generator degrades gracefully).
+	sgLogger := reporting.NewCommonLoggerAdapter(nil)
+	sgReportGenerator, err := strategy_gpt.NewReportGenerator(
+		aiBackend,
+		promptMgr,
+		nil, // RAGEngine — nil means RAG retrieval is skipped
+		strategyCfg,
+		common.NewNoopIntelligenceMetrics(),
+		sgLogger,
+	)
+	if err != nil {
+		logger.Warn("StrategyGPT ReportGenerator init failed, reports will be unavailable", logging.Err(err))
+	}
+
+	// Wire reporting application services
+	var ftoSvc reporting.FTOReportService
+	if sgReportGenerator != nil {
+		ftoSvc = reporting.NewStrategyFTOReportService(sgReportGenerator, nil)
+	} else {
+		ftoSvc = nil // ReportHandler will be nil, routes won't register
+	}
+	infringeReportSvc := reporting.NewMinimalInfringementReportService()
+	portfolioReportSvc := reporting.NewMinimalPortfolioReportService()
+	templateSvc := reporting.NewMinimalTemplateService()
+
+	var reportHandler *h.ReportHandler
+	if ftoSvc != nil {
+		reportHandler = h.NewReportHandler(ftoSvc, infringeReportSvc, portfolioReportSvc, templateSvc, logger)
+		logger.Info("StrategyGPT reporting engine initialized")
+	}
+
+	// --- ChemExtractor — regex-based chemical entity extraction ---
+	chemExtractor, err := newMinimalChemExtractor()
+	if err != nil {
+		logger.Warn("ChemExtractor init failed", logging.Err(err))
+	} else {
+		logger.Info("ChemExtractor initialized (regex-based, NER disabled)")
+		_ = chemExtractor // available for patent_mining.ChemExtractionService when storage is ready
+	}
+
+	// --- Worker Scheduler — background data sync & middleware refresh ---
+	// 1. DataSource Registry (currently no external sources configured —
+	//    add PubChem/EPO OPS implementations when API keys are available)
+	dsRegistry := datasource.NewRegistry()
+
+	// 2. Neo4j Knowledge Graph repository
+	var kgRepo neo4j_repos.KnowledgeGraphRepository
+	if neo4jDriver != nil {
+		kgRepo = neo4j_repos.NewNeo4jKnowledgeGraphRepo(neo4jDriver, logger)
+		logger.Info("Neo4j graph repository initialized")
+	}
+
+	// 3. OpenSearch Indexer
+	var osIndexer *search_os.Indexer
+	if osClient != nil {
+		osIndexer = search_os.NewIndexer(osClient, search_os.IndexerConfig{}, logger)
+		logger.Info("OpenSearch indexer initialized")
+	}
+
+	// 4. Milvus Collection Manager
+	var milvusCollMgr *search_milvus.CollectionManager
+	if milvusClient != nil {
+		milvusCollMgr = search_milvus.NewCollectionManager(milvusClient, search_milvus.CollectionConfig{}, logger)
+		logger.Info("Milvus collection manager initialized")
+	}
+
+	// 4a. EmbeddingClient — config-driven, reuses the same LLM provider
+	var embedClient *common.EmbeddingClient
+	if aiBackend != nil && cfg != nil {
+		embedClient = common.NewEmbeddingClient(cfg, aiBackend)
+		if embedClient != nil {
+			ec := embedClient.Config()
+			logger.Info("Embedding client initialized",
+				logging.String("provider", ec.Provider),
+				logging.String("model", ec.ModelName),
+				logging.Int("dimensions", ec.Dimensions))
+		}
+	}
+
+	// 5. Schedule worker tasks
+	scheduler := worker.NewScheduler()
+
+	// Patent sync — runs every 6 hours
+	scheduler.Register(tasks.NewPatentSyncTask(dsRegistry, patentRepo, kafkaProducer))
+
+	// Molecule sync — runs every 12 hours
+	scheduler.Register(tasks.NewMoleculeSyncTask(dsRegistry, moleculeRepo, kafkaProducer))
+
+	// OpenSearch index refresh — daily at 2 AM
+	if osIndexer != nil {
+		scheduler.Register(tasks.NewIndexRefreshTask(osIndexer))
+	}
+
+	// Neo4j graph build — daily at 3 AM
+	if neo4jDriver != nil && kgRepo != nil {
+		scheduler.Register(tasks.NewGraphBuildTask(neo4jDriver, kgRepo))
+	}
+
+	// Milvus embedding generation — daily at 4 AM
+	if milvusCollMgr != nil {
+		scheduler.Register(tasks.NewEmbeddingGenTask(milvusCollMgr, embedClient, cfg))
+	}
+
+	scheduler.Start(context.Background())
+	logger.Info("Worker scheduler started", logging.Int("tasks", len(scheduler.Tasks())))
+	shutdownSteps = append(shutdownSteps, shutdownStep{name: "worker-scheduler", close: func() {
+		scheduler.Stop()
+	}})
 
 	// --- CORS Middleware (permissive for docker-machine dev) ---
 	corsMw := httpmw.NewCORSMiddleware(httpmw.CORSConfig{
@@ -277,6 +408,7 @@ func main() {
 		AIHandler:             aiHandler,
 		CollaborationHandler:  collaborationHandler,
 		HealthHandler:         healthHandler,
+		ReportHandler:         reportHandler,
 		CORSMiddleware:      corsMw,
 		Logger:              logger,
 		MetricsCollector:    metrics,

@@ -24,6 +24,7 @@ i18n
     lng: 'zh-CN',
     fallbackLng: 'en',
     supportedLngs: ['zh-CN', 'en', 'ja', 'ko', 'de', 'fr'],
+    load: 'languageOnly',
     interpolation: {
       escapeValue: false,
     },

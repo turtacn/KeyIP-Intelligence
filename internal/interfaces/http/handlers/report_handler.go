@@ -130,8 +130,8 @@ func (h *ReportHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/reports/{report_id}/download", h.DownloadReport)
 	mux.HandleFunc("GET /api/v1/reports", h.ListReports)
 	mux.HandleFunc("DELETE /api/v1/reports/{report_id}", h.DeleteReport)
-	mux.HandleFunc("GET /api/v1/reports/templates", h.ListTemplates)
-	mux.HandleFunc("GET /api/v1/reports/templates/{id}", h.GetTemplate)
+	mux.HandleFunc("GET /api/v1/report-templates", h.ListTemplates)
+	mux.HandleFunc("GET /api/v1/report-templates/{id}", h.GetTemplate)
 }
 
 // GenerateFTOReport handles POST /api/v1/reports/fto.

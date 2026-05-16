@@ -12,6 +12,9 @@
 4. [Infrastructure Layer](#infrastructure-layer)
 5. [Data Layer](#data-layer)
 6. [Intelligence Layer](#intelligence-layer)
+   - [AI Model Catalog](#ai-model-catalog)
+   - [Intelligence Layer Code Structure](#intelligence-layer-code-structure)
+   - [Intelligence Design Documents](#intelligence-design-documents)
 7. [Application Layer](#application-layer)
 8. [Cross-Cutting Concerns](#cross-cutting-concerns)
 9. [Data Flow Diagrams](#data-flow-diagrams)
@@ -346,6 +349,16 @@ internal/intelligence/
 
 ```
 
+### Intelligence Design Documents
+
+The Intelligence layer is further detailed in dedicated design documents:
+
+| Document | File | Description |
+|:---------|:-----|:------------|
+| **LLM Configuration & Model Backend** | [`intelligence/llm-config.md`](intelligence/llm-config.md) | Multi-provider LLM architecture, config-driven model routing, Anthropic/OpenAI/local backends, graceful degradation, and security constraints |
+| **Embedding Service Design** | [`intelligence/embedding-design.md`](intelligence/embedding-design.md) | EmbeddingClient abstraction, multi-provider embedding strategy, prompt-based extraction from Anthropic, config.yml specifications, and fallback chain |
+| **Worker Scheduler & Data Pipeline** | [`intelligence/worker-pipeline.md`](intelligence/worker-pipeline.md) | Background task scheduling engine, data flow pipeline (PostgreSQL → OpenSearch → Neo4j → Milvus), DataSource Registry for external patent/molecule sources, and graceful degradation matrix |
+
 ---
 
 ## Application Layer
@@ -639,10 +652,20 @@ KeyIP-Intelligence/
 │           ├── dev/                        # Dev overlay
 │           └── prod/                       # Production overlay
 ├── docs/
-│   ├── architecture.md                    # This file
-│   ├── apis.md                            # API reference
-│   ├── deployment.md                      # Deployment guide
-│   └── development.md                     # Development guide
+│   ├── intelligence/                        # Intelligence layer design docs
+│   │   ├── embedding-design.md              # Embedding service design
+│   │   ├── llm-config.md                    # LLM config & model backend
+│   │   └── worker-pipeline.md               # Worker scheduler & data pipeline
+│   ├── architecture.md                      # This file
+│   ├── apis.md                              # API reference
+│   ├── deployment.md                        # Deployment guide
+│   ├── development.md                       # Development guide
+│   ├── external-services.md                 # External services integration
+│   ├── PRD.md                               # Product requirements document
+│   ├── white-paper.md                       # Technical white paper
+│   ├── local-dev.txt                        # Local dev quick reference
+│   ├── user-test-guide.md                   # User acceptance test guide
+│   └── webui-quickstart.md                  # WebUI quickstart
 ├── internal/
 │   ├── application/
 │   │   ├── patent_mining/

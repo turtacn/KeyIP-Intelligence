@@ -999,12 +999,26 @@ func scanMoleculeWithScore(row scanner) (*molecule.MoleculeWithScore, error) {
 	ms := &molecule.MoleculeWithScore{Molecule: m}
 	var meta []byte
 	var statusStr string
+	var inchi sql.NullString
+	var inchiKey sql.NullString
+	var molecularFormula sql.NullString
+	var name sql.NullString
+	var sourceReference sql.NullString
+	var molecularWeight sql.NullFloat64
+	var exactMass sql.NullFloat64
+	var logP sql.NullFloat64
+	var tpsa sql.NullFloat64
+	var numAtoms sql.NullInt64
+	var numBonds sql.NullInt64
+	var numRings sql.NullInt64
+	var numAromaticRings sql.NullInt64
+	var numRotatableBonds sql.NullInt64
 
 	// Columns match the SELECT m.*, score
 	err := row.Scan(
-		&m.ID, &m.SMILES, &m.CanonicalSMILES, &m.InChI, &m.InChIKey, &m.MolecularFormula, &m.MolecularWeight,
-		&m.ExactMass, &m.LogP, &m.TPSA, &m.NumAtoms, &m.NumBonds, &m.NumRings, &m.NumAromaticRings,
-		&m.NumRotatableBonds, &statusStr, &m.Name, pq.Array(&m.Aliases), &m.Source, &m.SourceReference, &meta,
+		&m.ID, &m.SMILES, &m.CanonicalSMILES, &inchi, &inchiKey, &molecularFormula, &molecularWeight,
+		&exactMass, &logP, &tpsa, &numAtoms, &numBonds, &numRings, &numAromaticRings,
+		&numRotatableBonds, &statusStr, &name, pq.Array(&m.Aliases), &m.Source, &sourceReference, &meta,
 		&m.CreatedAt, &m.UpdatedAt, &m.DeletedAt, &ms.Score,
 	)
 	if err != nil {
@@ -1013,6 +1027,50 @@ func scanMoleculeWithScore(row scanner) (*molecule.MoleculeWithScore, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan molecule with score")
 	}
+
+	if inchi.Valid {
+		m.InChI = inchi.String
+	}
+	if inchiKey.Valid {
+		m.InChIKey = inchiKey.String
+	}
+	if molecularFormula.Valid {
+		m.MolecularFormula = molecularFormula.String
+	}
+	if name.Valid {
+		m.Name = name.String
+	}
+	if sourceReference.Valid {
+		m.SourceReference = sourceReference.String
+	}
+	if molecularWeight.Valid {
+		m.MolecularWeight = molecularWeight.Float64
+	}
+	if exactMass.Valid {
+		m.ExactMass = exactMass.Float64
+	}
+	if logP.Valid {
+		m.LogP = logP.Float64
+	}
+	if tpsa.Valid {
+		m.TPSA = tpsa.Float64
+	}
+	if numAtoms.Valid {
+		m.NumAtoms = int(numAtoms.Int64)
+	}
+	if numBonds.Valid {
+		m.NumBonds = int(numBonds.Int64)
+	}
+	if numRings.Valid {
+		m.NumRings = int(numRings.Int64)
+	}
+	if numAromaticRings.Valid {
+		m.NumAromaticRings = int(numAromaticRings.Int64)
+	}
+	if numRotatableBonds.Valid {
+		m.NumRotatableBonds = int(numRotatableBonds.Int64)
+	}
+
 	m.Status = molecule.MoleculeStatus(statusStr)
 	if len(meta) > 0 {
 		_ = json.Unmarshal(meta, &m.Metadata)
@@ -1070,6 +1128,20 @@ func scanMolecule(row scanner) (*molecule.Molecule, error) {
 	m := &molecule.Molecule{}
 	var meta []byte
 	var statusStr string
+	var inchi sql.NullString
+	var inchiKey sql.NullString
+	var molecularFormula sql.NullString
+	var name sql.NullString
+	var sourceReference sql.NullString
+	var molecularWeight sql.NullFloat64
+	var exactMass sql.NullFloat64
+	var logP sql.NullFloat64
+	var tpsa sql.NullFloat64
+	var numAtoms sql.NullInt64
+	var numBonds sql.NullInt64
+	var numRings sql.NullInt64
+	var numAromaticRings sql.NullInt64
+	var numRotatableBonds sql.NullInt64
 
 	// Columns: id, smiles, canonical_smiles, inchi, inchi_key, molecular_formula, molecular_weight,
 	// exact_mass, logp, tpsa, num_atoms, num_bonds, num_rings, num_aromatic_rings,
@@ -1077,9 +1149,9 @@ func scanMolecule(row scanner) (*molecule.Molecule, error) {
 	// created_at, updated_at, deleted_at
 
 	err := row.Scan(
-		&m.ID, &m.SMILES, &m.CanonicalSMILES, &m.InChI, &m.InChIKey, &m.MolecularFormula, &m.MolecularWeight,
-		&m.ExactMass, &m.LogP, &m.TPSA, &m.NumAtoms, &m.NumBonds, &m.NumRings, &m.NumAromaticRings,
-		&m.NumRotatableBonds, &statusStr, &m.Name, pq.Array(&m.Aliases), &m.Source, &m.SourceReference, &meta,
+		&m.ID, &m.SMILES, &m.CanonicalSMILES, &inchi, &inchiKey, &molecularFormula, &molecularWeight,
+		&exactMass, &logP, &tpsa, &numAtoms, &numBonds, &numRings, &numAromaticRings,
+		&numRotatableBonds, &statusStr, &name, pq.Array(&m.Aliases), &m.Source, &sourceReference, &meta,
 		&m.CreatedAt, &m.UpdatedAt, &m.DeletedAt,
 	)
 	if err != nil {
@@ -1088,6 +1160,51 @@ func scanMolecule(row scanner) (*molecule.Molecule, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan molecule")
 	}
+
+	// Map nullable SQL values to struct fields
+	if inchi.Valid {
+		m.InChI = inchi.String
+	}
+	if inchiKey.Valid {
+		m.InChIKey = inchiKey.String
+	}
+	if molecularFormula.Valid {
+		m.MolecularFormula = molecularFormula.String
+	}
+	if name.Valid {
+		m.Name = name.String
+	}
+	if sourceReference.Valid {
+		m.SourceReference = sourceReference.String
+	}
+	if molecularWeight.Valid {
+		m.MolecularWeight = molecularWeight.Float64
+	}
+	if exactMass.Valid {
+		m.ExactMass = exactMass.Float64
+	}
+	if logP.Valid {
+		m.LogP = logP.Float64
+	}
+	if tpsa.Valid {
+		m.TPSA = tpsa.Float64
+	}
+	if numAtoms.Valid {
+		m.NumAtoms = int(numAtoms.Int64)
+	}
+	if numBonds.Valid {
+		m.NumBonds = int(numBonds.Int64)
+	}
+	if numRings.Valid {
+		m.NumRings = int(numRings.Int64)
+	}
+	if numAromaticRings.Valid {
+		m.NumAromaticRings = int(numAromaticRings.Int64)
+	}
+	if numRotatableBonds.Valid {
+		m.NumRotatableBonds = int(numRotatableBonds.Int64)
+	}
+
 	m.Status = molecule.Status(statusStr)
 	if len(meta) > 0 {
 		_ = json.Unmarshal(meta, &m.Metadata)

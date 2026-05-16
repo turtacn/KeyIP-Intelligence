@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -21,6 +22,90 @@ type Config struct {
 	Intelligence IntelligenceConfig `mapstructure:"intelligence"`
 	Monitoring   MonitoringConfig   `mapstructure:"monitoring"`
 	Notification NotificationConfig `mapstructure:"notification"`
+	LLM          LLMConfig          `mapstructure:"llm"`
+	DataSources  DataSourcesConfig  `mapstructure:"datasources"`
+}
+
+// LLMConfig holds LLM provider configuration.
+// Primary provider is used for all LLM calls; Fallback is used on primary failure.
+type LLMConfig struct {
+	Primary  LLMProviderConfig `mapstructure:"primary"`
+	Fallback LLMProviderConfig `mapstructure:"fallback"`
+}
+
+// LLMProviderConfig configures a single LLM provider.
+type LLMProviderConfig struct {
+	Provider     string  `mapstructure:"provider"`     // "anthropic", "openai", "deepseek"
+	Endpoint     string  `mapstructure:"endpoint"`     // Base URL, e.g. https://api.anthropic.com/v1
+	APIKey       string  `mapstructure:"api_key"`      // API key (supports ${ENV_VAR} interpolation)
+	APIKeyEnv    string  `mapstructure:"api_key_env"`  // Alternative: env var name containing the key
+	ModelName    string  `mapstructure:"model_name"`   // e.g. claude-sonnet-4-20250514
+	MaxTokens    int     `mapstructure:"max_tokens"`
+	Temperature  float64 `mapstructure:"temperature"`
+	TopP         float64 `mapstructure:"top_p"`
+	TimeoutSec   int     `mapstructure:"timeout_sec"`
+	RetryCount   int     `mapstructure:"retry_count"`
+	RetryDelayMs int     `mapstructure:"retry_delay_ms"`
+
+	// Embedding config — optionally use a different model for vector embeddings.
+	// If empty, defaults to the same ModelName (for OpenAI-compatible embeddings API)
+	// or falls back to prompt-based extraction (for Anthropic).
+	EmbeddingModelName  string `mapstructure:"embedding_model_name"`  // e.g. text-embedding-3-small
+	EmbeddingDimensions int    `mapstructure:"embedding_dimensions"`  // e.g. 1536, defaults 768
+}
+
+// ResolvedAPIKey returns the API key with env-var interpolation and priority.
+func (c LLMProviderConfig) ResolvedAPIKey() string {
+	if c.APIKey != "" {
+		return c.APIKey
+	}
+	if c.APIKeyEnv != "" {
+		return os.Getenv(c.APIKeyEnv)
+	}
+	return ""
+}
+
+// DataSourcesConfig holds external data source configuration.
+type DataSourcesConfig struct {
+	PubChem PubChemSourceConfig `mapstructure:"pubchem"`
+	EPO     EPOSourceConfig     `mapstructure:"epo"`
+	USPTO   USPTOConfig         `mapstructure:"uspto"`
+	CNIPA   CNIPAConfig         `mapstructure:"cnipa"`
+	WIPO    WIPOConfig          `mapstructure:"wipo"`
+}
+
+type PubChemSourceConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	BaseURL    string `mapstructure:"base_url"`
+	RateLimitQPS int  `mapstructure:"rate_limit_qps"`
+}
+
+type EPOSourceConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	BaseURL    string `mapstructure:"base_url"`
+	APIKey     string `mapstructure:"api_key"`
+	APIKeyEnv  string `mapstructure:"api_key_env"`
+}
+
+type USPTOConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	BaseURL    string `mapstructure:"base_url"`
+	APIKey     string `mapstructure:"api_key"`
+	APIKeyEnv  string `mapstructure:"api_key_env"`
+}
+
+type CNIPAConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	BaseURL    string `mapstructure:"base_url"`
+	APIKey     string `mapstructure:"api_key"`
+	APIKeyEnv  string `mapstructure:"api_key_env"`
+}
+
+type WIPOConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	BaseURL    string `mapstructure:"base_url"`
+	APIKey     string `mapstructure:"api_key"`
+	APIKeyEnv  string `mapstructure:"api_key_env"`
 }
 
 // ServerConfig holds server-related settings.

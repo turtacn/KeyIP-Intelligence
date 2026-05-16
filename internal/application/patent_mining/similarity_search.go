@@ -102,6 +102,14 @@ type SearchBySemanticRequest struct {
 	Filters    map[string]string `json:"filters,omitempty"`
 }
 
+// SearchByGNNRequest is the request for GNN embedding-based similarity search.
+type SearchByGNNRequest struct {
+	SMILES     string           `json:"smiles"`
+	Threshold  float64          `json:"threshold"`
+	TopK       int              `json:"top_k"`
+	Metric     SimilarityMetric `json:"metric"`
+}
+
 // SearchByPatentRequest is the request for patent-based hybrid search.
 type SearchByPatentRequest struct {
 	PatentID        string  `json:"patent_id"`

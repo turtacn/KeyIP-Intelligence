@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { isMockMode } from './apiMode';
 
 // ── Configuration ──────────────────────────────────────────────
 const KEYCLOAK_URL = import.meta.env.VITE_KEYCLOAK_URL || '';
@@ -140,7 +139,7 @@ function isKeycloakConfigured(): boolean {
 
 /** Check if we can use local email+password sign-in (backend auth, no Keycloak). */
 export function isLocalAuthAvailable(): boolean {
-  return !isMockMode();
+  return true;
 }
 
 /**
@@ -311,8 +310,6 @@ export async function refreshAccessToken(): Promise<string | null> {
  * Returns null if no valid token is available or auth is not applicable.
  */
 export async function getAccessToken(): Promise<string | null> {
-  if (isMockMode()) return null;
-
   const token = getStoredAccessToken();
   if (!token) return null;
 
@@ -332,7 +329,6 @@ export async function getAccessToken(): Promise<string | null> {
 }
 
 export function isAuthenticated(): boolean {
-  if (isMockMode()) return false;
   const token = getStoredAccessToken();
   if (!token) return false;
   return !isTokenExpired(token);

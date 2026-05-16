@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/adapter';
-import { isMockMode } from '../utils/apiMode';
 import type { ApiResponse } from '../types/api';
 
 /** A unified alert item representing either a lifecycle deadline or an API alert. */
@@ -56,12 +55,6 @@ export function useAlerts(pollIntervalMs = 60000): UseAlertsReturn {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchAlerts = useCallback(async () => {
-    if (isMockMode()) {
-      setLoading(false);
-      setAlerts([]);
-      return;
-    }
-
     try {
       const [deadlinesResult, alertsResult] = await Promise.allSettled([
         api.get<ApiResponse<unknown[]>>('/lifecycle/deadlines'),
@@ -148,8 +141,6 @@ export function useAlerts(pollIntervalMs = 60000): UseAlertsReturn {
 
   // Polling interval
   useEffect(() => {
-    if (isMockMode()) return;
-
     intervalRef.current = setInterval(fetchAlerts, pollIntervalMs);
     return () => {
       if (intervalRef.current) {

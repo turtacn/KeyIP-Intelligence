@@ -12,14 +12,24 @@ export default defineConfig({
   ],
   outputDir: "../artifacts/test-output",
   use: {
-    baseURL: process.env.BASE_URL || "http://localhost:19666",
+    baseURL: process.env.BASE_URL || "http://192.168.99.100",
     headless: true,
+    locale: "en-US",
     viewport: { width: 1280, height: 720 },
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
-    video: { mode: "on", size: { width: 1280, height: 720 } },
+    video: "off",
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
-    launchOptions: { args: ["--disable-dev-shm-usage"] },
+    launchOptions: {
+      executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || "/usr/bin/chromium-browser",
+      args: [
+        "--disable-dev-shm-usage",
+        // CDP debug port is off by default to avoid port conflicts with
+        // parallel workers.  Enable per-run with:
+        //   CDP_PORT=9222 npx playwright test …
+        ...(process.env.CDP_PORT ? [`--remote-debugging-port=${process.env.CDP_PORT}`, "--remote-debugging-address=0.0.0.0"] : []),
+      ],
+    },
   },
 });

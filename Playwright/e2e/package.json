@@ -9,7 +9,7 @@
     "report": "playwright show-report ../artifacts/playwright-report || true"
   },
   "devDependencies": {
-    "@playwright/test": "^1.41.2",
+    "@playwright/test": "^1.40.1",
     "typescript": "^5.4.5"
   }
 }

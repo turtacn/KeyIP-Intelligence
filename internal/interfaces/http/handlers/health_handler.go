@@ -247,12 +247,21 @@ func parsePagination(r *http.Request) (int, int) {
 }
 
 // writeJSON writes a JSON response with the given status code.
+// For 2xx responses, the data is automatically wrapped in the frontend-compatible
+// ApiResponse envelope: {"code":0,"message":"ok","data":<original>}.
+// For non-2xx responses, data is written as-is (typically ErrorResponse).
 func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if data != nil {
-		_ = json.NewEncoder(w).Encode(data)
+	if data == nil {
+		w.WriteHeader(statusCode)
+		return
 	}
+	if statusCode >= 200 && statusCode < 300 {
+		writeAPISuccess(w, statusCode, data)
+		return
+	}
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 // ErrorResponse is the standard error response body.
@@ -285,7 +294,8 @@ func writeAppError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, err)
 	default:
 		// Mask internal errors
-		writeError(w, http.StatusInternalServerError, errors.New(errors.ErrCodeInternal, "internal server error"))
+		msg := err.Error()
+		writeError(w, http.StatusInternalServerError, errors.New(errors.ErrCodeInternal, "internal server error: "+msg))
 	}
 }
 

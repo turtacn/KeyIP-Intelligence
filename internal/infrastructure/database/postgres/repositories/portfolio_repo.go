@@ -952,12 +952,14 @@ func (r *postgresPortfolioRepo) WithTx(ctx context.Context, fn func(portfolio.Po
 func scanPortfolio(row scanner) (*portfolio.Portfolio, error) {
 	p := &portfolio.Portfolio{}
 	var meta []byte
+	var description sql.NullString
 	// id, name, description, owner_id, status, tech_domains, target_jurisdictions, metadata, created_at, updated_at, deleted_at
 	err := row.Scan(
-		&p.ID, &p.Name, &p.Description, &p.OwnerID, &p.Status,
+		&p.ID, &p.Name, &description, &p.OwnerID, &p.Status,
 		pq.Array(&p.TechDomains), pq.Array(&p.TargetJurisdictions), &meta,
 		&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 	)
+	p.Description = description.String
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.New(errors.ErrCodeNotFound, "portfolio not found")
@@ -974,17 +976,25 @@ func scanPortfolioPatent(row scanner) (*patent.Patent, error) {
 	p := &patent.Patent{}
 	var raw, meta []byte
 	var statusStr string
+	var titleEn, abstractStr, abstractEn, assigneeName, familyID, appNum, fullTextHash sql.NullString
 	err := row.Scan(
-		&p.ID, &p.PatentNumber, &p.Title, &p.TitleEn, &p.Abstract, &p.AbstractEn, &p.Type, &statusStr,
+		&p.ID, &p.PatentNumber, &p.Title, &titleEn, &abstractStr, &abstractEn, &p.Type, &statusStr,
 		&p.FilingDate, &p.PublicationDate, &p.GrantDate, &p.ExpiryDate, &p.PriorityDate,
-		&p.AssigneeID, &p.AssigneeName, &p.Jurisdiction,
+		&p.AssigneeID, &assigneeName, &p.Jurisdiction,
 		pq.Array(&p.IPCCodes), pq.Array(&p.CPCCodes), pq.Array(&p.KeyIPTechCodes),
-		&p.FamilyID, &p.ApplicationNumber, &p.FullTextHash, &p.Source,
+		&familyID, &appNum, &fullTextHash, &p.Source,
 		&raw, &meta, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
+	p.TitleEn = titleEn.String
+	p.Abstract = abstractStr.String
+	p.AbstractEn = abstractEn.String
+	p.AssigneeName = assigneeName.String
+	p.FamilyID = familyID.String
+	p.ApplicationNumber = appNum.String
+	p.FullTextHash = fullTextHash.String
 
 	p.Status = parsePatentStatus(statusStr)
 	if len(raw) > 0 {

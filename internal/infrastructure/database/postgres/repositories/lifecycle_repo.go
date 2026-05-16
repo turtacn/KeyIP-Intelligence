@@ -923,10 +923,11 @@ type postgresLifecycleRepo struct {
 func scanAnnuity(row scanner) (*lifecycle.Annuity, error) {
 	a := &lifecycle.Annuity{}
 	var metaJSON []byte
+	var paymentRef, agentName, agentRef, notes sql.NullString
 	err := row.Scan(
 		&a.ID, &a.PatentID, &a.YearNumber, &a.DueDate, &a.GraceDeadline, &a.Status,
-		&a.Amount, &a.Currency, &a.PaidAmount, &a.PaidDate, &a.PaymentReference,
-		&a.AgentName, &a.AgentReference, &a.Notes, &a.ReminderSentAt, &a.ReminderCount, &metaJSON,
+		&a.Amount, &a.Currency, &a.PaidAmount, &a.PaidDate, &paymentRef,
+		&agentName, &agentRef, &notes, &a.ReminderSentAt, &a.ReminderCount, &metaJSON,
 		&a.CreatedAt, &a.UpdatedAt,
 	)
 	if err != nil {
@@ -935,6 +936,10 @@ func scanAnnuity(row scanner) (*lifecycle.Annuity, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan annuity")
 	}
+	a.PaymentReference = paymentRef.String
+	a.AgentName = agentName.String
+	a.AgentReference = agentRef.String
+	a.Notes = notes.String
 	if len(metaJSON) > 0 {
 		_ = json.Unmarshal(metaJSON, &a.Metadata)
 	}
@@ -944,8 +949,9 @@ func scanAnnuity(row scanner) (*lifecycle.Annuity, error) {
 func scanDeadline(row scanner) (*lifecycle.Deadline, error) {
 	d := &lifecycle.Deadline{}
 	var remJSON, metaJSON, extHistoryJSON []byte
+	var description sql.NullString
 	err := row.Scan(
-		&d.ID, &d.PatentID, &d.DeadlineType, &d.Title, &d.Description,
+		&d.ID, &d.PatentID, &d.DeadlineType, &d.Title, &description,
 		&d.DueDate, &d.OriginalDueDate, &d.Status, &d.Priority, &d.AssigneeID,
 		&d.CompletedAt, &d.CompletedBy, &d.ExtensionCount, &extHistoryJSON,
 		&remJSON, &d.LastReminderAt, &metaJSON, &d.CreatedAt, &d.UpdatedAt,
@@ -956,6 +962,7 @@ func scanDeadline(row scanner) (*lifecycle.Deadline, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan deadline")
 	}
+	d.Description = description.String
 	if len(remJSON) > 0 {
 		_ = json.Unmarshal(remJSON, &d.ReminderConfig)
 	}
@@ -1003,9 +1010,10 @@ func scanEvent(row scanner) (*lifecycle.LifecycleEvent, error) {
 func scanCostRecord(row scanner) (*lifecycle.CostRecord, error) {
 	c := &lifecycle.CostRecord{}
 	var meta []byte
+	var description, invoiceRef sql.NullString
 	err := row.Scan(
 		&c.ID, &c.PatentID, &c.CostType, &c.Amount, &c.Currency, &c.AmountUSD,
-		&c.ExchangeRate, &c.IncurredDate, &c.Description, &c.InvoiceReference,
+		&c.ExchangeRate, &c.IncurredDate, &description, &invoiceRef,
 		&c.RelatedAnnuityID, &c.RelatedEventID, &meta, &c.CreatedAt,
 	)
 	if err != nil {
@@ -1014,6 +1022,8 @@ func scanCostRecord(row scanner) (*lifecycle.CostRecord, error) {
 		}
 		return nil, errors.Wrap(err, errors.ErrCodeDatabaseError, "failed to scan cost record")
 	}
+	c.Description = description.String
+	c.InvoiceReference = invoiceRef.String
 	if len(meta) > 0 {
 		_ = json.Unmarshal(meta, &c.Metadata)
 	}

@@ -194,4 +194,63 @@ notification:
     token: "dev-token"
     encoding_aes_key: "dev-aes-key"
 
+# =============================================================================
+# LLM Configuration — Large Language Model providers
+# =============================================================================
+# Primary provider is used for all LLM calls (StrategyGPT, FTO report, etc.)
+# Fallback is used on primary failure (rate limit, timeout, auth error).
+# API keys are read from environment variables for security.
+# Supported providers: anthropic, openai, deepseek
+llm:
+  primary:
+    provider: "anthropic"
+    endpoint: "https://api.anthropic.com/v1"
+    api_key_env: "ANTHROPIC_API_KEY"
+    model_name: "claude-sonnet-4-20250514"
+    max_tokens: 8192
+    temperature: 0.7
+    top_p: 0.9
+    timeout_sec: 120
+    retry_count: 3
+    retry_delay_ms: 2000
+  fallback:
+    provider: "deepseek"
+    endpoint: "https://api.deepseek.com/v1"
+    api_key_env: "DEEPSEEK_API_KEY"
+    model_name: "deepseek-chat"
+    max_tokens: 8192
+    temperature: 0.7
+    top_p: 0.9
+    timeout_sec: 120
+    retry_count: 3
+    retry_delay_ms: 2000
+
+# =============================================================================
+# Data Sources — external patent & molecule data providers
+# =============================================================================
+# Free/open-source sources for development; paid sources for production.
+# Each source implements the same interface (PatentDataSource / MoleculeDataSource)
+# and can be enabled/disabled independently.
+datasources:
+  pubchem:
+    enabled: true
+    base_url: "https://pubchem.ncbi.nlm.nih.gov/rest"
+    rate_limit_qps: 5
+  epo:
+    enabled: false
+    base_url: "https://ops.epo.org/3.2/rest-services"
+    api_key_env: "EPO_API_KEY"
+  uspto:
+    enabled: false
+    base_url: "https://developer.uspto.gov/ibd-api/v1"
+    api_key_env: "USPTO_API_KEY"
+  cnipa:
+    enabled: false
+    base_url: "https://cnipa.gov.cn/api"
+    api_key_env: "CNIPA_API_KEY"
+  wipo:
+    enabled: false
+    base_url: "https://api.wipo.int"
+    api_key_env: "WIPO_API_KEY"
+
 # //Personal.AI order the ending
