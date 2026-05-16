@@ -1,0 +1,70 @@
+server:
+  http:
+    host: "0.0.0.0"
+    port: 18080
+
+database:
+  postgres:
+    host: "localhost"
+    port: 5432
+    user: "keyip"
+    password: "keyip_dev"
+    dbname: "keyip_dev"
+    sslmode: "disable"
+  neo4j:
+    uri: "bolt://localhost:7687"
+    user: "neo4j"
+    password: "neo4j_dev"
+
+cache:
+  redis:
+    addr: "localhost:6379"
+    password: ""
+    db: 0
+
+search:
+  opensearch:
+    addresses: ["http://localhost:9200"]
+    username: "admin"
+    password: "admin"
+  milvus:
+    address: "localhost"
+    port: 19530
+
+messaging:
+  kafka:
+    brokers: ["localhost:9092"]
+    consumer_group: "keyip-demo"
+
+storage:
+  minio:
+    endpoint: "localhost:9002"
+    access_key: "minioadmin"
+    secret_key: "minioadmin"
+    bucket_name: "keyip-documents"
+
+auth:
+  keycloak:
+    base_url: "http://localhost:8180"
+    realm: "keyip"
+    client_id: "keyip-api"
+    client_secret: "demo-secret"
+  jwt:
+    secret: "demo-jwt-secret-for-dev-only"
+    issuer: "keyip-demo"
+
+intelligence:
+  models_dir: "./models"
+  molpatent_gnn:
+    model_path: "dummy.pt"
+  claim_bert:
+    model_path: "dummy"
+  strategy_gpt:
+    endpoint: "https://api.deepseek.com/v1"
+    api_key: "sk-demo"
+    model_name: "deepseek-chat"
+  chem_extractor:
+    ocr_endpoint: "http://localhost:8081/ocr"
+    ner_model_path: "dummy"
+  infringe_net:
+    model_path: "dummy.pt"
