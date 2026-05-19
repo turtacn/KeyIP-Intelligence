@@ -22,7 +22,7 @@ const http = require('http');
 const fs = require('fs');
 
 const BASE_URL = process.env.KEYIP_BASE_URL || 'http://192.168.99.100';
-const CDP_URL = process.env.CDP_URL || 'http://192.168.99.1:9222'; // docker-machine host
+const CDP_URL = process.env.CDP_URL || 'http://192.168.99.1:2222'; // docker-machine host
 const REPORT_PATH = '/tmp/keyip_verify_report.json';
 const SCREENSHOT_DIR = '/tmp/keyip_screenshots';
 

@@ -7,7 +7,7 @@ const { WebSocket } = require('ws');
 const http = require('http');
 
 const BASE_URL = 'http://192.168.99.100';
-const CDP = 'http://localhost:9222';
+const CDP = 'http://localhost:2222';
 
 const PAGES = {
   dashboard:         { url: '/dashboard',           title: 'KeyIP' },

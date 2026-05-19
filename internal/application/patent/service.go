@@ -4,6 +4,7 @@ package patent
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	domainPatent "github.com/turtacn/KeyIP-Intelligence/internal/domain/patent"
@@ -398,20 +399,37 @@ func (s *serviceImpl) AdvancedSearch(ctx context.Context, input *AdvancedSearchI
 func (s *serviceImpl) GetStats(ctx context.Context, input *StatsInput) (*Stats, error) {
 	byJurisdiction, _ := s.repo.CountByJurisdiction(ctx)
 	byStatus, _ := s.repo.CountByStatus(ctx)
+	byYear, _ := s.repo.CountByYear(ctx, "filing_date")
 
 	var total int64
-	for _, count := range byStatus {
+	var active int64
+	for status, count := range byStatus {
 		total += count
+		if status == domainPatent.PatentStatusGranted || status == domainPatent.PatentStatusFiled ||
+			status == domainPatent.PatentStatusPublished || status == domainPatent.PatentStatusUnderExamination {
+			active += count
+		}
+	}
+
+	// Convert year map from int keys to string keys
+	byYearStr := make(map[string]int64, len(byYear))
+	for yr, cnt := range byYear {
+		byYearStr[strconv.Itoa(yr)] = cnt
+	}
+
+	var activePerc float64
+	if total > 0 {
+		activePerc = float64(active) / float64(total) * 100
 	}
 
 	return &Stats{
 		TotalPatents:        total,
 		ByJurisdiction:      byJurisdiction,
-		ByYear:              map[string]int64{},
+		ByYear:              byYearStr,
 		TopApplicants:       []ApplicantStat{},
 		TopIPCCodes:         []IPCStat{},
 		AverageClaimsPerDoc: 0,
-		ActivePatentPerc:    0,
+		ActivePatentPerc:    activePerc,
 	}, nil
 }
 

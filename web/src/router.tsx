@@ -16,6 +16,11 @@ const KnowledgeGraph = React.lazy(() => import('./pages/KnowledgeGraph'));
 const Health = React.lazy(() => import('./pages/Health'));
 const PatentDetail = React.lazy(() => import('./pages/PatentDetail'));
 const MoleculeDetail = React.lazy(() => import('./pages/MoleculeDetail'));
+const Molecules = React.lazy(() => import('./pages/Molecules'));
+const FTOSearch = React.lazy(() => import('./pages/FTOSearch'));
+const Workspaces = React.lazy(() => import('./pages/Workspaces'));
+const Reports = React.lazy(() => import('./pages/Reports'));
+const Settings = React.lazy(() => import('./pages/Settings'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
 
 const router = createBrowserRouter([
@@ -76,8 +81,28 @@ const router = createBrowserRouter([
         element: <PatentDetail />,
       },
       {
+        path: 'molecules',
+        element: <Molecules />,
+      },
+      {
         path: 'molecules/:id',
         element: <MoleculeDetail />,
+      },
+      {
+        path: 'fto',
+        element: <FTOSearch />,
+      },
+      {
+        path: 'workspaces',
+        element: <Workspaces />,
+      },
+      {
+        path: 'reports',
+        element: <Reports />,
+      },
+      {
+        path: 'settings',
+        element: <Settings />,
       },
       {
         path: 'health',

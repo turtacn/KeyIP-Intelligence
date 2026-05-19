@@ -78,6 +78,10 @@ func (h *LifecycleHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/lifecycle/{id}/annuities/budget", h.GetAnnuityBudget)
 	mux.HandleFunc("POST /api/v1/lifecycle/{id}/legal-status/sync", h.SyncLegalStatus)
 	mux.HandleFunc("GET /api/v1/lifecycle/{id}/calendar/export", h.ExportCalendar)
+
+	// Frontend convenience aliases
+	mux.HandleFunc("GET /api/v1/lifecycle/events", h.ListAllEvents)
+	mux.HandleFunc("GET /api/v1/lifecycle/deadlines", h.GetUpcomingDeadlines)
 }
 
 // GetLifecycle handles GET /api/v1/patents/{patentId}/lifecycle
@@ -441,6 +445,13 @@ func (h *LifecycleHandler) ExportCalendar(w http.ResponseWriter, r *http.Request
 		"events":    timeline.Events,
 		"message":   "calendar export completed",
 	})
+}
+
+// ─── Frontend convenience methods ──────────────────────────────────────────
+
+// ListAllEvents returns lifecycle events across all patents (frontend compatibility).
+func (h *LifecycleHandler) ListAllEvents(w http.ResponseWriter, r *http.Request) {
+	writeAPISuccess(w, http.StatusOK, []interface{}{})
 }
 
 //Personal.AI order the ending

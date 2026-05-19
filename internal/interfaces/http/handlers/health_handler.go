@@ -175,6 +175,9 @@ func (h *HealthHandler) Detailed(w http.ResponseWriter, r *http.Request) {
 		status = "degraded"
 	}
 
+	// Ensure all infrastructure components are represented
+	h.ensureComponents(components)
+
 	resp := DetailedResponse{
 		Status:     status,
 		Version:    h.version,
@@ -187,6 +190,19 @@ func (h *HealthHandler) Detailed(w http.ResponseWriter, r *http.Request) {
 		code = http.StatusServiceUnavailable
 	}
 	writeJSON(w, code, resp)
+}
+
+// ensureComponents ensures all expected infrastructure components are present
+// in the component map, adding "not_configured" entries for those not registered.
+func (h *HealthHandler) ensureComponents(components map[string]ComponentCheck) {
+	expected := []string{"postgres", "redis", "neo4j", "opensearch", "milvus", "kafka", "minio", "keycloak"}
+	for _, name := range expected {
+		if _, ok := components[name]; !ok {
+			components[name] = ComponentCheck{
+				Status: "not_configured",
+			}
+		}
+	}
 }
 
 // checkAll runs all health checkers concurrently and returns results.

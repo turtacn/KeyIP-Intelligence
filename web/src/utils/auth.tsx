@@ -162,8 +162,8 @@ export async function localSignIn(email: string, password: string): Promise<{ su
     }
 
     const body = await resp.json();
-    // API returns flat { access_token, token_type, expires_in } (not wrapped in data)
-    const token = body.access_token;
+    // API returns { code, data: { access_token, ... } } (wrapped in ApiResponse envelope)
+    const token = body?.data?.access_token || body.access_token;
     if (!token) {
       return { success: false, error: 'No access_token in response' };
     }

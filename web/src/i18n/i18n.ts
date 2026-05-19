@@ -22,9 +22,13 @@ i18n
       fr: { translation: fr },
     },
     lng: 'zh-CN',
-    fallbackLng: 'en',
+    fallbackLng: 'zh-CN',
     supportedLngs: ['zh-CN', 'en', 'ja', 'ko', 'de', 'fr'],
-    load: 'languageOnly',
+    detection: {
+      order: ['localStorage'],
+      lookupLocalStorage: 'keyip_language',
+      caches: ['localStorage'],
+    },
     interpolation: {
       escapeValue: false,
     },

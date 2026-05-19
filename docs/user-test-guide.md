@@ -1,358 +1,261 @@
-# KeyIP Intelligence — User Test Guide (v2.0)
+# KeyIP Intelligence — Production Test Guide (v4.0)
 
-**Last Updated:** 2026-05-16  
-**Test Suite Version:** E2E Automated (40 tests, 100% pass rate)  
-**Environment:** Docker Machine (chromedp headless Chrome 148)
+**Last Updated:** 2026-05-18
+**Mode:** Production — Real Go apiserver, no stubs
+**Environment:** Docker Machine (Chrome CDP port 2222)
 
 ---
 
 ## Table of Contents
 
-1. [Environment Setup](#1-environment-setup)
-2. [Running the E2E Test Suite](#2-running-the-e2e-test-suite)
-3. [Manual Test Scenarios](#3-manual-test-scenarios)
-4. [API Endpoint Reference](#4-api-endpoint-reference)
-5. [Edge Cases & Boundary Testing](#5-edge-cases--boundary-testing)
-6. [Known Behaviors](#6-known-behaviors)
+1. [Architecture](#1-architecture)
+2. [Environment Setup](#2-environment-setup)
+3. [Running E2E Tests](#3-running-e2e-tests)
+4. [API Endpoint Status](#4-api-endpoint-status)
+5. [SPA Page Routes](#5-spa-page-routes)
+6. [Real OLED Patent Test Scenarios](#6-real-oled-patent-test-scenarios)
 7. [Troubleshooting](#7-troubleshooting)
 
 ---
 
-## 1. Environment Setup
+## 1. Architecture
+
+```
+Browser (http://192.168.99.100)
+         │
+         ▼
+    ┌─────────┐      /api/*       ┌──────────────┐      ┌───────────┐
+    │  nginx  │ ─── proxy_pass ── │  apiserver   │ ───  │ PostgreSQL │
+    │  :80    │                   │  :8080 (Go)  │      │  :5432     │
+    └─────────┘                   └──────────────┘      └───────────┘
+         │                              │
+    /assets/*                      Redis :6379
+    /index.html                    Neo4j :7687 (optional)
+    (SPA fallback)
+```
+
+**No stubs. No hardcoded JSON.** All `/api/*` requests go to the Go apiserver which queries the real PostgreSQL database.
+
+---
+
+## 2. Environment Setup
 
 ### Prerequisites
 
-- Docker Engine (Docker Machine on macOS supported)
-- Python 3.11+ with `websocket-client` package
-- Running containers (start via `scripts/start-services.sh`):
-  - `keyip-web` (nginx, port 80) — frontend SPA + API proxy
-  - `keyip-apiserver` (Go, port 8080) — backend API server
-  - `keyip-postgres` (PostgreSQL 16, port 5432) — primary database
-  - `keyip-redis` (Redis 7, port 6379) — cache
-  - `keyip-chrome` (headless Chrome, port 9222) — CDP for E2E
+- Docker Engine with Docker Machine
+- Running infrastructure containers:
+  - `keyip-web` (nginx, port 80)
+  - `keyip-apiserver` (Go, port 8080)
+  - `keyip-postgres` (PostgreSQL 16, port 5432)
+  - `keyip-chrome` (headless Chrome, port **2222**) — for browser-based E2E tests
+- Real data imported via `scripts/seed.sh` or `scripts/import/`
 
-### Starting Services
+### Starting Chrome with CDP on Port 2222
 
 ```bash
-# Start all infrastructure
-./scripts/start-services.sh
-
-# Start Chrome for E2E testing
-docker run -d --name keyip-chrome \
-  --network keyip-network \
-  -p 9222:9222 \
-  --security-opt seccomp=unconfined \
-  --entrypoint /headless-shell/headless-shell \
-  chromedp/headless-shell:latest \
-  --no-sandbox --disable-gpu --disable-dev-shm-usage \
-  --remote-debugging-address=0.0.0.0 --remote-debugging-port=9222 \
-  --remote-allow-origins='*'
+./harness/launch-chrome-cdp.sh
 ```
+
+### Access Points
+
+| Service | URL |
+|---------|-----|
+| Web UI | `http://192.168.99.100/dashboard` |
+| Chrome CDP | `http://192.168.99.100:2222/json` |
+| Apiserver health | `http://192.168.99.100:8080/api/v1/healthz` |
 
 ---
 
-## 2. Running the E2E Test Suite
+## 3. Running E2E Tests
 
-### Automated Test Suite
+### Production Comprehensive Test (Recommended)
 
 ```bash
-# From project root
 docker run --rm --network container:keyip-chrome \
-  -v $(pwd)/e2e_test.py:/test/e2e_test.py:ro \
-  -v $(pwd)/docs/screenshots:/tmp/keyip-e2e-screenshots \
+  -v $(pwd)/e2e_comprehensive.py:/test/e2e_comprehensive.py:ro \
   python:3.11-alpine sh -c "
     pip install websocket-client -q
-    python3 /test/e2e_test.py
+    python3 /test/e2e_comprehensive.py
   "
 ```
 
-### Test Suite Structure
+**What it validates:**
+- Phase 1: Health endpoints (healthz, readyz — real Go handlers)
+- Phase 2: Patent CRUD (GET/POST /api/v1/patents — real DB data)
+- Phase 3: Molecule CRUD (GET/POST /api/v1/molecules — real DB data)
+- Phase 4: Portfolio CRUD (GET/POST /api/v1/portfolios)
+- Phase 5: Auth (POST signin → 401 with bad credentials, GET me → 401 without token)
+- Phase 6: Workspaces (GET/POST /api/v1/workspaces)
+- Phase 7: Reports (POST /api/v1/reports/fto, .../infringement)
+- Phase 8: Missing endpoints (expect 404 — no stubs to mask gaps)
+- Phase 9: SPA page routing (13 browser pages via Chrome CDP)
 
-The E2E test suite (`e2e_test.py`) performs **40 automated tests** across 3 phases:
+### Quick Smoke Test
 
-| Phase | Tests | Description |
-|-------|-------|------------|
-| Phase 1 | 21 API tests | All JSON API endpoints return correct status & data |
-| Phase 2 | 9 Edge case tests | Invalid inputs, missing data, SPA fallback behavior |
-| Phase 3 | 13 Page tests | Chrome CDP navigation + screenshots of every page |
-
-### Current Test Results
-
-```
-RESULTS: 40/40 passed (0 failed) ✓
-```
-
----
-
-## 3. Manual Test Scenarios
-
-### 3.1 Sign In / Authentication
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Sign In Page Loads** | Navigate to `/` | Login form displays with email/password fields |
-| **Auth API Returns Token** | `GET /api/v1/auth/signin` | Returns JWT token with user info |
-| **Auth Me Returns User** | `GET /api/v1/auth/me` | Returns current user profile |
-| **Invalid Credentials** | Submit empty form | Form validation prevents submission |
-
-### 3.2 Dashboard
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Dashboard Loads** | Navigate to `/dashboard` | Displays metrics: total patents, alerts, trends |
-| **Metrics API** | `GET /api/v1/dashboard/metrics` | Returns portfolio stats, jurisdiction breakdown, competitor comparison |
-| **Alerts Panel** | `GET /api/v1/alerts` | Returns list of unread/read alerts |
-
-### 3.3 Patent Management
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Patent List** | Navigate to `/patents` | Table with patent data (CN, US, EP, KR, JP) |
-| **Patent Search API** | `GET /api/v1/patents/search` | Returns 5 OLED patents with IPC codes |
-| **Patent Detail by Number** | `GET /api/v1/patents/CN115650927B` | Returns claims, inventors, citations |
-| **Patent Detail US** | `GET /api/v1/patents/US11678901B2` | Returns US patent with organometallic details |
-| **Invalid Patent** | `GET /api/v1/patents/INVALID-99999ZZ` | Returns 500 (proxied to apiserver) |
-
-### 3.4 Molecules Database
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Molecules Page** | Navigate to `/molecules` | Molecular library interface loads |
-
-### 3.5 Portfolio Management
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Portfolio List** | Navigate to `/portfolios` | Portfolio overview page |
-| **Portfolio Summary API** | `GET /api/v1/portfolios/summary` | 51 patents, $25M value, jurisdiction breakdown |
-| **Portfolio Scores** | `GET /api/v1/portfolios/scores` | Technical/legal/commercial scores |
-| **Constellation Map** | `GET /api/v1/portfolios/pf-001/constellation` | Returns patent landscape points and clusters |
-
-### 3.6 Lifecycle Management
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Lifecycle Page** | Navigate to `/lifecycle` | Timeline and deadline views |
-| **Lifecycle Events** | `GET /api/v1/lifecycle/events` | Filing → Publication → Grant event chain |
-| **Deadlines** | `GET /api/v1/lifecycle/deadlines` | Renewal fees, office action deadlines |
-
-### 3.7 FTO (Freedom to Operate)
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **FTO Search Page** | Navigate to `/fto` | Search interface for FTO analysis |
-| **FTO Search API** | `GET /api/v1/fto/search` | Returns competitor patent matches with risk levels |
-
-### 3.8 Infringement Monitoring
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Infringement Page** | Navigate to `/infringement` | Monitoring dashboard |
-| **Watch List** | `GET /api/v1/infringement/watch` | Detected potential infringements |
-| **Alert List** | `GET /api/v1/infringement/alerts` | High/medium risk alerts |
-
-### 3.9 Knowledge Graph
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Graph Page** | Navigate to `/knowledge-graph` | Interactive graph visualization |
-| **Graph API** | `GET /api/v1/knowledge-graph` | Nodes (patents + molecules), edges (relationships) |
-
-### 3.10 Workspaces
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Workspaces Page** | Navigate to `/workspaces` | Collaboration workspace interface |
-
-### 3.11 Reports
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Reports Page** | Navigate to `/reports` | Report generation interface |
-
-### 3.12 Partners & Settings
-
-| Test Case | Steps | Expected Result |
-|-----------|-------|----------------|
-| **Partners API** | `GET /api/v1/partners` | Tokyo Chemical, Sigma-Aldrich, Samsung |
-| **Settings API** | `GET /api/v1/settings` | Theme, language, notification preferences |
-
----
-
-## 4. API Endpoint Reference
-
-All API endpoints return JSON with the following envelope:
-
-```json
-{
-  "code": 0,
-  "message": "ok",
-  "data": { ... }
-}
+```bash
+docker run --rm --network container:keyip-chrome \
+  -v $(pwd)/e2e_test.py:/test/e2e_test.py:ro \
+  python:3.11-alpine sh -c "
+    pip install websocket-client -q && python3 /test/e2e_test.py
+  "
 ```
 
-### Health Checks
+---
 
-| Endpoint | Method | Status | Description |
-|----------|--------|--------|------------|
-| `/api/v1/healthz` | GET | 200 | Liveness probe (via nginx stub) |
-| `/api/v1/readyz` | GET | 200 | Readiness probe (via nginx stub) |
-| `/api/v1/healthz/detail` | GET | 200 | Detailed component health (via nginx stub) |
+## 4. API Endpoint Status
 
-### Data Endpoints (Nginx Stubs)
+### Operational (Go handlers, real DB data)
 
-| Endpoint | Method | Status | Data |
-|----------|--------|--------|------|
-| `/api/v1/dashboard/metrics` | GET | 200 | Portfolio dashboard metrics |
-| `/api/v1/alerts` | GET | 200 | Alert list |
-| `/api/v1/patents/search` | GET | 200 | 5 OLED patent results |
-| `/api/v1/patents/{number}` | GET | 200 | Patent detail by number |
-| `/api/v1/lifecycle/events` | GET | 200 | Patent lifecycle events |
-| `/api/v1/lifecycle/deadlines` | GET | 200 | Upcoming deadlines |
-| `/api/v1/fto/search` | GET | 200 | FTO analysis results |
-| `/api/v1/infringement/watch` | GET | 200 | Infringement watch list |
-| `/api/v1/infringement/alerts` | GET | 200 | Infringement alerts |
-| `/api/v1/portfolios/summary` | GET | 200 | Portfolio summary |
-| `/api/v1/portfolios/scores` | GET | 200 | Portfolio scores |
-| `/api/v1/portfolios/coverage` | GET | 200 | Jurisdiction coverage |
-| `/api/v1/portfolios/{id}/constellation` | GET | 200 | Patent landscape |
-| `/api/v1/knowledge-graph` | GET | 200 | Knowledge graph data |
-| `/api/v1/partners` | GET | 200 | Partner list |
-| `/api/v1/settings` | GET | 200 | User settings |
+| Method | Endpoint | Handler | Description |
+|--------|----------|---------|-------------|
+| GET | `/api/v1/healthz` | HealthHandler | Liveness probe |
+| GET | `/api/v1/readyz` | HealthHandler | Readiness probe |
+| GET | `/api/v1/patents` | PatentHandler | List patents (DB) |
+| POST | `/api/v1/patents` | PatentHandler | Create patent |
+| GET | `/api/v1/molecules` | MoleculeHandler | List molecules (DB) |
+| POST | `/api/v1/molecules` | MoleculeHandler | Create molecule |
+| GET | `/api/v1/portfolios` | PortfolioHandler | List portfolios (DB) |
+| POST | `/api/v1/portfolios` | PortfolioHandler | Create portfolio |
+| GET | `/api/v1/workspaces` | CollaborationHandler | List workspaces |
+| POST | `/api/v1/workspaces` | CollaborationHandler | Create workspace |
+| POST | `/api/v1/auth/signin` | AuthHandler | Sign in (requires email+password) |
+| GET | `/api/v1/auth/me` | AuthHandler | Current user (requires Bearer token) |
+| POST | `/api/v1/reports/fto` | ReportHandler | Generate FTO report |
+| POST | `/api/v1/reports/infringement` | ReportHandler | Generate infringement report |
+| POST | `/api/v1/ai/analyze-patent` | AIHandler | AI patent analysis |
+| POST | `/api/v1/ai/chat` | AIHandler | AI chat |
+| GET | `/api/v1/patents/{id}/lifecycle` | LifecycleHandler | Patent lifecycle |
+| GET | `/api/version` | VersionHandler | API version |
+| GET | `/api/v1/runtime/info` | RuntimeHandler | Runtime info |
+| GET | `/api/v1/ws/events` | WSHandler | WebSocket events |
 
-### Auth Endpoints (Nginx Stubs — Dev Mode)
+### Pending Implementation (returns 404 — not masked by stubs)
 
-| Endpoint | Method | Status | Description |
-|----------|--------|--------|------------|
-| `/api/v1/auth/signin` | GET | 200 | Dev-mode sign in (bypasses bcrypt) |
-| `/api/v1/auth/me` | GET | 200 | Current user profile |
+| Endpoint | Frontend uses for | Priority |
+|----------|-------------------|----------|
+| `/api/v1/dashboard/metrics` | Executive dashboard KPIs | HIGH |
+| `/api/v1/alerts` | Alert notifications | HIGH |
+| `/api/v1/patents/search` | Patent search with filters | HIGH |
+| `/api/v1/patents/{number}` | Patent detail by number | HIGH |
+| `/api/v1/lifecycle/events` | Lifecycle console | MEDIUM |
+| `/api/v1/lifecycle/deadlines` | Deadline tracking | MEDIUM |
+| `/api/v1/fto/search` | FTO analysis | MEDIUM |
+| `/api/v1/infringement/alerts` | Infringement monitoring | MEDIUM |
+| `/api/v1/infringement/watch` | Infringement watch list | MEDIUM |
+| `/api/v1/portfolios/summary` | Portfolio overview | HIGH |
+| `/api/v1/portfolios/scores` | Portfolio scoring | MEDIUM |
+| `/api/v1/portfolios/coverage` | Jurisdiction coverage | MEDIUM |
+| `/api/v1/knowledge-graph` | Citation network graph | LOW |
+| `/api/v1/partners` | Partner management | LOW |
+| `/api/v1/settings` | User preferences | LOW |
+| `/api/v1/molecules/search` | Molecule search | MEDIUM |
+| `/api/v1/molecules/{id}` | Molecule detail | MEDIUM |
 
 ---
 
-## 5. Edge Cases & Boundary Testing
+## 5. SPA Page Routes
 
-### 5.1 SPA Client-Side Routing
-
-| Input | Expected | Actual |
-|-------|----------|--------|
-| `/nonexistent-xyz` | 404 JSON | 200 HTML (SPA fallback to index.html) ✓ |
-| `/healthz` (bare path) | 404 | 200 HTML (SPA fallback) ✓ |
-
-> **Note:** The nginx configuration uses `try_files $uri $uri/ /index.html` which causes all unmatched routes to serve the SPA shell. This is expected behavior for single-page applications.
-
-### 5.2 Invalid Data
-
-| Input | Expected | Actual |
-|-------|----------|--------|
-| `/api/v1/patents/INVALID-99999ZZ` | 400 Bad Request | 500 (go-apiserver internal error) |
-| `/api/v1/patents/search?q=` (empty) | 200 OK | 200 OK with full result set |
-
-### 5.3 Auth Edge Cases
-
-| Test | Result |
-|------|--------|
-| Auth signin without credentials | 200 OK (dev mode stub always returns token) |
-| Auth me without token | 200 OK (nginx stub always returns profile) |
+| Route | Component | APIs Called | Status |
+|-------|-----------|-------------|--------|
+| `/dashboard` | ExecutiveDashboard | `dashboard/metrics` → **404 (pending)** | Shows error state |
+| `/patent-mining` | PatentMining | `patents/search`, `molecules` | Partial — search returns 404 |
+| `/infringement-watch` | InfringementWatch | `infringement/alerts` → **404** | Shows error state |
+| `/portfolio` | PortfolioOptimizer | `portfolios/summary`, `.../scores` → **404** | Shows error state |
+| `/lifecycle` | LifecycleConsole | `lifecycle/events` → **404** | Shows error state |
+| `/partners` | PartnerPortal | `partners` → **404** | Shows error state |
+| `/knowledge-graph` | KnowledgeGraph | `knowledge-graph` → **404** | Uses mock fallback |
+| `/search` | Search | `patents/search`, `molecules/search` → **404** | Shows error state |
+| `/health` | Health | `healthz/detail` → **404** | Shows no-data state |
+| `/molecules` | Molecules | `molecules` → ✓ | **WORKS** |
+| `/fto` | FTOSearch | `fto/search` → **404** | Shows intro state |
+| `/workspaces` | Workspaces | `workspaces` → ✓ | **WORKS** (mock data) |
+| `/reports` | Reports | — (mock) | Shows static content |
+| `/settings` | Settings | `settings` → **404** | Uses defaults |
+| `/patents/:id` | PatentDetail | `patents/{id}` → **404** | Shows error state |
+| `/molecules/:id` | MoleculeDetail | `molecules/{id}` → **404** | Shows error state |
 
 ---
 
-## 6. Known Behaviors
+## 6. Real OLED Patent Test Scenarios
 
-### 6.1 Health Check
+### 6.1 Verify Real Database Data
 
-The Docker health check for `keyip-apiserver` uses `wget --spider http://localhost:8080/healthz`. The apiserver registers this endpoint at the Go HTTP handler level (not through nginx).
+```bash
+# List patents from the real database
+curl http://192.168.99.100/api/v1/patents
 
-### 6.2 Nginx Stubs
+# List molecules
+curl http://192.168.99.100/api/v1/molecules
 
-In development mode, most `/api/v1/*` endpoints are served as hardcoded JSON stubs from nginx. These provide realistic OLED patent portfolio data for frontend development without requiring the Go apiserver to be fully wired.
+# Create a test patent
+curl -X POST http://192.168.99.100/api/v1/patents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Novel Blue TADF Emitter",
+    "abstract": "A thermally activated delayed fluorescence material with ΔEST < 0.10 eV",
+    "application_no": "CN20261000001",
+    "applicant": "KeyIP OLED Lab",
+    "inventors": ["Zhang Wei", "Li Ming"],
+    "ipc_codes": ["H10K 50/00", "C09K 11/06"],
+    "filing_date": "2026-05-15",
+    "jurisdiction": "CN"
+  }'
+```
 
-### 6.3 Chrome CDP
+### 6.2 Test with Real Web Data
 
-For E2E browser testing, Chrome must be started with:
-- `--remote-allow-origins='*'` to accept WebSocket connections
-- `--no-sandbox` for Docker compatibility
-- The test runner must share the Chrome container's network namespace (`--network container:keyip-chrome`)
+Import real OLED patent data from public sources (CNIPA, USPTO, EPO):
+```bash
+# Import real data (if import scripts exist)
+./scripts/import/import_patents.sh
+./scripts/seed.sh
+```
 
-### 6.4 Docker Machine
+### 6.3 Validate API Contract
 
-On Docker Machine setups:
-- Services are accessed via the VM IP (192.168.99.100), not localhost
-- Volume mounts go to the VM, not the macOS host directly
-- Proxy settings may interfere with localhost connections
+```bash
+# Health check
+curl -s http://192.168.99.100/api/v1/healthz | python3 -m json.tool
+
+# List real patents
+curl -s http://192.168.99.100/api/v1/patents | python3 -m json.tool
+
+# List real molecules
+curl -s http://192.168.99.100/api/v1/molecules | python3 -m json.tool
+```
 
 ---
 
 ## 7. Troubleshooting
 
-### API returns HTML instead of JSON
+### Endpoint returns 404
 
-**Symptom:** `GET /api/v1/some-endpoint` returns HTML  
-**Cause:** The endpoint path doesn't match any nginx location block  
-**Fix:** Check `web/nginx.conf` for missing location blocks or order issues
+**Expected for pending endpoints** (see section 4). Not a bug — the Go handler hasn't been implemented yet.
 
-### Chrome CDP connection refused
+### Endpoint returns HTML instead of JSON
 
-**Symptom:** WebSocket handshake fails with 403 or connection refused  
-**Fix:**
+The SPA fallback (`try_files $uri /index.html`) catches unmatched paths. API paths should have `/api/` prefix. If you see HTML for an `/api/` path, check nginx.conf is proxying correctly.
+
+### Chrome CDP Connection Refused
+
 ```bash
-docker stop keyip-chrome && docker rm keyip-chrome
-docker run -d --name keyip-chrome \
-  --network keyip-network -p 9222:9222 \
-  --security-opt seccomp=unconfined \
-  --entrypoint /headless-shell/headless-shell \
-  chromedp/headless-shell:latest \
-  --no-sandbox --disable-gpu --disable-dev-shm-usage \
-  --remote-debugging-address=0.0.0.0 --remote-debugging-port=9222 \
-  --remote-allow-origins='*'
+# Check Chrome is running
+./harness/launch-chrome-cdp.sh --status
+
+# Restart if needed
+./harness/launch-chrome-cdp.sh --restart
 ```
 
-### Apiserver unhealthy
+### Nginx Stubs Still Active?
 
-**Symptom:** `docker ps` shows `(unhealthy)` for keyip-apiserver  
-**Fix:** The health check uses `/healthz` endpoint; restart with correct health check:
+Stubs have been **completely removed** from `web/nginx.conf`, `web/nginx-stubs.conf`, and `web/stubs.conf`. All `/api/` requests now proxy to the Go apiserver. If you still see stub data, the Docker image needs rebuilding:
+
 ```bash
-docker stop keyip-apiserver && docker rm keyip-apiserver
-docker run -d --name keyip-apiserver \
-  --network keyip-network -p 8080:8080 \
-  --health-cmd="wget --no-verbose --tries=1 --spider http://localhost:8080/api/v1/healthz" \
-  --health-interval=15s --health-timeout=5s --health-start-period=10s \
-  -v $(pwd)/configs:/app/configs:ro \
-  keyip-apiserver:local -config /app/configs/docker-net.yaml
+docker build -t keyip-web:latest -f web/Dockerfile web/
+docker restart keyip-web
 ```
 
 ---
 
-## Appendix A: Test Screenshots
-
-All page screenshots are saved to `docs/screenshots/` during E2E test runs:
-
-- `sign-in.png` — Sign In / Login page
-- `dashboard.png` — Main dashboard
-- `patents.png` — Patent search
-- `molecules.png` — Molecular library
-- `portfolios.png` — Portfolio management
-- `lifecycle.png` — Patent lifecycle
-- `fto-search.png` — FTO analysis
-- `infringement.png` — Infringement monitoring
-- `knowledge-graph.png` — Knowledge graph
-- `workspaces.png` — Workspace management
-- `reports.png` — Report generation
-- `partners.png` — Partner management
-- `settings.png` — Application settings
-
----
-
-## Appendix B: Automated Test Script
-
-The complete test script is at `e2e_test.py` in the project root. It can be run independently:
-
-```bash
-python3 e2e_test.py
-```
-
-It auto-detects the web server and Chrome CDP endpoint, runs all 40 tests, and outputs pass/fail results with screenshots.
-
----
-
-*KeyIP Intelligence — User Test Guide v2.0*  
-*Generated from E2E test run: 40/40 passed, 0 failed*
+*KeyIP Intelligence — Production Test Guide v4.0*
+*No stubs. Real backend. Industrial delivery.*

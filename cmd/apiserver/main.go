@@ -255,6 +255,8 @@ func main() {
 		&redisHealthAdapter{redisClient},
 	)
 
+	dashboardHandler := h.NewDashboardHandler(patentSvc, logger)
+
 	authHandler := h.NewAuthHandler(authSvc, logger)
 	collaborationWorkspaceSvc := collaboration.NewMinimalWorkspaceService(logger)
 	collaborationSharingSvc := collaboration.NewMinimalSharingService(logger)
@@ -407,6 +409,7 @@ func main() {
 		CollaborationHandler:  collaborationHandler,
 		HealthHandler:         healthHandler,
 		ReportHandler:         reportHandler,
+		DashboardHandler:      dashboardHandler,
 		CORSMiddleware:      corsMw,
 		Logger:              logger,
 		MetricsCollector:    metrics,

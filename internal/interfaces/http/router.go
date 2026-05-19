@@ -38,6 +38,7 @@ type RouterConfig struct {
 	ReportHandler        *handlers.ReportHandler
 	HealthHandler        *handlers.HealthHandler
 	AIHandler            *handlers.AIHandler
+	DashboardHandler     *handlers.DashboardHandler
 
 	// Middleware
 	AuthMiddleware               *middleware.AuthMiddleware
@@ -180,6 +181,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	}
 	if cfg.ReportHandler != nil {
 		cfg.ReportHandler.RegisterRoutes(mux)
+	}
+	if cfg.DashboardHandler != nil {
+		cfg.DashboardHandler.RegisterRoutes(mux)
 	}
 
 	// --- Global Middleware Chain ---

@@ -28,6 +28,8 @@ function statusBg(status: ServiceStatus): string {
       return 'bg-yellow-500';
     case 'unhealthy':
       return 'bg-red-500';
+    case 'not_configured':
+      return 'bg-slate-300';
     default:
       return 'bg-slate-400';
   }
@@ -41,6 +43,8 @@ function statusIcon(status: ServiceStatus) {
       return AlertTriangle;
     case 'unhealthy':
       return XCircle;
+    case 'not_configured':
+      return Server;
     default:
       return Server;
   }
@@ -109,7 +113,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ name, detail, statusLabel, no
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-slate-900 text-sm">{name}</h3>
-        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${status === 'healthy' ? 'bg-green-50 text-green-700' : status === 'degraded' ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-700'}`}>
+        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${status === 'healthy' ? 'bg-green-50 text-green-700' : status === 'degraded' ? 'bg-yellow-50 text-yellow-700' : status === 'not_configured' ? 'bg-slate-100 text-slate-500' : 'bg-red-50 text-red-700'}`}>
           <Icon className="w-3 h-3" />
           {statusLabel}
         </span>
@@ -157,6 +161,7 @@ const Health: React.FC = () => {
       case 'healthy': return t('health.status_healthy');
       case 'degraded': return t('health.status_degraded');
       case 'unhealthy': return t('health.status_unhealthy');
+      case 'not_configured': return t('health.status_not_configured', '未配置');
       default: return t('health.status_unknown');
     }
   };

@@ -96,3 +96,6 @@ Playwright/debug_*.py
 # //Personal.AI order the ending
 node_modules/
 /ai/
+/bugs/
+/docs/screenshots/
+/docs/screenshots/

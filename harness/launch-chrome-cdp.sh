@@ -1,50 +1,146 @@
 #!/bin/bash
-# KeyIP-Intelligence CDP Chrome 启动脚本
-# 在 macOS 宿主机上执行（不是在 docker-machine 或容器内）
-# 用法: bash harness/launch-chrome-cdp.sh
+# =============================================================================
+# KeyIP Intelligence — Launch Chrome with CDP Debugging (Port 2222)
+# =============================================================================
+# This script starts a headless Chrome container with Chrome DevTools Protocol
+# enabled on port 2222 for E2E browser testing.
+#
+# Usage:
+#   ./launch-chrome-cdp.sh              # Start Chrome on port 2222
+#   ./launch-chrome-cdp.sh --stop       # Stop and remove Chrome container
+#   ./launch-chrome-cdp.sh --status     # Check if Chrome is running
+#
+# Network: keyip-network (must exist — see deployments/docker/docker-compose.yml)
+# =============================================================================
 
-set -e
+set -euo pipefail
 
-CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-CHROMIUM="/Applications/Chromium.app/Contents/MacOS/Chromium"
+CONTAINER_NAME="keyip-chrome"
+CDP_PORT="${CDP_PORT:-2222}"
+NETWORK="${NETWORK:-keyip-network}"
+IMAGE="chromedp/headless-shell:latest"
 
-# 杀掉旧的 debug 实例
-pkill -f "remote-debugging-port" 2>/dev/null || true
-sleep 1
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
 
-if [ -f "$CHROME" ]; then
-    CHROME_BIN="$CHROME"
-elif [ -f "$CHROMIUM" ]; then
-    CHROME_BIN="$CHROMIUM"
-else
-    echo "ERROR: Chrome/Chromium not found"
-    exit 1
-fi
+# ─── Functions ────────────────────────────────────────────────────────────
 
-echo "🚀 Starting Chrome with CDP on port 9222..."
-echo "   Target: http://192.168.99.100/dashboard"
+status() {
+    if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        echo -e "${GREEN}[OK]${NC} Chrome container '${CONTAINER_NAME}' is running"
+        local ip="${DOCKER_MACHINE_IP:-192.168.99.100}"
+        echo "  CDP endpoint: http://${ip}:${CDP_PORT}/json"
+        echo "  WebSocket:    ws://${ip}:${CDP_PORT}/devtools/browser/..."
+        return 0
+    elif docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        echo -e "${YELLOW}[STOPPED]${NC} Chrome container '${CONTAINER_NAME}' exists but is stopped"
+        return 1
+    else
+        echo -e "${RED}[NOT FOUND]${NC} Chrome container '${CONTAINER_NAME}' does not exist"
+        return 1
+    fi
+}
 
-"$CHROME_BIN" \
-    --remote-debugging-port=9222 \
-    --user-data-dir=/tmp/chrome-debug-profile \
-    --no-first-run \
-    --no-default-browser-check \
-    --disable-extensions \
-    --disable-background-networking \
-    --disable-sync \
-    --disable-translate \
-    --disable-features=TranslateUI \
-    --window-size=1400,900 \
-    "http://192.168.99.100/dashboard" &
+start() {
+    # Ensure network exists
+    if ! docker network ls --format '{{.Name}}' | grep -q "^${NETWORK}$"; then
+        echo -e "${YELLOW}[WARN]${NC} Network '${NETWORK}' not found. Creating..."
+        docker network create "${NETWORK}"
+    fi
 
-sleep 2
+    # Stop existing container if present
+    if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        echo "Removing existing Chrome container..."
+        docker stop "${CONTAINER_NAME}" 2>/dev/null || true
+        docker rm "${CONTAINER_NAME}" 2>/dev/null || true
+    fi
 
-# 验证 CDP 端口
-if curl -s http://localhost:9222/json | python3 -m json.tool > /dev/null 2>&1; then
-    echo "✅ CDP ready at localhost:9222"
-    echo ""
-    echo "现在可以运行容器内验证:"
-    echo "  node harness/cdp-verify.js"
-else
-    echo "⚠️  CDP may not be ready, try: curl http://localhost:9222/json"
-fi
+    echo "Starting Chrome with CDP on port ${CDP_PORT}..."
+    docker run -d \
+        --name "${CONTAINER_NAME}" \
+        --network "${NETWORK}" \
+        -p "${CDP_PORT}:${CDP_PORT}" \
+        --security-opt seccomp=unconfined \
+        --shm-size=2g \
+        --entrypoint /headless-shell/headless-shell \
+        "${IMAGE}" \
+        --no-sandbox \
+        --disable-gpu \
+        --disable-dev-shm-usage \
+        --disable-extensions \
+        --disable-background-networking \
+        --disable-sync \
+        --no-first-run \
+        --remote-debugging-address=0.0.0.0 \
+        --remote-debugging-port="${CDP_PORT}" \
+        --remote-allow-origins='*' \
+        --window-size=1440,900
+
+    # Wait for Chrome to be ready
+    echo "Waiting for Chrome CDP..."
+    for i in $(seq 1 30); do
+        if docker exec "${CONTAINER_NAME}" wget -qO- "http://localhost:${CDP_PORT}/json/version" 2>/dev/null | grep -q "Browser"; then
+            echo -e "${GREEN}[READY]${NC} Chrome CDP is available on port ${CDP_PORT}"
+            local ip="${DOCKER_MACHINE_IP:-192.168.99.100}"
+            echo ""
+            echo "  CDP Endpoint:  http://${ip}:${CDP_PORT}/json"
+            echo "  WebSocket:     ws://${ip}:${CDP_PORT}/devtools/browser/..."
+            echo ""
+            echo "  Test with:     curl http://${ip}:${CDP_PORT}/json"
+            echo "  E2E Test:      python3 e2e_comprehensive.py"
+            return 0
+        fi
+        sleep 2
+    done
+    echo -e "${RED}[FAIL]${NC} Chrome did not become ready within 60s"
+    docker logs "${CONTAINER_NAME}" 2>&1 | tail -20
+    return 1
+}
+
+stop() {
+    if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        echo "Stopping Chrome container..."
+        docker stop "${CONTAINER_NAME}"
+        docker rm "${CONTAINER_NAME}"
+        echo -e "${GREEN}[OK]${NC} Chrome container removed"
+    else
+        echo "Chrome container is not running"
+    fi
+}
+
+logs() {
+    docker logs -f --tail 50 "${CONTAINER_NAME}"
+}
+
+# ─── Main ─────────────────────────────────────────────────────────────────
+
+case "${1:-start}" in
+    --start|start)
+        start
+        ;;
+    --stop|stop)
+        stop
+        ;;
+    --status|status)
+        status
+        ;;
+    --logs|logs)
+        logs
+        ;;
+    --restart|restart)
+        stop
+        sleep 2
+        start
+        ;;
+    *)
+        echo "Usage: $0 [--start|--stop|--status|--logs|--restart]"
+        echo ""
+        echo "Environment variables:"
+        echo "  CDP_PORT          Chrome CDP port (default: 2222)"
+        echo "  NETWORK           Docker network name (default: keyip-network)"
+        echo "  DOCKER_MACHINE_IP Docker Machine VM IP (default: 192.168.99.100)"
+        exit 1
+        ;;
+esac

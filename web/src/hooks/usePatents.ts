@@ -19,7 +19,10 @@ export function usePatents(page = 1, pageSize = 20): UseQueryResult<Patent[]> {
     setError(null);
     try {
       const response = await patentService.getPatents(page, pageSize);
-      setData(response.data);
+      // API returns { code:0, data:{ patents:[...] } }
+      const raw = response.data as any;
+      const list = raw?.patents ?? raw ?? [];
+      setData(Array.isArray(list) ? list : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
